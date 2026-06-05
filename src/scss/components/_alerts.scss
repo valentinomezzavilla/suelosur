@@ -1,0 +1,39 @@
+@use '../abstracts/variables' as *;
+
+.alert {
+  border: 1px solid transparent;
+  border-radius: $radius-md;
+  font-size: $fs-sm;
+  padding: 0.7rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+
+  .alert-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  &.alert-success {
+    background: $success-soft;
+    border-color: $success-border;
+    color: $success-text;
+    .alert-dot { background: #10b981; }
+  }
+
+  &.alert-danger {
+    background: $danger-soft;
+    border-color: $danger-border;
+    color: $danger-text;
+    .alert-dot { background: $danger; }
+  }
+
+  &.alert-warning {
+    background: $warning-soft;
+    border-color: $warning-border;
+    color: $warning-text;
+    .alert-dot { background: $warning; }
+  }
+}

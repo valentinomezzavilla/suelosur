@@ -1,0 +1,43 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">📦 <%= titulo %></h4>
+  <a href="/productos" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-480">
+  <div class="card-body">
+    <form action="<%= producto ? `/productos/${producto.id}?_method=PUT` : '/productos' %>" method="POST">
+
+      <div class="mb-3">
+        <label class="form-label">Nombre del producto *</label>
+        <input type="text" name="nombre" class="form-control"
+               value="<%= producto?.nombre || '' %>" required autofocus
+               placeholder="Ej: Arena Fina">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Unidad de medida</label>
+        <select name="unidad_medida" class="form-select">
+          <% ['Tonelada','Metro cúbico','Camión','Hora'].forEach(u => { %>
+            <option value="<%= u %>" <%= (producto?.unidad_medida || 'Tonelada') === u ? 'selected' : '' %>><%= u %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Precio de referencia ($)</label>
+        <input type="number" name="precio_referencia" class="form-control text-end"
+               value="<%= producto?.precio_referencia || 0 %>"
+               step="0.01" min="0" placeholder="0.00">
+        <small class="text-muted">Precio sugerido que se pre-completa al crear una OP</small>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4">
+          <%= producto ? 'Guardar cambios' : 'Crear producto' %>
+        </button>
+        <a href="/productos" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+
+    </form>
+  </div>
+</div>

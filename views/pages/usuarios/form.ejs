@@ -1,0 +1,64 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">🔑 <%= titulo %></h4>
+  <a href="/usuarios" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-500">
+  <div class="card-body">
+    <form action="<%= usuario ? `/usuarios/${usuario.id}?_method=PUT` : '/usuarios' %>" method="POST">
+
+      <div class="mb-3">
+        <label class="form-label">Nombre completo *</label>
+        <input type="text" name="nombre" class="form-control"
+               value="<%= usuario?.nombre || '' %>" required autofocus
+               placeholder="Ej: Juan García">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Nombre de usuario *</label>
+        <input type="text" name="usuario" class="form-control"
+               value="<%= usuario?.usuario || '' %>" required
+               placeholder="Ej: jgarcia" autocomplete="off">
+        <small class="text-muted">Se usa para iniciar sesión, sin espacios</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Rol *</label>
+        <select name="rol" class="form-select" required>
+          <option value="">Seleccionar rol...</option>
+          <option value="admin_ventas"   <%= usuario?.rol === 'admin_ventas'   ? 'selected' : '' %>>📋 Admin Ventas</option>
+          <option value="admin_contable" <%= usuario?.rol === 'admin_contable' ? 'selected' : '' %>>💰 Admin Contable</option>
+          <option value="chofer"         <%= usuario?.rol === 'chofer'         ? 'selected' : '' %>>🚛 Chofer</option>
+          <option value="dueno"          <%= usuario?.rol === 'dueno'          ? 'selected' : '' %>>👑 Dueño</option>
+        </select>
+      </div>
+
+      <hr class="my-3">
+      <p class="text-muted small mb-2">
+        <%= usuario ? 'Dejá en blanco para mantener la contraseña actual.' : 'Contraseña para el nuevo usuario.' %>
+      </p>
+
+      <div class="mb-3">
+        <label class="form-label">Contraseña <%= !usuario ? '*' : '' %></label>
+        <input type="password" name="password" class="form-control"
+               <%= !usuario ? 'required' : '' %> autocomplete="new-password"
+               placeholder="<%= usuario ? 'Nueva contraseña (opcional)' : 'Mínimo 6 caracteres' %>">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Confirmar contraseña <%= !usuario ? '*' : '' %></label>
+        <input type="password" name="password_confirm" class="form-control"
+               <%= !usuario ? 'required' : '' %> autocomplete="new-password"
+               placeholder="Repetir contraseña">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4">
+          <%= usuario ? 'Guardar cambios' : 'Crear usuario' %>
+        </button>
+        <a href="/usuarios" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+
+    </form>
+  </div>
+</div>

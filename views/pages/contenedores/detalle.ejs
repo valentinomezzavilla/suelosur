@@ -1,0 +1,171 @@
+<%
+  const labelEstado = {
+    en_planta:   'En planta',
+    vaciado:     'Vaciado',
+    entregado:   'Entregado',
+    en_alquiler: 'En alquiler',
+    a_retirar:   'A retirar',
+    en_transito: 'En tránsito',
+  }
+  const badgeEstado = {
+    en_planta:   'badge-activo',
+    vaciado:     'badge-pendiente',
+    entregado:   'badge-en-transito',
+    en_alquiler: 'badge-en-transito',
+    a_retirar:   'badge-alerta',
+    en_transito: 'badge-pendiente',
+  }
+  const ultimo = contenedor.movimientos[0]
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title">📦 Contenedor N° <%= contenedor.numero_contenedor %></h4>
+    <small class="text-muted">Condición: <%= contenedor.estado_general?.replace('_',' ') %></small>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/contenedores/<%= contenedor.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️ Editar</a>
+    <a href="/contenedores" class="btn btn-sm btn-outline-secondary">← Volver</a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Estado actual -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 card-accent-orange">
+      <div class="card-body text-center">
+        <p class="text-muted small mb-2">Estado actual</p>
+        <% if (ultimo) { %>
+          <h4>
+            <span class="badge rounded-pill px-3 py-2 <%= badgeEstado[ultimo.estado_paso] || 'badge-pendiente' %>">
+              <%= labelEstado[ultimo.estado_paso] || ultimo.estado_paso %>
+            </span>
+          </h4>
+          <small class="text-muted">desde el <%= ultimo.fecha_movimiento %></small>
+          <% if (ultimo.cliente_nombre) { %>
+            <hr>
+            <p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
+            <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>
+            <small class="text-muted">📍 <%= ultimo.domicilio_entrega %></small><br>
+            <small class="text-muted">Zona: <%= ultimo.zona_entrega %></small>
+          <% } %>
+        <% } else { %>
+          <p class="text-muted mb-0">Sin movimientos registrados.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registrar movimiento -->
+  <div class="col-md-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-header card-header-light">Registrar movimiento</div>
+      <div class="card-body">
+        <form action="/contenedores/<%= contenedor.id %>/movimiento" method="POST">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Nuevo estado *</label>
+              <select name="estado_paso" class="form-select" required>
+                <option value="">Seleccionar...</option>
+                <% Object.entries(labelEstado).forEach(([k,v]) => { %>
+                  <option value="<%= k %>"><%= v %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fecha y hora</label>
+              <input type="datetime-local" name="fecha_movimiento" class="form-control">
+              <small class="text-muted">Dejar vacío para usar ahora.</small>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Chofer</label>
+              <select name="id_chofer" class="form-select">
+                <option value="">— sin chofer —</option>
+                <% choferes.forEach(c => { %>
+                  <option value="<%= c.id %>"><%= c.nombre %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Camión</label>
+              <select name="id_camion" class="form-select">
+                <option value="">— sin camión —</option>
+                <% camiones.forEach(c => { %>
+                  <option value="<%= c.id %>"><%= c.nombre %> (<%= c.patente %>)</option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Observaciones</label>
+              <input type="text" name="observaciones" class="form-control" placeholder="Notas opcionales...">
+            </div>
+            <div class="col-12 text-end">
+              <button type="submit" class="btn btn-naranja">Registrar movimiento</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Historial -->
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header card-header-light">
+        Historial de movimientos (<%= contenedor.movimientos.length %>)
+      </div>
+      <div class="card-body p-0">
+        <% if (!contenedor.movimientos.length) { %>
+          <p class="text-muted text-center py-4 mb-0">Sin movimientos registrados.</p>
+        <% } else { %>
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Estado</th>
+              <th>OP / Cliente</th>
+              <th>Chofer</th>
+              <th>Camión</th>
+              <th>Observaciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% contenedor.movimientos.forEach(m => { %>
+            <tr>
+              <td><small class="text-muted"><%= m.fecha_movimiento %></small></td>
+              <td>
+                <span class="badge rounded-pill px-3 <%= badgeEstado[m.estado_paso] || 'badge-pendiente' %>">
+                  <%= labelEstado[m.estado_paso] || m.estado_paso %>
+                </span>
+              </td>
+              <td>
+                <% if (m.nro_op) { %>
+                  <small class="fw-semibold">OP-<%= String(m.nro_op).padStart(4,'0') %></small><br>
+                  <small class="text-muted"><%= m.cliente_nombre %></small>
+                <% } else { %>
+                  <small class="text-muted">—</small>
+                <% } %>
+              </td>
+              <td><small><%= m.chofer_nombre || '—' %></small></td>
+              <td><small><%= m.camion_nombre ? `${m.camion_nombre} (${m.camion_patente})` : '—' %></small></td>
+              <td><small class="text-muted"><%= m.observaciones || '—' %></small></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <% if (contenedor.observaciones) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header card-header-light">Observaciones del contenedor</div>
+      <div class="card-body"><%= contenedor.observaciones %></div>
+    </div>
+  </div>
+  <% } %>
+
+</div>

@@ -1,0 +1,181 @@
+<%
+  const badgeOP = {
+    pendiente:  'badge-pendiente',
+    despachado: 'badge-en-transito',
+    entregado:  'badge-activo',
+    anulado:    'badge-alerta',
+  }
+  const labelCont = {
+    en_planta:   'En planta',
+    vaciado:     'Vaciado',
+    entregado:   'En domicilio',
+    en_alquiler: 'En alquiler',
+    a_retirar:   'A retirar',
+    en_transito: 'En tránsito',
+  }
+  const iconCont = {
+    en_planta: '🏠', vaciado: '🧹', entregado: '📦',
+    en_alquiler: '⏳', a_retirar: '⚠️', en_transito: '🚛',
+  }
+  const estadoCont = alquiler.estadoContenedor?.estado_paso
+  const estaAnulado = alquiler.estado === 'anulado'
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title">
+      📦 Alquiler OP-<%= String(alquiler.nro_op).padStart(4,'0') %>
+      <span class="badge rounded-pill ms-2 <%= badgeOP[alquiler.estado] %>"><%= alquiler.estado %></span>
+    </h4>
+    <small class="text-muted">Emitido: <%= new Date(alquiler.fecha_emision).toLocaleDateString('es-AR') %> · <%= alquiler.administrativo_nombre %></small>
+  </div>
+  <a href="/contenedores/alquileres" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="row g-3 mb-4">
+
+  <!-- Info del alquiler -->
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header-orange px-3 py-2">👤 Cliente y Domicilio</div>
+      <div class="card-body">
+        <p class="fw-bold mb-1"><%= alquiler.cliente_nombre %></p>
+        <% if (alquiler.tel_whatsapp) { %>
+          <p class="text-muted small mb-2">📱 <%= alquiler.tel_whatsapp %></p>
+        <% } %>
+        <hr class="my-2">
+        <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
+        <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
+        <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler %> días</p>
+        <p class="mb-0"><strong>Precio:</strong>
+          <% const precio = alquiler.detalle?.precio_alquiler || 0 %>
+          <%= precio > 0 ? `$${precio.toFixed(2)}` : '—' %>
+        </p>
+        <% if (alquiler.observaciones) { %>
+          <hr class="my-2">
+          <small class="text-muted"><%= alquiler.observaciones %></small>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info del contenedor + acciones -->
+  <div class="col-md-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header-orange px-3 py-2">📦 Contenedor y Estado</div>
+      <div class="card-body">
+
+        <% if (!alquiler.detalle?.id_contenedor) { %>
+          <!-- Sin contenedor asignado -->
+          <p class="text-muted fst-italic mb-3">Sin contenedor asignado todavía.</p>
+          <% if (!estaAnulado && alquiler.estado === 'pendiente') { %>
+            <form action="/alquileres/contenedores/<%= alquiler.id %>/asignar" method="POST" class="d-flex gap-2">
+              <select name="id_contenedor" class="form-select form-select-sm" required>
+                <option value="">Seleccionar contenedor...</option>
+                <% disponibles.forEach(c => { %>
+                  <option value="<%= c.id %>">N° <%= c.numero_contenedor %></option>
+                <% }) %>
+              </select>
+              <button type="submit" class="btn btn-sm btn-naranja text-nowrap">Asignar</button>
+            </form>
+          <% } %>
+
+        <% } else { %>
+          <!-- Con contenedor asignado -->
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="icon-xl"><%= iconCont[estadoCont] || '📦' %></div>
+            <div>
+              <p class="fw-bold fs-5 mb-0">Contenedor N° <%= alquiler.detalle.numero_contenedor %></p>
+              <span class="badge badge-en-transito rounded-pill px-3">
+                <%= labelCont[estadoCont] || estadoCont %>
+              </span>
+            </div>
+            <% if (alquiler.diasEnDomicilio != null) { %>
+              <div class="ms-auto text-end">
+                <div class="fw-bold fs-4
+                  <%= alquiler.diasEnDomicilio >= alquiler.detalle.plazo_alquiler ? 'dias-rojo'
+                    : alquiler.diasEnDomicilio >= alquiler.detalle.plazo_alquiler - 1 ? 'dias-alerta'
+                    : 'dias-ok' %>">
+                  <%= alquiler.diasEnDomicilio %> / <%= alquiler.detalle.plazo_alquiler %>d
+                </div>
+                <small class="text-muted">días en domicilio</small>
+              </div>
+            <% } %>
+          </div>
+
+          <!-- Acciones según estado -->
+          <% if (!estaAnulado) { %>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <% if (alquiler.estado === 'pendiente') { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/despachar" method="POST">
+                  <button class="btn btn-sm btn-naranja">🚛 Registrar salida</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'despachado') { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/entregar" method="POST">
+                  <button class="btn btn-sm btn-naranja">📦 Confirmar entrega</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'entregado' && (estadoCont === 'entregado' || estadoCont === 'en_alquiler')) { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/retirar" method="POST">
+                  <button class="btn btn-sm btn-outline-secondary">⚠️ Registrar retiro</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'entregado' && estadoCont === 'en_transito') { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST">
+                  <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'pendiente' || alquiler.estado === 'despachado') { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/anular" method="POST"
+                      onsubmit="return confirm('¿Anular este alquiler?')">
+                  <button class="btn btn-sm btn-outline-danger">❌ Anular</button>
+                </form>
+              <% } %>
+            </div>
+          <% } %>
+        <% } %>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline de movimientos -->
+<% if (alquiler.movimientos?.length) { %>
+<div class="card shadow-sm">
+  <div class="card-header-light px-3 py-2 fw-semibold">📋 Historial de movimientos</div>
+  <div class="card-body py-3">
+    <div class="timeline">
+      <% alquiler.movimientos.forEach((m, i) => { %>
+      <div class="timeline-item d-flex gap-3 mb-3">
+        <div class="timeline-dot flex-shrink-0">
+          <div class="bg-orange rounded-circle" style="width:10px;height:10px;margin-top:5px;"></div>
+          <% if (i < alquiler.movimientos.length - 1) { %>
+            <div class="bg-orange-soft" style="width:2px;height:100%;margin-left:4px;min-height:20px;"></div>
+          <% } %>
+        </div>
+        <div class="flex-grow-1 pb-2 border-divider">
+          <div class="d-flex justify-content-between">
+            <span class="fw-semibold"><%= labelCont[m.estado_paso] || m.estado_paso %></span>
+            <small class="text-muted">
+              <%= new Date(m.fecha_movimiento).toLocaleDateString('es-AR') %>
+              <%= new Date(m.fecha_movimiento).toLocaleTimeString('es-AR', {hour:'2-digit',minute:'2-digit'}) %>
+            </small>
+          </div>
+          <% if (m.chofer_nombre) { %>
+            <small class="text-muted">Chofer: <%= m.chofer_nombre %></small>
+          <% } %>
+          <% if (m.camion_patente) { %>
+            <small class="text-muted ms-2">Camión: <%= m.camion_patente %></small>
+          <% } %>
+          <% if (m.observaciones) { %>
+            <p class="text-muted small mb-0 mt-1"><%= m.observaciones %></p>
+          <% } %>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</div>
+<% } %>

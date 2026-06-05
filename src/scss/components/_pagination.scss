@@ -1,0 +1,8 @@
+@use '../abstracts/variables' as *;
+
+.pagination-orange {
+  --bs-pagination-active-bg: #{$accent};
+  --bs-pagination-active-border-color: #{$accent};
+  --bs-pagination-color: #{$accent};
+  --bs-pagination-hover-color: #{$accent-dark};
+}

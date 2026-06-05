@@ -1,0 +1,158 @@
+<%
+  const conteo = { en_planta:0, entregado:0, en_alquiler:0, a_retirar:0, en_transito:0, vaciado:0 }
+  resumen.forEach(r => { if (conteo[r.estado_paso] !== undefined) conteo[r.estado_paso] = r.total })
+
+  const badgeEstado = {
+    en_planta:   'badge-activo',
+    vaciado:     'badge-pendiente',
+    entregado:   'badge-en-transito',
+    en_alquiler: 'badge-en-transito',
+    a_retirar:   'badge-alerta',
+    en_transito: 'badge-pendiente',
+  }
+  const labelEstado = {
+    en_planta:   'En planta',
+    vaciado:     'Vaciado',
+    entregado:   'Entregado',
+    en_alquiler: 'En alquiler',
+    a_retirar:   'A retirar',
+    en_transito: 'En tránsito',
+  }
+  function semaforoDias(dias, plazo) {
+    if (!plazo || plazo <= 0) return ''
+    if (dias >= plazo)         return 'dias-rojo'
+    if (dias >= plazo - 1)     return 'dias-alerta'
+    return 'dias-ok'
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title">📦 Contenedores</h4>
+  <div class="d-flex gap-2">
+    <a href="/contenedores/circuito" class="btn btn-outline-secondary">🗺️ Circuito del día</a>
+    <% if (user?.rol === 'dueno') { %>
+      <a href="/contenedores/configuracion" class="btn btn-outline-secondary">⚙️ Configuración</a>
+    <% } %>
+    <a href="/contenedores/nuevo" class="btn btn-naranja">+ Nuevo Contenedor</a>
+  </div>
+</div>
+
+<!-- Resumen de estados -->
+<div class="row g-2 mb-4">
+  <% [
+    { key:'en_planta',   label:'En planta',    icono:'🏠' },
+    { key:'vaciado',     label:'Vaciados',     icono:'🧹' },
+    { key:'entregado',   label:'Entregados',   icono:'📦' },
+    { key:'en_alquiler', label:'En alquiler',  icono:'⏳' },
+    { key:'a_retirar',   label:'A retirar',    icono:'⚠️' },
+    { key:'en_transito', label:'En tránsito',  icono:'🚛' },
+  ].forEach(s => { %>
+  <div class="col-6 col-md-2">
+    <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
+      <div class="card shadow-sm h-100 text-center py-2">
+        <div class="icon-sm"><%= s.icono %></div>
+        <div class="fw-bold fs-5"><%= conteo[s.key] %></div>
+        <small class="<%= badgeEstado[s.key] %> badge rounded-pill px-2"><%= s.label %></small>
+      </div>
+    </a>
+  </div>
+  <% }) %>
+</div>
+
+<!-- Filtros -->
+<form method="GET" action="/contenedores" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Estado actual</label>
+        <select name="estado_paso" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% Object.entries(labelEstado).forEach(([k,v]) => { %>
+            <option value="<%= k %>" <%= filtros.estado_paso === k ? 'selected' : '' %>><%= v %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Condición general</label>
+        <select name="estado_general" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <option value="operativo"      <%= filtros.estado_general === 'operativo'      ? 'selected' : '' %>>Operativo</option>
+          <option value="en_reparacion"  <%= filtros.estado_general === 'en_reparacion'  ? 'selected' : '' %>>En reparación</option>
+          <option value="baja"           <%= filtros.estado_general === 'baja'           ? 'selected' : '' %>>De baja</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Filtrar</button>
+        <a href="/contenedores" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Tabla -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!contenedores.length) { %>
+      <%- include('../../partials/empty_state', { icono: '📦', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/contenedores/nuevo', accionLabel: 'Crear primer contenedor' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>N°</th>
+          <th>Estado actual</th>
+          <th>Cliente / OP</th>
+          <th>Domicilio</th>
+          <th>Zona</th>
+          <th class="text-center">Días</th>
+          <th class="text-center">Condición</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% contenedores.forEach(c => { %>
+        <tr class="<%= !c.activo ? 'text-muted' : '' %>">
+          <td class="fw-bold text-orange">N° <%= c.numero_contenedor %></td>
+          <td>
+            <span class="badge rounded-pill px-3 <%= badgeEstado[c.estado_paso] || 'badge-pendiente' %>">
+              <%= labelEstado[c.estado_paso] || c.estado_paso %>
+            </span>
+          </td>
+          <td>
+            <% if (c.cliente_nombre) { %>
+              <small class="fw-semibold"><%= c.cliente_nombre %></small><br>
+              <small class="text-muted">OP-<%= String(c.nro_op).padStart(4,'0') %></small>
+            <% } else { %>
+              <small class="text-muted">—</small>
+            <% } %>
+          </td>
+          <td><small class="text-muted"><%= c.domicilio_entrega || '—' %></small></td>
+          <td><small class="text-muted"><%= c.zona_entrega || '—' %></small></td>
+          <td class="text-center">
+            <% if (c.estado_paso === 'entregado' || c.estado_paso === 'en_alquiler' || c.estado_paso === 'a_retirar') { %>
+              <span class="<%= semaforoDias(c.dias_en_estado, c.plazo_alquiler) %>">
+                <%= c.dias_en_estado %><% if (c.plazo_alquiler) { %> / <%= c.plazo_alquiler %><% } %>
+              </span>
+            <% } else { %>
+              <small class="text-muted"><%= c.dias_en_estado %>d</small>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <small class="text-muted"><%= c.estado_general?.replace('_',' ') %></small>
+          </td>
+          <td class="text-center">
+            <a href="/contenedores/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver">👁️</a>
+            <a href="/contenedores/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar">✏️</a>
+            <form action="/contenedores/<%= c.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= c.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
+                      title="<%= c.activo ? 'Desactivar' : 'Activar' %>">
+                <%= c.activo ? '🚫' : '✅' %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

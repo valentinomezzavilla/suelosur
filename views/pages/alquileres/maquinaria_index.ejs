@@ -1,0 +1,92 @@
+<%
+  function badgeMaq(est) {
+    if (est === 'anulado')    return { label: 'Anulado',    badge: 'badge-alerta' }
+    if (est === 'pendiente')  return { label: 'Pendiente',  badge: 'badge-pendiente' }
+    if (est === 'despachado') return { label: 'Despachado', badge: 'badge-en-transito' }
+    if (est === 'entregado')  return { label: 'En trabajo', badge: 'badge-activo' }
+    return { label: est, badge: 'badge-pendiente' }
+  }
+%>
+
+<div class="page-header mb-4">
+  <h4 class="page-title">🚜 Alquileres de Maquinaria</h4>
+  <a href="/alquileres/maquinaria/nuevo" class="btn btn-primary-modern btn-sm">+ Nuevo alquiler</a>
+</div>
+
+<!-- Por finalizar -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center" style="background:#fef9e7;">
+    <span class="card-modern-title">Finalizando hoy o mañana</span>
+    <span class="badge badge-pendiente rounded-pill px-3"><%= grupos.porFinalizar.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <% if (!grupos.porFinalizar.length) { %><%- include('../../partials/empty_state', { icono:'📭', mensaje:'Sin alquileres finalizando próximamente.', compact:true }) %><% } else { %>
+    <table class="table-modern mb-0"><thead><tr><th>OP</th><th>Cliente</th><th>Maquinaria</th><th>Domicilio</th><th>Días</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+      <% grupos.porFinalizar.forEach(a => { const est = badgeMaq(a.estado) %>
+      <tr>
+        <td class="fw-bold"><a href="/alquileres/maquinaria/<%= a.id %>" class="text-decoration-none text-orange">OP-<%= String(a.nro_op).padStart(4,'0') %></a></td>
+        <td><%= a.cliente_nombre %></td>
+        <td><small><%= a.maquinaria_nombre || '—' %></small></td>
+        <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
+        <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
+        <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
+        <td><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+      </tr>
+      <% }) %>
+    </tbody></table>
+    <% } %>
+  </div>
+</div>
+
+<!-- Actuales -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center">
+    <span class="card-modern-title">En trabajo — actuales</span>
+    <span class="badge badge-en-transito rounded-pill px-3"><%= grupos.actuales.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <% if (!grupos.actuales.length) { %><%- include('../../partials/empty_state', { icono:'📭', mensaje:'Sin alquileres activos.', compact:true }) %><% } else { %>
+    <table class="table-modern mb-0"><thead><tr><th>OP</th><th>Cliente</th><th>Maquinaria</th><th>Domicilio</th><th>Días rest.</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+      <% grupos.actuales.forEach(a => { const est = badgeMaq(a.estado) %>
+      <tr>
+        <td class="fw-bold"><a href="/alquileres/maquinaria/<%= a.id %>" class="text-decoration-none text-orange">OP-<%= String(a.nro_op).padStart(4,'0') %></a></td>
+        <td><%= a.cliente_nombre %></td>
+        <td><small><%= a.maquinaria_nombre || '—' %></small></td>
+        <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
+        <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
+        <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
+        <td><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+      </tr>
+      <% }) %>
+    </tbody></table>
+    <% } %>
+  </div>
+</div>
+
+<!-- Programados -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center">
+    <span class="card-modern-title">Programados — pendientes de iniciar</span>
+    <span class="badge badge-activo rounded-pill px-3"><%= grupos.programados.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <% if (!grupos.programados.length) { %><%- include('../../partials/empty_state', { icono:'📭', mensaje:'Sin alquileres programados.', compact:true }) %><% } else { %>
+    <table class="table-modern mb-0"><thead><tr><th>OP</th><th>Cliente</th><th>Maquinaria</th><th>Domicilio</th><th>Inicio plan.</th><th>Estado</th><th></th></tr></thead>
+    <tbody>
+      <% grupos.programados.forEach(a => { const est = badgeMaq(a.estado) %>
+      <tr>
+        <td class="fw-bold"><a href="/alquileres/maquinaria/<%= a.id %>" class="text-decoration-none text-orange">OP-<%= String(a.nro_op).padStart(4,'0') %></a></td>
+        <td><%= a.cliente_nombre %></td>
+        <td><small><%= a.maquinaria_nombre || '—' %></small></td>
+        <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
+        <td><small><%= a.fecha_entrega_planificada ? new Date(a.fecha_entrega_planificada+'T12:00:00').toLocaleDateString('es-AR') : '—' %></small></td>
+        <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
+        <td><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+      </tr>
+      <% }) %>
+    </tbody></table>
+    <% } %>
+  </div>
+</div>

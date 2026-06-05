@@ -1,0 +1,44 @@
+@use '../abstracts/variables' as *;
+
+// ── Colores ────────────────────────────────────────────────────
+.text-orange      { color: $accent      !important; }
+.text-orange-dark { color: $accent-dark !important; }
+.text-dark-title  { color: $dark        !important; }
+.text-green       { color: $success     !important; }
+.text-blue        { color: $info        !important; }
+.text-muted-soft  { color: $muted-soft  !important; }
+.text-muted-light { color: $muted-light !important; }
+
+.bg-dark-custom   { background: $dark       !important; }
+.bg-mid           { background: $dark-2     !important; }
+.bg-light-soft    { background: $bg-app     !important; }
+.bg-orange        { background: $accent     !important; }
+.bg-orange-soft   { background: $accent-soft!important; }
+
+// ── Iconos (size by font-size) ─────────────────────────────────
+.icon-sm  { font-size: 1.2rem; }
+.icon-md  { font-size: 1.4rem; }
+.icon-lg  { font-size: 2.5rem; }
+.icon-xl  { font-size: 3rem; }
+.icon-xxl { font-size: 4rem; }
+
+// ── Radios ─────────────────────────────────────────────────────
+.rounded-8  { border-radius: $radius-md !important; }
+.rounded-10 { border-radius: $radius-lg !important; }
+.rounded-14 { border-radius: $radius-xl !important; }
+
+// ── Tamaños ────────────────────────────────────────────────────
+.col-w-50  { width: 50px;  }
+.col-w-140 { width: 140px; }
+.col-w-160 { width: 160px; }
+
+.min-vh-100 { min-height: 100vh; }
+.min-vh-60  { min-height: 60vh; }
+
+.maxw-480 { max-width: 480px; }
+.maxw-500 { max-width: 500px; }
+.maxw-600 { max-width: 600px; }
+
+// ── Bordes ─────────────────────────────────────────────────────
+.border-divider { border-top: 1px solid #eee; }
+.border-sidebar { border-color: $dark-2 !important; }

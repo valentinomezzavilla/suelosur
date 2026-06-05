@@ -1,0 +1,113 @@
+<main id="clientes-detalle">
+
+        <div class="page-header">
+            <div>
+                <a href="/clientes/cuentas" class="back-link">← Cuentas corrientes</a>
+                <h1 class="page-title">Cuenta corriente — <%= cliente.nombre %> <%= cliente.apellido %></h1>
+            </div>
+            <% if (cliente.saldo < 0) { %>
+                <button type="button" class="btn-primary-green btn-abonar"
+                    data-id="<%= cliente.id %>"
+                    data-nombre="<%= cliente.nombre %> <%= cliente.apellido %>"
+                    data-deuda="<%= Math.abs(cliente.saldo) %>">
+                    Saldar deuda total
+                </button>
+            <% } %>
+        </div>
+
+        <div class="detail-card">
+            <p class="detalle-section-title">Resumen</p>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Saldo actual</span>
+                    <span class="info-value">
+                        <% if (cliente.saldo < 0) { %>
+                            <span class="saldo-negativo" style="font-weight:700">Debe $<%= Math.abs(cliente.saldo).toLocaleString('es-AR') %></span>
+                        <% } else if (cliente.saldo === 0) { %>
+                            <span class="saldo-positivo">Al día</span>
+                        <% } else { %>
+                            <span class="saldo-positivo" style="font-weight:700">A favor $<%= cliente.saldo.toLocaleString('es-AR') %></span>
+                        <% } %>
+                    </span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Deuda pendiente (por transacciones CC)</span>
+                    <span class="info-value" style="font-weight:700">$<%= deudaTotal.toLocaleString('es-AR') %></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="clientes-historial">
+            <h2 class="clientes-historial__title">Transacciones en cuenta corriente</h2>
+            <% if (deudasCC.length === 0) { %>
+                <div class="clientes-historial__empty">Sin transacciones en cuenta corriente</div>
+            <% } else { %>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#ID</th>
+                                <th>Tipo</th>
+                                <th>Descripcion</th>
+                                <th>Fecha</th>
+                                <th>Monto</th>
+                                <th>Estado</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% deudasCC.forEach(t => { %>
+                                <tr>
+                                    <td>#<%= t.id %></td>
+                                    <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
+                                    <td><%= t.descripcion %></td>
+                                    <td><%= t.fecha %></td>
+                                    <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
+                                    <td>
+                                        <% if (t.saldada) { %>
+                                            <span class="badge badge--con-stock">Saldada</span>
+                                        <% } else { %>
+                                            <span class="badge badge--sin-stock">Pendiente</span>
+                                        <% } %>
+                                    </td>
+                                    <td>
+                                        <% if (!t.saldada) { %>
+                                            <form action="/clientes/<%= cliente.id %>/saldar-transaccion/<%= t.id %>" method="POST" style="display:inline"
+                                                  onsubmit="return confirm('¿Saldar esta deuda de $<%= t.monto?.toLocaleString('es-AR') %>?')">
+                                                <button type="submit" class="btn-primary-green btn-sm">Saldar</button>
+                                            </form>
+                                        <% } %>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+
+        <!-- Modal saldar deuda total -->
+        <div id="modal-abonar" class="modal-overlay" style="display:none">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h2 class="modal-title">Saldar deuda — <span id="modal-abonar-nombre"></span></h2>
+                    <button type="button" class="modal-close" id="cerrarModalAbonar">✕</button>
+                </div>
+                <p style="margin:0.75rem 0 0.25rem; font-size:0.9rem; color:#64748b">
+                    Deuda total: <strong id="modal-abonar-deuda"></strong>
+                </p>
+                <form id="formAbonar" method="POST" style="margin-top:1rem">
+                    <div class="form-group">
+                        <label for="inputMonto">Monto a abonar</label>
+                        <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="Ej: 15000">
+                    </div>
+                    <div class="modal-actions" style="margin-top:1rem">
+                        <button type="submit" class="btn-primary-green">Confirmar pago</button>
+                        <button type="button" class="btn-secondary btn-sm" id="btnPagarTotal">Pagar total</button>
+                        <button type="button" class="btn-secondary" id="cancelarModalAbonar">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </main>

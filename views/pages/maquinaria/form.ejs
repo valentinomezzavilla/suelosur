@@ -1,0 +1,66 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">🚜 <%= titulo %></h4>
+  <a href="/maquinaria" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="<%= maquina ? `/maquinaria/${maquina.id}?_method=PUT` : '/maquinaria' %>" method="POST">
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-8">
+          <label class="form-label">Nombre *</label>
+          <input type="text" name="nombre" class="form-control" value="<%= maquina?.nombre || '' %>" required autofocus>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo</label>
+          <select name="tipo" class="form-select">
+            <% ['bobcat','minicargadora','retroexcavadora','otro'].forEach(t => { %>
+              <option value="<%= t %>" <%= (maquina?.tipo||'bobcat') === t ? 'selected' : '' %>><%= t %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Patente</label>
+          <input type="text" name="patente" class="form-control" value="<%= maquina?.patente || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Modelo</label>
+          <input type="text" name="modelo" class="form-control" value="<%= maquina?.modelo || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Año</label>
+          <input type="number" name="anio" class="form-control" value="<%= maquina?.anio || '' %>" min="1990" max="2030">
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Condición general</label>
+          <select name="estado_general" class="form-select">
+            <% ['operativo','en_servicio','baja'].forEach(e => { %>
+              <option value="<%= e %>" <%= (maquina?.estado_general||'operativo') === e ? 'selected' : '' %>><%= e.replace('_',' ') %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Km actuales</label>
+          <input type="number" name="km_actuales" class="form-control" value="<%= maquina?.km_actuales || 0 %>" min="0">
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Observaciones</label>
+        <textarea name="observaciones" class="form-control" rows="2"><%= maquina?.observaciones || '' %></textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4"><%= maquina ? 'Guardar cambios' : 'Crear máquina' %></button>
+        <a href="/maquinaria" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

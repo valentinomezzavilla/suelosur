@@ -1,0 +1,179 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.card {
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+}
+
+.card-header-light {
+  background: $bg-card-alt;
+  border-bottom: 1px solid $border-soft;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.card-header-orange {
+  background: $accent-soft;
+  color: $accent;
+  border-bottom: 1px solid $accent-soft;
+  padding: 0.5rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.card-accent-orange { border-left: 4px solid $accent; }
+.card-accent-green  { border-left: 4px solid $success; }
+.card-accent-blue   { border-left: 4px solid $info; }
+
+.card-modern {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+
+.card-modern-header {
+  padding: 0.85rem 1.15rem;
+  border-bottom: 1px solid $border-soft;
+  background: $bg-card-alt;
+}
+
+.card-modern-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  color: $dark;
+  letter-spacing: 0.1px;
+  text-transform: uppercase;
+}
+
+.card-modern-body {
+  padding: 1.15rem;
+  overflow-x: auto;
+
+  &.p-0 { padding: 0; }
+}
+
+// ── Stat cards (resumen de estados) ──────────────────────────
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.85rem;
+  margin-bottom: 1.5rem;
+
+  @include md-down { grid-template-columns: repeat(2, 1fr); }
+
+  &--5 {
+    grid-template-columns: repeat(5, 1fr);
+    @include lg-down { grid-template-columns: repeat(3, 1fr); }
+    @include sm-down { grid-template-columns: repeat(2, 1fr); }
+  }
+}
+
+.stat-card {
+  --stat-color: #{$muted};
+  --stat-soft:  #{$bg-app};
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1rem 1.1rem;
+  text-decoration: none;
+  overflow: hidden;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+
+  // Barra de acento a la izquierda
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: var(--stat-color);
+  }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
+    border-color: var(--stat-color);
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    border-radius: 50%;
+    background: var(--stat-soft);
+    line-height: 1;
+  }
+
+  &__body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+
+  &__value {
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1;
+    color: $dark;
+  }
+
+  &__label {
+    font-size: $fs-xs;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--stat-color);
+  }
+
+  // Tonos por estado
+  &--neutral { --stat-color: #{$accent};  --stat-soft: #{$accent-soft}; }
+  &--warning { --stat-color: #{$warning}; --stat-soft: #{$warning-soft}; }
+  &--info    { --stat-color: #{$info};    --stat-soft: #eaf4fb; }
+  &--success { --stat-color: #{$success}; --stat-soft: #{$success-soft}; }
+  &--danger  { --stat-color: #{$danger};  --stat-soft: #{$danger-soft}; }
+
+  // Pestaña activa
+  &--active {
+    border-color: var(--stat-color);
+    background: var(--stat-soft);
+    box-shadow: inset 0 0 0 1px var(--stat-color);
+
+    .stat-card__value { color: var(--stat-color); }
+  }
+}
+
+.kpi-card        { border-radius: $radius-lg; }
+.placeholder-card{ border-radius: $radius-lg; }
+.resumen-card    { border: 1px solid $accent-soft; }
+.box-credenciales{ background: $bg-app; border: 1px dashed #ddd; }
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: $dark;
+  margin: 0;
+  letter-spacing: -0.3px;
+}

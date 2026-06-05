@@ -1,0 +1,165 @@
+<%
+  const e = empleado || {}
+  const val = (k) => (e[k] === null || e[k] === undefined) ? '' : e[k]
+  const estados = [['activo','Activo'],['licencia','Licencia'],['suspendido','Suspendido'],['baja','Baja']]
+  const contratos = ['Efectivo','Contratado','Temporal','Pasantía','Eventual']
+%>
+
+<div class="page-header">
+  <div>
+    <a href="/empleados" class="back-link">← Flota de Personal</a>
+    <h1 class="page-title"><%= empleado ? 'Editar Empleado' : 'Nuevo Empleado' %><% if (empleado) { %> · Legajo #<%= e.legajo %><% } %></h1>
+  </div>
+</div>
+
+<form action="<%= empleado ? '/empleados/' + e.id + '?_method=PUT' : '/empleados' %>" method="POST" class="maxw-600">
+
+  <!-- Información personal -->
+  <div class="form-section">
+    <h3 class="form-section__title">Información personal</h3>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="nombre">Nombre *</label>
+        <input type="text" name="nombre" id="nombre" value="<%= val('nombre') %>" required autofocus>
+      </div>
+      <div class="form-group">
+        <label for="apellido">Apellido</label>
+        <input type="text" name="apellido" id="apellido" value="<%= val('apellido') %>">
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="dni">DNI</label>
+        <input type="text" name="dni" id="dni" value="<%= val('dni') %>">
+      </div>
+      <div class="form-group">
+        <label for="fecha_nacimiento">Fecha de nacimiento</label>
+        <input type="date" name="fecha_nacimiento" id="fecha_nacimiento" value="<%= val('fecha_nacimiento') %>">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="direccion">Dirección</label>
+      <input type="text" name="direccion" id="direccion" value="<%= val('direccion') %>">
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="telefono">Teléfono</label>
+        <input type="text" name="telefono" id="telefono" value="<%= val('telefono') %>">
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" name="email" id="email" value="<%= val('email') %>">
+      </div>
+    </div>
+  </div>
+
+  <!-- Información laboral -->
+  <div class="form-section">
+    <h3 class="form-section__title">Información laboral</h3>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="cargo">Cargo</label>
+        <input type="text" name="cargo" id="cargo" value="<%= val('cargo') %>" placeholder="Ej: Chofer">
+      </div>
+      <div class="form-group">
+        <label for="sector">Sector</label>
+        <input type="text" name="sector" id="sector" value="<%= val('sector') %>" placeholder="Ej: Logística">
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="fecha_ingreso">Fecha de ingreso</label>
+        <input type="date" name="fecha_ingreso" id="fecha_ingreso" value="<%= val('fecha_ingreso') %>">
+      </div>
+      <div class="form-group">
+        <label for="estado_laboral">Estado laboral</label>
+        <select name="estado_laboral" id="estado_laboral">
+          <% estados.forEach(([k,l]) => { %>
+            <option value="<%= k %>" <%= (val('estado_laboral') || 'activo') === k ? 'selected' : '' %>><%= l %></option>
+          <% }) %>
+        </select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="tipo_contratacion">Tipo de contratación</label>
+      <select name="tipo_contratacion" id="tipo_contratacion">
+        <option value="">— Sin especificar —</option>
+        <% contratos.forEach(c => { %>
+          <option value="<%= c %>" <%= val('tipo_contratacion') === c ? 'selected' : '' %>><%= c %></option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+
+  <!-- Información económica -->
+  <div class="form-section">
+    <h3 class="form-section__title">Información económica</h3>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="salario">Salario</label>
+        <input type="number" name="salario" id="salario" value="<%= val('salario') %>" min="0" step="100">
+      </div>
+      <div class="form-group">
+        <label for="bonificaciones">Bonificaciones</label>
+        <input type="number" name="bonificaciones" id="bonificaciones" value="<%= val('bonificaciones') %>" min="0" step="100">
+      </div>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="descuentos">Descuentos</label>
+        <input type="number" name="descuentos" id="descuentos" value="<%= val('descuentos') %>" min="0" step="100">
+      </div>
+      <div class="form-group">
+        <label for="viaticos">Viáticos</label>
+        <input type="number" name="viaticos" id="viaticos" value="<%= val('viaticos') %>" min="0" step="100">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="horas_extras">Horas extras</label>
+      <input type="number" name="horas_extras" id="horas_extras" value="<%= val('horas_extras') %>" min="0" step="0.5">
+    </div>
+  </div>
+
+  <!-- Información operativa -->
+  <div class="form-section">
+    <h3 class="form-section__title">Información operativa</h3>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label for="vehiculo_asignado">Vehículo asignado</label>
+        <input type="text" name="vehiculo_asignado" id="vehiculo_asignado" value="<%= val('vehiculo_asignado') %>" placeholder="Ej: Camión AB123CD">
+      </div>
+      <div class="form-group">
+        <label for="licencia_categoria">Licencia (categoría)</label>
+        <input type="text" name="licencia_categoria" id="licencia_categoria" value="<%= val('licencia_categoria') %>" placeholder="Ej: E1">
+      </div>
+    </div>
+    <div class="form-group">
+      <label for="licencia_vencimiento">Vencimiento de licencia</label>
+      <input type="date" name="licencia_vencimiento" id="licencia_vencimiento" value="<%= val('licencia_vencimiento') %>">
+    </div>
+    <div class="form-group">
+      <label for="certificaciones">Certificaciones</label>
+      <textarea name="certificaciones" id="certificaciones" rows="2" placeholder="Cursos, habilitaciones, etc."><%= val('certificaciones') %></textarea>
+    </div>
+  </div>
+
+  <!-- Vínculo con usuario del sistema -->
+  <div class="form-section">
+    <h3 class="form-section__title">Acceso al sistema (opcional)</h3>
+    <div class="form-group">
+      <label for="id_usuario">Usuario vinculado</label>
+      <select name="id_usuario" id="id_usuario">
+        <option value="">— Sin acceso al sistema —</option>
+        <% usuarios.forEach(u => { %>
+          <option value="<%= u.id %>" <%= val('id_usuario') === u.id ? 'selected' : '' %>><%= u.nombre %> (<%= u.usuario %>)</option>
+        <% }) %>
+      </select>
+      <p class="form-hint">Vinculá este empleado con su cuenta de acceso, si la tiene.</p>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit" class="btn-primary"><%= empleado ? 'Guardar cambios' : 'Crear empleado' %></button>
+    <a href="/empleados" class="btn-secondary">Cancelar</a>
+  </div>
+</form>

@@ -1,0 +1,85 @@
+<%
+  const e = empleado
+  const dash = (v) => (v === null || v === undefined || v === '') ? '—' : v
+  const money = (v) => '$' + Number(v || 0).toLocaleString('es-AR')
+  const badgeLab = { activo:'badge-activo', licencia:'badge-en-transito', suspendido:'badge-pendiente', baja:'badge-alerta' }
+  const labelLab = { activo:'Activo', licencia:'Licencia', suspendido:'Suspendido', baja:'Baja' }
+%>
+
+<div class="page-header">
+  <div>
+    <a href="/empleados" class="back-link">← Flota de Personal</a>
+    <h1 class="page-title"><%= e.apellido %> <%= e.nombre %> · Legajo #<%= e.legajo %></h1>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge rounded-pill px-3 <%= badgeLab[e.estado_laboral] || 'badge-pendiente' %>"><%= labelLab[e.estado_laboral] || e.estado_laboral %></span>
+    <a href="/empleados/<%= e.id %>/editar" class="btn-primary btn-sm">✏️ Editar</a>
+  </div>
+</div>
+
+<div class="alquiler-form-layout">
+  <div class="alquiler-form-main">
+
+    <div class="form-section">
+      <h3 class="form-section__title">Información personal</h3>
+      <div class="resumen-grid">
+        <span class="resumen-label">Nombre</span>          <span class="resumen-valor"><%= e.nombre %> <%= e.apellido %></span>
+        <span class="resumen-label">DNI</span>             <span class="resumen-valor"><%= dash(e.dni) %></span>
+        <span class="resumen-label">Nacimiento</span>      <span class="resumen-valor"><%= dash(e.fecha_nacimiento) %></span>
+        <span class="resumen-label">Dirección</span>       <span class="resumen-valor"><%= dash(e.direccion) %></span>
+        <span class="resumen-label">Teléfono</span>        <span class="resumen-valor"><%= dash(e.telefono) %></span>
+        <span class="resumen-label">Email</span>           <span class="resumen-valor"><%= dash(e.email) %></span>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Información laboral</h3>
+      <div class="resumen-grid">
+        <span class="resumen-label">Cargo</span>           <span class="resumen-valor"><%= dash(e.cargo) %></span>
+        <span class="resumen-label">Sector</span>          <span class="resumen-valor"><%= dash(e.sector) %></span>
+        <span class="resumen-label">Ingreso</span>         <span class="resumen-valor"><%= dash(e.fecha_ingreso) %></span>
+        <span class="resumen-label">Contratación</span>    <span class="resumen-valor"><%= dash(e.tipo_contratacion) %></span>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Información operativa</h3>
+      <div class="resumen-grid">
+        <span class="resumen-label">Vehículo</span>        <span class="resumen-valor"><%= dash(e.vehiculo_asignado) %></span>
+        <span class="resumen-label">Licencia</span>        <span class="resumen-valor"><%= dash(e.licencia_categoria) %></span>
+        <span class="resumen-label">Vence</span>           <span class="resumen-valor"><%= dash(e.licencia_vencimiento) %></span>
+        <span class="resumen-label">Certificaciones</span><span class="resumen-valor"><%= dash(e.certificaciones) %></span>
+      </div>
+    </div>
+
+  </div>
+
+  <aside class="alquiler-form-aside">
+
+    <div class="form-section alquiler-resumen">
+      <h3 class="form-section__title">Información económica</h3>
+      <div class="resumen-grid">
+        <span class="resumen-label">Salario</span>        <span class="resumen-valor"><%= money(e.salario) %></span>
+        <span class="resumen-label">Bonificaciones</span> <span class="resumen-valor"><%= money(e.bonificaciones) %></span>
+        <span class="resumen-label">Descuentos</span>     <span class="resumen-valor"><%= money(e.descuentos) %></span>
+        <span class="resumen-label">Viáticos</span>       <span class="resumen-valor"><%= money(e.viaticos) %></span>
+        <span class="resumen-label">Horas extras</span>   <span class="resumen-valor"><%= dash(e.horas_extras) %></span>
+      </div>
+      <div class="resumen-total">
+        <span>Neto estimado</span>
+        <span><%= money((e.salario || 0) + (e.bonificaciones || 0) + (e.viaticos || 0) - (e.descuentos || 0)) %></span>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Acceso al sistema</h3>
+      <% if (e.usuario_sistema) { %>
+        <p class="resumen-valor"><%= e.usuario_nombre %></p>
+        <span class="badge rounded-pill px-3 badge-en-transito"><%= e.usuario_sistema %></span>
+      <% } else { %>
+        <p class="form-hint">Este empleado no tiene cuenta de acceso al sistema.</p>
+      <% } %>
+    </div>
+
+  </aside>
+</div>

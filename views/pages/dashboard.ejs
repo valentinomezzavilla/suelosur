@@ -1,0 +1,43 @@
+<div class="mb-4">
+  <h4 class="fw-bold text-dark-title">📊 Tablero de Control</h4>
+  <p class="text-muted">Bienvenido, <%= user.nombre %>. Aquí verás los KPIs del sistema.</p>
+</div>
+
+<!-- KPIs placeholder -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 card-accent-orange kpi-card">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Cuentas a Cobrar</p>
+        <h3 class="fw-bold text-orange">—</h3>
+        <small class="text-muted">Disponible cuando esté el módulo de cobranzas</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 card-accent-green kpi-card">
+      <div class="card-body">
+        <p class="text-muted small mb-1">Contenedores Alquilados</p>
+        <h3 class="fw-bold text-green">—</h3>
+        <small class="text-muted">Disponible cuando esté el módulo de contenedores</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100 card-accent-blue kpi-card">
+      <div class="card-body">
+        <p class="text-muted small mb-1">OPs del Mes</p>
+        <h3 class="fw-bold text-blue">—</h3>
+        <small class="text-muted">Disponible cuando esté el módulo de ventas</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow-sm kpi-card">
+  <div class="card-body text-center py-5">
+    <div class="icon-xl">🚧</div>
+    <h5 class="mt-3 fw-bold text-dark-title">Dashboard en construcción</h5>
+    <p class="text-muted">Los KPIs reales se conectarán a medida que se completen los módulos del sistema.</p>
+  </div>
+</div>

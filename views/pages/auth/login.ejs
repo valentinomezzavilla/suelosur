@@ -1,0 +1,71 @@
+<div class="card shadow-sm login-card">
+
+      <!-- Header -->
+      <div class="login-header">
+        <div class="brand-name mb-1">SUELOSUR</div>
+        <small class="sub">Sistema de Gestión Integral</small>
+      </div>
+
+      <div class="card-body p-4">
+        <% if (error && error.length > 0) { %>
+          <div class="alert alert-danger py-2 small">❌ <%= error[0] %></div>
+        <% } %>
+
+        <form action="/auth/login" method="POST">
+          <div class="mb-3">
+            <label class="form-label fw-semibold small">Usuario</label>
+            <input
+              type="text"
+              name="usuario"
+              class="form-control login-input"
+              placeholder="nombre de usuario"
+              required
+              autofocus
+              autocomplete="username"
+            >
+          </div>
+          <div class="mb-4">
+            <label class="form-label fw-semibold small">Contraseña</label>
+            <input
+              type="password"
+              name="password"
+              class="form-control login-input"
+              placeholder="••••••••"
+              required
+            >
+          </div>
+          <button type="submit" class="btn w-100 login-submit">
+            Ingresar al sistema
+          </button>
+        </form>
+      </div>
+
+      <!-- Credenciales de prueba -->
+      <div class="mx-3 mb-3 p-3 rounded box-credenciales">
+        <p class="fw-bold small mb-2 text-secondary">🔑 Credenciales de prueba <span class="text-muted fw-normal">(contraseña: suelosur123)</span></p>
+        <div class="d-flex flex-column gap-2">
+          <% [
+            { usuario: 'valentino',      rol: 'Dueño'          },
+            { usuario: 'admin_ventas',   rol: 'Admin Ventas'   },
+            { usuario: 'admin_contable', rol: 'Admin Contable' },
+            { usuario: 'chofer',         rol: 'Chofer'         },
+          ].forEach(u => { %>
+          <div class="d-flex justify-content-between align-items-center">
+            <small>
+              <button type="button"
+                      class="btn btn-sm btn-link p-0 fw-semibold text-decoration-none text-orange"
+                      onclick="document.querySelector('[name=usuario]').value='<%= u.usuario %>'; document.querySelector('[name=password]').value='suelosur123'">
+                <%= u.usuario %>
+              </button>
+            </small>
+            <span class="badge badge-rol"><%= u.rol %></span>
+          </div>
+          <% }) %>
+        </div>
+      </div>
+
+      <div class="text-center pb-3">
+        <small class="login-footer">VM Software Solutions — 2025</small>
+      </div>
+
+</div>

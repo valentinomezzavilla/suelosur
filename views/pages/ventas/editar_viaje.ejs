@@ -1,0 +1,113 @@
+<main id="venta-viaje">
+
+        <div class="page-header">
+            <div>
+                <a href="/ventas/viaje/detalle/<%= viaje.id %>" class="back-link">← Detalle viaje</a>
+                <h1 class="page-title">Editar viaje #<%= viaje.id %></h1>
+            </div>
+        </div>
+
+        <form action="/ventas/viaje/editar/<%= viaje.id %>" method="POST" class="viaje-form-layout">
+
+            <div class="viaje-form-main">
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Cliente</h3>
+                    <div class="form-group">
+                        <label>Cliente</label>
+                        <input type="text" value="<%= viaje.clienteNombre %>" readonly class="input-readonly">
+                        <p class="form-hint">El cliente no se puede cambiar desde aqui.</p>
+                    </div>
+                    <div class="form-group">
+                        <label for="telefono">Telefono de contacto</label>
+                        <input type="text" name="telefono" id="telefono" value="<%= viaje.telefono || '' %>" placeholder="351 000 0000">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Fecha y hora del viaje</h3>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="fecha">Fecha *</label>
+                            <input type="date" name="fecha" id="fecha" value="<%= viaje.fecha %>" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="hora">Hora</label>
+                            <input type="time" name="hora" id="hora" value="<%= viaje.hora || '' %>">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Direccion de entrega</h3>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="calle">Calle *</label>
+                            <input type="text" name="calle" id="calle" value="<%= calle %>" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="numero">Numero</label>
+                            <input type="text" name="numero" id="numero" value="<%= numero %>">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Descripcion (opcional)</h3>
+                    <div class="form-group">
+                        <textarea name="descripcion" id="descripcion" rows="3"><%= viaje.descripcion || '' %></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <aside class="viaje-form-aside">
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Producto</h3>
+                    <div class="form-group">
+                        <label>Producto</label>
+                        <input type="text" value="<%= viaje.productoNombre %>" readonly class="input-readonly">
+                    </div>
+                    <div class="form-group">
+                        <label for="cantidad">Cantidad *</label>
+                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="1" required>
+                        <p class="form-hint">Cambiar la cantidad ajusta el stock del producto.</p>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Precios</h3>
+                    <div class="form-group">
+                        <label for="precioProducto">Precio unitario</label>
+                        <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="precioFlete">Precio del flete</label>
+                        <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="precioTotal">Total</label>
+                        <input type="number" name="precioTotal" id="precioTotal" value="<%= viaje.precioTotal %>" min="0" step="100">
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3 class="form-section__title">Metodo de pago</h3>
+                    <div class="form-group">
+                        <select name="metodoPago" id="metodoPago">
+                            <option value="efectivo"         <%= viaje.metodoPago === 'efectivo' ? 'selected' : '' %>>Efectivo</option>
+                            <option value="transferencia"    <%= viaje.metodoPago === 'transferencia' ? 'selected' : '' %>>Transferencia</option>
+                            <option value="cuenta_corriente" <%= viaje.metodoPago === 'cuenta_corriente' ? 'selected' : '' %>>Cuenta corriente</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display:flex; gap:0.5rem">
+                    <button type="submit" class="btn-primary-green">Guardar cambios</button>
+                    <a href="/ventas/viaje/detalle/<%= viaje.id %>" class="btn-secondary">Cancelar</a>
+                </div>
+            </aside>
+
+        </form>
+
+    </main>

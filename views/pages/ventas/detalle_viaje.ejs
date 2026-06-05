@@ -1,0 +1,110 @@
+<main id="detalle-viaje-page">
+
+        <div class="page-header">
+            <div>
+                <a href="/ventas" class="back-link">← Ventas</a>
+                <h1 class="page-title">Viaje #<%= viaje.id %></h1>
+            </div>
+            <% if (viaje.estado === 'pendiente') { %>
+            <div style="display:flex; gap:0.5rem">
+                <a href="/ventas/viaje/editar/<%= viaje.id %>" class="btn-secondary-yellow">Editar</a>
+                <form action="/ventas/cancelar-viaje/<%= viaje.id %>" method="POST" style="display:inline"
+                      onsubmit="return confirm('¿Cancelar este viaje? Se restituira el stock del producto.')">
+                    <button type="submit" class="btn-secondary">Cancelar</button>
+                </form>
+                <form action="/ventas/finalizar-viaje/<%= viaje.id %>" method="POST" style="display:inline"
+                      onsubmit="return confirm('¿Finalizar este viaje?')">
+                    <button type="submit" class="btn-primary-green">Finalizar viaje</button>
+                </form>
+            </div>
+            <% } %>
+        </div>
+
+        <div class="detalle-grid">
+            <div class="detail-card">
+                <p class="detalle-section-title">Informacion del viaje</p>
+                <div class="info-grid">
+                    <div class="info-row">
+                        <span class="info-label">Estado</span>
+                        <span class="info-value">
+                            <span class="badge badge--<%= viaje.estado === 'finalizado' ? 'con-stock' : 'alquilado' %>">
+                                <%= viaje.estado === 'finalizado' ? 'Finalizado' : 'Pendiente' %>
+                            </span>
+                        </span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cliente</span>
+                        <span class="info-value"><%= viaje.clienteNombre %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Telefono</span>
+                        <span class="info-value"><%= viaje.telefono || '—' %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Fecha</span>
+                        <span class="info-value"><%= formatFecha(viaje.fecha) %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Hora</span>
+                        <span class="info-value"><%= viaje.hora || '—' %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Direccion</span>
+                        <span class="info-value"><%= viaje.direccion || '—' %></span>
+                    </div>
+                    <% if (viaje.descripcion) { %>
+                    <div class="info-row">
+                        <span class="info-label">Descripcion</span>
+                        <span class="info-value"><%= viaje.descripcion %></span>
+                    </div>
+                    <% } %>
+                </div>
+            </div>
+
+            <div class="detail-card">
+                <p class="detalle-section-title">Detalle de la venta</p>
+                <div class="info-grid">
+                    <div class="info-row">
+                        <span class="info-label">Producto</span>
+                        <span class="info-value"><%= viaje.productoNombre %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Cantidad</span>
+                        <span class="info-value"><%= viaje.cantidad %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Subtotal producto</span>
+                        <span class="info-value">$<%= viaje.precioProducto?.toLocaleString('es-AR') %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Flete</span>
+                        <span class="info-value">$<%= viaje.precioFlete?.toLocaleString('es-AR') %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Total</span>
+                        <span class="info-value detalle-precio">$<%= viaje.precioTotal?.toLocaleString('es-AR') %></span>
+                    </div>
+                    <div class="info-row">
+                        <span class="info-label">Metodo de pago</span>
+                        <span class="info-value"><%= viaje.metodoPago %></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <% if (viaje.direccion) { %>
+        <div class="detail-card" style="margin-top:1rem">
+            <p class="detalle-section-title">Ubicacion</p>
+            <iframe style="width:100%;height:300px;border:none;border-radius:8px" allowfullscreen loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade"
+                src="https://maps.google.com/maps?q=<%= encodeURIComponent(viaje.direccion + ', Cordoba, Argentina') %>&output=embed&hl=es">
+            </iframe>
+        </div>
+        <% } %>
+
+        <div style="margin-top:1.5rem; display:flex; gap:0.5rem">
+            <a href="/ventas" class="btn-secondary">Volver a ventas</a>
+            <a href="/ventas/viaje" class="btn-primary">Nuevo viaje</a>
+        </div>
+
+    </main>

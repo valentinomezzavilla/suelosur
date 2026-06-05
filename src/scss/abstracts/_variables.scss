@@ -1,0 +1,87 @@
+// ═══════════════════════════════════════════════════════════════
+// Suelosur — Design tokens
+// ═══════════════════════════════════════════════════════════════
+
+// ── Paleta de marca ────────────────────────────────────────────
+$accent:        #0d9488;  // teal corporativo
+$accent-dark:   #0f766e;
+$accent-soft:   #effdfa;
+
+// ── Neutros ────────────────────────────────────────────────────
+$dark:          #1e2535;
+$dark-2:        #2e3650;
+$ink:           #111827;
+$ink-soft:      #374151;
+$muted:         #6b7280;
+$muted-soft:    #888;
+$muted-light:   #bbb;
+
+$border:        #e4e9f2;
+$border-soft:   #eef1f6;
+$border-line:   #f3f4f7;
+
+$bg-app:        #f3f6f7;
+$bg-card:       #ffffff;
+$bg-card-alt:   #f8fafa;
+
+$sidebar-bg:    #0d1518;
+$sidebar-border:rgba(255, 255, 255, 0.06);
+$sidebar-text:  rgba(255, 255, 255, 0.72);
+$sidebar-muted: rgba(255, 255, 255, 0.32);
+
+// ── Estados ────────────────────────────────────────────────────
+$success:       #27ae60;
+$success-soft:  #ecfdf5;
+$success-border:#a7f3d0;
+$success-text:  #065f46;
+
+$warning:       #f39c12;
+$warning-soft:  #fffbeb;
+$warning-border:#fde68a;
+$warning-text:  #92400e;
+
+$danger:        #e74c3c;
+$danger-soft:   #fef2f2;
+$danger-border: #fecaca;
+$danger-text:   #991b1b;
+
+$info:          #2980b9;
+
+// ── Espaciado / radios ─────────────────────────────────────────
+$radius-sm: 6px;
+$radius-md: 8px;
+$radius-lg: 10px;
+$radius-xl: 14px;
+
+// ── Altura uniforme de controles (inputs, selects, botones) ────
+$control-h:    40px;
+$control-h-sm: 32px;
+
+// ── Sombras (sistema de elevación) ─────────────────────────────
+$shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+$shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
+$shadow-md: 0 4px 14px rgba(16, 24, 40, 0.08);
+$shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
+
+// ── Focus ring ─────────────────────────────────────────────────
+$focus-ring: 0 0 0 3px rgba(13, 148, 136, 0.18);
+
+// ── Layout ─────────────────────────────────────────────────────
+$sidebar-w:        240px;
+$sidebar-w-mobile: 280px;
+$navbar-h:         60px;
+$content-pad:      1.75rem;
+$content-pad-mob:  1rem;
+
+// ── Tipografía ─────────────────────────────────────────────────
+$font-base:   "Segoe UI", system-ui, -apple-system, sans-serif;
+$fs-base:     0.95rem;
+$fs-sm:       0.85rem;
+$fs-xs:       0.75rem;
+$fs-xxs:      0.68rem;
+
+// ── Breakpoints ────────────────────────────────────────────────
+$bp-sm:  576px;
+$bp-md:  768px;
+$bp-lg:  992px;
+$bp-xl:  1200px;

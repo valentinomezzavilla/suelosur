@@ -1,0 +1,165 @@
+<div class="page-header">
+  <div>
+    <a href="/alquileres/contenedores" class="back-link">← Alquileres</a>
+    <h1 class="page-title">Nuevo Alquiler de Contenedor</h1>
+  </div>
+</div>
+
+<script id="precios-config" type="application/json"><%- JSON.stringify(configPrecios) %></script>
+
+<!-- ── Paso 1: seleccionar contenedor ─────────────────────────── -->
+<div class="form-section">
+  <div class="d-flex justify-content-between align-items-center" style="flex-wrap:wrap;gap:0.75rem">
+    <h3 class="form-section__title" style="margin:0">Seleccioná un contenedor</h3>
+    <% if (porLiberar && porLiberar.length> 0) { %>
+      <label class="toggle-row">
+        <input type="checkbox" id="contenedorPorFinalizar">
+        <span>Mostrar próximos a finalizar (<%= porLiberar.length %>)</span>
+      </label>
+      <% } %>
+  </div>
+
+  <div id="listaDisponibles" class="alquiler-cards-grid" style="margin-top:1rem">
+    <% if (disponibles.length===0) { %>
+      <%- include('../../partials/empty_state', { icono: '📦' , mensaje: 'No hay contenedores disponibles.' }) %>
+        <% } %>
+          <% disponibles.forEach(c=> { %>
+            <div class="alquiler-card" data-id="<%= c.id %>" data-numero="<%= c.numero_contenedor %>">
+              <div class="alquiler-card__numero">#<%= c.numero_contenedor %>
+              </div>
+              <span class="badge badge--con-stock">Disponible</span>
+              <button type="button" class="btn-seleccionar-cont btn-primary btn-sm">Seleccionar</button>
+            </div>
+            <% }) %>
+  </div>
+
+  <% if (porLiberar && porLiberar.length> 0) { %>
+    <div id="listaPorFinalizar" class="alquiler-cards-grid" style="display:none;margin-top:1rem">
+      <% porLiberar.forEach(c=> { %>
+        <div class="alquiler-card alquiler-card--por-liberar" data-id="<%= c.id %>"
+          data-numero="<%= c.numero_contenedor %>" data-fin="<%= c.fecha_liberacion %>"
+          data-alquiler-actual="<%= c.alquiler_actual_id %>">
+          <div class="alquiler-card__numero">#<%= c.numero_contenedor %>
+          </div>
+          <span class="badge badge--pendiente">Libera: <%= c.fecha_liberacion %></span>
+          <small class="text-muted">
+            <%= c.cliente_actual %>
+          </small>
+          <button type="button" class="btn-seleccionar-cont btn-primary btn-sm">Seleccionar</button>
+        </div>
+        <% }) %>
+    </div>
+    <% } %>
+</div>
+
+<!-- ── Paso 2: modal con el formulario de alquiler ────────────── -->
+<div id="modal-alquiler" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-box--lg">
+    <div class="modal-header">
+      <h2 class="modal-title">Nuevo alquiler — <span id="modal-cont-label"></span></h2>
+      <button type="button" class="modal-close" id="cerrarModalAlquiler">✕</button>
+    </div>
+
+    <form action="/alquileres/contenedores" method="POST" id="formNuevoAlquiler" class="modal-body">
+      <input type="hidden" name="id_contenedor" id="inputContenedorId">
+      <input type="hidden" name="alquiler_actual_id" id="inputAlquilerActualId">
+      <input type="hidden" name="lat" id="inputLat">
+      <input type="hidden" name="lng" id="inputLng">
+
+      <!-- Cliente -->
+      <div class="form-section">
+        <%- include('../../partials/buscar_cliente') %>
+      </div>
+
+      <!-- Dirección -->
+      <div class="form-section">
+        <h3 class="form-section__title">Dirección de entrega</h3>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="calle">Calle *</label>
+            <input type="text" name="calle" id="calle" placeholder="Ej: Av. Colón" required>
+          </div>
+          <div class="form-group">
+            <label for="numero">Número *</label>
+            <input type="text" name="numero" id="numero" placeholder="Ej: 1234" required>
+          </div>
+
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="zona">Zona</label>
+            <input type="text" name="zona_entrega" id="zona" placeholder="Ej: Norte">
+          </div>
+          <div class="form-group form-group--action">
+            <button type="button" id="btnBuscarDireccion" class="btn-secondary btn-buscar-mapa">📍 Buscar en
+              mapa</button>
+          </div>
+        </div>
+        <p id="msgMapa" class="form-hint" style="display:none">Ingresá calle y número para buscar.</p>
+        <div id="mapaEntrega" style="display:none;margin-top:0.75rem">
+          <div id="mapaContenedor" style="width:100%;height:250px;border-radius:8px"></div>
+        </div>
+      </div>
+
+      <!-- Fechas -->
+      <div class="form-section">
+        <h3 class="form-section__title">Período de alquiler</h3>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="fechaInicio">Fecha inicio *</label>
+            <input type="date" name="fechaInicio" id="fechaInicio" required>
+          </div>
+          <div class="form-group">
+            <label for="fechaFin">Fecha fin *</label>
+            <input type="date" name="fechaFin" id="fechaFin" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- Precio -->
+      <div class="form-section">
+        <h3 class="form-section__title">Precio</h3>
+        <div id="precioAlquilerDisplay" class="resumen-valor">—</div>
+        <label class="toggle-row">
+          <input type="checkbox" id="checkEditarPrecio">
+          <span>Editar precio manualmente</span>
+        </label>
+        <input type="number" name="precio_alquiler" id="precioAlquilerInput" class="input-sm" style="display:none"
+          min="0" step="100">
+      </div>
+
+      <!-- Método de pago -->
+      <%- include('../../partials/metodo_pago') %>
+
+        <!-- Observaciones -->
+        <div class="form-section">
+          <h3 class="form-section__title">Observaciones</h3>
+          <div class="form-group">
+            <textarea name="observaciones" rows="2" placeholder="Notas adicionales..."></textarea>
+          </div>
+        </div>
+
+        <!-- Resumen -->
+        <div class="form-section alquiler-resumen">
+          <h3 class="form-section__title">Resumen</h3>
+          <div class="resumen-grid">
+            <span class="resumen-label">Cliente</span> <span class="resumen-valor" id="res-cliente">—</span>
+            <span class="resumen-label">Dirección</span> <span class="resumen-valor" id="res-direccion">—</span>
+            <span class="resumen-label">Contenedor</span> <span class="resumen-valor" id="res-contenedor">—</span>
+            <span class="resumen-label">Inicio</span> <span class="resumen-valor" id="res-inicio">—</span>
+            <span class="resumen-label">Fin</span> <span class="resumen-valor" id="res-fin">—</span>
+            <span class="resumen-label">Días</span> <span class="resumen-valor" id="res-dias">—</span>
+            <span class="resumen-label">Pago</span> <span class="resumen-valor" id="res-pago">—</span>
+          </div>
+          <div id="res-total" class="resumen-total" style="display:none">
+            <span>Total</span>
+            <span id="res-total-valor"></span>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelarModalAlquiler">Cancelar</button>
+          <button type="submit" class="btn-finalizar" style="width:auto">Confirmar alquiler</button>
+        </div>
+    </form>
+  </div>
+</div>

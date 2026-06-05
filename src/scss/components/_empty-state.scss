@@ -1,0 +1,44 @@
+@use '../abstracts/variables' as *;
+
+// ── Estado vacío unificado ─────────────────────────────────────
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+
+  &__icon {
+    font-size: 2.75rem;
+    line-height: 1;
+    opacity: 0.55;
+  }
+
+  &__msg {
+    margin: 0;
+    color: $muted;
+    font-size: $fs-sm;
+    font-weight: 500;
+  }
+
+  // Variante compacta para secciones / cards pequeñas
+  &--compact {
+    padding: 1.5rem 1rem;
+    gap: 0.4rem;
+
+    .empty-state__icon { font-size: 1.75rem; }
+  }
+}
+
+// ── Barra de paginación reutilizable ───────────────────────────
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid $border-soft;
+}

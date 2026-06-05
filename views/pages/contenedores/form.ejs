@@ -1,0 +1,50 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">📦 <%= titulo %></h4>
+  <a href="/contenedores" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="<%= contenedor ? `/contenedores/${contenedor.id}?_method=PUT` : '/contenedores' %>" method="POST">
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Número de contenedor *</label>
+          <input type="number" name="numero_contenedor" class="form-control" min="1"
+                 value="<%= contenedor?.numero_contenedor || '' %>" required autofocus>
+          <small class="text-muted">No tiene tope, podés crear los que necesites.</small>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Condición general</label>
+          <select name="estado_general" class="form-select">
+            <% ['operativo','en_reparacion','baja'].forEach(e => { %>
+              <option value="<%= e %>" <%= (contenedor?.estado_general || 'operativo') === e ? 'selected' : '' %>>
+                <%= e.replace('_',' ') %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Fecha de última pintada</label>
+        <input type="date" name="fecha_ultima_pintada" class="form-control"
+               value="<%= contenedor?.fecha_ultima_pintada || '' %>">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Observaciones</label>
+        <textarea name="observaciones" class="form-control" rows="3"
+                  placeholder="Notas sobre el estado, golpes, reparaciones..."><%= contenedor?.observaciones || '' %></textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4">
+          <%= contenedor ? 'Guardar cambios' : 'Crear contenedor' %>
+        </button>
+        <a href="/contenedores" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+
+    </form>
+  </div>
+</div>

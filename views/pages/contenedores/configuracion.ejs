@@ -1,0 +1,60 @@
+<div class="page-header">
+  <div>
+    <a href="/contenedores" class="back-link">← Contenedores</a>
+    <h1 class="page-title">Configuración — Contenedores</h1>
+  </div>
+</div>
+
+<div class="config-page">
+  <form action="/contenedores/configuracion" method="POST" class="config-form">
+
+    <div class="form-section">
+      <h3 class="form-section__title">Precios de alquiler</h3>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="precio_dia">Precio por día ($)</label>
+          <input type="number" name="precio_dia" id="precio_dia" value="<%= precios.precioDia %>" min="0" step="100">
+          <small class="form-hint">Se aplica para alquileres menores al plazo máximo</small>
+        </div>
+        <div class="form-group">
+          <label for="precio_alquiler">Precio base alquiler ($)</label>
+          <input type="number" name="precio_alquiler" id="precio_alquiler" value="<%= precios.precioAlquiler %>" min="0" step="100">
+          <small class="form-hint">Se aplica cuando el plazo alcanza el máximo de días</small>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="costo_extra_dia">Costo extra por día adicional ($)</label>
+        <input type="number" name="costo_extra_dia" id="costo_extra_dia" value="<%= precios.costoExtraDia %>" min="0" step="100">
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Plazos</h3>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="plazo_minimo">Estadía mínima (días)</label>
+          <input type="number" name="plazo_minimo" id="plazo_minimo" value="<%= precios.plazoMinimo %>" min="1" max="30">
+        </div>
+        <div class="form-group">
+          <label for="plazo_maximo">Estadía máxima (días)</label>
+          <input type="number" name="plazo_maximo" id="plazo_maximo" value="<%= precios.plazoMaximo %>" min="1" max="90">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Disponibilidad</h3>
+      <div class="form-group">
+        <label for="tiempo_entre_alquileres">Tiempo mínimo entre alquileres (horas)</label>
+        <input type="number" name="tiempo_entre_alquileres" id="tiempo_entre_alquileres" value="<%= precios.tiempoEntreAlq %>" min="0">
+        <small class="form-hint">Horas mínimas que debe pasar entre la devolución y un nuevo alquiler del mismo contenedor</small>
+      </div>
+    </div>
+
+    <div class="config-actions">
+      <button type="submit" class="btn-primary">Guardar configuración</button>
+      <a href="/contenedores" class="btn-secondary">Cancelar</a>
+    </div>
+
+  </form>
+</div>

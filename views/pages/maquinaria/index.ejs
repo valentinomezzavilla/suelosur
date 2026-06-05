@@ -1,0 +1,73 @@
+<%
+  const conteo = { en_planta:0, despachada:0, en_uso:0, a_retirar:0, en_servicio:0 }
+  resumen.forEach(r => { if (conteo[r.estado_paso] !== undefined) conteo[r.estado_paso] = r.total })
+  const badgeEstado = { en_planta:'badge-activo', despachada:'badge-en-transito', en_uso:'badge-en-transito', a_retirar:'badge-alerta', en_servicio:'badge-pendiente' }
+  const labelEstado = { en_planta:'En planta', despachada:'Despachada', en_uso:'En uso', a_retirar:'A retirar', en_servicio:'En servicio' }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title">🚜 Maquinaria</h4>
+  <div class="d-flex gap-2">
+    <a href="/alquileres/maquinaria" class="btn btn-outline-secondary btn-sm">Ver alquileres</a>
+    <% if (user?.rol === 'dueno') { %>
+      <a href="/maquinaria/configuracion" class="btn btn-outline-secondary btn-sm">⚙️ Configuración</a>
+    <% } %>
+    <a href="/maquinaria/nuevo" class="btn btn-naranja">+ Nueva máquina</a>
+  </div>
+</div>
+
+<!-- Resumen de estados -->
+<div class="row g-2 mb-4">
+  <% Object.entries(labelEstado).forEach(([key, label]) => { %>
+  <div class="col-6 col-md-2">
+    <a href="/maquinaria?estado_paso=<%= key %>" class="text-decoration-none">
+      <div class="card shadow-sm h-100 text-center py-2">
+        <div class="fw-bold fs-5"><%= conteo[key] %></div>
+        <small class="<%= badgeEstado[key] %> badge rounded-pill px-2"><%= label %></small>
+      </div>
+    </a>
+  </div>
+  <% }) %>
+</div>
+
+<!-- Tabla -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!maquinas.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🚜', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/maquinaria/nuevo', accionLabel: '+ Nueva máquina' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th><th>Tipo</th><th>Patente</th><th>Estado actual</th>
+          <th>Cliente / OP</th><th>Días</th><th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% maquinas.forEach(m => { %>
+        <tr class="<%= !m.activo ? 'text-muted' : '' %>">
+          <td class="fw-bold text-orange"><%= m.nombre %></td>
+          <td><small class="text-muted"><%= m.tipo %></small></td>
+          <td><small class="text-muted"><%= m.patente || '—' %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= badgeEstado[m.estado_paso] || 'badge-pendiente' %>"><%= labelEstado[m.estado_paso] || m.estado_paso %></span></td>
+          <td>
+            <% if (m.cliente_nombre) { %>
+              <small class="fw-semibold"><%= m.cliente_nombre %></small><br>
+              <small class="text-muted">OP-<%= String(m.nro_op).padStart(4,'0') %></small>
+            <% } else { %><small class="text-muted">—</small><% } %>
+          </td>
+          <td><small class="text-muted"><%= m.dias_en_estado %>d</small></td>
+          <td class="text-center">
+            <a href="/maquinaria/<%= m.id %>" class="btn btn-sm btn-outline-secondary">👁️</a>
+            <a href="/maquinaria/<%= m.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️</a>
+            <form action="/maquinaria/<%= m.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= m.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"><%= m.activo ? '🚫' : '✅' %></button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

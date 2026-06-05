@@ -1,0 +1,132 @@
+<%
+  const conteo = { pendiente: 0, despachado: 0, entregado: 0, anulado: 0 }
+  resumen.forEach(r => { if (conteo[r.estado] !== undefined) conteo[r.estado] = r.total })
+  const totalTodas  = Object.values(conteo).reduce((a, b) => a + b, 0)
+  const estadoAct   = filtros.estado || ''
+
+  // Filtros vigentes (sin page) para preservarlos en links de tabs / orden
+  const baseFiltros = {}
+  ;['estado','id_cliente','q','sort','dir'].forEach(k => { if (filtros[k]) baseFiltros[k] = filtros[k] })
+
+  // Helper: link de pestaña por estado (resetea page, preserva búsqueda/cliente)
+  const tabHref = (key) => {
+    const o = {}
+    if (key) o.estado = key
+    if (filtros.id_cliente) o.id_cliente = filtros.id_cliente
+    if (filtros.q) o.q = filtros.q
+    return '/ventas?' + new URLSearchParams(o).toString()
+  }
+
+  // Helper: encabezado ordenable
+  const thSort = (col, label, extraClass) => {
+    const activo  = filtros.sort === col
+    const nextDir = (activo && filtros.dir === 'asc') ? 'desc' : 'asc'
+    const arrow   = activo ? (filtros.dir === 'asc' ? ' ▲' : ' ▼') : ''
+    const o = { ...baseFiltros, sort: col, dir: nextDir }
+    const href = '/ventas?' + new URLSearchParams(o).toString()
+    return `<a href="${href}" class="th-sort${activo ? ' is-active' : ''}">${label}${arrow}</a>`
+  }
+
+  const tabs = [
+    { key:'',           label:'Todas',       tono:'neutral', icono:'📋', count: totalTodas },
+    { key:'pendiente',  label:'Pendientes',  tono:'warning', icono:'⏳', count: conteo.pendiente },
+    { key:'despachado', label:'Despachadas', tono:'info',    icono:'🚛', count: conteo.despachado },
+    { key:'entregado',  label:'Entregadas',  tono:'success', icono:'✅', count: conteo.entregado },
+    { key:'anulado',    label:'Anuladas',    tono:'danger',  icono:'✕',  count: conteo.anulado },
+  ]
+  const badgeMap = { pendiente:'badge-pendiente', despachado:'badge-en-transito', entregado:'badge-activo', anulado:'badge-alerta' }
+  const labelEstado = { pendiente:'Pendiente', despachado:'Despachado', entregado:'Entregado', anulado:'Anulado' }
+  const tipoMap  = { M:'Material', C:'Contenedor', B:'Bobcat' }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title">📋 Órdenes de Pedido</h4>
+  <div class="d-flex gap-2">
+    <a href="/ventas/cantera" class="btn btn-naranja btn-sm">+ Venta en cantera</a>
+    <a href="/ventas/viaje"   class="btn btn-naranja btn-sm">+ Venta con viaje</a>
+  </div>
+</div>
+
+<!-- Pestañas por estado (cada una es una tabla independiente) -->
+<div class="stat-cards stat-cards--5">
+  <% tabs.forEach(t => { %>
+    <a href="<%= tabHref(t.key) %>"
+       class="stat-card stat-card--<%= t.tono %> <%= estadoAct === t.key ? 'stat-card--active' : '' %>">
+      <div class="stat-card__icon"><%= t.icono %></div>
+      <div class="stat-card__body">
+        <span class="stat-card__value"><%= t.count %></span>
+        <span class="stat-card__label"><%= t.label %></span>
+      </div>
+    </a>
+  <% }) %>
+</div>
+
+<!-- Buscador + filtro de cliente -->
+<form method="GET" action="/ventas" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <% if (filtros.estado) { %><input type="hidden" name="estado" value="<%= filtros.estado %>"><% } %>
+    <% if (filtros.sort)   { %><input type="hidden" name="sort"   value="<%= filtros.sort %>"><% } %>
+    <% if (filtros.dir)    { %><input type="hidden" name="dir"    value="<%= filtros.dir %>"><% } %>
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="N° de OP, cliente...">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Cliente</label>
+        <select name="id_cliente" class="form-select form-select-sm">
+          <option value="">Todos los clientes</option>
+          <% clientes.forEach(c => { %>
+            <option value="<%= c.id %>" <%= filtros.id_cliente === c.id ? 'selected' : '' %>><%= c.nombre %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <a href="/ventas<%= filtros.estado ? '?estado=' + filtros.estado : '' %>" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Tabla del estado activo -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!ops.length) { %>
+      <%- include('../../partials/empty_state', { icono: '📋', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/ventas/cantera', accionLabel: 'Crear primera OP' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th><%- thSort('nro_op', 'Nro. OP') %></th>
+          <th><%- thSort('cliente', 'Cliente') %></th>
+          <th>Tipo</th>
+          <th><%- thSort('fecha', 'Fecha') %></th>
+          <th class="text-end"><%- thSort('total', 'Total') %></th>
+          <th class="text-center"><%- thSort('estado', 'Estado') %></th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% ops.forEach(op => { %>
+        <tr>
+          <td class="fw-bold text-orange">OP-<%= String(op.nro_op).padStart(4,'0') %></td>
+          <td><%= op.cliente_nombre %></td>
+          <td><small class="text-muted"><%= tipoMap[op.tipo_op] || op.tipo_op %></small></td>
+          <td><small class="text-muted"><%= op.fecha_emision %></small></td>
+          <td class="text-end fw-semibold">$<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+          <td class="text-center">
+            <span class="badge rounded-pill px-3 py-1 <%= badgeMap[op.estado] %>"><%= labelEstado[op.estado] || op.estado %></span>
+          </td>
+          <td class="text-center">
+            <a href="/ventas/<%= op.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <%- include('../../partials/paginacion', { page, totalPaginas, total, limit, filtros }) %>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,19 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.app-wrapper {
+  display: flex;
+  min-height: 100vh;
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  padding: $content-pad 2rem;
+  background: $bg-app;
+  overflow-y: auto;
+
+  @include md-down {
+    padding: $content-pad-mob;
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "name": "suelosur",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión Integral — Suelosur S.A.S.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "concurrently \"nodemon server.js\" \"sass --watch src/scss/main.scss:public/css/main.css\"",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "better-sqlite3": "^12.9.0",
+    "connect-flash": "^0.1.1",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.9",
+    "express": "^4.18.2",
+    "express-ejs-layouts": "^2.5.1",
+    "express-session": "^1.17.3",
+    "method-override": "^3.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "nodemon": "^3.0.2",
+    "sass": "^1.89.0"
+  }
+}

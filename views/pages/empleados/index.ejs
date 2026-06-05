@@ -1,0 +1,82 @@
+<%
+  const badgeLab = { activo:'badge-activo', licencia:'badge-en-transito', suspendido:'badge-pendiente', baja:'badge-alerta' }
+  const labelLab = { activo:'Activo', licencia:'Licencia', suspendido:'Suspendido', baja:'Baja' }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title">👷 Flota de Personal</h4>
+  <a href="/empleados/nuevo" class="btn btn-naranja">+ Nuevo Empleado</a>
+</div>
+
+<!-- Buscador -->
+<form method="GET" action="/empleados" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="Nombre, DNI, legajo, cargo o sector...">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <% if (filtros.q) { %><a href="/empleados" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<!-- Tabla -->
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!empleados.length) { %>
+      <%- include('../../partials/empty_state', { icono: '👷', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/empleados/nuevo', accionLabel: 'Crear primer empleado' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Legajo</th>
+          <th>Nombre</th>
+          <th>DNI</th>
+          <th>Cargo</th>
+          <th>Sector</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Usuario</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% empleados.forEach(e => { %>
+        <tr class="<%= !e.activo ? 'text-muted' : '' %>">
+          <td class="fw-bold text-orange">#<%= e.legajo %></td>
+          <td class="fw-semibold"><%= e.apellido %> <%= e.nombre %></td>
+          <td><small class="text-muted"><%= e.dni || '—' %></small></td>
+          <td><small class="text-muted"><%= e.cargo || '—' %></small></td>
+          <td><small class="text-muted"><%= e.sector || '—' %></small></td>
+          <td class="text-center">
+            <span class="badge rounded-pill px-3 <%= badgeLab[e.estado_laboral] || 'badge-pendiente' %>"><%= labelLab[e.estado_laboral] || e.estado_laboral %></span>
+          </td>
+          <td class="text-center">
+            <% if (e.usuario_sistema) { %>
+              <span class="badge rounded-pill px-2 badge-en-transito"><%= e.usuario_sistema %></span>
+            <% } else { %>
+              <small class="text-muted">—</small>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <a href="/empleados/<%= e.id %>" class="btn btn-sm btn-outline-secondary" title="Ver">👁️</a>
+            <a href="/empleados/<%= e.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar">✏️</a>
+            <form action="/empleados/<%= e.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= e.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
+                      title="<%= e.activo ? 'Desactivar' : 'Activar' %>">
+                <%= e.activo ? '🚫' : '✅' %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <%- include('../../partials/paginacion', { page, totalPaginas, total, limit, filtros }) %>
+    <% } %>
+  </div>
+</div>

@@ -1,0 +1,50 @@
+@use '../abstracts/variables' as *;
+
+// ── Badges con sintaxis BEM (badge--variant) usadas en vistas custom
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2em 0.55em;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.3px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  &--con-stock,
+  &--disponible {
+    background: #eafaf1;
+    color: #1e8449;
+    border-color: #58d68d;
+  }
+
+  &--sin-stock {
+    background: #fdf0ef;
+    color: #922b21;
+    border-color: $danger;
+  }
+
+  &--alquilado,
+  &--pendiente {
+    background: #fef9e7;
+    color: #b7770d;
+    border-color: #f9ca24;
+  }
+
+  &--en-transito,
+  &--despachado {
+    background: #eaf4fb;
+    color: #1a5276;
+    border-color: #3498db;
+  }
+
+  &--anulado {
+    background: #f3f4f6;
+    color: #6b7280;
+    border-color: #9ca3af;
+  }
+}

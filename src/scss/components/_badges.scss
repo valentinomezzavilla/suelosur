@@ -1,0 +1,43 @@
+@use '../abstracts/variables' as *;
+
+.badge-en-transito,
+.badge-alerta,
+.badge-activo,
+.badge-pendiente { font-size: 0.78rem; }
+
+.badge-pendiente {
+  background: #fef9e7;
+  color: #b7770d;
+  border: 1px solid #f9ca24;
+}
+
+.badge-activo {
+  background: #eafaf1;
+  color: #1e8449;
+  border: 1px solid #58d68d;
+}
+
+.badge-alerta {
+  background: #fdf0ef;
+  color: #922b21;
+  border: 1px solid $danger;
+}
+
+.badge-en-transito {
+  background: #eaf4fb;
+  color: #1a5276;
+  border: 1px solid #3498db;
+}
+
+.badge-rol {
+  background: $accent-soft;
+  color: $accent;
+  border: 1px solid $accent;
+  font-size: 0.65rem;
+}
+
+.badge-rol-lg { background: $accent; }
+
+.dias-ok     { color: $success; font-weight: 700; }
+.dias-alerta { color: $warning; font-weight: 700; }
+.dias-rojo   { color: $danger;  font-weight: 700; }

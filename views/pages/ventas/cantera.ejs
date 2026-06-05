@@ -1,0 +1,92 @@
+<main id="ventas" class="ventas-layout">
+
+        <!-- Productos -->
+        <section class="ventas-productos">
+            <div class="ventas-productos__header">
+                <div>
+                    <a href="/ventas" class="back-link">← Ventas</a>
+                    <h2 class="ventas-productos__title">Venta en Cantera</h2>
+                </div>
+            </div>
+            <ul class="ventas-lista-productos">
+                <% productos.forEach(p => { %>
+                    <%
+                      const stock  = Number(p.disponible_real ?? p.stock ?? 0)
+                      const precio = Number(p.precio_referencia ?? p.precio ?? 0)
+                      const nombre = p.nombre || p.producto || ''
+                    %>
+                    <li>
+                        <div class="ventas-card <%= stock <= 0 ? 'ventas-card--sin-stock' : '' %>">
+                            <div class="ventas-card__top">
+                                <span class="ventas-card__nombre"><%= nombre %></span>
+                                <span class="badge badge--<%= stock > 0 ? 'con-stock' : 'sin-stock' %>">
+                                    <%= stock > 0 ? stock + ' ' + (p.unidad_medida || 'unid.') : 'Sin stock' %>
+                                </span>
+                            </div>
+                            <div class="ventas-card__precio">$<%= precio.toLocaleString('es-AR') %></div>
+                            <button
+                                class="addToCart btn-primary"
+                                data-id="<%= p.id %>"
+                                data-nombre="<%= nombre %>"
+                                data-precio="<%= precio %>"
+                                data-stock="<%= stock %>"
+                                <%= stock <= 0 ? 'disabled' : '' %>
+                            >
+                                <%= stock <= 0 ? 'Sin stock' : '+ Agregar' %>
+                            </button>
+                        </div>
+                    </li>
+                <% }) %>
+            </ul>
+        </section>
+
+        <!-- Carrito -->
+        <aside id="carrito" class="carrito-aside">
+            <h3 class="carrito-title">Carrito</h3>
+            <div id="cartItemsContainer"></div>
+            <div id="cartTotal" class="cart-total-bar" style="display:none">
+                <span>Total</span>
+                <span id="cartTotalValor"></span>
+            </div>
+
+            <!-- Precio editable -->
+            <div id="precioEditableSection" class="precio-editable-section" style="display:none">
+                <label class="toggle-row">
+                    <input type="checkbox" id="checkPrecioEditable">
+                    <span>Modificar precio total</span>
+                </label>
+                <input type="number" id="precioEditableInput" class="input-sm" style="display:none" min="0" step="100">
+            </div>
+
+            <!-- Cliente -->
+            <div id="seccionCliente" style="display:none">
+                <div class="carrito-seccion">
+                    <label class="toggle-row">
+                        <input type="checkbox" id="checkParticular">
+                        <span>Cliente particular (sin datos)</span>
+                    </label>
+                </div>
+                <div id="busquedaClienteWrapper">
+                    <%- include('../../partials/buscar_cliente') %>
+                </div>
+
+                <%- include('../../partials/metodo_pago') %>
+            </div>
+
+            <!-- Acciones -->
+            <div id="cartActions" class="cart-actions" style="display:none">
+                <button type="button" id="btnConfirmarCantera" class="btn-finalizar" disabled>Confirmar venta</button>
+                <button type="button" id="btnLimpiarCarrito" class="btn-secondary">Limpiar carrito</button>
+            </div>
+        </aside>
+
+    </main>
+
+    <!-- Form oculto para submit -->
+    <form id="formCantera" action="/ventas/finalizar-cantera" method="POST" style="display:none">
+        <input type="hidden" name="clienteId" id="formClienteId">
+        <input type="hidden" name="clienteNombre" id="formClienteNombre">
+        <input type="hidden" name="items" id="formItems">
+        <input type="hidden" name="metodoPago" id="formMetodoPago">
+        <input type="hidden" name="precioTotal" id="formPrecioTotal">
+    </form>

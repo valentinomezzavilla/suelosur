@@ -1,0 +1,168 @@
+<%
+  const badgeMap = { pendiente:'badge-pendiente', despachado:'badge-en-transito', entregado:'badge-activo', anulado:'badge-alerta' }
+  const badge = badgeMap[op.estado] || 'badge-pendiente'
+  const nroFormato = 'OP-' + String(op.nro_op).padStart(4,'0')
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title"><%= nroFormato %></h4>
+    <small class="text-muted">Emitida el <%= op.fecha_emision %> por <%= op.administrativo_nombre %></small>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge rounded-pill px-3 py-2 <%= badge %>"><%= op.estado %></span>
+    <% if (op.estado !== 'anulado') { %>
+      <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">🖨️ Remito</a>
+    <% } %>
+    <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Volver</a>
+  </div>
+</div>
+
+<div class="row g-4">
+
+  <!-- Info cliente -->
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header card-header-light">Cliente</div>
+      <div class="card-body">
+        <p class="fw-bold mb-1"><%= op.cliente_nombre %></p>
+        <% if (op.domicilio_ppal) { %>
+          <p class="text-muted small mb-1">📍 <%= op.domicilio_ppal %></p>
+        <% } %>
+        <% if (op.tel_whatsapp) { %>
+          <p class="text-muted small mb-0">📱 <%= op.tel_whatsapp %></p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Totales -->
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100 card-accent-orange">
+      <div class="card-body d-flex flex-column justify-content-center text-center">
+        <p class="text-muted small mb-1">Total</p>
+        <h3 class="fw-bold text-orange">
+          $<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+        </h3>
+      </div>
+    </div>
+  </div>
+
+  <!-- Acciones -->
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header card-header-light">Acciones</div>
+      <div class="card-body d-flex flex-column gap-2">
+        <% if (op.estado === 'pendiente') { %>
+          <form action="/ventas/<%= op.id %>/despachar" method="POST">
+            <button class="btn btn-naranja w-100">🚛 Marcar como Despachada</button>
+          </form>
+          <form action="/ventas/<%= op.id %>/entregar" method="POST">
+            <button class="btn btn-success w-100">✅ Confirmar Entrega</button>
+          </form>
+        <% } %>
+        <% if (op.estado === 'despachado') { %>
+          <form action="/ventas/<%= op.id %>/entregar" method="POST">
+            <button class="btn btn-success w-100">✅ Confirmar Entrega</button>
+          </form>
+        <% } %>
+        <% if (['pendiente','despachado'].includes(op.estado)) { %>
+          <form action="/ventas/<%= op.id %>/anular" method="POST"
+                onsubmit="return confirm('¿Anular esta orden? No se puede deshacer.')">
+            <button class="btn btn-outline-danger w-100">✕ Anular OP</button>
+          </form>
+        <% } %>
+        <% if (op.estado === 'entregado' || op.estado === 'anulado') { %>
+          <p class="text-muted text-center small mt-2">No hay acciones disponibles.</p>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detalle según tipo -->
+  <div class="col-12">
+    <% if (op.tipo_op === 'C' && op.contenedor) { %>
+      <div class="card shadow-sm">
+        <div class="card-header card-header-light">Alquiler de contenedor</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <small class="text-muted d-block">Contenedor asignado</small>
+              <p class="fw-bold mb-0">
+                <% if (op.contenedor.numero_contenedor) { %>
+                  N° <%= op.contenedor.numero_contenedor %>
+                <% } else { %>
+                  <span class="text-muted">— sin asignar —</span>
+                <% } %>
+              </p>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Plazo</small>
+              <p class="fw-bold mb-0"><%= op.contenedor.plazo_alquiler %> días</p>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Zona</small>
+              <p class="fw-bold mb-0"><%= op.contenedor.zona_entrega %></p>
+            </div>
+            <div class="col-md-3">
+              <small class="text-muted d-block">Precio</small>
+              <p class="fw-bold mb-0 text-orange">
+                $<%= (op.contenedor.precio_alquiler || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+              </p>
+            </div>
+            <div class="col-12">
+              <small class="text-muted d-block">Domicilio</small>
+              <p class="mb-0">📍 <%= op.contenedor.domicilio_entrega %></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="card shadow-sm">
+        <div class="card-header card-header-light">Productos</div>
+        <div class="card-body p-0">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Unidad</th>
+                <th class="text-end">Cantidad</th>
+                <th class="text-end">Precio Unit.</th>
+                <th class="text-end">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% op.detalles.forEach(d => { %>
+              <tr>
+                <td class="fw-semibold"><%= d.producto_nombre %></td>
+                <td class="text-muted"><%= d.unidad_medida %></td>
+                <td class="text-end"><%= d.cantidad_pedida.toFixed(2) %></td>
+                <td class="text-end">$<%= d.precio_unitario.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+                <td class="text-end fw-bold">$<%= d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td colspan="4" class="text-end fw-bold">TOTAL</td>
+                <td class="text-end fw-bold text-orange remito-total">
+                  $<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (op.observaciones) { %>
+  <div class="col-12">
+    <div class="card shadow-sm">
+      <div class="card-header card-header-light">Observaciones</div>
+      <div class="card-body"><%= op.observaciones %></div>
+    </div>
+  </div>
+  <% } %>
+
+</div>

@@ -1,0 +1,41 @@
+@use 'variables' as *;
+
+// ── Media queries ──────────────────────────────────────────────
+@mixin sm-down  { @media (max-width: #{$bp-sm - 0.02px}) { @content; } }
+@mixin md-down  { @media (max-width: #{$bp-md - 0.02px}) { @content; } }
+@mixin lg-down  { @media (max-width: #{$bp-lg - 0.02px}) { @content; } }
+@mixin xl-down  { @media (max-width: #{$bp-xl - 0.02px}) { @content; } }
+
+@mixin sm-up    { @media (min-width: $bp-sm) { @content; } }
+@mixin md-up    { @media (min-width: $bp-md) { @content; } }
+@mixin lg-up    { @media (min-width: $bp-lg) { @content; } }
+@mixin xl-up    { @media (min-width: $bp-xl) { @content; } }
+
+// ── Patrones ───────────────────────────────────────────────────
+@mixin truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@mixin scrollbar($w: 6px, $thumb: #ccc, $track: #f1f1f1, $thumb-hover: $accent) {
+  &::-webkit-scrollbar       { width: $w; }
+  &::-webkit-scrollbar-track { background: $track; }
+  &::-webkit-scrollbar-thumb { background: $thumb; border-radius: 3px; }
+  &::-webkit-scrollbar-thumb:hover { background: $thumb-hover; }
+}
+
+@mixin card-base {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+}
+
+@mixin reset-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}

@@ -1,0 +1,52 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">📦 Productos</h4>
+  <a href="/productos/nuevo" class="btn btn-naranja">+ Nuevo Producto</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!productos.length) { %>
+      <%- include('../../partials/empty_state', { icono: '📦', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/productos/nuevo', accionLabel: 'Crear primer producto' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Unidad</th>
+          <th class="text-end">Precio Referencia</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% productos.forEach(p => { %>
+        <tr class="<%= !p.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold"><%= p.nombre %></td>
+          <td><small class="text-muted"><%= p.unidad_medida %></small></td>
+          <td class="text-end fw-semibold text-orange">
+            $<%= Number(p.precio_referencia).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+          </td>
+          <td class="text-center">
+            <% if (p.activo) { %>
+              <span class="badge rounded-pill px-3 badge-activo">Activo</span>
+            <% } else { %>
+              <span class="badge rounded-pill px-3 badge-alerta">Inactivo</span>
+            <% } %>
+          </td>
+          <td class="text-center">
+            <a href="/productos/<%= p.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️</a>
+            <form action="/productos/<%= p.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= p.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
+                      title="<%= p.activo ? 'Desactivar' : 'Activar' %>">
+                <%= p.activo ? '🚫' : '✅' %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <%- include('../../partials/paginacion', { page, totalPaginas, total, limit, filtros }) %>
+    <% } %>
+  </div>
+</div>

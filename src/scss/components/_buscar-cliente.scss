@@ -1,0 +1,71 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.buscar-cliente {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  &__inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+
+    @include sm-down { grid-template-columns: 1fr; }
+  }
+
+  &__btns {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+
+    // El botón principal de búsqueda con contorno de marca (visible)
+    #btnBuscarCliente {
+      background: #fff;
+      color: $accent;
+      border: 1.5px solid $accent;
+
+      &:hover { background: $accent; color: #fff; border-color: $accent; }
+    }
+  }
+
+  &__resultado {
+    background: $bg-card-alt;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+    padding: 0.65rem 0.85rem;
+    font-size: $fs-sm;
+
+    .resultado-item {
+      padding: 0.4rem 0;
+      border-bottom: 1px solid $border-line;
+      cursor: pointer;
+
+      &:last-child { border-bottom: none; }
+      &:hover { background: $accent-soft; }
+    }
+  }
+
+  &__seleccionado {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    background: $accent-soft;
+    border: 1px solid $accent;
+    border-radius: $radius-md;
+    padding: 0.55rem 0.75rem;
+    font-size: $fs-sm;
+    color: $accent-dark;
+    flex-wrap: wrap;
+
+    > .btn-sm { margin-left: auto; }
+  }
+
+  &__crear {
+    background: $bg-card-alt;
+    border: 1px dashed $border;
+    border-radius: $radius-md;
+    padding: 0.85rem;
+  }
+}

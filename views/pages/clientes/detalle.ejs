@@ -1,0 +1,207 @@
+<main id="clientes-detalle">
+
+        <div class="page-header">
+            <div>
+                <a href="/clientes" class="back-link">← Clientes</a>
+                <h1 class="page-title">
+                  <% if (cliente.numero) { %><span class="text-orange">#<%= cliente.numero %></span> — <% } %><%= cliente.nombre %> <%= cliente.apellido %>
+                </h1>
+            </div>
+            <div style="display:flex; gap:0.5rem">
+                <a href="/clientes/<%= cliente.id %>/editar" class="btn-secondary-yellow">Editar</a>
+                <form action="/clientes/<%= cliente.id %>/toggle" method="POST" class="cliente-eliminar-form"
+                      onsubmit="return confirm('¿Dar de baja a <%= cliente.nombre %> <%= cliente.apellido %>?')">
+                    <button type="submit" class="btn-danger">Dar de baja</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Info basica -->
+        <div class="detail-card">
+            <p class="detalle-section-title">Informacion del cliente</p>
+            <div class="info-grid">
+                <div class="info-row">
+                    <span class="info-label">Nombre</span>
+                    <span class="info-value"><%= cliente.nombre %> <%= cliente.apellido %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">DNI</span>
+                    <span class="info-value"><%= cliente.dni || '—' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Telefono</span>
+                    <span class="info-value"><%= cliente.telefono || '—' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Email</span>
+                    <span class="info-value"><%= cliente.email || '—' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Direccion</span>
+                    <span class="info-value"><%= cliente.direccion || '—' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Cuenta corriente</span>
+                    <span class="info-value">
+                        <% if (cliente.cuentaCorriente) { %>
+                            <span class="badge badge--con-stock">Habilitada</span>
+                            — Saldo: <b>$<%= cliente.saldo.toLocaleString('es-AR') %></b>
+                        <% } else { %>
+                            <span class="badge badge--sin-stock">No habilitada</span>
+                            <form action="/clientes/<%= cliente.id %>/habilitar-cuenta" method="POST" style="display:inline; margin-left:0.5rem">
+                                <button type="submit" class="btn-sm btn-primary-green">Habilitar</button>
+                            </form>
+                        <% } %>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filtros del historial -->
+        <div class="historial-filtros-card">
+            <form method="GET" action="/clientes/<%= cliente.id %>" class="filtros-bar">
+                <div class="filtro-group">
+                    <label>Desde</label>
+                    <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde %>">
+                </div>
+                <div class="filtro-group">
+                    <label>Hasta</label>
+                    <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta %>">
+                </div>
+                <div class="filtro-group">
+                    <label>Operacion</label>
+                    <select name="tipoOp">
+                        <option value="">Todas</option>
+                        <option value="alquiler"     <%= filtros.tipoOp === 'alquiler'     ? 'selected' : '' %>>Alquileres</option>
+                        <option value="transaccion"  <%= filtros.tipoOp === 'transaccion'  ? 'selected' : '' %>>Transacciones</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">Filtrar</button>
+                <% if (filtros.fechaDesde || filtros.fechaHasta || filtros.tipoOp) { %>
+                    <a href="/clientes/<%= cliente.id %>" class="btn-secondary">Limpiar</a>
+                <% } %>
+            </form>
+        </div>
+
+        <!-- Historial de alquileres -->
+        <% if (!filtros.tipoOp || filtros.tipoOp === 'alquiler') { %>
+        <div class="clientes-historial">
+            <h2 class="clientes-historial__title">Historial de alquileres</h2>
+            <% if (alquileres.length === 0) { %>
+                <div class="clientes-historial__empty">Sin alquileres registrados</div>
+            <% } else { %>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Contenedor</th>
+                                <th>Inicio</th>
+                                <th>Fin</th>
+                                <th>Direccion</th>
+                                <th>Estado</th>
+                                <th>Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% alquileres.forEach(a => { %>
+                                <tr>
+                                    <td>#<%= a.id %></td>
+                                    <td><%= formatFecha(a.inicioAlquiler) %></td>
+                                    <td><%= formatFecha(a.finAlquiler) %></td>
+                                    <td><%= a.direccionAlquiler %></td>
+                                    <td>
+                                        <span class="badge badge--<%= a.estado === 'Alquilado' ? 'alquilado' : 'disponible' %>">
+                                            <%= a.estado %>
+                                        </span>
+                                    </td>
+                                    <td>$<%= a.precioAlquiler?.toLocaleString('es-AR') || '—' %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+        <% } %>
+
+        <!-- Deudas de cuenta corriente (transacciones con metodoPago=cuenta_corriente) -->
+        <% if (cliente.cuentaCorriente && deudasCC && deudasCC.length > 0) { %>
+        <div class="clientes-historial">
+            <h2 class="clientes-historial__title">Deudas de cuenta corriente</h2>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#ID Transaccion</th>
+                            <th>Tipo</th>
+                            <th>Descripcion</th>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                            <th>Estado</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% deudasCC.forEach(t => { %>
+                            <tr>
+                                <td>#<%= t.id %></td>
+                                <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
+                                <td><%= t.descripcion %></td>
+                                <td><%= t.fecha %></td>
+                                <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
+                                <td>
+                                    <% if (t.saldada) { %>
+                                        <span class="badge badge--con-stock">Saldada</span>
+                                    <% } else { %>
+                                        <span class="badge badge--sin-stock">Pendiente</span>
+                                    <% } %>
+                                </td>
+                                <td>
+                                    <% if (!t.saldada) { %>
+                                        <button type="button" class="btn-primary-green btn-sm" disabled title="Disponible en Sprint 4">Saldar</button>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <% } %>
+
+        <!-- Historial de transacciones -->
+        <% if (!filtros.tipoOp || filtros.tipoOp === 'transaccion') { %>
+        <div class="clientes-historial">
+            <h2 class="clientes-historial__title">Historial de transacciones</h2>
+            <% if (transacciones.length === 0) { %>
+                <div class="clientes-historial__empty">Sin transacciones registradas</div>
+            <% } else { %>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#ID</th>
+                                <th>Tipo</th>
+                                <th>Descripcion</th>
+                                <th>Fecha</th>
+                                <th>Monto</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% transacciones.slice().reverse().forEach(t => { %>
+                                <tr>
+                                    <td>#<%= t.id %></td>
+                                    <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
+                                    <td><%= t.descripcion %></td>
+                                    <td><%= t.fecha %></td>
+                                    <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } %>
+        </div>
+        <% } %>
+
+    </main>

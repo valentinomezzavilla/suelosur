@@ -1,0 +1,112 @@
+<%
+  const badgeOP = { pendiente:'badge-pendiente', despachado:'badge-en-transito', entregado:'badge-activo', anulado:'badge-alerta' }
+  const labelMaq = { en_planta:'En planta', despachada:'Despachada', en_uso:'En trabajo', a_retirar:'A retirar', en_servicio:'En servicio' }
+  const estaAnulado = alquiler.estado === 'anulado'
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title">
+      🚜 Alquiler Maq. OP-<%= String(alquiler.nro_op).padStart(4,'0') %>
+      <span class="badge rounded-pill ms-2 <%= badgeOP[alquiler.estado] %>"><%= alquiler.estado %></span>
+    </h4>
+    <small class="text-muted">Emitido: <%= new Date(alquiler.fecha_emision).toLocaleDateString('es-AR') %> · <%= alquiler.administrativo_nombre %></small>
+  </div>
+  <a href="/alquileres/maquinaria" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="row g-3 mb-4">
+
+  <!-- Info cliente -->
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header-orange px-3 py-2">👤 Cliente y Domicilio</div>
+      <div class="card-body">
+        <p class="fw-bold mb-1"><%= alquiler.cliente_nombre %></p>
+        <% if (alquiler.tel_whatsapp) { %><p class="text-muted small mb-2">📱 <%= alquiler.tel_whatsapp %></p><% } %>
+        <hr class="my-2">
+        <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
+        <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
+        <p class="mb-1"><strong>Días pactados:</strong> <%= alquiler.detalle?.plazo_alquiler %></p>
+        <p class="mb-1"><strong>Horas pactadas:</strong> <%= alquiler.detalle?.horas_pactadas || 0 %>h</p>
+        <p class="mb-0"><strong>Precio:</strong>
+          <%= (alquiler.detalle?.precio_total || 0) > 0 ? `$${alquiler.detalle.precio_total.toFixed(2)}` : '—' %>
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Info maquinaria + acciones -->
+  <div class="col-md-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header-orange px-3 py-2">🚜 Maquinaria y Estado</div>
+      <div class="card-body">
+        <% if (!alquiler.detalle?.id_maquinaria) { %>
+          <p class="text-muted fst-italic mb-3">Sin maquinaria asignada.</p>
+          <% if (!estaAnulado && alquiler.estado === 'pendiente') { %>
+            <form action="/alquileres/maquinaria/<%= alquiler.id %>/asignar" method="POST" class="d-flex gap-2">
+              <select name="id_maquinaria" class="form-select form-select-sm" required>
+                <option value="">Seleccionar...</option>
+                <% disponibles.forEach(m => { %><option value="<%= m.id %>"><%= m.nombre %> (<%= m.tipo %>)</option><% }) %>
+              </select>
+              <button type="submit" class="btn btn-sm btn-naranja text-nowrap">Asignar</button>
+            </form>
+          <% } %>
+        <% } else { %>
+          <p class="fw-bold fs-5 mb-1"><%= alquiler.detalle.maquinaria_nombre %></p>
+          <span class="badge badge-en-transito rounded-pill px-3"><%= labelMaq[alquiler.estadoMaquinaria?.estado_paso] || alquiler.estadoMaquinaria?.estado_paso || '—' %></span>
+          <% if (!estaAnulado) { %>
+            <div class="d-flex flex-wrap gap-2 mt-3">
+              <% if (alquiler.estado === 'pendiente') { %>
+                <form action="/alquileres/maquinaria/<%= alquiler.id %>/despachar" method="POST">
+                  <button class="btn btn-sm btn-naranja">🚛 Registrar salida</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'despachado') { %>
+                <form action="/alquileres/maquinaria/<%= alquiler.id %>/entregar" method="POST">
+                  <button class="btn btn-sm btn-naranja">⚒️ Confirmar inicio trabajo</button>
+                </form>
+              <% } %>
+              <% if (alquiler.estado === 'entregado') { %>
+                <form action="/alquileres/maquinaria/<%= alquiler.id %>/retirar" method="POST">
+                  <button class="btn btn-sm btn-outline-secondary">⚠️ Trabajo finalizado</button>
+                </form>
+                <form action="/alquileres/maquinaria/<%= alquiler.id %>/devolver" method="POST">
+                  <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta</button>
+                </form>
+              <% } %>
+              <% if (['pendiente','despachado'].includes(alquiler.estado)) { %>
+                <form action="/alquileres/maquinaria/<%= alquiler.id %>/anular" method="POST" onsubmit="return confirm('¿Anular este alquiler?')">
+                  <button class="btn btn-sm btn-outline-danger">❌ Anular</button>
+                </form>
+              <% } %>
+            </div>
+          <% } %>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Timeline -->
+<% if (alquiler.movimientos?.length) { %>
+<div class="card shadow-sm">
+  <div class="card-header-light px-3 py-2 fw-semibold">📋 Historial de movimientos</div>
+  <div class="card-body py-3">
+    <% alquiler.movimientos.forEach((m, i) => { %>
+    <div class="d-flex gap-3 mb-3">
+      <div class="flex-shrink-0"><div class="bg-orange rounded-circle" style="width:10px;height:10px;margin-top:5px;"></div></div>
+      <div class="flex-grow-1 pb-2">
+        <div class="d-flex justify-content-between">
+          <span class="fw-semibold"><%= labelMaq[m.estado_paso] || m.estado_paso %></span>
+          <small class="text-muted"><%= new Date(m.fecha_movimiento).toLocaleDateString('es-AR') %></small>
+        </div>
+        <% if (m.operario_nombre) { %><small class="text-muted">Operario: <%= m.operario_nombre %></small><% } %>
+        <% if (m.horas_trabajadas > 0) { %><small class="text-muted ms-2">Horas: <%= m.horas_trabajadas %>h</small><% } %>
+        <% if (m.observaciones) { %><p class="text-muted small mb-0 mt-1"><%= m.observaciones %></p><% } %>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+</div>
+<% } %>

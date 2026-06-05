@@ -1,0 +1,20 @@
+@use '../abstracts/variables' as *;
+
+.error-wrapper {
+  min-height: 60vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
+}
+
+.error-icon { font-size: 4rem; }
+
+.error-back-btn {
+  background: $accent;
+  color: #fff;
+  border-radius: $radius-md;
+
+  &:hover { background: $accent-dark; color: #fff; }
+}

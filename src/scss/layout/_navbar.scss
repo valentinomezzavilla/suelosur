@@ -1,0 +1,53 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.app-navbar {
+  background: #fff;
+  border-bottom: 1px solid $border;
+  padding: 0.9rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: $navbar-h;
+
+  @include md-down {
+    padding: 0.75rem 1rem;
+  }
+
+  .nav-title {
+    color: $dark;
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.05rem;
+    letter-spacing: -0.2px;
+    @include truncate;
+  }
+
+  .nav-date {
+    color: $muted;
+    font-size: 0.78rem;
+    text-transform: capitalize;
+
+    @include sm-down { display: none; }
+  }
+}
+
+// ── Botón hamburguesa (visible solo en mobile) ─────────────────
+.navbar-toggle {
+  @include reset-button;
+  display: none;
+  width: 36px;
+  height: 36px;
+  border-radius: $radius-md;
+  align-items: center;
+  justify-content: center;
+  color: $dark;
+  transition: background 0.12s;
+
+  &:hover { background: $bg-app; }
+
+  @include md-down { display: inline-flex; }
+
+  svg { width: 22px; height: 22px; }
+}

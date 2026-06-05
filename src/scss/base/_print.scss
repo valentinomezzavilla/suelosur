@@ -1,0 +1,5 @@
+@media print {
+  .no-print, .btn, #sidebar, .app-sidebar, .app-navbar, form { display: none !important; }
+  .card-header-orange,
+  .card-header-light { background: #eee !important; color: #000 !important; }
+}

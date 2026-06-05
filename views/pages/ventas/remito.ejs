@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Remito <%= 'OP-' + String(op.nro_op).padStart(4,'0') %> — Suelosur</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/css/main.css">
+</head>
+<body class="remito-body">
+
+  <!-- Controles (no se imprimen) -->
+  <div class="mb-3 no-print d-flex gap-2 align-items-center">
+    <button onclick="window.print()" class="btn btn-sm remito-print-btn">🖨️ Imprimir / Guardar PDF</button>
+    <a href="/ventas/<%= op.id %>" class="btn btn-sm btn-outline-secondary">← Volver a la OP</a>
+    <span class="ms-auto badge badge-activo px-3 py-2">✅ Entrega confirmada</span>
+  </div>
+
+  <!-- Encabezado -->
+  <div class="d-flex justify-content-between align-items-start mb-4">
+    <div>
+      <div class="remito-brand">SUELOSUR</div>
+      <small class="text-muted">Áridos · Contenedores · Movimiento de suelo</small><br>
+      <small class="text-muted">Córdoba, Argentina</small>
+    </div>
+    <div class="text-end">
+      <h5 class="fw-bold mb-0 remito-title">REMITO</h5>
+      <div class="fw-bold fs-4">
+        <% if (op.nro_remito) { %>
+          0001-<%= String(op.nro_remito).padStart(8, '0') %>
+        <% } else { %>
+          OP-<%= String(op.nro_op).padStart(4,'0') %>
+        <% } %>
+      </div>
+      <small class="text-muted">OP interna: <%= String(op.nro_op).padStart(4,'0') %></small><br>
+      <small class="text-muted">Fecha: <%= new Date(op.fecha_emision).toLocaleDateString('es-AR') %></small>
+    </div>
+  </div>
+
+  <hr>
+
+  <!-- Cliente -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <p class="text-muted small mb-0 text-uppercase fw-bold">Cliente</p>
+      <p class="fw-bold mb-0 fs-5"><%= op.cliente_nombre %></p>
+      <% if (op.domicilio_ppal) { %><p class="text-muted small mb-0">📍 <%= op.domicilio_ppal %></p><% } %>
+      <% if (op.tel_whatsapp)   { %><p class="text-muted small mb-0">Tel: <%= op.tel_whatsapp %></p><% } %>
+    </div>
+    <div class="col-md-6 text-md-end">
+      <p class="text-muted small mb-0 text-uppercase fw-bold">Atendido por</p>
+      <p class="mb-0"><%= op.administrativo_nombre %></p>
+      <% const tipoLabel = { M: 'Venta áridos', C: 'Alquiler contenedor', B: 'Bobcat' } %>
+      <span class="badge badge-rol"><%= tipoLabel[op.tipo_op] || op.tipo_op %></span>
+    </div>
+  </div>
+
+  <!-- Tabla: Material (tipo M / B) -->
+  <% if (op.tipo_op !== 'C') { %>
+  <table class="table table-bordered align-middle mb-4">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Producto</th>
+        <th class="text-center">Unidad</th>
+        <th class="text-end">Cantidad</th>
+        <th class="text-end">Precio Unit.</th>
+        <th class="text-end">Subtotal</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% op.detalles.forEach((d, i) => { %>
+      <tr>
+        <td class="text-muted"><%= i + 1 %></td>
+        <td class="fw-semibold"><%= d.producto_nombre %></td>
+        <td class="text-center text-muted"><%= d.unidad_medida %></td>
+        <td class="text-end"><%= d.cantidad_pedida.toFixed(2) %></td>
+        <td class="text-end">$<%= d.precio_unitario.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+        <td class="text-end fw-bold">$<%= d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+      </tr>
+      <% }) %>
+      <tr class="remito-total-row remito-total">
+        <td colspan="5" class="text-end fw-bold">TOTAL</td>
+        <td class="text-end fw-bold">
+          $<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <% } %>
+
+  <!-- Tabla: Alquiler de contenedor (tipo C) -->
+  <% if (op.tipo_op === 'C' && op.contenedor) { %>
+  <table class="table table-bordered align-middle mb-4">
+    <thead>
+      <tr>
+        <th>Descripción</th>
+        <th class="text-center">Contenedor</th>
+        <th>Domicilio de entrega</th>
+        <th class="text-center">Plazo</th>
+        <th class="text-end">Precio</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="fw-semibold">Alquiler de contenedor de obra</td>
+        <td class="text-center fw-bold">
+          <% if (op.contenedor.numero_contenedor) { %>
+            N° <%= op.contenedor.numero_contenedor %>
+          <% } else { %>
+            <span class="text-muted">—</span>
+          <% } %>
+        </td>
+        <td>
+          <%= op.contenedor.domicilio_entrega %>
+          <% if (op.contenedor.zona_entrega) { %>
+            <small class="text-muted"> (zona <%= op.contenedor.zona_entrega %>)</small>
+          <% } %>
+        </td>
+        <td class="text-center"><%= op.contenedor.plazo_alquiler %> días</td>
+        <td class="text-end fw-bold">
+          $<%= (op.contenedor.precio_alquiler || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+        </td>
+      </tr>
+      <tr class="remito-total-row remito-total">
+        <td colspan="4" class="text-end fw-bold">TOTAL</td>
+        <td class="text-end fw-bold">
+          $<%= (op.contenedor.precio_alquiler || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <% } %>
+
+  <% if (op.observaciones) { %>
+  <div class="mb-4">
+    <p class="text-muted small fw-bold text-uppercase mb-1">Observaciones</p>
+    <p class="mb-0"><%= op.observaciones %></p>
+  </div>
+  <% } %>
+
+  <!-- Firmas -->
+  <div class="d-flex justify-content-between mt-5 pt-4">
+    <div class="firma-box">Firma y aclaración cliente</div>
+    <div class="firma-box">Firma Suelosur</div>
+  </div>
+
+</body>
+</html>

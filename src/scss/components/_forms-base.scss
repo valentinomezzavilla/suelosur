@@ -1,0 +1,198 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ── Sección de formulario (card sin borde) ────────────────────
+.form-section {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1rem;
+
+  &__title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: $dark;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    margin: 0 0 0.85rem;
+  }
+
+  @include md-down {
+    padding: 1rem;
+  }
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+
+  &:last-child { margin-bottom: 0; }
+
+  label {
+    font-size: $fs-xs;
+    font-weight: 600;
+    color: $ink-soft;
+    letter-spacing: 0.2px;
+  }
+
+  input:not([type="radio"]):not([type="checkbox"]),
+  select,
+  textarea {
+    width: 100%;
+    min-height: $control-h;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+    padding: 0 0.75rem;
+    font-size: $fs-sm;
+    background: #fff;
+    color: $dark;
+    font-family: inherit;
+    transition: border-color 0.12s, box-shadow 0.12s;
+
+    &:focus {
+      outline: none;
+      border-color: $accent;
+      box-shadow: $focus-ring;
+    }
+
+    &::placeholder { color: #9ca3af; }
+  }
+
+  // Radios / checkboxes: tamaño nativo, nunca estirados
+  input[type="radio"],
+  input[type="checkbox"] {
+    width: auto;
+    min-height: 0;
+    accent-color: $accent;
+    flex-shrink: 0;
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 80px;
+    padding: 0.6rem 0.75rem;
+    line-height: 1.5;
+  }
+}
+
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.85rem;
+
+  @include sm-down { grid-template-columns: 1fr; }
+}
+
+.form-hint {
+  font-size: $fs-xs;
+  color: $muted;
+  margin: 0.4rem 0 0;
+}
+
+// ── Form-group con un solo botón en lugar de input ────────────
+.form-group--action {
+  align-self: end;
+  justify-content: flex-end;
+  margin-bottom: 0.85rem;
+}
+
+// Botón "Buscar en mapa" — misma altura que los inputs hermanos, contorno teal visible
+.btn-buscar-mapa {
+  align-self: stretch;
+  width: 100%;
+  height: $control-h;
+  min-height: $control-h;
+  font-weight: 600;
+  gap: 0.4rem;
+  background: #fff;
+  color: $accent;
+  border: 1.5px solid $accent;
+
+  &:hover {
+    background: $accent;
+    color: #fff;
+    border-color: $accent;
+  }
+}
+
+// ── Inputs en variantes ──────────────────────────────────────
+.input-sm {
+  width: 100%;
+  min-height: $control-h-sm;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  padding: 0 0.6rem;
+  font-size: $fs-sm;
+  background: #fff;
+  color: $dark;
+  transition: border-color 0.12s, box-shadow 0.12s;
+
+  &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
+}
+
+.input-readonly {
+  background: $bg-app !important;
+  color: $dark;
+  font-weight: 600;
+  cursor: default;
+}
+
+.input-total {
+  font-size: 1.1rem;
+  color: $accent;
+  font-weight: 700;
+}
+
+// ── Toggles + radios ─────────────────────────────────────────
+.toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: $fs-sm;
+  color: $ink-soft;
+  cursor: pointer;
+  user-select: none;
+
+  input[type="checkbox"] { accent-color: $accent; }
+}
+
+.toggle-sm {
+  font-size: $fs-xs;
+  color: $muted;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  cursor: pointer;
+  margin: 0 0 0.5rem;
+  font-size: $fs-sm;
+  color: $dark;
+  transition: border-color 0.12s, background 0.12s;
+
+  &:hover { border-color: #9ca3af; background: $bg-card-alt; }
+
+  input[type=radio] { accent-color: $accent; }
+
+  &:has(input[type=radio]:checked) {
+    border-color: $accent;
+    background: $accent-soft;
+    color: $accent;
+    font-weight: 600;
+  }
+}
+
+.precio-total-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+
+  > input { flex: 1; }
+}

@@ -1,0 +1,58 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0 text-dark-title">👥 <%= titulo %></h4>
+  <a href="/clientes" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="<%= cliente ? `/clientes/${cliente.id}?_method=PUT` : '/clientes' %>" method="POST">
+
+      <div class="mb-3">
+        <label class="form-label">Nombre / Razón social *</label>
+        <input type="text" name="nombre" class="form-control"
+               value="<%= cliente?.nombre || '' %>" required autofocus>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Tipo de cliente</label>
+          <select name="tipo_cliente" class="form-select">
+            <option value="">Seleccionar...</option>
+            <% ['Empresa','Particular','Obra','Constructor'].forEach(t => { %>
+              <option value="<%= t %>" <%= cliente?.tipo_cliente === t ? 'selected' : '' %>><%= t %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Zona</label>
+          <select name="zona" class="form-select">
+            <option value="">Seleccionar...</option>
+            <% ['Norte','Sur','Este','Oeste','Centro'].forEach(z => { %>
+              <option value="<%= z %>" <%= cliente?.zona === z ? 'selected' : '' %>><%= z %></option>
+            <% }) %>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Domicilio principal</label>
+        <input type="text" name="domicilio_ppal" class="form-control"
+               value="<%= cliente?.domicilio_ppal || '' %>" placeholder="Calle y número">
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Teléfono / WhatsApp</label>
+        <input type="text" name="tel_whatsapp" class="form-control"
+               value="<%= cliente?.tel_whatsapp || '' %>" placeholder="Ej: 3514001234">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4">
+          <%= cliente ? 'Guardar cambios' : 'Crear cliente' %>
+        </button>
+        <a href="/clientes" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+
+    </form>
+  </div>
+</div>

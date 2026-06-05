@@ -1,0 +1,63 @@
+<!-- Componente reutilizable: Buscar cliente -->
+<div class="buscar-cliente" id="buscarClienteComponent">
+    <h3 class="form-section__title">Cliente</h3>
+
+    <div class="buscar-cliente__inputs">
+        <div class="form-group">
+            <label for="buscarClienteId">N° Cliente</label>
+            <input type="number" id="buscarClienteId" placeholder="Ej: 1" min="1" class="input-sm">
+        </div>
+        <div class="form-group">
+            <label for="buscarClienteDni">DNI</label>
+            <input type="number" id="buscarClienteDni" placeholder="Ej: 30000001" class="input-sm">
+        </div>
+        <div class="form-group">
+            <label for="buscarClienteNombre">Nombre o Apellido</label>
+            <input type="text" id="buscarClienteNombre" placeholder="Ej: Juan" class="input-sm">
+        </div>
+        <div class="buscar-cliente__btns">
+            <button type="button" class="btn-secondary" id="btnBuscarCliente">Buscar cliente</button>
+            <button type="button" class="btn-secondary" id="btnMostrarCrearCliente">+ Crear nuevo</button>
+        </div>
+    </div>
+
+    <!-- Resultado de busqueda -->
+    <div id="buscarClienteResultado" class="buscar-cliente__resultado" style="display:none"></div>
+
+    <!-- Cliente seleccionado -->
+    <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="display:none">
+        <span class="badge badge--con-stock">Cliente seleccionado</span>
+        <span id="clienteSeleccionadoNombre"></span>
+        <button type="button" class="btn-sm btn-secondary" id="btnCambiarCliente">Cambiar</button>
+    </div>
+
+    <!-- Formulario crear cliente inline -->
+    <div id="crearClienteInline" class="buscar-cliente__crear" style="display:none">
+        <p class="form-hint">No se encontraron resultados. Podes crear un cliente nuevo:</p>
+        <div class="form-row-2">
+            <div class="form-group">
+                <label for="nuevoClienteNombre">Nombre *</label>
+                <input type="text" id="nuevoClienteNombre" placeholder="Nombre">
+            </div>
+            <div class="form-group">
+                <label for="nuevoClienteApellido">Apellido *</label>
+                <input type="text" id="nuevoClienteApellido" placeholder="Apellido">
+            </div>
+        </div>
+        <div class="form-row-2">
+            <div class="form-group">
+                <label for="nuevoClienteTelefono">Telefono *</label>
+                <input type="number" id="nuevoClienteTelefono" placeholder="351 000 0000">
+            </div>
+            <div class="form-group">
+                <label for="nuevoClienteDni">DNI (opcional)</label>
+                <input type="number" id="nuevoClienteDni" placeholder="30000000">
+            </div>
+        </div>
+        <button type="button" class="btn-primary" id="btnCrearClienteInline">Crear cliente</button>
+    </div>
+
+    <!-- Hidden inputs para el form padre -->
+    <input type="hidden" name="clienteId" id="inputClienteId">
+    <input type="hidden" name="clienteNombre" id="inputClienteNombre">
+</div>

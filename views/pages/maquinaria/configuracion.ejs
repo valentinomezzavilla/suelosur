@@ -1,0 +1,83 @@
+<div class="page-header">
+  <div>
+    <a href="/maquinaria" class="back-link">← Maquinaria</a>
+    <h1 class="page-title">Configuración — Maquinaria</h1>
+  </div>
+</div>
+
+<div class="config-page">
+
+  <!-- Configuracion global -->
+  <form action="/maquinaria/configuracion" method="POST" class="config-form">
+    <div class="form-section">
+      <h3 class="form-section__title">Precios globales (por defecto)</h3>
+      <p class="form-hint">Estos valores se aplican a todas las máquinas que no tengan un precio personalizado.</p>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="precio_por_hora_default">Precio por hora ($)</label>
+          <input type="number" name="precio_por_hora_default" id="precio_por_hora_default" value="<%= defaults.precioHora %>" min="0" step="100">
+        </div>
+        <div class="form-group">
+          <label for="precio_por_dia_default">Precio por día ($)</label>
+          <input type="number" name="precio_por_dia_default" id="precio_por_dia_default" value="<%= defaults.precioDia %>" min="0" step="100">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="modo_precio_default">Modalidad por defecto</label>
+        <select name="modo_precio_default" id="modo_precio_default" class="form-select">
+          <option value="hora" <%= defaults.modoPrecio === 'hora' ? 'selected' : '' %>>Por hora</option>
+          <option value="dia" <%= defaults.modoPrecio === 'dia' ? 'selected' : '' %>>Por día</option>
+        </select>
+      </div>
+      <button type="submit" class="btn-primary">Guardar globales</button>
+    </div>
+  </form>
+
+  <!-- Configuracion por maquinaria -->
+  <div class="form-section" style="margin-top:2rem">
+    <h3 class="form-section__title">Precios personalizados por máquina</h3>
+    <p class="form-hint">Los valores personalizados sobreescriben los globales. Dejá vacío para usar el precio global.</p>
+
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Máquina</th>
+            <th>Tipo</th>
+            <th>$/Hora</th>
+            <th>$/Día</th>
+            <th>Modo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% maquinaria.forEach(m => {
+            const ov = overrides[m.id] || {}
+          %>
+            <tr>
+              <form action="/maquinaria/configuracion/<%= m.id %>" method="POST">
+                <td class="fw-semibold"><%= m.nombre %></td>
+                <td><span class="badge badge--alquilado"><%= m.tipo %></span></td>
+                <td>
+                  <input type="number" name="precio_por_hora" value="<%= m.precio_por_hora || '' %>" min="0" step="100" class="input-sm" placeholder="<%= defaults.precioHora %>" style="width:100px">
+                </td>
+                <td>
+                  <input type="number" name="precio_por_dia" value="<%= m.precio_por_dia || '' %>" min="0" step="100" class="input-sm" placeholder="<%= defaults.precioDia %>" style="width:100px">
+                </td>
+                <td>
+                  <select name="modo_precio" class="form-select form-select-sm" style="width:100px">
+                    <option value="">Global</option>
+                    <option value="hora" <%= m.modo_precio === 'hora' ? 'selected' : '' %>>Hora</option>
+                    <option value="dia" <%= m.modo_precio === 'dia' ? 'selected' : '' %>>Día</option>
+                  </select>
+                </td>
+                <td><button type="submit" class="btn-primary btn-sm">Guardar</button></td>
+              </form>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,294 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Ventas — cantera & viaje
+// ═══════════════════════════════════════════════════════════════
+
+// ── Cantera: layout productos | carrito ────────────────────────
+.ventas-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.25rem;
+  align-items: start;
+
+  @include lg-down { grid-template-columns: 1fr 320px; }
+  @include md-down { grid-template-columns: 1fr; }
+}
+
+.ventas-productos {
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+  }
+
+  &__title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: $dark;
+    margin: 0.25rem 0 0;
+    letter-spacing: -0.3px;
+  }
+}
+
+.ventas-lista-productos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.85rem;
+
+  @include sm-down { grid-template-columns: 1fr 1fr; }
+}
+
+.ventas-card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+
+  &:hover { border-color: $accent; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.1); }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  &__nombre {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: $dark;
+  }
+
+  &__precio {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: $accent;
+    line-height: 1.1;
+  }
+
+  &--sin-stock {
+    opacity: 0.65;
+    background: $bg-app;
+
+    .ventas-card__precio { color: $muted; }
+  }
+
+  .addToCart {
+    width: 100%;
+    margin-top: 0.25rem;
+  }
+}
+
+// ── Carrito (aside) ────────────────────────────────────────────
+.carrito-aside {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1.15rem;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+
+  @include md-down {
+    position: static;
+    max-height: none;
+  }
+}
+
+.carrito-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: $dark;
+  margin: 0 0 0.5rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid $border;
+}
+
+#cartItemsContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 60px;
+
+  &:empty::before {
+    content: 'Carrito vacío';
+    color: $muted;
+    font-size: $fs-sm;
+    font-style: italic;
+    display: block;
+    text-align: center;
+    padding: 1rem 0;
+  }
+}
+
+.cart-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  background: $bg-app;
+  border: 1px solid $border-soft;
+  border-radius: $radius-md;
+  font-size: $fs-sm;
+
+  &__info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  &__nombre {
+    font-weight: 600;
+    color: $dark;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__meta {
+    font-size: $fs-xs;
+    color: $muted;
+    line-height: 1.2;
+
+    b { color: $dark; font-weight: 700; }
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    flex-shrink: 0;
+  }
+}
+
+.qty-btn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  color: $dark;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+
+  &:hover {
+    background: $accent-soft;
+    border-color: $accent;
+    color: $accent;
+  }
+
+  &:active { transform: translateY(1px); }
+
+  &.qty-remove {
+    margin-left: 0.2rem;
+    color: $danger;
+
+    &:hover {
+      background: $danger-soft;
+      border-color: $danger-border;
+      color: $danger;
+    }
+  }
+}
+
+.qty-display {
+  min-width: 22px;
+  text-align: center;
+  font-weight: 700;
+  color: $dark;
+  font-size: $fs-sm;
+}
+
+.cart_empty {
+  color: $muted;
+  font-size: $fs-sm;
+  font-style: italic;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.cart-total-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.65rem 0.85rem;
+  background: $accent;
+  color: #fff;
+  border-radius: $radius-md;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.precio-editable-section {
+  background: $bg-app;
+  border-radius: $radius-md;
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.carrito-seccion {
+  padding-top: 0.5rem;
+  border-top: 1px dashed $border;
+}
+
+.cart-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid $border;
+}
+
+// ── Viaje: layout 2 columnas ───────────────────────────────────
+.viaje-form-layout {
+  display: grid;
+  grid-template-columns: 1fr 400px;
+  gap: 1.25rem;
+  align-items: start;
+
+  @include lg-down { grid-template-columns: 1fr 340px; }
+  @include md-down { grid-template-columns: 1fr; }
+}
+
+.viaje-form-main,
+.viaje-form-aside {
+  display: flex;
+  flex-direction: column;
+}
+
+.viaje-form-aside {
+  position: sticky;
+  top: 1rem;
+
+  @include md-down { position: static; }
+}

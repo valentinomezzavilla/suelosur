@@ -1,0 +1,26 @@
+<main id="confirmacion-page">
+
+        <div class="confirmacion-card">
+            <div class="confirmacion-icon">&#10003;</div>
+            <h1 class="confirmacion-titulo">Venta confirmada</h1>
+            <div class="confirmacion-detalles">
+                <div class="info-row">
+                    <span class="info-label">Tipo</span>
+                    <span class="info-value"><%= tipo === 'cantera' ? 'Venta en Cantera' : 'Venta con Viaje' %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Cliente</span>
+                    <span class="info-value"><%= cliente %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Total</span>
+                    <span class="info-value detalle-precio">$<%= Number(total).toLocaleString('es-AR') %></span>
+                </div>
+            </div>
+            <div class="confirmacion-acciones">
+                <a href="/ventas/cantera" class="btn-primary">Nueva venta</a>
+                <a href="/ventas" class="btn-secondary">Volver a ventas</a>
+            </div>
+        </div>
+
+    </main>

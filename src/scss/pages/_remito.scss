@@ -1,0 +1,48 @@
+@use '../abstracts/variables' as *;
+
+.remito-body {
+  font-family: $font-base;
+  font-size: 0.9rem;
+  color: $dark;
+  padding: 1.5rem;
+}
+
+.remito-brand {
+  color: $accent;
+  font-weight: 800;
+  font-size: 1.6rem;
+  letter-spacing: 1px;
+}
+
+.remito-title { color: $accent; }
+
+.remito-total td {
+  color: $accent;
+  font-size: 1.1rem;
+}
+
+.remito-total-row td {
+  background: $accent-soft;
+  font-weight: bold;
+}
+
+.remito-print-btn {
+  background: $accent;
+  color: #fff;
+  font-weight: 600;
+
+  &:hover { background: $accent-dark; color: #fff; }
+}
+
+.firma-box {
+  border-top: 1px solid #ccc;
+  width: 200px;
+  text-align: center;
+  padding-top: 6px;
+  font-size: 0.8rem;
+  color: $muted-soft;
+}
+
+@media print {
+  .remito-body { font-size: 0.85rem; }
+}

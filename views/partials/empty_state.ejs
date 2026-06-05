@@ -1,0 +1,7 @@
+<div class="empty-state <%= typeof compact !== 'undefined' && compact ? 'empty-state--compact' : '' %>">
+  <div class="empty-state__icon"><%= typeof icono !== 'undefined' ? icono : '📭' %></div>
+  <p class="empty-state__msg"><%= typeof mensaje !== 'undefined' ? mensaje : 'Aún no hay datos para mostrar.' %></p>
+  <% if (typeof accionHref !== 'undefined' && typeof accionLabel !== 'undefined') { %>
+    <a href="<%= accionHref %>" class="btn btn-naranja btn-sm"><%= accionLabel %></a>
+  <% } %>
+</div>

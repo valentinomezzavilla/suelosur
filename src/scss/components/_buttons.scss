@@ -1,0 +1,99 @@
+@use '../abstracts/variables' as *;
+
+.btn-naranja {
+  background: $accent;
+  color: #fff;
+  border: none;
+  border-radius: $radius-md;
+  font-weight: 600;
+
+  &:hover { background: $accent-dark; color: #fff; }
+}
+
+.btn-logout {
+  background: $dark-2;
+  color: $accent;
+  border: 1px solid $accent;
+}
+
+.btn-primary-modern {
+  background: $accent;
+  color: #fff;
+  border: 1px solid $accent;
+  border-radius: $radius-md;
+  font-weight: 500;
+  font-size: $fs-sm;
+  padding: 0.5rem 1rem;
+  transition: background 0.12s, transform 0.05s;
+
+  &:hover  { background: $accent-dark; border-color: $accent-dark; color: #fff; }
+  &:active { transform: translateY(1px); }
+}
+
+.btn-secondary-modern {
+  background: #fff;
+  color: $dark;
+  border: 1px solid #d1d5db;
+  border-radius: $radius-md;
+  font-weight: 500;
+  font-size: $fs-sm;
+  padding: 0.5rem 1rem;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover { background: #f3f4f6; border-color: #9ca3af; }
+}
+
+.btn-ghost {
+  background: #eef2f5;
+  color: $ink-soft;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  font-size: $fs-sm;
+  padding: 0.4rem 0.9rem;
+  border-radius: $radius-md;
+  transition: color 0.12s, background 0.12s, border-color 0.12s;
+
+  &:hover { color: $dark; background: #e2e8f0; border-color: #94a3b8; }
+}
+
+// ── Refuerzo de botones Bootstrap tenues (más visibles) ────────
+.btn-outline-secondary {
+  --bs-btn-color: #{$ink-soft};
+  --bs-btn-border-color: #cbd5e1;
+  --bs-btn-bg: #fff;
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #{$accent};
+  --bs-btn-hover-border-color: #{$accent};
+  --bs-btn-font-weight: 600;
+}
+
+.btn-outline-success {
+  --bs-btn-color: #{$success};
+  --bs-btn-border-color: #{$success};
+  --bs-btn-hover-bg: #{$success};
+  --bs-btn-hover-border-color: #{$success};
+  --bs-btn-font-weight: 600;
+}
+
+.btn-outline-danger {
+  --bs-btn-color: #{$danger};
+  --bs-btn-border-color: #{$danger};
+  --bs-btn-hover-bg: #{$danger};
+  --bs-btn-hover-border-color: #{$danger};
+  --bs-btn-font-weight: 600;
+}
+
+.btn-icon-danger {
+  background: transparent;
+  border: none;
+  color: $danger;
+  font-size: 1.1rem;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: background 0.12s;
+
+  &:hover { background: rgba(231, 76, 60, 0.1); }
+}

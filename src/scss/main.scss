@@ -1,0 +1,43 @@
+// ═══════════════════════════════════════════════════════════════
+// Suelosur — Hoja de estilos principal
+// Arquitectura: abstracts → base → layout → components → pages → utilities
+// ═══════════════════════════════════════════════════════════════
+
+// ── Base ───────────────────────────────────────────────────────
+@use 'base/root';
+@use 'base/scrollbar';
+@use 'base/print';
+
+// ── Layout ─────────────────────────────────────────────────────
+@use 'layout/app-shell';
+@use 'layout/sidebar';
+@use 'layout/navbar';
+
+// ── Componentes ────────────────────────────────────────────────
+@use 'components/buttons';
+@use 'components/buttons-base';
+@use 'components/cards';
+@use 'components/tables';
+@use 'components/forms';
+@use 'components/forms-base';
+@use 'components/badges';
+@use 'components/badges-pill';
+@use 'components/alerts';
+@use 'components/modals';
+@use 'components/pagination';
+@use 'components/empty-state';
+@use 'components/resumen';
+@use 'components/back-link';
+@use 'components/buscar-cliente';
+
+// ── Páginas ────────────────────────────────────────────────────
+@use 'pages/auth';
+@use 'pages/error';
+@use 'pages/placeholder';
+@use 'pages/remito';
+@use 'pages/ventas';
+@use 'pages/alquileres';
+@use 'pages/configuracion';
+
+// ── Utilidades (al final, para que ganen por especificidad) ────
+@use 'utilities/helpers';

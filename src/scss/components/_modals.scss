@@ -1,0 +1,121 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.modal-header-dark {
+  background: $dark;
+  color: #fff;
+
+  .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+}
+
+.modal-content {
+  border-radius: $radius-lg;
+  border: 1px solid $border;
+}
+
+// En mobile dejamos el modal full-width
+@include sm-down {
+  .modal-dialog { margin: 0.5rem; }
+}
+
+// ── Modal propio (overlay) — usado fuera de Bootstrap ──────────
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1060;
+  display: none; // el JS lo cambia a flex
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(17, 24, 39, 0.55);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.modal-box {
+  background: $bg-card;
+  border-radius: $radius-xl;
+  width: 100%;
+  max-width: 480px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.32);
+  animation: modal-pop 0.16s ease-out;
+
+  &--lg { max-width: 800px; }
+}
+
+@keyframes modal-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.5rem;
+  border-bottom: 1px solid $border-soft;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(180deg, $bg-card 0%, $bg-card-alt 100%);
+  z-index: 1;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: $dark;
+  letter-spacing: -0.2px;
+
+  span { color: $accent; }
+}
+
+.modal-close {
+  background: transparent;
+  border: 0;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: $muted;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: $radius-sm;
+
+  &:hover { color: $dark; background: $bg-app; }
+}
+
+.modal-body {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+
+  // Secciones del formulario dentro del modal: más prolijas y jerarquizadas
+  .form-section {
+    margin: 0;
+    background: $bg-card-alt;
+    border: 1px solid $border-soft;
+    border-radius: $radius-lg;
+    padding: 1.1rem 1.25rem;
+  }
+
+  .form-section__title {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: $accent;
+    border-bottom: 1px solid $border-soft;
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.9rem;
+  }
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding-top: 0.25rem;
+}

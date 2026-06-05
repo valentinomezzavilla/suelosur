@@ -1,0 +1,146 @@
+<main id="venta-viaje">
+
+        <div class="page-header">
+            <div>
+                <a href="/ventas" class="back-link">← Ventas</a>
+                <h1 class="page-title">Venta con Viaje</h1>
+            </div>
+        </div>
+
+        <form action="/ventas/crear-viaje" method="POST" class="viaje-form-layout" id="formViaje">
+
+            <div class="viaje-form-main">
+
+                <!-- Cliente -->
+                <div class="form-section">
+                    <%- include('../../partials/buscar_cliente') %>
+                    <div class="form-group" style="margin-top:0.75rem">
+                        <label for="telefonoViaje">Telefono de contacto *</label>
+                        <input type="text" name="telefono" id="telefonoViaje" placeholder="351 000 0000" required>
+                    </div>
+                </div>
+
+                <!-- Fecha y hora -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Fecha y hora del viaje</h3>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="fechaViaje">Fecha *</label>
+                            <input type="date" name="fecha" id="fechaViaje" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="horaViaje">Hora</label>
+                            <input type="time" name="hora" id="horaViaje">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direccion -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Direccion de entrega</h3>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="calleViaje">Calle *</label>
+                            <input type="text" name="calle" id="calleViaje" placeholder="Av. Siempre Viva" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="numeroViaje">Numero</label>
+                            <input type="text" name="numero" id="numeroViaje" placeholder="123">
+                        </div>
+                    </div>
+                    <button type="button" id="btnBuscarDireccionViaje" class="btn-secondary btn-buscar-mapa">📍 Buscar en mapa</button>
+                    <p id="msgMapaViaje" class="form-hint">Ingresa calle y numero para buscar.</p>
+                    <div id="mapaViaje" style="display:none;margin-top:0.75rem">
+                        <div id="mapaViajeLeaflet" style="width:100%;height:250px;border-radius:8px"></div>
+                    </div>
+                </div>
+
+                <!-- Descripcion -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Descripcion (opcional)</h3>
+                    <div class="form-group">
+                        <textarea name="descripcion" id="descripcionViaje" rows="3" placeholder="Detalles adicionales del viaje..."></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Columna derecha: Producto + Precios + Pago -->
+            <aside class="viaje-form-aside">
+
+                <!-- Producto -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Producto</h3>
+                    <div class="form-group">
+                        <label for="productoViaje">Producto *</label>
+                        <select name="productoId" id="productoViaje" required>
+                            <option value="">— Seleccionar producto —</option>
+                            <% productos.forEach(p => { %>
+                                <%
+                                  const stock  = Number(p.disponible_real ?? p.stock ?? 0)
+                                  const precio = Number(p.precio_referencia ?? p.precio ?? 0)
+                                  const nombre = p.nombre || p.producto || ''
+                                %>
+                                <% if (stock > 0) { %>
+                                <option value="<%= p.id %>" data-precio="<%= precio %>" data-stock="<%= stock %>">
+                                    <%= nombre %> — $<%= precio.toLocaleString('es-AR') %> (<%= stock %> <%= p.unidad_medida || 'unid.' %>)
+                                </option>
+                                <% } %>
+                            <% }) %>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cantidadViaje">Cantidad *</label>
+                        <input type="number" name="cantidad" id="cantidadViaje" value="1" min="1" required>
+                    </div>
+                </div>
+
+                <!-- Precios -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Precios</h3>
+                    <div class="form-group">
+                        <label>Subtotal producto</label>
+                        <input type="text" id="subtotalProducto" readonly class="input-readonly">
+                        <input type="hidden" name="precioProducto" id="precioProductoHidden">
+                    </div>
+                    <div class="form-group">
+                        <label for="precioFlete">Precio del flete</label>
+                        <input type="number" name="precioFlete" id="precioFlete" value="35000" min="0" step="100">
+                    </div>
+                    <div class="form-group">
+                        <label>Total</label>
+                        <div class="precio-total-row">
+                            <input type="text" id="totalDisplay" readonly class="input-readonly input-total">
+                            <label class="toggle-row toggle-sm">
+                                <input type="checkbox" id="checkEditarTotal">
+                                <span>Editar</span>
+                            </label>
+                        </div>
+                        <input type="number" name="precioTotal" id="precioTotalInput" style="display:none" min="0" step="100">
+                    </div>
+                </div>
+
+                <!-- Metodo de pago -->
+                <%- include('../../partials/metodo_pago') %>
+
+                <!-- Opcion finalizar -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Tipo de operacion</h3>
+                    <div class="form-group">
+                        <label class="radio-option">
+                            <input type="radio" name="tipoOperacion" value="programar" checked id="opProgramar">
+                            <span>Programar viaje</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="tipoOperacion" value="finalizar" id="opFinalizar">
+                            <span>Finalizar ahora</span>
+                        </label>
+                    </div>
+                    <input type="hidden" name="finalizarAhora" id="inputFinalizarAhora" value="false">
+                </div>
+
+                <button type="submit" class="btn-finalizar" id="btnConfirmarViaje">Confirmar venta</button>
+            </aside>
+
+        </form>
+
+    </main>

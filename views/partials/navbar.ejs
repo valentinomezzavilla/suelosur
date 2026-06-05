@@ -1,0 +1,8 @@
+<header class="app-navbar">
+  <h6 class="nav-title">
+    <%= typeof titulo !== 'undefined' ? titulo : 'Sistema de Gestión' %>
+  </h6>
+  <div class="d-flex align-items-center gap-3">
+    <small class="nav-date"><%= new Date().toLocaleDateString('es-AR', { weekday:'long', year:'numeric', month:'long', day:'numeric' }) %></small>
+  </div>
+</header>

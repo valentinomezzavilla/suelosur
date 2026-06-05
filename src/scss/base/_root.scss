@@ -1,0 +1,30 @@
+@use '../abstracts/variables' as *;
+
+:root {
+  --accent:      #{$accent};
+  --accent-dark: #{$accent-dark};
+  --accent-soft: #{$accent-soft};
+  --dark:        #{$dark};
+  --mid:         #{$dark-2};
+  --sidebar-w:   #{$sidebar-w};
+}
+
+body {
+  font-family: $font-base;
+  font-size:   $fs-base;
+  color:       $dark;
+  background:  $bg-app;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Foco accesible y consistente en controles Bootstrap (filtros, modales)
+.form-control:focus,
+.form-select:focus {
+  border-color: $accent;
+  box-shadow: $focus-ring;
+}
+
+// Botones Bootstrap usados en cabeceras: misma altura/peso que el resto
+.btn { font-weight: 600; }
+.btn-sm { font-weight: 600; }

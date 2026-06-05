@@ -1,0 +1,102 @@
+<%
+  // Estado computado del alquiler (PENDIENTE, DESPACHADO, EN CURSO, RETIRADO)
+  function estadoAlquiler(a) {
+    if (a.estado === 'anulado')    return { label: 'Anulado',     badge: 'badge-alerta' }
+    if (a.estado === 'pendiente')  return { label: 'Pendiente',   badge: 'badge-pendiente' }
+    if (a.estado === 'despachado') return { label: 'Despachado',  badge: 'badge-en-transito' }
+    if (a.estado === 'entregado') {
+      if (['en_planta','vaciado'].includes(a.contenedor_estado)) return { label: 'Retirado', badge: 'badge-activo' }
+      return { label: 'En curso', badge: 'badge-en-transito' }
+    }
+    return { label: a.estado, badge: 'badge-pendiente' }
+  }
+
+  function semaforoDias(dias) {
+    if (dias == null) return ''
+    if (dias <= 0) return 'dias-rojo'
+    if (dias <= 1) return 'dias-alerta'
+    return 'dias-ok'
+  }
+
+  function tabla(lista, opts = {}) {
+    if (!lista.length) return `<div class="empty-state empty-state--compact"><div class="empty-state__icon">📭</div><p class="empty-state__msg">${opts.empty || 'Aún no hay datos para mostrar.'}</p></div>`
+    return `
+    <table class="table-modern mb-0">
+      <thead>
+        <tr>
+          <th>OP / Remito</th>
+          <th>Cliente</th>
+          <th class="text-center">Contenedor</th>
+          <th>Domicilio</th>
+          <th class="text-center">Plazo</th>
+          <th class="text-center">${opts.colDias || 'Días restantes'}</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center"></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${lista.map(a => {
+          const est = estadoAlquiler(a)
+          return `
+          <tr>
+            <td class="fw-bold">
+              <a href="/alquileres/contenedores/${a.id}" class="text-decoration-none text-orange">OP-${String(a.nro_op).padStart(4,'0')}</a>
+              ${a.nro_remito ? `<br><small class="text-muted">R: 0001-${String(a.nro_remito).padStart(8,'0')}</small>` : ''}
+            </td>
+            <td class="fw-semibold">${a.cliente_nombre}</td>
+            <td class="text-center">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : '<span class="text-muted fst-italic">Sin asignar</span>'}</td>
+            <td><small class="text-muted">${a.domicilio_entrega || '—'}</small></td>
+            <td class="text-center"><small>${a.plazo_alquiler}d</small></td>
+            <td class="text-center ${semaforoDias(a.dias_restantes)} fw-semibold">
+              ${opts.mostrarDias === 'planificada' ? (a.fecha_entrega_planificada ? new Date(a.fecha_entrega_planificada + 'T12:00:00').toLocaleDateString('es-AR') : '—')
+                : (a.dias_restantes != null ? a.dias_restantes + 'd' : '—')}
+            </td>
+            <td class="text-center"><span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span></td>
+            <td class="text-center"><a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+          </tr>`
+        }).join('')}
+      </tbody>
+    </table>`
+  }
+%>
+
+<div class="page-header mb-4">
+  <h4 class="page-title">Alquileres de contenedores</h4>
+  <div class="d-flex gap-2">
+    <a href="/contenedores/circuito" class="btn btn-ghost btn-sm">Circuito del día</a>
+    <a href="/alquileres/contenedores/nuevo" class="btn btn-primary-modern btn-sm">+ Nuevo alquiler</a>
+  </div>
+</div>
+
+<!-- 1. Alquileres por finalizar (mañana) -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center" style="background:#fef9e7;">
+    <span class="card-modern-title">Por finalizar — finalizan hoy o mañana</span>
+    <span class="badge badge-pendiente rounded-pill px-3"><%= grupos.porFinalizar.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <%- tabla(grupos.porFinalizar, { empty: 'No hay alquileres finalizando próximamente.' }) %>
+  </div>
+</div>
+
+<!-- 2. Alquileres actuales (en curso) -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center">
+    <span class="card-modern-title">Alquileres actuales — en curso</span>
+    <span class="badge badge-en-transito rounded-pill px-3"><%= grupos.actuales.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <%- tabla(grupos.actuales, { empty: 'No hay alquileres activos.' }) %>
+  </div>
+</div>
+
+<!-- 3. Alquileres programados (pendientes / despachados) -->
+<div class="card-modern mb-3">
+  <div class="card-modern-header d-flex justify-content-between align-items-center">
+    <span class="card-modern-title">Alquileres programados — pendientes de iniciar</span>
+    <span class="badge badge-activo rounded-pill px-3"><%= grupos.programados.length %></span>
+  </div>
+  <div class="card-modern-body p-0">
+    <%- tabla(grupos.programados, { empty: 'No hay alquileres programados.', colDias: 'Inicio planificado', mostrarDias: 'planificada' }) %>
+  </div>
+</div>

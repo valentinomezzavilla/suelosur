@@ -1,0 +1,181 @@
+<main id="transacciones-page">
+
+            <div class="page-header">
+                <h1 class="page-title">Transacciones</h1>
+            </div>
+
+            <!-- Filtros -->
+            <form method="GET" action="/transacciones" class="filtros-bar filtros-bar--extended">
+                <div class="filtro-group">
+                    <label>#ID</label>
+                    <input type="number" name="id" value="<%= filtros.id %>" placeholder="Buscar por ID..." min="1">
+                </div>
+                <div class="filtro-group">
+                    <label>Tipo</label>
+                    <select name="tipo">
+                        <option value="todos" <%=filtros.tipo==='todos' || !filtros.tipo ? 'selected' : '' %>>Todos
+                        </option>
+                        <% tipos.forEach(t=> { %>
+                            <option value="<%= t %>" <%=filtros.tipo===t ? 'selected' : '' %>><%= t %>
+                            </option>
+                            <% }) %>
+                    </select>
+                </div>
+                <div class="filtro-group">
+                    <label>#ID Cliente</label>
+                    <input type="number" name="idCliente" value="<%= filtros.idCliente %>"
+                        placeholder="ID del cliente...">
+                </div>
+                <div class="filtro-group">
+                    <label>Cliente</label>
+                    <input type="text" name="cliente" value="<%= filtros.cliente %>"
+                        placeholder="Nombre del cliente...">
+                </div>
+                <div class="filtro-group">
+                    <label>Mes (historial)</label>
+                    <input type="month" name="mes" value="<%= filtros.mes %>">
+                </div>
+                <div class="filtro-group">
+                    <label>Desde</label>
+                    <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde %>">
+                </div>
+                <div class="filtro-group">
+                    <label>Hasta</label>
+                    <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta %>">
+                </div>
+                <div class="filtro-group">
+                    <label>Monto mín.</label>
+                    <input type="number" name="montoMin" value="<%= filtros.montoMin %>" placeholder="0" min="0">
+                </div>
+                <div class="filtro-group">
+                    <label>Monto máx.</label>
+                    <input type="number" name="montoMax" value="<%= filtros.montoMax %>" placeholder="Sin límite"
+                        min="0">
+                </div>
+                <button type="submit" class="btn-primary">Filtrar</button>
+                <% if (filtros.id || filtros.tipo || filtros.idCliente || filtros.cliente || filtros.fechaDesde || filtros.fechaHasta ||
+                    filtros.montoMin || filtros.montoMax || filtros.mes) { %>
+                    <a href="/transacciones" class="btn-secondary">Limpiar</a>
+                    <% } %>
+            </form>
+
+            <div class="total-mes-bar" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.5rem 0;font-weight:600">
+                <span>Total <% if (filtros.mes) { %>de <%= filtros.mes %><% } else { %>filtrado<% } %>:</span>
+                <span>$<%= (totalMes || 0).toLocaleString('es-AR') %></span>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#ID</th>
+                            <th>Tipo</th>
+                            <th>Cliente</th>
+                            <th>Descripción</th>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% if (transacciones.length===0) { %>
+                            <tr>
+                                <td colspan="7" class="td-vacia">No hay transacciones que coincidan con los filtros</td>
+                            </tr>
+                            <% } %>
+                                <% transacciones.forEach(t=> { %>
+                                    <tr>
+                                        <td>#<%= t.id %>
+                                        </td>
+                                        <td>
+                                            <span
+                                                class="badge badge--tipo-<%= t.tipo.toLowerCase().replace(/ /g,'-') %>">
+                                                <%= t.tipo %>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <%= t.cliente %>
+                                        </td>
+                                        <td>
+                                            <%= t.descripcion %>
+                                        </td>
+                                        <td>
+                                            <%= t.fecha %>
+                                        </td>
+                                        <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %>
+                                        </td>
+                                        <td>
+                                            <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
+                                                data-id="<%= t.id %>" data-tipo="<%= t.tipo %>"
+                                                data-cliente="<%= t.cliente %>" data-descripcion="<%= t.descripcion %>"
+                                                data-fecha="<%= t.fecha %>" data-monto="<%= t.monto %>"
+                                                data-metodo-pago="<%= t.metodoPago || '' %>">
+                                                Ver
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <% }) %>
+                    </tbody>
+                </table>
+            </div>
+
+            <% if (totalPaginas > 1) { %>
+                <%
+                    const qs = Object.entries(filtros).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+                    const base = '/transacciones?' + (qs ? qs + '&' : '');
+                %>
+                <nav class="pagination" style="display:flex;justify-content:center;align-items:center;gap:0.75rem;padding:1rem 0;margin-top:0.5rem">
+                    <% if (pagina > 1) { %>
+                        <a href="<%= base %>page=<%= pagina - 1 %>" class="btn-secondary btn-sm">← Anterior</a>
+                    <% } else { %>
+                        <span class="btn-secondary btn-sm" style="opacity:0.4;pointer-events:none">← Anterior</span>
+                    <% } %>
+                    <span style="font-weight:600">Página <%= pagina %> de <%= totalPaginas %> (<%= totalTransacciones %> resultados)</span>
+                    <% if (pagina < totalPaginas) { %>
+                        <a href="<%= base %>page=<%= pagina + 1 %>" class="btn-secondary btn-sm">Siguiente →</a>
+                    <% } else { %>
+                        <span class="btn-secondary btn-sm" style="opacity:0.4;pointer-events:none">Siguiente →</span>
+                    <% } %>
+                </nav>
+            <% } %>
+
+        </main>
+
+        <!-- Modal detalle transaccion -->
+        <div id="modal-transaccion" class="modal-overlay" style="display:none">
+            <div class="modal-box">
+                <div class="modal-header">
+                    <h2 class="modal-title">Detalle de transacción <span id="modal-t-id"></span></h2>
+                    <button type="button" class="modal-close" id="cerrarModalTransaccion">✕</button>
+                </div>
+                <div class="alquiler-resumen__rows" style="margin-top:1rem">
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Tipo</span>
+                        <span id="modal-t-tipo"></span>
+                    </div>
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Cliente</span>
+                        <span id="modal-t-cliente"></span>
+                    </div>
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Descripción</span>
+                        <span id="modal-t-descripcion"></span>
+                    </div>
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Fecha</span>
+                        <span id="modal-t-fecha"></span>
+                    </div>
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Monto</span>
+                        <span id="modal-t-monto" style="font-weight:700"></span>
+                    </div>
+                    <div class="alquiler-resumen__row">
+                        <span class="alquiler-resumen__label">Método de pago</span>
+                        <span id="modal-t-metodo-pago" style="font-weight:700"></span>
+                    </div>
+                </div>
+                <div class="modal-actions" style="margin-top:1.5rem">
+                    <button type="button" class="btn-secondary" id="cerrarModalTransaccionBtn">Cerrar</button>
+                </div>
+            </div>
+        </div>

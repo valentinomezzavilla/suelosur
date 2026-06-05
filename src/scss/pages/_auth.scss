@@ -1,0 +1,54 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.auth-body {
+  min-height: 100vh;
+  background: $bg-app;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.login-card {
+  border-radius: $radius-xl;
+  overflow: hidden;
+  width: 100%;
+  max-width: 420px;
+}
+
+.login-header {
+  background: $dark;
+  color: #fff;
+  text-align: center;
+  padding: 1.75rem 1.5rem 1.5rem;
+
+  .brand-name {
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.6rem;
+    letter-spacing: 2px;
+    line-height: 1.15;
+  }
+
+  .sub {
+    color: $muted-light;
+    font-size: 0.78rem;
+    letter-spacing: 0.3px;
+  }
+}
+
+.login-input  { border-radius: $radius-md; }
+
+.login-submit {
+  background: $accent;
+  border: none;
+  border-radius: $radius-md;
+  padding: 0.7rem;
+  color: #fff;
+  font-weight: 600;
+
+  &:hover { background: $accent-dark; color: #fff; }
+}
+
+.login-footer { color: $muted-light; }
