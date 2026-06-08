@@ -41,7 +41,7 @@ const ClientesController = {
       if (!cli) { req.flash('error', 'No encontrado.'); return res.redirect('/clientes') }
       const cliente = { ...cli, cuentaCorriente: !!cli.cuenta_corriente, telefono: cli.telefono || cli.tel_whatsapp, direccion: cli.domicilio_ppal, saldo: cli.saldo ?? 0 }
       const movimientos   = ClientesModel.movimientos(cliente.id)
-      const transacciones = TransaccionesModel.filtrar({ clienteId: cliente.id })
+      const transacciones = TransaccionesModel.filtrar({ clienteId: cliente.id, limit: 1000 }).rows
       const alquileres    = []
       const deudasCC      = transacciones
         .filter(t => t.metodo_pago === 'cuenta_corriente')

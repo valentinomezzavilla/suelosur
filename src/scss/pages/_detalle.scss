@@ -1,0 +1,197 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Páginas de detalle / información (clientes, ventas, cuentas, confirmación)
+// ═══════════════════════════════════════════════════════════════
+
+.detail-card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+  box-shadow: $shadow-sm;
+}
+
+.detalle-section-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: $dark;
+  margin: 0 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid $border-soft;
+}
+
+.detalle-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  align-items: start;
+
+  @include md-down { grid-template-columns: 1fr; }
+}
+
+// ── Grilla de info (label / value) ────────────────────────────
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.85rem 1.75rem;
+}
+
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid $border-line;
+
+  &:last-child { border-bottom: none; }
+}
+
+.info-label {
+  color: $muted;
+  font-size: $fs-sm;
+  font-weight: 500;
+}
+
+.info-value {
+  color: $dark;
+  font-weight: 600;
+  font-size: $fs-sm;
+  text-align: right;
+}
+
+.detalle-precio { color: $accent; font-weight: 700; font-size: 1.1rem; }
+
+.saldo-negativo { color: $danger; }
+.saldo-positivo { color: $success; }
+
+// ── Filtros de historial + secciones de historial ────────────
+.historial-filtros-card {
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  box-shadow: $shadow-xs;
+}
+
+.clientes-historial {
+  margin-bottom: 1.75rem;
+
+  &__title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: $dark;
+    margin: 0 0 0.75rem;
+  }
+
+  &__empty {
+    color: $muted;
+    font-style: italic;
+    font-size: $fs-sm;
+    text-align: center;
+    padding: 1.25rem;
+    background: $bg-card;
+    border: 1px dashed $border;
+    border-radius: $radius-md;
+  }
+}
+
+// ── Secciones genéricas (cuentas) ─────────────────────────────
+.cuentas-section { margin-bottom: 2rem; }
+
+.section-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: $dark;
+  margin: 0 0 0.75rem;
+}
+
+.section-subtitle { font-size: $fs-sm; color: $muted; }
+
+// ── Filas de resumen en modal de transacción ──────────────────
+.alquiler-resumen__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.alquiler-resumen__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid $border-soft;
+
+  &:last-child { border-bottom: none; }
+}
+
+.alquiler-resumen__label {
+  color: $muted;
+  font-size: $fs-sm;
+  font-weight: 500;
+}
+
+// ── Pantalla de confirmación de venta ─────────────────────────
+.confirmacion-card {
+  max-width: 480px;
+  margin: 3rem auto;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-xl;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: $shadow-md;
+}
+
+.confirmacion-icon {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.1rem;
+  border-radius: 50%;
+  background: $success-soft;
+  color: $success;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+}
+
+.confirmacion-titulo {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: $dark;
+  margin: 0 0 1.5rem;
+}
+
+.confirmacion-detalles {
+  text-align: left;
+  background: $bg-card-alt;
+  border: 1px solid $border-soft;
+  border-radius: $radius-md;
+  padding: 0.5rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.confirmacion-acciones {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}

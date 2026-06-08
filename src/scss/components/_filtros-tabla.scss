@@ -1,0 +1,125 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Barra de filtros + tabla "data-table" (transacciones, detalle cliente)
+// ═══════════════════════════════════════════════════════════════
+
+.filtros-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 1rem 1.15rem;
+  margin-bottom: 1rem;
+  box-shadow: $shadow-xs;
+}
+
+.filtro-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+
+  label {
+    font-size: $fs-xs;
+    font-weight: 600;
+    color: $ink-soft;
+    letter-spacing: 0.2px;
+  }
+
+  input,
+  select {
+    min-height: $control-h;
+    min-width: 140px;
+    border: 1px solid $border;
+    border-radius: $radius-md;
+    padding: 0 0.7rem;
+    font-size: $fs-sm;
+    background: #fff;
+    color: $dark;
+    font-family: inherit;
+    transition: border-color 0.12s, box-shadow 0.12s;
+
+    &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
+  }
+}
+
+// ── Tabla standalone (sin Bootstrap) ──────────────────────────
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+}
+
+.data-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: $fs-sm;
+
+  thead th {
+    background: $bg-card-alt;
+    color: $muted;
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    text-align: left;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid $border;
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid $border-line;
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: $accent-soft; }
+}
+
+.td-vacia {
+  text-align: center;
+  color: $muted;
+  font-style: italic;
+  padding: 2.25rem 1rem !important;
+}
+
+.td-acciones { white-space: nowrap; text-align: right; }
+
+.transaccion-monto {
+  font-weight: 700;
+  color: $dark;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.total-mes-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  background: $accent-soft;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  font-weight: 700;
+  color: $accent-dark;
+}
+
+// Badges de tipo de transacción (dinámicos: badge--tipo-xxx)
+.badge[class*="--tipo-"] {
+  background: $accent-soft;
+  color: $accent-dark;
+  border-color: rgba(13, 148, 136, 0.35);
+}

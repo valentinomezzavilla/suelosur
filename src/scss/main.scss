@@ -26,6 +26,7 @@
 @use 'components/modals';
 @use 'components/pagination';
 @use 'components/empty-state';
+@use 'components/filtros-tabla';
 @use 'components/resumen';
 @use 'components/back-link';
 @use 'components/buscar-cliente';
@@ -38,6 +39,7 @@
 @use 'pages/ventas';
 @use 'pages/alquileres';
 @use 'pages/configuracion';
+@use 'pages/detalle';
 
 // ── Utilidades (al final, para que ganen por especificidad) ────
 @use 'utilities/helpers';
