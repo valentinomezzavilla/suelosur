@@ -598,6 +598,178 @@ db.exec(`
 
 
 // ═══════════════════════════════════════════════════════════════════
+// BLOQUE 10 — CHOFERES Y FLOTA (gestión integral)
+// ═══════════════════════════════════════════════════════════════════
+
+db.exec(`
+
+  -- [N] Gestión documental polimórfica (choferes y camiones)
+  CREATE TABLE IF NOT EXISTS documentos (
+    id               TEXT PRIMARY KEY,
+    entidad_tipo     TEXT NOT NULL CHECK (entidad_tipo IN ('empleado','vehiculo')),
+    entidad_id       TEXT NOT NULL,
+    tipo             TEXT NOT NULL,
+    descripcion      TEXT DEFAULT '',
+    archivo          TEXT,
+    fecha_emision    TEXT,
+    fecha_vencimiento TEXT,
+    created_at       TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_documentos_entidad ON documentos(entidad_tipo, entidad_id);
+
+  -- [N] Asignación chofer ↔ camión (historial)
+  CREATE TABLE IF NOT EXISTS asignaciones_chofer (
+    id            TEXT PRIMARY KEY,
+    id_empleado   TEXT NOT NULL REFERENCES empleados(id),
+    id_vehiculo   TEXT NOT NULL REFERENCES flota_vehiculos(id),
+    tipo          TEXT NOT NULL DEFAULT 'principal' CHECK (tipo IN ('principal','alternativo')),
+    fecha_desde   TEXT NOT NULL DEFAULT (date('now')),
+    fecha_hasta   TEXT,
+    activo        INTEGER DEFAULT 1,
+    observaciones TEXT DEFAULT '',
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Control horario / jornadas
+  CREATE TABLE IF NOT EXISTS control_horario (
+    id             TEXT PRIMARY KEY,
+    id_empleado    TEXT NOT NULL REFERENCES empleados(id),
+    fecha          TEXT NOT NULL DEFAULT (date('now')),
+    hora_ingreso   TEXT,
+    hora_egreso    TEXT,
+    horas_normales REAL DEFAULT 0,
+    horas_extra    REAL DEFAULT 0,
+    motivo_extra   TEXT DEFAULT '',
+    aprobado       INTEGER DEFAULT 0,
+    aprobado_por   TEXT,
+    observaciones  TEXT DEFAULT '',
+    created_at     TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Pagos a empleados (sueldos, anticipos, viáticos, HE, etc.)
+  CREATE TABLE IF NOT EXISTS pagos_empleado (
+    id           TEXT PRIMARY KEY,
+    id_empleado  TEXT NOT NULL REFERENCES empleados(id),
+    tipo         TEXT NOT NULL CHECK (tipo IN ('sueldo','anticipo','viatico','horas_extra','bonificacion','descuento','liquidacion')),
+    periodo      TEXT,
+    monto        REAL NOT NULL DEFAULT 0,
+    fecha        TEXT NOT NULL DEFAULT (date('now')),
+    descripcion  TEXT DEFAULT '',
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Historial de estados operativos de vehículos
+  CREATE TABLE IF NOT EXISTS estado_vehiculo_hist (
+    id            TEXT PRIMARY KEY,
+    id_vehiculo   TEXT NOT NULL REFERENCES flota_vehiculos(id),
+    estado        TEXT NOT NULL,
+    fecha         TEXT NOT NULL DEFAULT (datetime('now')),
+    id_usuario    TEXT,
+    observaciones TEXT DEFAULT ''
+  );
+
+  -- [N] Reglas de mantenimiento por km / fecha (NULL id_vehiculo = global)
+  CREATE TABLE IF NOT EXISTS config_mantenimiento (
+    id           TEXT PRIMARY KEY,
+    id_vehiculo  TEXT REFERENCES flota_vehiculos(id),
+    tipo         TEXT NOT NULL,
+    cada_km      INTEGER,
+    cada_meses   INTEGER,
+    descripcion  TEXT DEFAULT '',
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Gastos del vehículo (seguros, impuestos, peajes, multas, ...)
+  CREATE TABLE IF NOT EXISTS gastos_vehiculo (
+    id           TEXT PRIMARY KEY,
+    id_vehiculo  TEXT NOT NULL REFERENCES flota_vehiculos(id),
+    categoria    TEXT NOT NULL CHECK (categoria IN ('seguro','impuesto','peaje','estacionamiento','multa','otro')),
+    descripcion  TEXT DEFAULT '',
+    monto        REAL NOT NULL DEFAULT 0,
+    fecha        TEXT NOT NULL DEFAULT (date('now')),
+    vencimiento  TEXT,
+    estado       TEXT DEFAULT 'pagado',
+    archivo      TEXT,
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Posiciones GPS (vacía — preparada para integración futura)
+  CREATE TABLE IF NOT EXISTS gps_posiciones (
+    id           TEXT PRIMARY KEY,
+    id_vehiculo  TEXT NOT NULL REFERENCES flota_vehiculos(id),
+    lat          REAL,
+    lng          REAL,
+    velocidad    REAL,
+    estado       TEXT,
+    fecha        TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Auditoría de cambios (choferes, flota, etc.)
+  CREATE TABLE IF NOT EXISTS auditoria (
+    id           TEXT PRIMARY KEY,
+    entidad_tipo TEXT NOT NULL,
+    entidad_id   TEXT NOT NULL,
+    accion       TEXT NOT NULL,
+    id_usuario   TEXT,
+    detalle      TEXT DEFAULT '',
+    created_at   TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON auditoria(entidad_tipo, entidad_id);
+
+  -- [N] Configuración de notificaciones (email diferido)
+  CREATE TABLE IF NOT EXISTS config_notificaciones (
+    id          TEXT PRIMARY KEY,
+    clave       TEXT NOT NULL UNIQUE,
+    valor       TEXT NOT NULL DEFAULT '',
+    created_at  TEXT DEFAULT (datetime('now'))
+  );
+
+  -- [N] Asignación polimórfica de recursos a choferes (camión / máquina)
+  CREATE TABLE IF NOT EXISTS asignaciones_recurso (
+    id            TEXT PRIMARY KEY,
+    id_empleado   TEXT NOT NULL REFERENCES empleados(id),
+    recurso_tipo  TEXT NOT NULL CHECK (recurso_tipo IN ('camion','maquina')),
+    recurso_id    TEXT NOT NULL,
+    fecha_desde   TEXT NOT NULL DEFAULT (date('now')),
+    fecha_hasta   TEXT,
+    activo        INTEGER DEFAULT 1,
+    observaciones TEXT DEFAULT '',
+    created_at    TEXT DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_asig_recurso ON asignaciones_recurso(recurso_tipo, recurso_id, activo);
+  CREATE INDEX IF NOT EXISTS idx_asig_empleado ON asignaciones_recurso(id_empleado, activo);
+
+  -- [N] Ingresos de stock con trazabilidad de proveedor
+  CREATE TABLE IF NOT EXISTS stock_ingresos (
+    id             TEXT PRIMARY KEY,
+    id_producto    TEXT NOT NULL REFERENCES productos(id),
+    id_proveedor   TEXT REFERENCES proveedores(id),
+    cantidad       REAL NOT NULL,
+    costo_unitario REAL DEFAULT 0,
+    id_usuario     TEXT,
+    observaciones  TEXT DEFAULT '',
+    fecha          TEXT NOT NULL DEFAULT (date('now')),
+    created_at     TEXT DEFAULT (datetime('now'))
+  );
+
+`)
+
+// Seed de configuración de notificaciones (valores por defecto)
+;(() => {
+  const defaults = [
+    ['email_activo', '0'],
+    ['email_destinatarios', ''],
+    ['umbral_dias', '90,60,30'],
+    ['alertas_licencias', '1'],
+    ['alertas_documentos', '1'],
+    ['alertas_mantenimiento', '1'],
+  ]
+  const ins = db.prepare(`INSERT OR IGNORE INTO config_notificaciones (id, clave, valor) VALUES (?, ?, ?)`)
+  defaults.forEach(([k, v]) => ins.run(crypto.randomUUID(), k, v))
+})()
+
+
+// ═══════════════════════════════════════════════════════════════════
 // MIGRACIONES — columnas añadidas en sprints posteriores
 // Se ejecutan con try/catch: si la columna ya existe, SQLite lanza
 // error y se ignora silenciosamente.
@@ -652,6 +824,63 @@ const migrations = [
   // ── Sprint 2+ — Método de pago en alquileres ───────────────────
   `ALTER TABLE op_detalle_contenedor ADD COLUMN metodo_pago TEXT`,
   `ALTER TABLE op_detalle_maquinaria ADD COLUMN metodo_pago TEXT`,
+
+  // ── Fase 3 — Remito firmado (archivo subido) por operación ──────
+  `ALTER TABLE op_encabezado ADD COLUMN archivo_remito TEXT`,
+
+  // ── Normalización de IDs legibles en transacciones (numero por tipo) ─
+  `ALTER TABLE transacciones ADD COLUMN numero INTEGER`,
+
+  // ── Recursos asignados a la operación (camión + chofer) ─────────
+  `ALTER TABLE op_encabezado ADD COLUMN id_chofer TEXT`,
+  `ALTER TABLE op_encabezado ADD COLUMN id_camion TEXT`,
+  `ALTER TABLE op_encabezado ADD COLUMN asignacion_fecha TEXT`,
+  `ALTER TABLE op_encabezado ADD COLUMN asignacion_usuario TEXT`,
+
+  // ── Módulo Choferes — campos extra en empleados ─────────────────
+  `ALTER TABLE empleados ADD COLUMN cuil TEXT`,
+  `ALTER TABLE empleados ADD COLUMN contacto_emergencia TEXT`,
+  `ALTER TABLE empleados ADD COLUMN contacto_emergencia_tel TEXT`,
+  `ALTER TABLE empleados ADD COLUMN convenio TEXT`,
+  `ALTER TABLE empleados ADD COLUMN categoria_laboral TEXT`,
+  `ALTER TABLE empleados ADD COLUMN sueldo_basico REAL DEFAULT 0`,
+  `ALTER TABLE empleados ADD COLUMN supervisor_id TEXT`,
+  `ALTER TABLE empleados ADD COLUMN es_chofer INTEGER DEFAULT 0`,
+  `ALTER TABLE empleados ADD COLUMN licencia_numero TEXT`,
+  `ALTER TABLE empleados ADD COLUMN licencia_fecha_emision TEXT`,
+  `ALTER TABLE empleados ADD COLUMN licencia_organismo TEXT`,
+  `ALTER TABLE empleados ADD COLUMN fecha_baja TEXT`,
+  `ALTER TABLE empleados ADD COLUMN motivo_baja TEXT`,
+
+  // ── Módulo Flota — campos extra en flota_vehiculos ──────────────
+  `ALTER TABLE flota_vehiculos ADD COLUMN marca TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN modelo TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN anio INTEGER`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN nro_chasis TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN nro_motor TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN tipo_unidad TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN capacidad_carga REAL`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN estado_operativo TEXT DEFAULT 'disponible'`,
+
+  // ── Flota — combustible y mantenimiento ─────────────────────────
+  `ALTER TABLE combustible ADD COLUMN estacion TEXT`,
+  `ALTER TABLE mantenimiento_vehiculo ADD COLUMN categoria TEXT DEFAULT 'preventivo'`,
+  `ALTER TABLE mantenimiento_vehiculo ADD COLUMN descripcion TEXT DEFAULT ''`,
+  `ALTER TABLE mantenimiento_vehiculo ADD COLUMN proximo_km INTEGER`,
+  `ALTER TABLE mantenimiento_vehiculo ADD COLUMN archivo TEXT`,
+
+  // ── Flota de Personal — campos de gestión de flota ──────────────
+  `ALTER TABLE flota_vehiculos ADD COLUMN numero_interno INTEGER`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN fecha_ultimo_mant TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN fecha_proximo_mant TEXT`,
+  `ALTER TABLE flota_vehiculos ADD COLUMN observaciones TEXT DEFAULT ''`,
+  `ALTER TABLE maquinaria ADD COLUMN numero_interno INTEGER`,
+  `ALTER TABLE maquinaria ADD COLUMN horas_uso REAL DEFAULT 0`,
+  `ALTER TABLE maquinaria ADD COLUMN estado_operativo TEXT DEFAULT 'disponible'`,
+  `ALTER TABLE maquinaria ADD COLUMN marca TEXT`,
+
+  // ── Circuitos — chofer como empleado (además del id_chofer→users heredado) ─
+  `ALTER TABLE circuitos ADD COLUMN id_empleado TEXT`,
 ]
 
 for (const sql of migrations) {
@@ -706,6 +935,31 @@ db.exec(`
   defaults.forEach(([clave, valor]) => ins.run(crypto.randomUUID(), clave, valor))
 })()
 
+
+// ── Backfill: número interno de camiones y maquinaria ─────────────
+;(() => {
+  const tablas = ['flota_vehiculos', 'maquinaria']
+  tablas.forEach(t => {
+    const pend = db.prepare(`SELECT id FROM ${t} WHERE numero_interno IS NULL ORDER BY created_at, id`).all()
+    if (!pend.length) return
+    let next = (db.prepare(`SELECT COALESCE(MAX(numero_interno),0) AS m FROM ${t}`).get().m || 0) + 1
+    const upd = db.prepare(`UPDATE ${t} SET numero_interno = ? WHERE id = ?`)
+    db.transaction(() => { pend.forEach(r => { upd.run(next, r.id); next++ }) })()
+  })
+})()
+
+// ── Backfill: numerar transacciones por tipo (numero secuencial) ──
+;(() => {
+  const pend = db.prepare(`SELECT id, tipo FROM transacciones WHERE numero IS NULL ORDER BY created_at, id`).all()
+  if (!pend.length) return
+  const maxPorTipo = {}
+  db.prepare(`SELECT tipo, COALESCE(MAX(numero),0) AS m FROM transacciones WHERE numero IS NOT NULL GROUP BY tipo`).all()
+    .forEach(r => { maxPorTipo[r.tipo] = r.m })
+  const upd = db.prepare(`UPDATE transacciones SET numero = ? WHERE id = ?`)
+  db.transaction(() => {
+    pend.forEach(t => { const n = (maxPorTipo[t.tipo] || 0) + 1; maxPorTipo[t.tipo] = n; upd.run(n, t.id) })
+  })()
+})()
 
 // ── Backfill: numerar clientes sin numero asignado ────────────────
 ;(() => {
@@ -796,6 +1050,17 @@ if (cantClientes === 0) {
   ].forEach(([nombre, apellido, dom, zona, tel, tipo]) =>
     insCli.run(crypto.randomUUID(), nombre, apellido, dom, zona, tel, tipo)
   )
+}
+
+// ── Proveedores de ejemplo ───────────────────────────────────────
+const cantProv = db.prepare('SELECT COUNT(*) AS n FROM proveedores').get().n
+if (cantProv === 0) {
+  const insProv = db.prepare(`INSERT INTO proveedores (id, nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?, ?)`)
+  ;[
+    ['Cantera del Centro S.A.', '30-11223344-5', 'Ruta 9 Km 12',        '3514112233', 'ventas@canteracentro.com'],
+    ['Áridos del Sur SRL',      '30-55667788-9', 'Camino a Alta Gracia', '3515667788', 'info@aridosdelsur.com'],
+    ['Transporte Norte',        '20-99887766-5', 'Av. Japón 1500',       '3513445566', 'contacto@transportenorte.com'],
+  ].forEach(([nombre, cuit, dom, tel, email]) => insProv.run(crypto.randomUUID(), nombre, cuit, dom, tel, email))
 }
 
 // ── Flota (5 camiones + 1 Bobcat) ───────────────────────────────

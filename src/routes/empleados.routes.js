@@ -13,5 +13,7 @@ router.get('/:id',           auth, acceso, ctrl.detalle)
 router.get('/:id/editar',    auth, acceso, ctrl.editar)
 router.put('/:id',           auth, acceso, ctrl.actualizar)
 router.post('/:id/toggle',   auth, acceso, ctrl.toggleActivo)
+router.post('/:id/asignaciones',                   auth, acceso, ctrl.asignarRecurso)
+router.post('/:id/asignaciones/:asigId/finalizar', auth, acceso, ctrl.finalizarAsignacion)
 
 module.exports = router

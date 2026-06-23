@@ -47,6 +47,34 @@
   }
 }
 
+// ── Chips de período (Hoy / Semana / Mes) ─────────────────────
+.periodo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.periodo-chip {
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid $border;
+  background: $bg-card;
+  color: $ink-soft;
+  font-size: $fs-sm;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+
+  &:hover { border-color: $accent; color: $accent; }
+
+  &.is-active {
+    background: $accent;
+    border-color: $accent;
+    color: #fff;
+  }
+}
+
 // ── Tabla standalone (sin Bootstrap) ──────────────────────────
 .table-wrapper {
   width: 100%;
@@ -121,5 +149,5 @@
 .badge[class*="--tipo-"] {
   background: $accent-soft;
   color: $accent-dark;
-  border-color: rgba(13, 148, 136, 0.35);
+  border-color: rgba(28, 91, 173, 0.35);
 }

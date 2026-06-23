@@ -7,12 +7,13 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 class="fw-bold mb-0 text-dark-title"><%= nroFormato %></h4>
-    <small class="text-muted">Emitida el <%= op.fecha_emision %> por <%= op.administrativo_nombre %></small>
+    <small class="text-muted">Emitida el <%= formatFecha(op.fecha_emision) %> por <%= op.administrativo_nombre %></small>
   </div>
   <div class="d-flex gap-2 align-items-center">
     <span class="badge rounded-pill px-3 py-2 <%= badge %>"><%= op.estado %></span>
     <% if (op.estado !== 'anulado') { %>
       <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">🖨️ Remito</a>
+      <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary">📄 PDF</a>
     <% } %>
     <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
@@ -162,6 +163,16 @@
       <div class="card-header card-header-light">Observaciones</div>
       <div class="card-body"><%= op.observaciones %></div>
     </div>
+  </div>
+  <% } %>
+
+  <div class="col-12">
+    <%- include('../../partials/recursos_operacion', { opId: op.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable }) %>
+  </div>
+
+  <% if (op.estado !== 'anulado') { %>
+  <div class="col-12">
+    <%- include('../../partials/remito_firmado', { opId: op.id, estado: op.estado, archivo: op.archivo_remito }) %>
   </div>
   <% } %>
 

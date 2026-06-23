@@ -1,0 +1,31 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('map', { size: 18 }) %> Nuevo Circuito</h4>
+  <a href="/circuitos" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="/circuitos" method="POST">
+      <div class="row g-3 mb-3">
+        <div class="col-md-6"><label class="form-label">Fecha *</label>
+          <input type="date" name="fecha" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>" required></div>
+        <div class="col-md-6"><label class="form-label">Chofer</label>
+          <select name="id_empleado" class="form-select">
+            <option value="">— Sin asignar —</option>
+            <% choferes.forEach(c => { %><option value="<%= c.id %>"><%= c.nombre %> <%= c.apellido %></option><% }) %>
+          </select></div>
+        <div class="col-md-6"><label class="form-label">Camión</label>
+          <select name="id_camion" class="form-select">
+            <option value="">— Sin asignar —</option>
+            <% camiones.forEach(v => { %><option value="<%= v.id %>"><%= [v.nombre, v.patente].filter(Boolean).join(' · ') %></option><% }) %>
+          </select></div>
+        <div class="col-12"><label class="form-label">Observaciones</label>
+          <input type="text" name="observaciones" class="form-control"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4">Crear circuito</button>
+        <a href="/circuitos" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

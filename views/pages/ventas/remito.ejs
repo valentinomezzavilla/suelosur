@@ -32,7 +32,7 @@
         <% } %>
       </div>
       <small class="text-muted">OP interna: <%= String(op.nro_op).padStart(4,'0') %></small><br>
-      <small class="text-muted">Fecha: <%= new Date(op.fecha_emision).toLocaleDateString('es-AR') %></small>
+      <small class="text-muted">Fecha: <%= formatFecha(op.fecha_emision) %></small>
     </div>
   </div>
 
@@ -49,10 +49,29 @@
     <div class="col-md-6 text-md-end">
       <p class="text-muted small mb-0 text-uppercase fw-bold">Atendido por</p>
       <p class="mb-0"><%= op.administrativo_nombre %></p>
-      <% const tipoLabel = { M: 'Venta áridos', C: 'Alquiler contenedor', B: 'Bobcat' } %>
+      <% const tipoLabel = { M: op.modalidad === 'flete' ? 'Venta con viaje' : 'Venta en cantera', C: 'Alquiler contenedor', MA: 'Alquiler maquinaria' } %>
       <span class="badge badge-rol"><%= tipoLabel[op.tipo_op] || op.tipo_op %></span>
+      <br>
+      <% const estadoLbl = { pendiente:'Pendiente', despachado:'Despachado', entregado:'Entregado', anulado:'Anulado' } %>
+      <span class="badge badge-activo mt-1"><%= estadoLbl[op.estado] || op.estado %></span>
     </div>
   </div>
+
+  <!-- Datos de entrega (venta con viaje) -->
+  <% if (op.modalidad === 'flete') {
+       const dirEntrega = [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim()
+  %>
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <p class="text-muted small mb-0 text-uppercase fw-bold">Domicilio de entrega</p>
+      <p class="fw-bold mb-0">📍 <%= dirEntrega || 'A coordinar' %></p>
+    </div>
+    <div class="col-md-6 text-md-end">
+      <p class="text-muted small mb-0 text-uppercase fw-bold">Fecha de entrega</p>
+      <p class="mb-0"><%= op.fecha_entrega_planificada ? formatFecha(op.fecha_entrega_planificada) : 'A coordinar' %></p>
+    </div>
+  </div>
+  <% } %>
 
   <!-- Tabla: Material (tipo M / B) -->
   <% if (op.tipo_op !== 'C') { %>

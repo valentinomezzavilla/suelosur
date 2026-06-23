@@ -2,10 +2,15 @@
 // Suelosur — Design tokens
 // ═══════════════════════════════════════════════════════════════
 
-// ── Paleta de marca ────────────────────────────────────────────
-$accent:        #0d9488;  // teal corporativo
-$accent-dark:   #0f766e;
-$accent-soft:   #effdfa;
+// ── Paleta de marca Suelosur ───────────────────────────────────
+$accent:        #1c5bad;  // azul corporativo (logo)
+$accent-dark:   #154a8e;
+$accent-soft:   #e9f1fb;
+
+// Amarillo / dorado del logo (acento secundario, realces)
+$brand-yellow:      #f5b301;
+$brand-yellow-dark: #d99a00;
+$brand-yellow-soft: #fff6e0;
 
 // ── Neutros ────────────────────────────────────────────────────
 $dark:          #1e2535;
@@ -20,11 +25,11 @@ $border:        #e4e9f2;
 $border-soft:   #eef1f6;
 $border-line:   #f3f4f7;
 
-$bg-app:        #f3f6f7;
+$bg-app:        #f4f6f9;
 $bg-card:       #ffffff;
-$bg-card-alt:   #f8fafa;
+$bg-card-alt:   #f8fafb;
 
-$sidebar-bg:    #0d1518;
+$sidebar-bg:    #0e1013;  // negro corporativo
 $sidebar-border:rgba(255, 255, 255, 0.06);
 $sidebar-text:  rgba(255, 255, 255, 0.72);
 $sidebar-muted: rgba(255, 255, 255, 0.32);
@@ -64,7 +69,7 @@ $shadow-md: 0 4px 14px rgba(16, 24, 40, 0.08);
 $shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
 
 // ── Focus ring ─────────────────────────────────────────────────
-$focus-ring: 0 0 0 3px rgba(13, 148, 136, 0.18);
+$focus-ring: 0 0 0 3px rgba(28, 91, 173, 0.2);
 
 // ── Layout ─────────────────────────────────────────────────────
 $sidebar-w:        240px;

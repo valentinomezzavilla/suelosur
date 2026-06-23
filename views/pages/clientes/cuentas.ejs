@@ -1,139 +1,141 @@
-<main id="clientes-cuentas">
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const totalDeuda  = conCuenta.filter(c => c.saldo < 0).reduce((a, c) => a + Math.abs(c.saldo), 0)
+  const totalAFavor = conCuenta.filter(c => c.saldo > 0).reduce((a, c) => a + c.saldo, 0)
+  const conDeuda    = conCuenta.filter(c => c.saldo < 0).length
+%>
 
-        <div class="page-header">
-            <div>
-                <a href="/clientes" class="back-link">← Clientes</a>
-                <h1 class="page-title">Cuentas corrientes</h1>
-            </div>
-        </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('chart', { size: 18 }) %> Cuentas corrientes</h4>
+  <a href="/clientes" class="btn btn-sm btn-outline-secondary">← Clientes</a>
+</div>
 
-        <!-- Cuentas activas -->
-        <section class="cuentas-section">
-            <h2 class="section-title">Cuentas habilitadas</h2>
+<!-- Métricas -->
+<div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px">
+  <div class="stat-card stat-card--danger">
+    <div class="stat-card__icon"><%- icon('alert', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(totalDeuda) %></span><span class="stat-card__label">Deuda total · <%= conDeuda %> cliente(s)</span></div>
+  </div>
+  <div class="stat-card stat-card--success">
+    <div class="stat-card__icon"><%- icon('checkCircle', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(totalAFavor) %></span><span class="stat-card__label">Saldo a favor</span></div>
+  </div>
+  <div class="stat-card stat-card--info">
+    <div class="stat-card__icon"><%- icon('users', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= conCuenta.length %></span><span class="stat-card__label">Cuentas habilitadas</span></div>
+  </div>
+</div>
 
-            <% if (conCuenta.length === 0) { %>
-                <div class="empty-state">
-                    <p>No hay cuentas corrientes habilitadas aún.</p>
-                </div>
+<!-- Cuentas habilitadas -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Cuentas habilitadas</div>
+  <div class="card-body p-0">
+    <% if (!conCuenta.length) { %>
+      <%- include('../../partials/empty_state', { icono: '💳', mensaje: 'No hay cuentas corrientes habilitadas aún.', accionHref: '/clientes', accionLabel: 'Ir a clientes' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th class="col-w-50">#</th>
+          <th>Cliente</th>
+          <th>Teléfono</th>
+          <th class="text-end">Saldo</th>
+          <th class="text-center">Movim.</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% conCuenta.forEach(c => { %>
+        <tr>
+          <td class="fw-semibold text-orange">#<%= c.numero %></td>
+          <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
+          <td><small class="text-muted"><%= c.telefono || '—' %></small></td>
+          <td class="text-end">
+            <% if (c.saldo < 0) { %>
+              <span class="fw-bold text-danger">Debe $<%= Math.abs(c.saldo).toLocaleString('es-AR') %></span>
+            <% } else if (c.saldo > 0) { %>
+              <span class="fw-bold text-success">A favor $<%= c.saldo.toLocaleString('es-AR') %></span>
             <% } else { %>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>#ID</th>
-                                <th>Cliente</th>
-                                <th>Teléfono</th>
-                                <th>Saldo</th>
-                                <th>Movimientos</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% conCuenta.forEach(c => { %>
-                                <tr>
-                                    <td>#<%= c.id %></td>
-                                    <td><%= c.nombre %> <%= c.apellido %></td>
-                                    <td><%= c.telefono || '—' %></td>
-                                    <td>
-                                        <% if (c.saldo < 0) { %>
-                                            <span class="saldo-negativo" style="font-weight:700">
-                                                Debe $<%= Math.abs(c.saldo).toLocaleString('es-AR') %>
-                                            </span>
-                                        <% } else if (c.saldo === 0) { %>
-                                            <span class="saldo-positivo">Al día</span>
-                                        <% } else { %>
-                                            <span class="saldo-positivo" style="font-weight:700">
-                                                A favor $<%= c.saldo.toLocaleString('es-AR') %>
-                                            </span>
-                                        <% } %>
-                                    </td>
-                                    <td><%= c.movimientos.length %></td>
-                                    <td class="td-acciones">
-                                        <a href="/clientes/cuentas/<%= c.id %>" class="btn-secondary btn-sm">Ver historial</a>
-                                        <% if (c.saldo < 0) { %>
-                                            <button type="button" class="btn-primary-green btn-sm btn-abonar"
-                                                data-id="<%= c.id %>"
-                                                data-nombre="<%= c.nombre %> <%= c.apellido %>"
-                                                data-deuda="<%= Math.abs(c.saldo) %>">
-                                                Saldar deuda
-                                            </button>
-                                        <% } %>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
+              <span class="badge rounded-pill px-3 badge-activo">Al día</span>
             <% } %>
-        </section>
-
-        <!-- Modal abonar -->
-        <div id="modal-abonar" class="modal-overlay" style="display:none">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <h2 class="modal-title">Saldar deuda — <span id="modal-abonar-nombre"></span></h2>
-                    <button type="button" class="modal-close" id="cerrarModalAbonar">✕</button>
-                </div>
-                <p style="margin:0.75rem 0 0.25rem; font-size:0.9rem; color:#64748b">
-                    Deuda total: <strong id="modal-abonar-deuda"></strong>
-                </p>
-                <form id="formAbonar" method="POST" style="margin-top:1rem">
-                    <div class="form-group">
-                        <label for="inputMonto">Monto a abonar</label>
-                        <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="Ej: 15000">
-                    </div>
-                    <div class="modal-actions" style="margin-top:1rem">
-                        <button type="submit" class="btn-primary-green">Confirmar pago</button>
-                        <button type="button" class="btn-secondary btn-sm" id="btnPagarTotal">Pagar total</button>
-                        <button type="button" class="btn-secondary" id="cancelarModalAbonar">Cancelar</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Agregar cuenta corriente a clientes sin cuenta -->
-        <section class="cuentas-section">
-            <div class="section-header-row">
-                <h2 class="section-title">Agregar una cuenta corriente</h2>
-                <span class="section-subtitle">Clientes sin cuenta corriente habilitada</span>
-            </div>
-
-            <% if (sinCuenta.length === 0) { %>
-                <div class="empty-state">
-                    <p>Todos los clientes ya tienen cuenta corriente habilitada y/o aún no hay clientes activos.</p>
-                </div>
-            <% } else { %>
-                <div class="table-wrapper">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>#ID</th>
-                                <th>Nombre</th>
-                                <th>Apellido</th>
-                                <th>Teléfono</th>
-                                <th>Email</th>
-                                <th>Acción</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% sinCuenta.forEach(c => { %>
-                                <tr>
-                                    <td>#<%= c.id %></td>
-                                    <td><%= c.nombre %></td>
-                                    <td><%= c.apellido %></td>
-                                    <td><%= c.telefono || '—' %></td>
-                                    <td><%= c.email || '—' %></td>
-                                    <td>
-                                        <form action="/clientes/<%= c.id %>/habilitar-cuenta" method="POST" style="display:inline">
-                                            <button type="submit" class="btn-primary-green">+ Habilitar cuenta</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
+          </td>
+          <td class="text-center"><small class="text-muted"><%= c.movimientos.length %></small></td>
+          <td class="text-center">
+            <a href="/clientes/cuentas/<%= c.id %>" class="btn btn-sm btn-outline-secondary">Estado de cuenta</a>
+            <% if (c.saldo < 0) { %>
+              <button type="button" class="btn btn-sm btn-success btn-abonar"
+                      data-id="<%= c.id %>" data-nombre="<%= c.nombre %> <%= c.apellido %>"
+                      data-deuda="<%= Math.abs(c.saldo) %>">Saldar</button>
             <% } %>
-        </section>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
 
-    </main>
+<!-- Habilitar cuenta a clientes sin CC -->
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span>Habilitar cuenta corriente</span>
+    <small class="text-muted">Clientes sin cuenta habilitada</small>
+  </div>
+  <div class="card-body p-0">
+    <% if (!sinCuenta.length) { %>
+      <div class="p-4 text-center text-muted">Todos los clientes activos ya tienen cuenta corriente habilitada.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th class="col-w-50">#</th>
+          <th>Cliente</th>
+          <th>Teléfono</th>
+          <th>Email</th>
+          <th class="text-center">Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sinCuenta.forEach(c => { %>
+        <tr>
+          <td class="fw-semibold text-orange">#<%= c.numero %></td>
+          <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
+          <td><small class="text-muted"><%= c.telefono || '—' %></small></td>
+          <td><small class="text-muted"><%= c.email || '—' %></small></td>
+          <td class="text-center">
+            <form action="/clientes/<%= c.id %>/habilitar-cuenta" method="POST" class="d-inline">
+              <button type="submit" class="btn btn-sm btn-success">+ Habilitar</button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
+
+<!-- Modal abonar -->
+<div id="modal-abonar" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2 class="modal-title">Saldar deuda — <span id="modal-abonar-nombre"></span></h2>
+      <button type="button" class="modal-close" id="cerrarModalAbonar">✕</button>
+    </div>
+    <p style="margin:0.75rem 0 0.25rem; font-size:0.9rem; color:#64748b">
+      Deuda total: <strong id="modal-abonar-deuda"></strong>
+    </p>
+    <form id="formAbonar" method="POST" style="margin-top:1rem">
+      <div class="form-group">
+        <label for="inputMonto">Monto a abonar</label>
+        <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="Ej: 15000">
+      </div>
+      <div class="modal-actions" style="margin-top:1rem">
+        <button type="submit" class="btn btn-success">Confirmar pago</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPagarTotal">Pagar total</button>
+        <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,4 +1,5 @@
 'use strict'
+const crypto = require('crypto')
 const db = require('../config/db')
 
 const StockModel = {
@@ -28,9 +29,23 @@ const StockModel = {
     ).run(cantidad_actual, stock_minimo, id_producto)
   },
 
-  registrarIngreso(id_producto, cantidad) {
-    db.prepare(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`
-    ).run(cantidad, id_producto)
+  registrarIngreso(id_producto, cantidad, { id_proveedor, costo_unitario, usuario, observaciones } = {}) {
+    db.transaction(() => {
+      db.prepare(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`).run(cantidad, id_producto)
+      db.prepare(`
+        INSERT INTO stock_ingresos (id, id_producto, id_proveedor, cantidad, costo_unitario, id_usuario, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(crypto.randomUUID(), id_producto, id_proveedor || null, cantidad,
+             parseFloat(costo_unitario) || 0, usuario || null, observaciones || '')
+    })()
+  },
+
+  ingresos(id_producto) {
+    return db.prepare(`
+      SELECT si.*, pr.nombre AS proveedor_nombre
+      FROM stock_ingresos si LEFT JOIN proveedores pr ON pr.id = si.id_proveedor
+      WHERE si.id_producto = ? ORDER BY si.fecha DESC, si.created_at DESC
+    `).all(id_producto)
   },
 
   registrarEgreso(id_producto, cantidad) {

@@ -46,6 +46,7 @@
                         <% if (cliente.cuentaCorriente) { %>
                             <span class="badge badge--con-stock">Habilitada</span>
                             — Saldo: <b>$<%= cliente.saldo.toLocaleString('es-AR') %></b>
+                            <a href="/clientes/cuentas/<%= cliente.id %>" class="btn-sm btn-secondary" style="margin-left:0.5rem">Estado de cuenta</a>
                         <% } else { %>
                             <span class="badge badge--sin-stock">No habilitada</span>
                             <form action="/clientes/<%= cliente.id %>/habilitar-cuenta" method="POST" style="display:inline; margin-left:0.5rem">
@@ -124,48 +125,38 @@
         </div>
         <% } %>
 
-        <!-- Deudas de cuenta corriente (transacciones con metodoPago=cuenta_corriente) -->
+        <!-- Movimientos en cuenta corriente (consumos en CC) -->
         <% if (cliente.cuentaCorriente && deudasCC && deudasCC.length > 0) { %>
         <div class="clientes-historial">
-            <h2 class="clientes-historial__title">Deudas de cuenta corriente</h2>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h2 class="clientes-historial__title mb-0">Consumos en cuenta corriente</h2>
+                <a href="/clientes/cuentas/<%= cliente.id %>" class="btn-primary-green btn-sm">Ir al estado de cuenta</a>
+            </div>
             <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#ID Transaccion</th>
+                            <th>Código</th>
                             <th>Tipo</th>
                             <th>Descripcion</th>
                             <th>Fecha</th>
                             <th>Monto</th>
-                            <th>Estado</th>
-                            <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         <% deudasCC.forEach(t => { %>
                             <tr>
-                                <td>#<%= t.id %></td>
+                                <td class="fw-semibold text-orange"><%= codigoTx(t) %></td>
                                 <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
                                 <td><%= t.descripcion %></td>
-                                <td><%= t.fecha %></td>
+                                <td><%= formatFecha(t.fecha) %></td>
                                 <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
-                                <td>
-                                    <% if (t.saldada) { %>
-                                        <span class="badge badge--con-stock">Saldada</span>
-                                    <% } else { %>
-                                        <span class="badge badge--sin-stock">Pendiente</span>
-                                    <% } %>
-                                </td>
-                                <td>
-                                    <% if (!t.saldada) { %>
-                                        <button type="button" class="btn-primary-green btn-sm" disabled title="Disponible en Sprint 4">Saldar</button>
-                                    <% } %>
-                                </td>
                             </tr>
                         <% }) %>
                     </tbody>
                 </table>
             </div>
+            <p class="form-hint mt-1">La cobranza y el saldo se gestionan en el <a href="/clientes/cuentas/<%= cliente.id %>">estado de cuenta</a>.</p>
         </div>
         <% } %>
 
@@ -180,7 +171,7 @@
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>#ID</th>
+                                <th>Código</th>
                                 <th>Tipo</th>
                                 <th>Descripcion</th>
                                 <th>Fecha</th>
@@ -190,10 +181,10 @@
                         <tbody>
                             <% transacciones.slice().reverse().forEach(t => { %>
                                 <tr>
-                                    <td>#<%= t.id %></td>
+                                    <td class="fw-semibold text-orange"><%= codigoTx(t) %></td>
                                     <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
                                     <td><%= t.descripcion %></td>
-                                    <td><%= t.fecha %></td>
+                                    <td><%= formatFecha(t.fecha) %></td>
                                     <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
                                 </tr>
                             <% }) %>

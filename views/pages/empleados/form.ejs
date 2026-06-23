@@ -3,6 +3,7 @@
   const val = (k) => (e[k] === null || e[k] === undefined) ? '' : e[k]
   const estados = [['activo','Activo'],['licencia','Licencia'],['suspendido','Suspendido'],['baja','Baja']]
   const contratos = ['Efectivo','Contratado','Temporal','Pasantía','Eventual']
+  const roles = ['Chofer','Operario','Maquinista','Mecánico','Administrativo','Encargado','Ayudante','Otro']
 %>
 
 <div class="page-header">
@@ -12,10 +13,12 @@
   </div>
 </div>
 
-<form action="<%= empleado ? '/empleados/' + e.id + '?_method=PUT' : '/empleados' %>" method="POST" class="maxw-600">
+<form action="<%= empleado ? '/empleados/' + e.id + '?_method=PUT' : '/empleados' %>" method="POST" class="empleado-form">
+
+  <div class="form-grid-2">
 
   <!-- Información personal -->
-  <div class="form-section">
+  <div class="form-section" style="grid-column:1/-1">
     <h3 class="form-section__title">Información personal</h3>
     <div class="form-row-2">
       <div class="form-group">
@@ -58,8 +61,14 @@
     <h3 class="form-section__title">Información laboral</h3>
     <div class="form-row-2">
       <div class="form-group">
-        <label for="cargo">Cargo</label>
-        <input type="text" name="cargo" id="cargo" value="<%= val('cargo') %>" placeholder="Ej: Chofer">
+        <label for="cargo">Rol / Cargo</label>
+        <select name="cargo" id="cargo">
+          <option value="">— Sin especificar —</option>
+          <% roles.forEach(r => { %>
+            <option value="<%= r %>" <%= val('cargo') === r ? 'selected' : '' %>><%= r %></option>
+          <% }) %>
+        </select>
+        <p class="form-hint">Con el rol <strong>Chofer</strong> podés asignarle un camión y/o una máquina desde su ficha.</p>
       </div>
       <div class="form-group">
         <label for="sector">Sector</label>
@@ -125,12 +134,12 @@
     <h3 class="form-section__title">Información operativa</h3>
     <div class="form-row-2">
       <div class="form-group">
-        <label for="vehiculo_asignado">Vehículo asignado</label>
-        <input type="text" name="vehiculo_asignado" id="vehiculo_asignado" value="<%= val('vehiculo_asignado') %>" placeholder="Ej: Camión AB123CD">
-      </div>
-      <div class="form-group">
         <label for="licencia_categoria">Licencia (categoría)</label>
         <input type="text" name="licencia_categoria" id="licencia_categoria" value="<%= val('licencia_categoria') %>" placeholder="Ej: E1">
+      </div>
+      <div class="form-group">
+        <label for="licencia_numero">Licencia (número)</label>
+        <input type="text" name="licencia_numero" id="licencia_numero" value="<%= val('licencia_numero') %>">
       </div>
     </div>
     <div class="form-group">
@@ -158,7 +167,9 @@
     </div>
   </div>
 
-  <div class="d-flex gap-2">
+  </div><!-- /form-grid-2 -->
+
+  <div class="d-flex gap-2 mt-3">
     <button type="submit" class="btn-primary"><%= empleado ? 'Guardar cambios' : 'Crear empleado' %></button>
     <a href="/empleados" class="btn-secondary">Cancelar</a>
   </div>

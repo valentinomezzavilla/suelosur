@@ -1,0 +1,71 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const presetHref = (p) => '/compras?preset=' + p
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('cart', { size: 18 }) %> Compras / Abastecimiento</h4>
+  <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra</a>
+</div>
+
+<div class="periodo-chips">
+  <a href="<%= presetHref('hoy') %>"    class="periodo-chip <%= filtros.preset==='hoy'    ? 'is-active' : '' %>">Hoy</a>
+  <a href="<%= presetHref('semana') %>" class="periodo-chip <%= filtros.preset==='semana' ? 'is-active' : '' %>">Esta semana</a>
+  <a href="<%= presetHref('mes') %>"    class="periodo-chip <%= filtros.preset==='mes'    ? 'is-active' : '' %>">Este mes</a>
+</div>
+
+<div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px">
+  <div class="stat-card stat-card--neutral"><div class="stat-card__icon"><%- icon('chart',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(resumen.total) %></span><span class="stat-card__label">Total · <%= periodoLabel %></span></div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__icon"><%- icon('cart',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.count %></span><span class="stat-card__label">Compras</span></div></div>
+  <div class="stat-card stat-card--success"><div class="stat-card__icon"><%- icon('layers',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= Number(resumen.cantidad).toLocaleString('es-AR') %></span><span class="stat-card__label">Unidades ingresadas</span></div></div>
+</div>
+
+<form method="GET" action="/compras" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <input type="hidden" name="preset" value="rango">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Proveedor</label>
+        <select name="proveedor" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% proveedores.forEach(p => { %><option value="<%= p.id %>" <%= filtros.proveedor===p.id?'selected':'' %>><%= p.nombre %></option><% }) %>
+        </select></div>
+      <div class="col-md-3"><label class="form-label">Producto</label>
+        <select name="producto" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% productos.forEach(p => { %><option value="<%= p.id %>" <%= filtros.producto===p.id?'selected':'' %>><%= p.nombre %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Desde</label><input type="date" name="fechaDesde" value="<%= filtros.fechaDesde||'' %>" class="form-control form-control-sm"></div>
+      <div class="col-md-2"><label class="form-label">Hasta</label><input type="date" name="fechaHasta" value="<%= filtros.fechaHasta||'' %>" class="form-control form-control-sm"></div>
+      <div class="col-auto"><button class="btn btn-sm btn-naranja">Filtrar</button>
+        <a href="/compras" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a></div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!compras.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🛒', mensaje: 'No hay compras registradas en el período.', accionHref: '/compras/nueva', accionLabel: 'Registrar primera compra' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Producto</th><th>Proveedor</th><th class="text-end">Cantidad</th><th class="text-end">Costo unit.</th><th class="text-end">Total</th><th>Registró</th></tr></thead>
+      <tbody>
+        <% compras.forEach(c => { %>
+        <tr>
+          <td><small class="text-muted"><%= formatFecha(c.fecha) %></small></td>
+          <td class="fw-semibold"><%= c.producto_nombre %></td>
+          <td><%= c.proveedor_nombre || '— sin proveedor —' %></td>
+          <td class="text-end"><%= c.cantidad %> <small class="text-muted"><%= c.unidad_medida %></small></td>
+          <td class="text-end"><%= money(c.costo_unitario) %></td>
+          <td class="text-end fw-semibold"><%= money(c.total) %></td>
+          <td><small class="text-muted"><%= c.usuario_nombre || '—' %></small></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

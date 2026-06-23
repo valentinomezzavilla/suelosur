@@ -1,0 +1,94 @@
+<%
+  const estadoBadge = { borrador:'badge-pendiente', confirmado:'badge-en-transito', en_curso:'badge-en-transito', finalizado:'badge-activo' }
+  const estadoLbl = { borrador:'Borrador', confirmado:'Confirmado', en_curso:'En curso', finalizado:'Finalizado' }
+  const paradaBadge = { pendiente:'badge-pendiente', completada:'badge-activo', cancelada:'badge-alerta' }
+  const tipoLbl = { entrega_material:'Entrega material', entrega_contenedor:'Entrega contenedor', retiro_contenedor:'Retiro contenedor', entrega_maquinaria:'Entrega maquinaria', retiro_maquinaria:'Retiro maquinaria' }
+  const c = circuito
+%>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <a href="/circuitos" class="text-muted small text-decoration-none">← Circuitos</a>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('map', { size: 18 }) %> Circuito del <%= formatFecha(c.fecha) %>
+      <span class="badge rounded-pill px-3 ms-2 <%= estadoBadge[c.estado] %>"><%= estadoLbl[c.estado] %></span>
+    </h4>
+    <small class="text-muted">
+      <%= c.chofer_nombre && c.chofer_nombre.trim() ? c.chofer_nombre : 'Sin chofer' %>
+      <% if (c.camion_nombre || c.camion_patente) { %> · 🚚 <%= [c.camion_nombre, c.camion_patente].filter(Boolean).join(' ') %><% } %>
+    </small>
+  </div>
+  <form action="/circuitos/<%= c.id %>/estado" method="POST" class="d-flex gap-2 align-items-end">
+    <div><label class="form-label">Estado</label>
+      <select name="estado" class="form-select form-select-sm">
+        <% ['borrador','confirmado','en_curso','finalizado'].forEach(e => { %><option value="<%= e %>" <%= c.estado===e?'selected':'' %>><%= estadoLbl[e] %></option><% }) %>
+      </select></div>
+    <button class="btn btn-sm btn-naranja">Actualizar</button>
+  </form>
+</div>
+
+<% if (c.observaciones) { %><div class="alert alert-light border small mb-3"><%= c.observaciones %></div><% } %>
+
+<!-- Agregar parada -->
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Agregar parada</div>
+  <div class="card-body">
+    <% if (!disponibles.length) { %>
+      <p class="text-muted mb-0">No hay operaciones pendientes disponibles para agregar.</p>
+    <% } else { %>
+    <form action="/circuitos/<%= c.id %>/paradas" method="POST">
+      <div class="d-flex gap-2 align-items-end flex-wrap">
+        <div class="flex-grow-1"><label class="form-label">Operación pendiente</label>
+          <select name="id_op_encabezado" class="form-select form-select-sm" required>
+            <option value="">Seleccionar...</option>
+            <% disponibles.forEach(o => { %>
+              <option value="<%= o.id %>">OP-<%= String(o.nro_op).padStart(4,'0') %> · <%= o.cliente_nombre %><%= o.domicilio ? ' · '+o.domicilio : '' %></option>
+            <% }) %>
+          </select></div>
+        <button class="btn btn-sm btn-naranja">+ Agregar</button>
+      </div>
+    </form>
+    <% } %>
+  </div>
+</div>
+
+<!-- Paradas -->
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold">Paradas del circuito (<%= c.paradas.length %>)</div>
+  <div class="card-body p-0">
+    <% if (!c.paradas.length) { %>
+      <div class="p-4 text-center text-muted">Sin paradas. Agregá operaciones pendientes arriba.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th class="col-w-50">#</th><th>Operación</th><th>Tipo</th><th>Cliente</th><th>Domicilio</th><th class="text-center">Estado</th><th class="text-center">Acciones</th></tr></thead>
+      <tbody>
+        <% c.paradas.forEach(p => { %>
+        <tr>
+          <td class="fw-semibold text-orange"><%= p.orden %></td>
+          <td>OP-<%= String(p.nro_op).padStart(4,'0') %></td>
+          <td><small class="text-muted"><%= tipoLbl[p.tipo_parada] || p.tipo_parada %></small></td>
+          <td><%= p.cliente_nombre %></td>
+          <td><small class="text-muted"><%= p.domicilio || '—' %></small></td>
+          <td class="text-center"><span class="badge rounded-pill px-3 <%= paradaBadge[p.estado] %>"><%= p.estado %></span></td>
+          <td class="text-center">
+            <% if (p.estado !== 'completada') { %>
+              <form action="/circuitos/<%= c.id %>/paradas/<%= p.id %>/estado" method="POST" class="d-inline">
+                <input type="hidden" name="estado" value="completada">
+                <button class="btn btn-sm btn-outline-success" title="Completar"><%- icon('check',{size:14}) %></button>
+              </form>
+            <% } else { %>
+              <form action="/circuitos/<%= c.id %>/paradas/<%= p.id %>/estado" method="POST" class="d-inline">
+                <input type="hidden" name="estado" value="pendiente">
+                <button class="btn btn-sm btn-outline-secondary" title="Reabrir"><%- icon('clock',{size:14}) %></button>
+              </form>
+            <% } %>
+            <form action="/circuitos/<%= c.id %>/paradas/<%= p.id %>/quitar" method="POST" class="d-inline">
+              <button class="btn btn-sm btn-outline-danger" title="Quitar"><%- icon('trash',{size:14}) %></button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

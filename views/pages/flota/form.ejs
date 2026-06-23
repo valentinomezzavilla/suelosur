@@ -1,0 +1,47 @@
+<%
+  const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo' }
+%>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> <%= titulo %></h4>
+  <a href="/flota" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<form action="<%= vehiculo ? `/flota/${vehiculo.id}?_method=PUT` : '/flota' %>" method="POST">
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Datos del vehículo</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-2"><label class="form-label">N° interno</label><input type="number" name="numero_interno" class="form-control" value="<%= vehiculo?.numero_interno || '' %>"></div>
+        <div class="col-md-3"><label class="form-label">Patente</label><input name="patente" class="form-control" value="<%= vehiculo?.patente || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Nombre / Identificación</label><input name="nombre" class="form-control" value="<%= vehiculo?.nombre || '' %>" placeholder="Ej: Camión 6"></div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo de unidad</label>
+          <select name="tipo_unidad" class="form-select">
+            <option value="">—</option>
+            <% ['Volcador','Batea','Chasis','Semirremolque','Utilitario','Otro'].forEach(t => { %><option <%= vehiculo?.tipo_unidad===t?'selected':'' %>><%= t %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label">Marca</label><input name="marca" class="form-control" value="<%= vehiculo?.marca || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Modelo</label><input name="modelo" class="form-control" value="<%= vehiculo?.modelo || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Año</label><input type="number" name="anio" class="form-control" value="<%= vehiculo?.anio || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">N° de chasis</label><input name="nro_chasis" class="form-control" value="<%= vehiculo?.nro_chasis || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">N° de motor</label><input name="nro_motor" class="form-control" value="<%= vehiculo?.nro_motor || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Capacidad de carga (tn / m³)</label><input type="number" step="0.01" name="capacidad_carga" class="form-control" value="<%= vehiculo?.capacidad_carga || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Kilometraje actual</label><input type="number" name="kilometraje" class="form-control" value="<%= vehiculo?.kilometraje || 0 %>"></div>
+        <div class="col-md-4">
+          <label class="form-label">Estado operativo</label>
+          <select name="estado_operativo" class="form-select">
+            <% estados.forEach(e => { %><option value="<%= e %>" <%= vehiculo?.estado_operativo===e?'selected':'' %>><%= estadoLbl[e] %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label">Último mantenimiento</label><input type="date" name="fecha_ultimo_mant" class="form-control" value="<%= vehiculo?.fecha_ultimo_mant || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Próximo mantenimiento</label><input type="date" name="fecha_proximo_mant" class="form-control" value="<%= vehiculo?.fecha_proximo_mant || '' %>"></div>
+        <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= vehiculo?.observaciones || '' %></textarea></div>
+        <input type="hidden" name="tipo_vehiculo" value="<%= vehiculo?.tipo_vehiculo || 'camion' %>">
+      </div>
+    </div>
+  </div>
+  <div class="d-flex gap-2 mb-4">
+    <button type="submit" class="btn btn-naranja px-4"><%= vehiculo ? 'Guardar cambios' : 'Registrar camión' %></button>
+    <a href="/flota" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>

@@ -1,30 +1,26 @@
-// busqueda y seleccion de clientes (reutilizable en varios formularios)
+// Búsqueda de clientes con autocomplete (reutilizable en varios formularios)
 (function () {
-    const btnBuscar           = document.getElementById('btnBuscarCliente');
-    const btnMostrarCrear     = document.getElementById('btnMostrarCrearCliente');
-    const inputId             = document.getElementById('buscarClienteId');
-    const inputDni            = document.getElementById('buscarClienteDni');
-    const inputNombre         = document.getElementById('buscarClienteNombre');
-    const divResultado        = document.getElementById('buscarClienteResultado');
-    const divSeleccionado     = document.getElementById('clienteSeleccionado');
-    const spanNombre          = document.getElementById('clienteSeleccionadoNombre');
-    const btnCambiar          = document.getElementById('btnCambiarCliente');
-    const divCrear            = document.getElementById('crearClienteInline');
-    const btnCrear            = document.getElementById('btnCrearClienteInline');
-    const hiddenId            = document.getElementById('inputClienteId');
-    const hiddenNombre        = document.getElementById('inputClienteNombre');
-    const opcionCC            = document.getElementById('opcionCuentaCorriente');
+    const input           = document.getElementById('buscarClienteInput');
+    const dropdown        = document.getElementById('buscarClienteDropdown');
+    const btnMostrarCrear = document.getElementById('btnMostrarCrearCliente');
+    const divSeleccionado = document.getElementById('clienteSeleccionado');
+    const spanNombre      = document.getElementById('clienteSeleccionadoNombre');
+    const btnCambiar      = document.getElementById('btnCambiarCliente');
+    const divCrear        = document.getElementById('crearClienteInline');
+    const btnCrear        = document.getElementById('btnCrearClienteInline');
+    const hiddenId        = document.getElementById('inputClienteId');
+    const hiddenNombre    = document.getElementById('inputClienteNombre');
+    const opcionCC        = document.getElementById('opcionCuentaCorriente');
 
-    if (!btnBuscar) return;
-
-    if (btnMostrarCrear) {
-        btnMostrarCrear.addEventListener('click', () => {
-            divResultado.style.display = 'none';
-            divCrear.style.display = 'block';
-        });
-    }
+    if (!input) return;
 
     let clienteActual = null;
+    let timer = null;
+    let ultimoTermino = '';
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+    function ocultarDropdown() { dropdown.style.display = 'none'; dropdown.innerHTML = ''; }
 
     function seleccionarCliente(c) {
         clienteActual = c;
@@ -33,119 +29,97 @@
         const prefijo = c.numero != null ? `#${c.numero} — ` : '';
         spanNombre.textContent = prefijo + c.nombreCompleto;
 
-        divResultado.style.display    = 'none';
-        divCrear.style.display        = 'none';
+        ocultarDropdown();
+        input.value = '';
+        if (divCrear)  divCrear.style.display = 'none';
         divSeleccionado.style.display = 'flex';
 
-        // muestro la opcion de cuenta corriente solo si el cliente la tiene habilitada
         if (opcionCC) {
             opcionCC.style.display = c.cuentaCorriente ? '' : 'none';
             const select = document.getElementById('metodoPago');
-            if (select && select.value === 'cuenta_corriente' && !c.cuentaCorriente) {
-                select.value = 'efectivo';
-            }
+            if (select && select.value === 'cuenta_corriente' && !c.cuentaCorriente) select.value = 'efectivo';
         }
-
         document.dispatchEvent(new CustomEvent('clienteSeleccionado', { detail: c }));
     }
 
     function resetBusqueda() {
         clienteActual = null;
-        hiddenId.value     = '';
+        hiddenId.value = '';
         hiddenNombre.value = '';
         divSeleccionado.style.display = 'none';
-        divResultado.style.display    = 'none';
-        divCrear.style.display        = 'none';
-        inputId.value     = '';
-        inputDni.value    = '';
-        inputNombre.value = '';
+        if (divCrear) divCrear.style.display = 'none';
+        ocultarDropdown();
+        input.value = '';
         if (opcionCC) opcionCC.style.display = 'none';
         document.dispatchEvent(new CustomEvent('clienteDeseleccionado'));
     }
 
-    btnBuscar.addEventListener('click', async () => {
-        const id     = inputId.value.trim();
-        const dni    = inputDni.value.trim();
-        const nombre = inputNombre.value.trim();
-
-        if (!id && !dni && !nombre) {
-            divResultado.innerHTML = '<p class="form-hint">Ingresa al menos un campo para buscar.</p>';
-            divResultado.style.display = 'block';
+    function renderResultados(data, termino) {
+        if (!data.length) {
+            dropdown.innerHTML = `<li class="autocomplete-empty">Sin resultados — <button type="button" class="autocomplete-crear">+ Crear cliente</button></li>`;
+            dropdown.style.display = 'block';
+            dropdown.querySelector('.autocomplete-crear')?.addEventListener('click', () => abrirCrear(termino));
             return;
         }
+        dropdown.innerHTML = data.map((c, i) => {
+            const num = c.numero != null ? `#${c.numero}` : '';
+            const dni = c.dni ? ` · DNI ${esc(c.dni)}` : '';
+            const tel = c.telefono ? ` · ${esc(c.telefono)}` : '';
+            return `<li class="autocomplete-item" data-i="${i}">
+                <span class="autocomplete-item__nombre">${esc(c.nombreCompleto)}</span>
+                <span class="autocomplete-item__meta">${num}${dni}${tel}</span>
+            </li>`;
+        }).join('');
+        dropdown.style.display = 'block';
+        dropdown.querySelectorAll('.autocomplete-item').forEach(li => {
+            li.addEventListener('mousedown', (e) => { e.preventDefault(); seleccionarCliente(data[Number(li.dataset.i)]); });
+        });
+    }
 
-        const params = new URLSearchParams();
-        if (id)     params.set('id', id);
-        if (dni)    params.set('dni', dni);
-        if (nombre) params.set('nombre', nombre);
-
+    async function buscar(termino) {
         try {
-            const resp = await fetch(`/clientes/api/buscar?${params}`);
+            const resp = await fetch(`/clientes/api/buscar?q=${encodeURIComponent(termino)}`);
             const data = await resp.json();
-
-            divCrear.style.display = 'none';
-
-            if (data.length === 0) {
-                divResultado.innerHTML = '<p class="form-hint">No se encontraron clientes.</p>';
-                divResultado.style.display = 'block';
-                divCrear.style.display = 'block';
-                // pre-lleno el form de crear con lo que busco
-                if (nombre) {
-                    const parts = nombre.split(' ');
-                    const nuevoNombreInput = document.getElementById('nuevoClienteNombre');
-                    const nuevoApellidoInput = document.getElementById('nuevoClienteApellido');
-                    if (nuevoNombreInput) nuevoNombreInput.value = parts[0] || '';
-                    if (nuevoApellidoInput) nuevoApellidoInput.value = parts.slice(1).join(' ') || '';
-                }
-                if (dni) {
-                    const nuevoDniInput = document.getElementById('nuevoClienteDni');
-                    if (nuevoDniInput) nuevoDniInput.value = dni;
-                }
-            } else if (data.length === 1) {
-                seleccionarCliente(data[0]);
-            } else {
-                // varios resultados, muestro lista para elegir
-                let html = '<p class="form-hint">Se encontraron varios clientes:</p><ul class="buscar-cliente__lista">';
-                data.forEach(c => {
-                    const numStr = c.numero != null ? `#${c.numero} ` : '';
-                    html += `<li>
-                        <button type="button" class="btn-seleccionar-cliente btn-secondary btn-sm"
-                            data-cliente='${JSON.stringify(c).replace(/'/g, "&#39;")}'>
-                            ${numStr}${c.nombreCompleto} ${c.dni ? '(DNI: ' + c.dni + ')' : ''} — ${c.telefono || 'sin tel.'}
-                        </button>
-                    </li>`;
-                });
-                html += '</ul>';
-                divResultado.innerHTML = html;
-                divResultado.style.display = 'block';
-
-                divResultado.querySelectorAll('.btn-seleccionar-cliente').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const c = JSON.parse(btn.dataset.cliente);
-                        seleccionarCliente(c);
-                    });
-                });
-            }
-        } catch (err) {
-            divResultado.innerHTML = '<p class="form-hint" style="color:var(--danger)">Error al buscar clientes.</p>';
-            divResultado.style.display = 'block';
+            if (input.value.trim() !== termino) return; // respuesta vieja
+            renderResultados(Array.isArray(data) ? data : [], termino);
+        } catch (_) {
+            dropdown.innerHTML = '<li class="autocomplete-empty">Error al buscar</li>';
+            dropdown.style.display = 'block';
         }
+    }
+
+    input.addEventListener('input', () => {
+        const t = input.value.trim();
+        ultimoTermino = t;
+        clearTimeout(timer);
+        if (t.length < 1) { ocultarDropdown(); return; }
+        timer = setTimeout(() => buscar(t), 250);
     });
 
+    input.addEventListener('focus', () => { if (input.value.trim()) buscar(input.value.trim()); });
+    input.addEventListener('blur', () => setTimeout(ocultarDropdown, 150));
+    input.addEventListener('keydown', (e) => { if (e.key === 'Escape') ocultarDropdown(); });
+
+    function abrirCrear(termino) {
+        ocultarDropdown();
+        if (!divCrear) return;
+        divCrear.style.display = 'block';
+        const parts = (termino || '').split(' ');
+        const n = document.getElementById('nuevoClienteNombre');
+        const a = document.getElementById('nuevoClienteApellido');
+        if (n && parts[0] && !/^\d+$/.test(parts[0])) n.value = parts[0];
+        if (a && parts.length > 1) a.value = parts.slice(1).join(' ');
+    }
+
+    if (btnMostrarCrear) btnMostrarCrear.addEventListener('click', () => abrirCrear(input.value.trim()));
     btnCambiar.addEventListener('click', resetBusqueda);
 
-    // crear cliente desde el mismo formulario sin ir a otra pagina
-    btnCrear.addEventListener('click', async () => {
+    if (btnCrear) btnCrear.addEventListener('click', async () => {
         const nombre   = document.getElementById('nuevoClienteNombre').value.trim();
         const apellido = document.getElementById('nuevoClienteApellido').value.trim();
         const telefono = document.getElementById('nuevoClienteTelefono').value.trim();
         const dni      = document.getElementById('nuevoClienteDni').value.trim();
-
-        if (!nombre || !apellido || !telefono) {
-            alert('Nombre, apellido y telefono son obligatorios.');
-            return;
-        }
-
+        if (!nombre || !apellido || !telefono) { alert('Nombre, apellido y telefono son obligatorios.'); return; }
         try {
             const resp = await fetch('/clientes/api/crear', {
                 method: 'POST',
@@ -153,17 +127,11 @@
                 body: JSON.stringify({ nombre, apellido, dni, telefono })
             });
             const data = await resp.json();
-            if (data.error) {
-                alert(data.error);
-                return;
-            }
+            if (data.error) { alert(data.error); return; }
             seleccionarCliente(data);
-        } catch (err) {
-            alert('Error al crear cliente.');
-        }
+        } catch (_) { alert('Error al crear cliente.'); }
     });
 
-    // expongo funciones para que otros scripts puedan acceder al cliente seleccionado
     window.getClienteSeleccionado = () => clienteActual;
     window.resetBusquedaCliente = resetBusqueda;
 })();

@@ -1,0 +1,58 @@
+<%
+  const sevBadge = { vencido:'badge-alerta', critico:'badge-alerta', alto:'badge-en-transito', medio:'badge-pendiente' }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('chart', { size: 18 }) %> Dashboard de Choferes</h4>
+  <a href="/choferes" class="btn btn-sm btn-outline-secondary">← Listado</a>
+</div>
+
+<div class="stat-cards stat-cards--5">
+  <div class="stat-card stat-card--info">
+    <div class="stat-card__icon"><%- icon('users', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= metricas.activos %></span><span class="stat-card__label">Choferes activos</span></div>
+  </div>
+  <div class="stat-card stat-card--warning">
+    <div class="stat-card__icon"><%- icon('clock', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= metricas.licenciasPorVencer %></span><span class="stat-card__label">Licencias por vencer</span></div>
+  </div>
+  <div class="stat-card stat-card--danger">
+    <div class="stat-card__icon"><%- icon('alert', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= metricas.docsVencidos %></span><span class="stat-card__label">Documentos vencidos</span></div>
+  </div>
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-card__icon"><%- icon('clock', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= metricas.heMes %></span><span class="stat-card__label">Horas extra (mes)</span></div>
+  </div>
+  <div class="stat-card stat-card--warning">
+    <div class="stat-card__icon"><%- icon('truck', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= metricas.sinCamion %></span><span class="stat-card__label">Sin camión asignado</span></div>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span>Próximos vencimientos y pendientes</span>
+    <a href="/alertas?modulo=choferes" class="small text-decoration-none">Ver todo →</a>
+  </div>
+  <div class="card-body p-0">
+    <% if (!alertas.length) { %>
+      <div class="p-4 text-center text-muted">Sin alertas activas. 🎉</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Severidad</th><th>Tipo</th><th>Chofer</th><th>Vence</th><th></th></tr></thead>
+      <tbody>
+        <% alertas.forEach(a => { %>
+        <tr>
+          <td><span class="badge rounded-pill px-3 <%= sevBadge[a.severidad] %>"><%= a.severidad %></span></td>
+          <td><%= a.titulo %></td>
+          <td class="fw-semibold"><%= a.entidad_nombre %></td>
+          <td><small class="text-muted"><%= a.fecha ? formatFecha(a.fecha) : (a.dias!=null ? a.dias+' días' : '—') %></small></td>
+          <td class="text-end"><a href="<%= a.link %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

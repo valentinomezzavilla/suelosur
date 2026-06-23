@@ -1,0 +1,21 @@
+<%
+  // Params: base (url sin query), extra (querystring extra p.ej. 'tab=horario'), filtros, periodoLabel
+  const _extra = extra ? (extra + '&') : ''
+  const chip = (p, label) => `<a href="${base}?${_extra}preset=${p}" class="periodo-chip ${filtros.preset===p?'is-active':''}">${label}</a>`
+%>
+<div class="periodo-chips">
+  <%- chip('hoy','Hoy') %>
+  <%- chip('semana','Esta semana') %>
+  <%- chip('mes','Este mes') %>
+</div>
+<form method="GET" action="<%= base %>" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <% if (extra) { extra.split('&').forEach(kv => { const [k,v]=kv.split('='); %><input type="hidden" name="<%= k %>" value="<%= v %>"><% }) } %>
+    <input type="hidden" name="preset" value="rango">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Desde</label><input type="date" name="fechaDesde" value="<%= filtros.fechaDesde || '' %>" class="form-control form-control-sm"></div>
+      <div class="col-md-3"><label class="form-label">Hasta</label><input type="date" name="fechaHasta" value="<%= filtros.fechaHasta || '' %>" class="form-control form-control-sm"></div>
+      <div class="col-auto"><button class="btn btn-sm btn-naranja">Filtrar</button></div>
+    </div>
+  </div>
+</form>

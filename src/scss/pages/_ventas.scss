@@ -56,7 +56,7 @@
   gap: 0.55rem;
   transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 
-  &:hover { border-color: $accent; box-shadow: 0 2px 6px rgba(13, 148, 136, 0.1); }
+  &:hover { border-color: $accent; box-shadow: 0 2px 6px rgba(28, 91, 173, 0.12); }
 
   &__top {
     display: flex;
@@ -291,4 +291,37 @@
   top: 1rem;
 
   @include md-down { position: static; }
+}
+
+// ── Viaje: densidad compacta y profesional ─────────────────────
+#venta-viaje {
+  .form-section {
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .form-section__title {
+    font-size: 0.72rem;
+    margin-bottom: 0.6rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid $border-line;
+  }
+
+  .form-group {
+    margin-bottom: 0.6rem;
+  }
+
+  // Aside aún más denso (Producto / Precios / Pago)
+  .viaje-form-aside .form-section { padding: 0.8rem 0.9rem; }
+
+  // Total destacado dentro de Precios
+  .input-total {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: $accent-dark;
+    background: $accent-soft;
+    border-color: rgba(28, 91, 173, 0.3);
+  }
+
+  .btn-finalizar { margin-top: 0.25rem; }
 }

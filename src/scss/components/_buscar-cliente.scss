@@ -5,6 +5,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+  align-items: flex-start;
+
+  &__search {
+    position: relative;
+    width: 100%;
+  }
 
   &__inputs {
     display: grid;
@@ -67,5 +73,53 @@
     border: 1px dashed $border;
     border-radius: $radius-md;
     padding: 0.85rem;
+    width: 100%;
   }
+}
+
+// ── Dropdown de autocomplete ───────────────────────────────────
+.autocomplete-dropdown {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  box-shadow: $shadow-md;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.autocomplete-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: $radius-sm;
+  cursor: pointer;
+
+  &:hover { background: $accent-soft; }
+
+  &__nombre { font-weight: 600; color: $dark; font-size: $fs-sm; }
+  &__meta   { font-size: $fs-xs; color: $muted; }
+}
+
+.autocomplete-empty {
+  padding: 0.6rem;
+  font-size: $fs-sm;
+  color: $muted;
+  text-align: center;
+}
+
+.autocomplete-crear {
+  background: transparent;
+  border: 0;
+  color: $accent;
+  font-weight: 600;
+  cursor: pointer;
 }

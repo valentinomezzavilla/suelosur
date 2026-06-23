@@ -1,0 +1,64 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> Proveedores</h4>
+  <a href="/proveedores/nuevo" class="btn btn-naranja">+ Nuevo Proveedor</a>
+</div>
+
+<form method="GET" action="/proveedores" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="Razón social, CUIT o email..." autofocus>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <% if (filtros.q) { %><a href="/proveedores" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!proveedores.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🏭', mensaje: 'No hay proveedores registrados.', accionHref: '/proveedores/nuevo', accionLabel: 'Crear primer proveedor' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Razón social</th>
+          <th>CUIT</th>
+          <th>Teléfono</th>
+          <th>Email</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% proveedores.forEach(p => { %>
+        <tr class="<%= !p.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold"><%= p.nombre %></td>
+          <td><small class="text-muted"><%= p.cuit || '—' %></small></td>
+          <td><small class="text-muted"><%= p.telefono || '—' %></small></td>
+          <td><small class="text-muted"><%= p.email || '—' %></small></td>
+          <td class="text-center">
+            <% if (p.activo) { %><span class="badge rounded-pill px-3 badge-activo">Activo</span>
+            <% } else { %><span class="badge rounded-pill px-3 badge-alerta">Inactivo</span><% } %>
+          </td>
+          <td class="text-center">
+            <a href="/proveedores/<%= p.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+            <form action="/proveedores/<%= p.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= p.activo ? 'btn-outline-danger' : 'btn-outline-success' %>" title="<%= p.activo ? 'Desactivar' : 'Activar' %>">
+                <%- p.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <%- include('../../partials/paginacion', { page, totalPaginas, total, limit, filtros }) %>
+    <% } %>
+  </div>
+</div>

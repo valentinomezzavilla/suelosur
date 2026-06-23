@@ -84,14 +84,12 @@
             <input type="text" name="numero" id="numero" placeholder="Ej: 1234" required>
           </div>
         </div>
-        <div class="form-row-2">
+        <div class="direccion-acciones">
           <div class="form-group">
             <label for="zona">Zona</label>
             <input type="text" name="zona_entrega" id="zona" placeholder="Ej: Norte">
           </div>
-          <div class="form-group form-group--action">
-            <button type="button" id="btnBuscarDireccion" class="btn-secondary btn-buscar-mapa">📍 Buscar en mapa</button>
-          </div>
+          <button type="button" id="btnBuscarDireccion" class="btn-secondary btn-buscar-mapa direccion-mapbtn"><%- icon('mapPin', { size: 15 }) %> Buscar en mapa</button>
         </div>
         <p id="msgMapa" class="form-hint" style="display:none">Ingresá calle y número para buscar.</p>
         <div id="mapaEntrega" style="display:none;margin-top:0.75rem">

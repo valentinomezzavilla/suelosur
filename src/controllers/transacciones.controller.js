@@ -1,5 +1,7 @@
 'use strict'
 const TransaccionesModel = require('../models/transacciones.model')
+const ClientesModel = require('../models/clientes.model')
+const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const TIPOS = ['Venta Cantera', 'Venta Viaje', 'Alquiler', 'Maquinaria', 'Ajuste']
 const POR_PAGINA = 20
@@ -7,27 +9,30 @@ const POR_PAGINA = 20
 const TransaccionesController = {
   index(req, res) {
     try {
-      const { id, tipo, idCliente, cliente, fechaDesde, fechaHasta, montoMin, montoMax, mes, sortBy, sortDir } = req.query
-      let fDesde = fechaDesde, fHasta = fechaHasta
-      if (mes && /^\d{4}-\d{2}$/.test(mes)) {
-        const [anio, mm] = mes.split('-').map(Number)
-        const ultimo = new Date(anio, mm, 0).getDate()
-        fDesde = `${mes}-01`; fHasta = `${mes}-${String(ultimo).padStart(2,'0')}`
+      const { id, tipo, idCliente, cliente, fechaDesde, fechaHasta, montoMin, montoMax, mes, preset, sortBy, sortDir } = req.query
+
+      // Período: presets (hoy/semana/mes/rango). Default = mes en curso.
+      const periodo = resolverPeriodo({ preset, desde: fechaDesde, hasta: fechaHasta, mes })
+
+      const baseFiltros = {
+        id, tipo, clienteId: idCliente, cliente,
+        fechaDesde: periodo.desde, fechaHasta: periodo.hasta,
+        montoMin, montoMax,
       }
 
       const pagina = Math.max(1, Number(req.query.page) || 1)
       const resultado = TransaccionesModel.filtrar({
-        id, tipo, clienteId: idCliente, cliente,
-        fechaDesde: fDesde, fechaHasta: fHasta,
-        montoMin, montoMax,
+        ...baseFiltros,
         page: pagina, limit: POR_PAGINA,
         sortBy: sortBy || 'created_at', sortDir: sortDir || 'DESC',
       })
+      const metricas = TransaccionesModel.resumen(baseFiltros)
 
       const filtros = {
         id: id||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'',
-        fechaDesde: fechaDesde||'', fechaHasta: fechaHasta||'', montoMin: montoMin||'',
-        montoMax: montoMax||'', mes: mes||'', sortBy: sortBy||'created_at', sortDir: sortDir||'DESC',
+        fechaDesde: periodo.desde||'', fechaHasta: periodo.hasta||'', montoMin: montoMin||'',
+        montoMax: montoMax||'', mes: periodo.mes||'', preset: periodo.preset||'',
+        sortBy: sortBy||'created_at', sortDir: sortDir||'DESC',
       }
 
       res.render('pages/transacciones/index', {
@@ -35,6 +40,9 @@ const TransaccionesController = {
         transacciones: resultado.rows,
         filtros,
         tipos: TIPOS,
+        clientesLista: ClientesModel.listar(),
+        metricas,
+        periodoLabel: etiquetaPeriodo(periodo),
         totalMes: resultado.sumaTotal,
         pagina: resultado.page,
         totalPaginas: resultado.totalPaginas,

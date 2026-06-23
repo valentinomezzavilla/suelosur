@@ -79,8 +79,19 @@ const AlquileresModel = {
       op.diasEnDomicilio = movEntrega
         ? Math.floor((Date.now() - new Date(movEntrega.fecha_movimiento).getTime()) / 86400000)
         : null
+      // Fecha exacta de fin de alquiler = fecha de entrega + plazo (días)
+      if (movEntrega) {
+        const ini = new Date(String(movEntrega.fecha_movimiento).slice(0, 10) + 'T00:00:00')
+        ini.setDate(ini.getDate() + (op.detalle.plazo_alquiler || 0))
+        op.fechaFinAlquiler = ini.toISOString().slice(0, 10)
+        const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+        op.diasRestantes = Math.round((ini - hoy) / 86400000)
+      } else {
+        op.fechaFinAlquiler = null; op.diasRestantes = null
+      }
     } else {
       op.movimientos = []; op.estadoContenedor = null; op.diasEnDomicilio = null
+      op.fechaFinAlquiler = null; op.diasRestantes = null
     }
     return op
   },
@@ -114,6 +125,22 @@ const AlquileresModel = {
 
   asignarContenedor(id_op, id_contenedor) {
     db.prepare(`UPDATE op_detalle_contenedor SET id_contenedor = ? WHERE id_orden_pedido = ?`).run(id_contenedor, id_op)
+  },
+
+  // Edición de los datos comerciales / de entrega del alquiler
+  actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada }) {
+    const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+    db.transaction(() => {
+      db.prepare(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ? WHERE id = ?`)
+        .run(observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, id_op)
+      db.prepare(`
+        UPDATE op_detalle_contenedor
+        SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,
+            plazo_alquiler = ?, precio_alquiler = ?, metodo_pago = ?
+        WHERE id_orden_pedido = ?
+      `).run(domicilio_entrega, calle || null, numero || null, zona_entrega || '',
+             parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op)
+    })()
   },
 
   despachar(id_op) {

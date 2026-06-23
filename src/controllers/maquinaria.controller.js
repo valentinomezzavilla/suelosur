@@ -15,18 +15,17 @@ const MaquinariaController = {
   },
 
   nuevo(req, res) {
-    res.render('pages/maquinaria/form', { titulo: 'Nueva Maquinaria', maquina: null })
+    res.render('pages/maquinaria/form', { titulo: 'Nueva Maquinaria', maquina: null, estadosOp: MaquinariaModel.ESTADOS_OP })
   },
 
   crear(req, res) {
     try {
-      const { nombre, tipo, patente, modelo, anio, estado_general, km_actuales, observaciones } = req.body
-      if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/maquinaria/nuevo') }
-      MaquinariaModel.crear({ nombre, tipo, patente, modelo, anio, estado_general, km_actuales, observaciones })
-      req.flash('success', `Maquinaria "${nombre}" creada.`)
+      if (!req.body.nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/maquinaria/nuevo') }
+      MaquinariaModel.crear(req.body)
+      req.flash('success', `Maquinaria "${req.body.nombre}" creada.`)
       res.redirect('/maquinaria')
     } catch (err) {
-      console.error(err); req.flash('error', 'Error.'); res.redirect('/maquinaria/nuevo')
+      console.error(err); req.flash('error', err.message || 'Error.'); res.redirect('/maquinaria/nuevo')
     }
   },
 
@@ -34,7 +33,7 @@ const MaquinariaController = {
     try {
       const maquina = MaquinariaModel.obtener(req.params.id)
       if (!maquina) { req.flash('error', 'No encontrada.'); return res.redirect('/maquinaria') }
-      res.render('pages/maquinaria/form', { titulo: 'Editar Maquinaria', maquina })
+      res.render('pages/maquinaria/form', { titulo: 'Editar Maquinaria', maquina, estadosOp: MaquinariaModel.ESTADOS_OP })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/maquinaria')
     }
@@ -44,9 +43,9 @@ const MaquinariaController = {
     try {
       MaquinariaModel.actualizar(req.params.id, req.body)
       req.flash('success', 'Maquinaria actualizada.')
-      res.redirect('/maquinaria')
+      res.redirect(`/maquinaria/${req.params.id}`)
     } catch (err) {
-      console.error(err); req.flash('error', 'Error.'); res.redirect('/maquinaria')
+      console.error(err); req.flash('error', err.message || 'Error.'); res.redirect(`/maquinaria/${req.params.id}/editar`)
     }
   },
 

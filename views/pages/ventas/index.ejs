@@ -6,16 +6,29 @@
 
   // Filtros vigentes (sin page) para preservarlos en links de tabs / orden
   const baseFiltros = {}
-  ;['estado','id_cliente','q','sort','dir'].forEach(k => { if (filtros[k]) baseFiltros[k] = filtros[k] })
+  ;['estado','id_cliente','q','sort','dir','preset','fechaDesde','fechaHasta','mes'].forEach(k => { if (filtros[k]) baseFiltros[k] = filtros[k] })
 
-  // Helper: link de pestaña por estado (resetea page, preserva búsqueda/cliente)
+  // Helper: link de pestaña por estado (resetea page, preserva búsqueda/cliente/período)
   const tabHref = (key) => {
     const o = {}
     if (key) o.estado = key
     if (filtros.id_cliente) o.id_cliente = filtros.id_cliente
     if (filtros.q) o.q = filtros.q
+    ;['preset','fechaDesde','fechaHasta','mes'].forEach(k => { if (filtros[k]) o[k] = filtros[k] })
     return '/ventas?' + new URLSearchParams(o).toString()
   }
+
+  // Helper: chips de período (preserva estado/cliente/q)
+  const presetHref = (p) => {
+    const o = { preset: p }
+    if (filtros.estado) o.estado = filtros.estado
+    if (filtros.id_cliente) o.id_cliente = filtros.id_cliente
+    if (filtros.q) o.q = filtros.q
+    return '/ventas?' + new URLSearchParams(o).toString()
+  }
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const tipoOperacion = (op) => op.modalidad === 'flete' ? 'Viaje' : 'Cantera'
+  const met = metricas || { total: 0, count: 0 }
 
   // Helper: encabezado ordenable
   const thSort = (col, label, extraClass) => {
@@ -28,11 +41,11 @@
   }
 
   const tabs = [
-    { key:'',           label:'Todas',       tono:'neutral', icono:'📋', count: totalTodas },
-    { key:'pendiente',  label:'Pendientes',  tono:'warning', icono:'⏳', count: conteo.pendiente },
-    { key:'despachado', label:'Despachadas', tono:'info',    icono:'🚛', count: conteo.despachado },
-    { key:'entregado',  label:'Entregadas',  tono:'success', icono:'✅', count: conteo.entregado },
-    { key:'anulado',    label:'Anuladas',    tono:'danger',  icono:'✕',  count: conteo.anulado },
+    { key:'',           label:'Todas',       tono:'neutral', icono:'clipboard', count: totalTodas },
+    { key:'pendiente',  label:'Pendientes',  tono:'warning', icono:'clock',     count: conteo.pendiente },
+    { key:'despachado', label:'Despachadas', tono:'info',    icono:'truck',     count: conteo.despachado },
+    { key:'entregado',  label:'Entregadas',  tono:'success', icono:'check',     count: conteo.entregado },
+    { key:'anulado',    label:'Anuladas',    tono:'danger',  icono:'x',         count: conteo.anulado },
   ]
   const badgeMap = { pendiente:'badge-pendiente', despachado:'badge-en-transito', entregado:'badge-activo', anulado:'badge-alerta' }
   const labelEstado = { pendiente:'Pendiente', despachado:'Despachado', entregado:'Entregado', anulado:'Anulado' }
@@ -40,7 +53,7 @@
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title">📋 Órdenes de Pedido</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('clipboard', { size: 18 }) %> Órdenes de Pedido</h4>
   <div class="d-flex gap-2">
     <a href="/ventas/cantera" class="btn btn-naranja btn-sm">+ Venta en cantera</a>
     <a href="/ventas/viaje"   class="btn btn-naranja btn-sm">+ Venta con viaje</a>
@@ -52,7 +65,7 @@
   <% tabs.forEach(t => { %>
     <a href="<%= tabHref(t.key) %>"
        class="stat-card stat-card--<%= t.tono %> <%= estadoAct === t.key ? 'stat-card--active' : '' %>">
-      <div class="stat-card__icon"><%= t.icono %></div>
+      <div class="stat-card__icon"><%- icon(t.icono, { size: 20 }) %></div>
       <div class="stat-card__body">
         <span class="stat-card__value"><%= t.count %></span>
         <span class="stat-card__label"><%= t.label %></span>
@@ -61,19 +74,37 @@
   <% }) %>
 </div>
 
-<!-- Buscador + filtro de cliente -->
+<!-- Período + métricas -->
+<div class="periodo-chips">
+  <a href="<%= presetHref('hoy') %>"    class="periodo-chip <%= filtros.preset==='hoy'    ? 'is-active' : '' %>">Hoy</a>
+  <a href="<%= presetHref('semana') %>" class="periodo-chip <%= filtros.preset==='semana' ? 'is-active' : '' %>">Esta semana</a>
+  <a href="<%= presetHref('mes') %>"    class="periodo-chip <%= filtros.preset==='mes'    ? 'is-active' : '' %>">Este mes</a>
+</div>
+<div class="stat-cards" style="grid-template-columns:repeat(2,minmax(0,1fr));max-width:560px">
+  <div class="stat-card stat-card--neutral">
+    <div class="stat-card__icon"><%- icon('chart', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(met.total) %></span><span class="stat-card__label">Total · <%= periodoLabel %></span></div>
+  </div>
+  <div class="stat-card stat-card--info">
+    <div class="stat-card__icon"><%- icon('clipboard', { size: 20 }) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= met.count %></span><span class="stat-card__label">Operaciones</span></div>
+  </div>
+</div>
+
+<!-- Buscador + filtros -->
 <form method="GET" action="/ventas" class="card shadow-sm mb-3">
   <div class="card-body py-2">
+    <input type="hidden" name="preset" value="rango">
     <% if (filtros.estado) { %><input type="hidden" name="estado" value="<%= filtros.estado %>"><% } %>
     <% if (filtros.sort)   { %><input type="hidden" name="sort"   value="<%= filtros.sort %>"><% } %>
     <% if (filtros.dir)    { %><input type="hidden" name="dir"    value="<%= filtros.dir %>"><% } %>
     <div class="row g-2 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Buscar</label>
         <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
                placeholder="N° de OP, cliente...">
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label">Cliente</label>
         <select name="id_cliente" class="form-select form-select-sm">
           <option value="">Todos los clientes</option>
@@ -82,8 +113,16 @@
           <% }) %>
         </select>
       </div>
+      <div class="col-md-2">
+        <label class="form-label">Desde</label>
+        <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde || '' %>" class="form-control form-control-sm">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Hasta</label>
+        <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta || '' %>" class="form-control form-control-sm">
+      </div>
       <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <button type="submit" class="btn btn-sm btn-naranja">Filtrar</button>
         <a href="/ventas<%= filtros.estado ? '?estado=' + filtros.estado : '' %>" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
       </div>
     </div>
@@ -111,10 +150,10 @@
       <tbody>
         <% ops.forEach(op => { %>
         <tr>
-          <td class="fw-bold text-orange">OP-<%= String(op.nro_op).padStart(4,'0') %></td>
+          <td class="fw-semibold text-orange">OP-<%= String(op.nro_op).padStart(4,'0') %></td>
           <td><%= op.cliente_nombre %></td>
-          <td><small class="text-muted"><%= tipoMap[op.tipo_op] || op.tipo_op %></small></td>
-          <td><small class="text-muted"><%= op.fecha_emision %></small></td>
+          <td><small class="text-muted"><%= tipoOperacion(op) %></small></td>
+          <td><small class="text-muted"><%= formatFecha(op.fecha_emision) %></small></td>
           <td class="text-end fw-semibold">$<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
           <td class="text-center">
             <span class="badge rounded-pill px-3 py-1 <%= badgeMap[op.estado] %>"><%= labelEstado[op.estado] || op.estado %></span>

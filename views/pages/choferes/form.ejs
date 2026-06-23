@@ -1,0 +1,90 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('hardhat', { size: 18 }) %> <%= titulo %></h4>
+  <a href="/choferes" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<form action="<%= chofer ? `/choferes/${chofer.id}?_method=PUT` : '/choferes' %>" method="POST">
+
+  <!-- Datos personales -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Datos personales</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Nombre *</label><input name="nombre" class="form-control" value="<%= chofer?.nombre || '' %>" required></div>
+        <div class="col-md-4"><label class="form-label">Apellido</label><input name="apellido" class="form-control" value="<%= chofer?.apellido || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">DNI</label><input name="dni" class="form-control" value="<%= chofer?.dni || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">CUIL / CUIT</label><input name="cuil" class="form-control" value="<%= chofer?.cuil || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Fecha de nacimiento</label><input type="date" name="fecha_nacimiento" class="form-control" value="<%= chofer?.fecha_nacimiento || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Teléfono</label><input name="telefono" class="form-control" value="<%= chofer?.telefono || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<%= chofer?.email || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Dirección</label><input name="direccion" class="form-control" value="<%= chofer?.direccion || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Contacto de emergencia</label><input name="contacto_emergencia" class="form-control" value="<%= chofer?.contacto_emergencia || '' %>"></div>
+        <div class="col-md-6"><label class="form-label">Tel. contacto de emergencia</label><input name="contacto_emergencia_tel" class="form-control" value="<%= chofer?.contacto_emergencia_tel || '' %>"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Información laboral -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Información laboral</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Fecha de ingreso</label><input type="date" name="fecha_ingreso" class="form-control" value="<%= chofer?.fecha_ingreso || '' %>"></div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo de contratación</label>
+          <select name="tipo_contratacion" class="form-select">
+            <option value="">—</option>
+            <% ['Efectivo','Eventual','Contratado','Tercerizado'].forEach(t => { %><option <%= chofer?.tipo_contratacion===t?'selected':'' %>><%= t %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Estado laboral</label>
+          <select name="estado_laboral" class="form-select">
+            <% ['activo','licencia','suspendido','baja'].forEach(e => { %><option value="<%= e %>" <%= chofer?.estado_laboral===e?'selected':'' %>><%= e %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-4"><label class="form-label">Categoría laboral</label><input name="categoria_laboral" class="form-control" value="<%= chofer?.categoria_laboral || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Convenio</label><input name="convenio" class="form-control" value="<%= chofer?.convenio || '' %>"></div>
+        <div class="col-md-4">
+          <label class="form-label">Supervisor</label>
+          <select name="supervisor_id" class="form-select">
+            <option value="">—</option>
+            <% supervisores.forEach(s => { %><option value="<%= s.id %>" <%= chofer?.supervisor_id===s.id?'selected':'' %>><%= s.nombre %> <%= s.apellido %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-12"><label class="form-label">Observaciones</label><input name="certificaciones" class="form-control" value="<%= chofer?.certificaciones || '' %>" placeholder="Notas, certificaciones, cursos..."></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Económico -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Información económica</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-4"><label class="form-label">Sueldo básico</label><input type="number" step="0.01" name="sueldo_basico" class="form-control" value="<%= chofer?.sueldo_basico || 0 %>"></div>
+        <div class="col-md-4"><label class="form-label">Viáticos</label><input type="number" step="0.01" name="viaticos" class="form-control" value="<%= chofer?.viaticos || 0 %>"></div>
+        <div class="col-md-4"><label class="form-label">Bonificaciones</label><input type="number" step="0.01" name="bonificaciones" class="form-control" value="<%= chofer?.bonificaciones || 0 %>"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Licencia -->
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold">Licencia de conducir</div>
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3"><label class="form-label">Número</label><input name="licencia_numero" class="form-control" value="<%= chofer?.licencia_numero || '' %>"></div>
+        <div class="col-md-3"><label class="form-label">Categoría</label><input name="licencia_categoria" class="form-control" value="<%= chofer?.licencia_categoria || '' %>" placeholder="Ej: E1, D2"></div>
+        <div class="col-md-2"><label class="form-label">Emisión</label><input type="date" name="licencia_fecha_emision" class="form-control" value="<%= chofer?.licencia_fecha_emision || '' %>"></div>
+        <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="licencia_vencimiento" class="form-control" value="<%= chofer?.licencia_vencimiento || '' %>"></div>
+        <div class="col-md-2"><label class="form-label">Organismo</label><input name="licencia_organismo" class="form-control" value="<%= chofer?.licencia_organismo || '' %>" placeholder="Municipalidad..."></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2 mb-4">
+    <button type="submit" class="btn btn-naranja px-4"><%= chofer ? 'Guardar cambios' : 'Crear chofer' %></button>
+    <a href="/choferes" class="btn btn-outline-secondary">Cancelar</a>
+  </div>
+</form>

@@ -4,6 +4,7 @@ const MaquinariaModel           = require('../models/maquinaria.model')
 const TransaccionesModel        = require('../models/transacciones.model')
 const ClientesModel             = require('../models/clientes.model')
 const ConfigMaquinariaModel     = require('../models/config_maquinaria.model')
+const OperacionesModel          = require('../models/operaciones.model')
 
 const AlquileresMaquinariaController = {
 
@@ -72,11 +73,36 @@ const AlquileresMaquinariaController = {
       res.render('pages/alquileres/maquinaria_detalle', {
         titulo: `Alquiler Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles,
+        recursos: OperacionesModel.obtenerRecursos(alquiler.id),
+        choferesDisp: OperacionesModel.choferesDisponibles(),
+        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar.')
       res.redirect('/alquileres/maquinaria')
+    }
+  },
+
+  editar(req, res) {
+    try {
+      const alquiler = AlquileresMaquinariaModel.obtener(req.params.id)
+      if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/maquinaria') }
+      if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/maquinaria/${alquiler.id}`) }
+      res.render('pages/alquileres/maquinaria_editar', { titulo: `Editar Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
+    } catch (err) {
+      console.error(err); req.flash('error', 'Error al cargar el alquiler.'); res.redirect('/alquileres/maquinaria')
+    }
+  },
+
+  actualizar(req, res) {
+    try {
+      AlquileresMaquinariaModel.actualizar(req.params.id, req.body)
+      req.flash('success', 'Alquiler actualizado.')
+      res.redirect(`/alquileres/maquinaria/${req.params.id}`)
+    } catch (err) {
+      console.error(err); req.flash('error', err.message || 'Error al actualizar.'); res.redirect(`/alquileres/maquinaria/${req.params.id}/editar`)
     }
   },
 

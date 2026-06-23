@@ -18,6 +18,8 @@
   tbody td {
     border-color: $border-line;
     padding: 0.7rem 1rem;
+    font-size: $fs-sm;
+    vertical-align: middle;
   }
   tbody tr {
     transition: background 0.1s;

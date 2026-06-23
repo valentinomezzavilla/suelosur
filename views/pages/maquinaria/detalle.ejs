@@ -6,11 +6,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h4 class="fw-bold mb-0 text-dark-title">🚜 <%= maquina.nombre %></h4>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> <%= maquina.nombre %></h4>
     <small class="text-muted"><%= maquina.tipo %> · <%= maquina.patente || 'sin patente' %></small>
   </div>
   <div class="d-flex gap-2">
-    <a href="/maquinaria/<%= maquina.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️ Editar</a>
+    <a href="/maquinaria/<%= maquina.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
     <a href="/maquinaria" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
 </div>
@@ -24,7 +24,7 @@
         <p class="text-muted small mb-2">Estado actual</p>
         <% if (ultimo) { %>
           <h4><span class="badge rounded-pill px-3 py-2 <%= badgeEstado[ultimo.estado_paso] || 'badge-pendiente' %>"><%= labelEstado[ultimo.estado_paso] || ultimo.estado_paso %></span></h4>
-          <small class="text-muted">desde <%= ultimo.fecha_movimiento %></small>
+          <small class="text-muted">desde <%= formatFechaHora(ultimo.fecha_movimiento) %></small>
           <% if (ultimo.cliente_nombre) { %>
             <hr><p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>
@@ -81,6 +81,46 @@
             </div>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Datos de flota + operador asignado -->
+  <% const estadoOpLbl = { disponible:'Disponible', en_operacion:'En operación', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio' } %>
+  <div class="col-md-7">
+    <div class="card shadow-sm h-100"><div class="card-header card-header-light">Datos de la máquina</div>
+      <div class="card-body ficha">
+        <div class="ficha-row"><span class="ficha-label">N° interno</span><span class="ficha-value"><%= maquina.numero_interno ? '#'+maquina.numero_interno : '—' %></span></div>
+        <div class="ficha-row"><span class="ficha-label">Marca / Modelo</span><span class="ficha-value"><%= [maquina.marca,maquina.modelo].filter(Boolean).join(' ') || '—' %></span></div>
+        <div class="ficha-row"><span class="ficha-label">Año</span><span class="ficha-value"><%= maquina.anio || '—' %></span></div>
+        <div class="ficha-row"><span class="ficha-label">Estado</span><span class="ficha-value"><%= estadoOpLbl[maquina.estado_operativo] || maquina.estado_operativo %></span></div>
+        <div class="ficha-row"><span class="ficha-label">Horas de uso</span><span class="ficha-value"><%= maquina.horas_uso || 0 %> h</span></div>
+        <div class="ficha-row"><span class="ficha-label">Último mant.</span><span class="ficha-value"><%= maquina.ultimo_service ? formatFecha(maquina.ultimo_service) : '—' %></span></div>
+        <div class="ficha-row"><span class="ficha-label">Próximo mant.</span><span class="ficha-value"><%= maquina.proximo_service ? formatFecha(maquina.proximo_service) : '—' %></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-5">
+    <div class="card shadow-sm h-100"><div class="card-header card-header-light">Operador / Chofer asignado</div>
+      <div class="card-body">
+        <% if (maquina.chofer_asignado) { %>
+          <p class="fw-bold mb-1"><%= maquina.chofer_asignado.empleado_nombre %></p>
+          <p class="text-muted small mb-2">Legajo #<%= maquina.chofer_asignado.legajo %> · desde <%= formatFecha(maquina.chofer_asignado.fecha_desde) %></p>
+          <span class="badge rounded-pill px-3 badge-activo">Asignada</span>
+        <% } else { %>
+          <p class="text-muted mb-2">Sin operador asignado.</p>
+          <p class="form-hint mb-0">Asigná esta máquina a un chofer desde la ficha del chofer o del empleado.</p>
+        <% } %>
+        <% if (maquina.asignaciones && maquina.asignaciones.length) { %>
+          <hr class="my-2">
+          <p class="text-muted small fw-semibold mb-1">Historial</p>
+          <% maquina.asignaciones.forEach(a => { %>
+            <div class="d-flex justify-content-between small">
+              <span><%= a.empleado_nombre %></span>
+              <span class="text-muted"><%= formatFecha(a.fecha_desde) %><%= a.fecha_hasta ? ' → '+formatFecha(a.fecha_hasta) : ' · activa' %></span>
+            </div>
+          <% }) %>
+        <% } %>
       </div>
     </div>
   </div>
@@ -149,7 +189,7 @@
           <tbody>
             <% maquina.movimientos.forEach(m => { %>
             <tr>
-              <td><small class="text-muted"><%= m.fecha_movimiento %></small></td>
+              <td><small class="text-muted"><%= formatFechaHora(m.fecha_movimiento) %></small></td>
               <td><span class="badge rounded-pill px-3 <%= badgeEstado[m.estado_paso] || 'badge-pendiente' %>"><%= labelEstado[m.estado_paso] || m.estado_paso %></span></td>
               <td><small><%= m.operario_nombre || '—' %></small></td>
               <td><small><%= m.horas_trabajadas > 0 ? m.horas_trabajadas + 'h' : '—' %></small></td>

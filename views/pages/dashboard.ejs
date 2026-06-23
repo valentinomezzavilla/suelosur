@@ -1,43 +1,84 @@
-<div class="mb-4">
-  <h4 class="fw-bold text-dark-title">📊 Tablero de Control</h4>
-  <p class="text-muted">Bienvenido, <%= user.nombre %>. Aquí verás los KPIs del sistema.</p>
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const sevBadge = { vencido:'badge-alerta', critico:'badge-alerta', alto:'badge-en-transito', medio:'badge-pendiente' }
+  const moduloLbl = { choferes:'Choferes', flota:'Flota' }
+%>
+
+<div class="mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('chart', { size: 18 }) %> Tablero de Control</h4>
+  <p class="text-muted mb-0">Bienvenido, <%= user.nombre %>. Resumen de <%= periodoLabel %>.</p>
 </div>
 
-<!-- KPIs placeholder -->
-<div class="row g-3 mb-4">
-  <div class="col-md-4">
-    <div class="card shadow-sm h-100 card-accent-orange kpi-card">
-      <div class="card-body">
-        <p class="text-muted small mb-1">Cuentas a Cobrar</p>
-        <h3 class="fw-bold text-orange">—</h3>
-        <small class="text-muted">Disponible cuando esté el módulo de cobranzas</small>
-      </div>
-    </div>
+<!-- KPIs principales -->
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100 card-accent-orange kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Ventas del mes</p>
+      <h3 class="fw-bold text-orange"><%= money(ventas.total) %></h3>
+      <small class="text-muted"><%= ventas.count %> operaciones</small>
+    </div></div>
   </div>
-  <div class="col-md-4">
-    <div class="card shadow-sm h-100 card-accent-green kpi-card">
-      <div class="card-body">
-        <p class="text-muted small mb-1">Contenedores Alquilados</p>
-        <h3 class="fw-bold text-green">—</h3>
-        <small class="text-muted">Disponible cuando esté el módulo de contenedores</small>
-      </div>
-    </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100 card-accent-green kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Facturación total (mes)</p>
+      <h3 class="fw-bold text-green"><%= money(trans.total) %></h3>
+      <small class="text-muted">Ventas <%= money(trans.ventas) %> · Alquileres <%= money(trans.alquileres) %></small>
+    </div></div>
   </div>
-  <div class="col-md-4">
-    <div class="card shadow-sm h-100 card-accent-blue kpi-card">
-      <div class="card-body">
-        <p class="text-muted small mb-1">OPs del Mes</p>
-        <h3 class="fw-bold text-blue">—</h3>
-        <small class="text-muted">Disponible cuando esté el módulo de ventas</small>
-      </div>
-    </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100 card-accent-blue kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Flota disponible</p>
+      <h3 class="fw-bold text-blue"><%= (flota.porEstado.disponible||0) %> / <%= flota.total %></h3>
+      <small class="text-muted"><%= (flota.porEstado.en_mantenimiento||0) %> en mantenimiento</small>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card shadow-sm h-100 kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Choferes activos</p>
+      <h3 class="fw-bold text-dark-title"><%= choferes %></h3>
+      <small class="text-muted">Personal de conducción</small>
+    </div></div>
   </div>
 </div>
 
-<div class="card shadow-sm kpi-card">
-  <div class="card-body text-center py-5">
-    <div class="icon-xl">🚧</div>
-    <h5 class="mt-3 fw-bold text-dark-title">Dashboard en construcción</h5>
-    <p class="text-muted">Los KPIs reales se conectarán a medida que se completen los módulos del sistema.</p>
+<!-- Alertas -->
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+        <span>Alertas</span><a href="/alertas" class="small text-decoration-none">Ver todo →</a>
+      </div>
+      <div class="card-body">
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Vencidas</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.vencido %></span></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Críticas (≤30d)</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.critico %></span></div>
+        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Altas (≤60d)</span><span class="badge rounded-pill px-3 badge-en-transito"><%= alertas.alto %></span></div>
+        <div class="d-flex justify-content-between"><span class="text-muted">Total</span><span class="fw-bold"><%= alertas.total %></span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white fw-semibold">Próximos vencimientos y pendientes</div>
+      <div class="card-body p-0">
+        <% if (!topAlertas.length) { %>
+          <div class="p-4 text-center text-muted">Sin alertas activas. 🎉</div>
+        <% } else { %>
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>Severidad</th><th>Módulo</th><th>Tipo</th><th>Entidad</th><th>Vence</th></tr></thead>
+          <tbody>
+            <% topAlertas.forEach(a => { %>
+            <tr>
+              <td><span class="badge rounded-pill px-3 <%= sevBadge[a.severidad] %>"><%= a.severidad %></span></td>
+              <td><small class="text-muted"><%= moduloLbl[a.modulo] %></small></td>
+              <td><a href="<%= a.link %>" class="text-decoration-none"><%= a.titulo %></a></td>
+              <td><%= a.entidad_nombre %></td>
+              <td><small class="text-muted"><%= a.fecha ? formatFecha(a.fecha) : (a.km_restante!=null ? a.km_restante+' km' : '—') %></small></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <% } %>
+      </div>
+    </div>
   </div>
 </div>

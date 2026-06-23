@@ -1,0 +1,38 @@
+<%
+  const d = alquiler.detalle || {}
+  const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente']]
+  const calle = d.domicilio_calle || d.domicilio_entrega || ''
+  const numero = d.domicilio_numero || ''
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Editar Alquiler OP-<%= String(alquiler.nro_op).padStart(4,'0') %></h4>
+  <a href="/alquileres/contenedores/<%= alquiler.id %>" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <p class="text-muted small mb-3">Cliente: <strong><%= alquiler.cliente_nombre %></strong> · El cliente y el contenedor asignado no se cambian acá (usá anular + recrear o "Asignar contenedor").</p>
+    <form action="/alquileres/contenedores/<%= alquiler.id %>?_method=PUT" method="POST">
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Calle</label><input name="calle" class="form-control" value="<%= calle %>"></div>
+        <div class="col-md-3"><label class="form-label">Número</label><input name="numero" class="form-control" value="<%= numero %>"></div>
+        <div class="col-md-3"><label class="form-label">Zona</label><input name="zona_entrega" class="form-control" value="<%= d.zona_entrega || '' %>"></div>
+        <div class="col-md-3"><label class="form-label">Plazo (días)</label><input type="number" min="1" name="plazo_alquiler" class="form-control" value="<%= d.plazo_alquiler || 5 %>"></div>
+        <div class="col-md-3"><label class="form-label">Precio</label><input type="number" step="0.01" min="0" name="precio_alquiler" class="form-control" value="<%= d.precio_alquiler || 0 %>"></div>
+        <div class="col-md-3"><label class="form-label">Fecha de entrega</label><input type="date" name="fecha_entrega_planificada" class="form-control" value="<%= alquiler.fecha_entrega_planificada || '' %>"></div>
+        <div class="col-md-3"><label class="form-label">Método de pago</label>
+          <select name="metodo_pago" class="form-select">
+            <option value="">— Sin especificar —</option>
+            <% metodos.forEach(([k,l]) => { %><option value="<%= k %>" <%= (alquiler.metodo_pago||d.metodo_pago)===k?'selected':'' %>><%= l %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= alquiler.observaciones || '' %></textarea></div>
+      </div>
+      <div class="d-flex gap-2 mt-3">
+        <button type="submit" class="btn btn-naranja px-4">Guardar cambios</button>
+        <a href="/alquileres/contenedores/<%= alquiler.id %>" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -13,7 +13,7 @@
   </div>
   <div class="d-flex gap-2 align-items-center">
     <span class="badge rounded-pill px-3 <%= badgeLab[e.estado_laboral] || 'badge-pendiente' %>"><%= labelLab[e.estado_laboral] || e.estado_laboral %></span>
-    <a href="/empleados/<%= e.id %>/editar" class="btn-primary btn-sm">✏️ Editar</a>
+    <a href="/empleados/<%= e.id %>/editar" class="btn-primary btn-sm"><%- icon('edit', { size: 15 }) %> Editar</a>
   </div>
 </div>
 
@@ -25,7 +25,7 @@
       <div class="resumen-grid">
         <span class="resumen-label">Nombre</span>          <span class="resumen-valor"><%= e.nombre %> <%= e.apellido %></span>
         <span class="resumen-label">DNI</span>             <span class="resumen-valor"><%= dash(e.dni) %></span>
-        <span class="resumen-label">Nacimiento</span>      <span class="resumen-valor"><%= dash(e.fecha_nacimiento) %></span>
+        <span class="resumen-label">Nacimiento</span>      <span class="resumen-valor"><%= e.fecha_nacimiento ? formatFecha(e.fecha_nacimiento) : '—' %></span>
         <span class="resumen-label">Dirección</span>       <span class="resumen-valor"><%= dash(e.direccion) %></span>
         <span class="resumen-label">Teléfono</span>        <span class="resumen-valor"><%= dash(e.telefono) %></span>
         <span class="resumen-label">Email</span>           <span class="resumen-valor"><%= dash(e.email) %></span>
@@ -37,7 +37,7 @@
       <div class="resumen-grid">
         <span class="resumen-label">Cargo</span>           <span class="resumen-valor"><%= dash(e.cargo) %></span>
         <span class="resumen-label">Sector</span>          <span class="resumen-valor"><%= dash(e.sector) %></span>
-        <span class="resumen-label">Ingreso</span>         <span class="resumen-valor"><%= dash(e.fecha_ingreso) %></span>
+        <span class="resumen-label">Ingreso</span>         <span class="resumen-valor"><%= e.fecha_ingreso ? formatFecha(e.fecha_ingreso) : '—' %></span>
         <span class="resumen-label">Contratación</span>    <span class="resumen-valor"><%= dash(e.tipo_contratacion) %></span>
       </div>
     </div>
@@ -45,12 +45,81 @@
     <div class="form-section">
       <h3 class="form-section__title">Información operativa</h3>
       <div class="resumen-grid">
-        <span class="resumen-label">Vehículo</span>        <span class="resumen-valor"><%= dash(e.vehiculo_asignado) %></span>
+        <span class="resumen-label">Rol / Cargo</span>     <span class="resumen-valor"><%= dash(e.cargo) %></span>
         <span class="resumen-label">Licencia</span>        <span class="resumen-valor"><%= dash(e.licencia_categoria) %></span>
-        <span class="resumen-label">Vence</span>           <span class="resumen-valor"><%= dash(e.licencia_vencimiento) %></span>
+        <span class="resumen-label">Vence</span>           <span class="resumen-valor"><%= e.licencia_vencimiento ? formatFecha(e.licencia_vencimiento) : '—' %></span>
         <span class="resumen-label">Certificaciones</span><span class="resumen-valor"><%= dash(e.certificaciones) %></span>
       </div>
     </div>
+
+    <!-- Recursos asignados (sólo choferes) -->
+    <% if (e.es_chofer) {
+         const actCamion = asignacionesActivas.find(a => a.recurso_tipo === 'camion')
+         const actMaquina = asignacionesActivas.find(a => a.recurso_tipo === 'maquina')
+    %>
+    <div class="form-section">
+      <h3 class="form-section__title">Recursos asignados</h3>
+      <div class="row g-2">
+        <div class="col-md-6">
+          <div class="recurso-box">
+            <div class="recurso-box__top"><%- icon('truck',{size:15}) %> Camión</div>
+            <% if (actCamion) { %>
+              <p class="fw-semibold mb-1"><%= actCamion.recurso_label %></p>
+              <form action="/empleados/<%= e.id %>/asignaciones/<%= actCamion.id %>/finalizar" method="POST"><button class="btn-secondary btn-sm">Liberar</button></form>
+            <% } else { %>
+              <form action="/empleados/<%= e.id %>/asignaciones" method="POST">
+                <input type="hidden" name="recurso_tipo" value="camion">
+                <select name="recurso_id" class="form-select form-select-sm mb-1" required>
+                  <option value="">Camión disponible...</option>
+                  <% camionesDisp.forEach(v => { %><option value="<%= v.id %>"><%= [v.numero_interno?'#'+v.numero_interno:null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
+                </select>
+                <button class="btn-primary btn-sm">Asignar camión</button>
+                <% if (!camionesDisp.length) { %><p class="form-hint mb-0">Sin camiones disponibles.</p><% } %>
+              </form>
+            <% } %>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="recurso-box">
+            <div class="recurso-box__top"><%- icon('hardhat',{size:15}) %> Máquina</div>
+            <% if (actMaquina) { %>
+              <p class="fw-semibold mb-1"><%= actMaquina.recurso_label %></p>
+              <form action="/empleados/<%= e.id %>/asignaciones/<%= actMaquina.id %>/finalizar" method="POST"><button class="btn-secondary btn-sm">Liberar</button></form>
+            <% } else { %>
+              <form action="/empleados/<%= e.id %>/asignaciones" method="POST">
+                <input type="hidden" name="recurso_tipo" value="maquina">
+                <select name="recurso_id" class="form-select form-select-sm mb-1" required>
+                  <option value="">Máquina disponible...</option>
+                  <% maquinasDisp.forEach(m => { %><option value="<%= m.id %>"><%= [m.numero_interno?'#'+m.numero_interno:null, m.nombre, m.tipo].filter(Boolean).join(' · ') %></option><% }) %>
+                </select>
+                <button class="btn-primary btn-sm">Asignar máquina</button>
+                <% if (!maquinasDisp.length) { %><p class="form-hint mb-0">Sin máquinas disponibles.</p><% } %>
+              </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <% if (asignacionesHist.length) { %>
+        <p class="form-section__title mt-3" style="font-size:0.72rem">Historial</p>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead><tr><th>Recurso</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th>Estado</th></tr></thead>
+            <tbody>
+              <% asignacionesHist.forEach(a => { %>
+              <tr>
+                <td><%= a.recurso_label %></td>
+                <td><%= a.recurso_tipo === 'camion' ? 'Camión' : 'Máquina' %></td>
+                <td><%= formatFecha(a.fecha_desde) %></td>
+                <td><%= a.fecha_hasta ? formatFecha(a.fecha_hasta) : '—' %></td>
+                <td><%= a.activo ? 'Activa' : 'Finalizada' %></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } %>
+    </div>
+    <% } %>
 
   </div>
 

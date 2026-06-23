@@ -1,0 +1,53 @@
+<%
+  // Params: opId, recursos, choferes, camiones, editable
+  const r = recursos || {}
+%>
+<div class="card shadow-sm">
+  <div class="card-header card-header-light d-flex justify-content-between align-items-center">
+    <span><%- icon('truck', { size: 15 }) %> Recursos asignados</span>
+  </div>
+  <div class="card-body">
+    <div class="row g-3 mb-2">
+      <div class="col-md-6">
+        <small class="text-muted d-block">Camión</small>
+        <p class="fw-semibold mb-0"><%= r.camion_label && r.camion_label.trim() ? r.camion_label : '— sin asignar —' %></p>
+      </div>
+      <div class="col-md-6">
+        <small class="text-muted d-block">Chofer</small>
+        <p class="fw-semibold mb-0"><%= r.chofer_nombre && r.chofer_nombre.trim() ? r.chofer_nombre : '— sin asignar —' %></p>
+      </div>
+    </div>
+    <% if (r.asignacion_fecha) { %>
+      <p class="text-muted small mb-0">Asignado el <%= formatFechaHora(r.asignacion_fecha) %><%= r.asignado_por ? ' por ' + r.asignado_por : '' %></p>
+    <% } %>
+
+    <% if (editable) { %>
+      <hr class="my-3">
+      <form action="/operaciones/<%= opId %>/recursos" method="POST">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-5">
+            <label class="form-label">Camión</label>
+            <select name="id_camion" class="form-select form-select-sm">
+              <option value="">— sin asignar —</option>
+              <% camiones.forEach(v => { %>
+                <option value="<%= v.id %>" <%= r.id_camion===v.id?'selected':'' %>>
+                  <%= [v.patente, v.nombre, [v.marca,v.modelo].filter(Boolean).join(' ')].filter(Boolean).join(' · ') %> — <%= v.estado_operativo %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Chofer</label>
+            <select name="id_chofer" class="form-select form-select-sm">
+              <option value="">— sin asignar —</option>
+              <% choferes.forEach(c => { %>
+                <option value="<%= c.id %>" <%= r.id_chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-auto"><button class="btn btn-sm btn-naranja">Guardar</button></div>
+        </div>
+      </form>
+    <% } %>
+  </div>
+</div>

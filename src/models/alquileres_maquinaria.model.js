@@ -99,6 +99,23 @@ const AlquileresMaquinariaModel = {
     db.prepare(`UPDATE op_detalle_maquinaria SET id_maquinaria = ? WHERE id_orden_pedido = ?`).run(id_maquinaria, id_op)
   },
 
+  // Edición de los datos comerciales / de trabajo del alquiler de maquinaria
+  actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago, observaciones, fecha_entrega_planificada }) {
+    const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+    db.transaction(() => {
+      db.prepare(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ? WHERE id = ?`)
+        .run(observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, id_op)
+      db.prepare(`
+        UPDATE op_detalle_maquinaria
+        SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,
+            plazo_alquiler = ?, precio_por_hora = ?, horas_pactadas = ?, precio_total = ?, metodo_pago = ?
+        WHERE id_orden_pedido = ?
+      `).run(domicilio_entrega, calle || null, numero || null, zona_entrega || '',
+             parseInt(plazo_alquiler) || 1, parseFloat(precio_por_hora) || 0,
+             parseFloat(horas_pactadas) || 0, parseFloat(precio_total) || 0, metodo_pago || null, id_op)
+    })()
+  },
+
   despachar(id_op) {
     const opm = db.prepare(`SELECT id, id_maquinaria FROM op_detalle_maquinaria WHERE id_orden_pedido = ? LIMIT 1`).get(id_op)
     if (!opm?.id_maquinaria) throw new Error('No hay maquinaria asignada.')

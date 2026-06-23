@@ -1,5 +1,5 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0 text-dark-title">👥 <%= titulo %></h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('users', { size: 18 }) %> <%= titulo %></h4>
   <a href="/clientes" class="btn btn-sm btn-outline-secondary">← Volver</a>
 </div>
 
@@ -7,10 +7,30 @@
   <div class="card-body">
     <form action="<%= cliente ? `/clientes/${cliente.id}?_method=PUT` : '/clientes' %>" method="POST">
 
-      <div class="mb-3">
-        <label class="form-label">Nombre / Razón social *</label>
-        <input type="text" name="nombre" class="form-control"
-               value="<%= cliente?.nombre || '' %>" required autofocus>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Nombre / Razón social *</label>
+          <input type="text" name="nombre" class="form-control"
+                 value="<%= cliente?.nombre || '' %>" required autofocus>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Apellido</label>
+          <input type="text" name="apellido" class="form-control"
+                 value="<%= cliente?.apellido || '' %>" placeholder="(opcional para empresas)">
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">DNI / CUIT</label>
+          <input type="text" name="dni" class="form-control"
+                 value="<%= cliente?.dni || '' %>" placeholder="Ej: 30123456">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="<%= cliente?.email || '' %>" placeholder="cliente@correo.com">
+        </div>
       </div>
 
       <div class="row g-3 mb-3">
@@ -40,10 +60,20 @@
                value="<%= cliente?.domicilio_ppal || '' %>" placeholder="Calle y número">
       </div>
 
-      <div class="mb-4">
+      <div class="mb-3">
         <label class="form-label">Teléfono / WhatsApp</label>
         <input type="text" name="tel_whatsapp" class="form-control"
                value="<%= cliente?.tel_whatsapp || '' %>" placeholder="Ej: 3514001234">
+      </div>
+
+      <div class="mb-4">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="cuentaCorriente" name="cuentaCorriente" value="true"
+                 <%= cliente?.cuenta_corriente ? 'checked' : '' %>>
+          <label class="form-check-label" for="cuentaCorriente">
+            Habilitar <strong>cuenta corriente</strong> para este cliente
+          </label>
+        </div>
       </div>
 
       <div class="d-flex gap-2">

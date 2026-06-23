@@ -53,9 +53,9 @@
     width: 34px;
     height: 34px;
     border-radius: $radius-md;
-    background: $accent;
-    color: #fff;
-    font-weight: 700;
+    background: #fff;
+    color: #0e1013;
+    font-weight: 800;
     font-size: 1.05rem;
     display: flex;
     align-items: center;
@@ -157,7 +157,7 @@
   padding: 0.55rem 1.25rem 0.25rem 2.5rem;
 }
 
-.nav-link {
+.app-sidebar .nav-link {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -171,17 +171,17 @@
   border-left: 2px solid transparent;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(242, 255, 0, 0.04);
     color: #fff;
   }
 
   &.is-active {
-    background: rgba(13, 148, 136, 0.16);
+    background: rgba(255, 255, 255, 0.1);
     color: #fff;
-    border-left-color: $accent;
-    font-weight: 500;
+    border-left-color: #fff;
+    font-weight: 600;
 
-    .nav-icon { color: $accent; }
+    .nav-icon { color: #fff; }
   }
 
   &.is-indent {

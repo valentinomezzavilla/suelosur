@@ -86,6 +86,21 @@
   @include sm-down { grid-template-columns: 1fr; }
 }
 
+// Grilla de 2 columnas para agrupar secciones de un formulario (más ancho y prolijo)
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+
+  .form-section { margin-bottom: 0; }
+
+  @include md-down { grid-template-columns: 1fr; }
+}
+
+// El form deja de estar limitado a 600px (usa el ancho disponible)
+.empleado-form { width: 100%; }
+
 .form-hint {
   font-size: $fs-xs;
   color: $muted;
@@ -115,6 +130,35 @@
     background: $accent;
     color: #fff;
     border-color: $accent;
+  }
+}
+
+// ── Dirección: Zona + botón "Buscar en mapa" alineados ────────
+// Desktop: input flexible + botón al fondo (auto). Mobile: apilados.
+.direccion-acciones {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.85rem;
+
+  .form-group {
+    flex: 1 1 auto;
+    margin-bottom: 0;
+  }
+
+  .direccion-mapbtn {
+    flex: 0 0 auto;
+    width: auto;
+    align-self: flex-end;
+    padding: 0 1.1rem;
+    white-space: nowrap;
+  }
+
+  @include sm-down {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+
+    .direccion-mapbtn { width: 100%; }
   }
 }
 

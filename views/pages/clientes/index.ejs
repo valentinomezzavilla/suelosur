@@ -1,7 +1,26 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0 text-dark-title">👥 Clientes</h4>
-  <a href="/clientes/nuevo" class="btn btn-naranja">+ Nuevo Cliente</a>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('users', { size: 18 }) %> Clientes</h4>
+  <div class="d-flex gap-2">
+    <a href="/clientes/cuentas" class="btn btn-sm btn-outline-secondary"><%- icon('chart', { size: 15 }) %> Cuentas corrientes</a>
+    <a href="/clientes/nuevo" class="btn btn-naranja">+ Nuevo Cliente</a>
+  </div>
 </div>
+
+<form method="GET" action="/clientes" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="N° de cliente, apellido, nombre o DNI..." autofocus>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <% if (filtros.q) { %><a href="/clientes" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
 
 <div class="card shadow-sm">
   <div class="card-body p-0">
@@ -24,7 +43,7 @@
       <tbody>
         <% clientes.forEach(c => { %>
         <tr class="<%= !c.activo ? 'text-muted' : '' %>">
-          <td class="fw-bold text-orange">#<%= c.numero %></td>
+          <td class="fw-semibold text-orange">#<%= c.numero %></td>
           <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
           <td><small class="text-muted"><%= c.tipo_cliente || '—' %></small></td>
           <td><small class="text-muted"><%= c.zona || '—' %></small></td>
@@ -38,13 +57,17 @@
             <% } %>
           </td>
           <td class="text-center">
-            <a href="/clientes/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️</a>
-            <form action="/clientes/<%= c.id %>/toggle" method="POST" class="d-inline">
-              <button class="btn btn-sm <%= c.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
-                      title="<%= c.activo ? 'Desactivar' : 'Activar' %>">
-                <%= c.activo ? '🚫' : '✅' %>
-              </button>
-            </form>
+            <a href="/clientes/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+            <% if (c.activo) { %>
+              <form action="/clientes/<%= c.id %>/eliminar" method="POST" class="d-inline"
+                    onsubmit="return confirm('¿Eliminar a <%= c.nombre %> <%= c.apellido %>? Se da de baja (baja lógica) y se conserva el historial.')">
+                <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
+              </form>
+            <% } else { %>
+              <form action="/clientes/<%= c.id %>/toggle" method="POST" class="d-inline">
+                <button class="btn btn-sm btn-outline-success" title="Reactivar"><%- icon('check', { size: 15 }) %></button>
+              </form>
+            <% } %>
           </td>
         </tr>
         <% }) %>

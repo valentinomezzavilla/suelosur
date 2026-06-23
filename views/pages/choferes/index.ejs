@@ -1,0 +1,72 @@
+<%
+  const diasHasta = (f) => { if(!f) return null; const s=String(f).slice(0,10); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null; const d=new Date(+m[1],+m[2]-1,+m[3]); const h=new Date(); return Math.round((d-new Date(h.getFullYear(),h.getMonth(),h.getDate()))/86400000) }
+  const licBadge = (f) => { const d=diasHasta(f); if(d==null) return ['badge-pendiente','—']; if(d<0) return ['badge-alerta','Vencida']; if(d<=30) return ['badge-alerta', d+'d']; if(d<=90) return ['badge-en-transito', d+'d']; return ['badge-activo', formatFecha(f)] }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('hardhat', { size: 18 }) %> Choferes</h4>
+  <div class="d-flex gap-2">
+    <a href="/choferes/dashboard" class="btn btn-sm btn-outline-secondary"><%- icon('chart', { size: 15 }) %> Dashboard</a>
+    <div class="dropdown d-inline">
+      <a href="/choferes/reporte/licencias" class="btn btn-sm btn-outline-secondary"><%- icon('printer', { size: 15 }) %> Reportes</a>
+    </div>
+    <a href="/choferes/nuevo" class="btn btn-naranja">+ Nuevo Chofer</a>
+  </div>
+</div>
+
+<form method="GET" action="/choferes" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="Legajo, apellido, nombre o DNI..." autofocus>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <% if (filtros.q) { %><a href="/choferes" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!choferes.length) { %>
+      <%- include('../../partials/empty_state', { icono: '👷', mensaje: 'No hay choferes registrados.', accionHref: '/choferes/nuevo', accionLabel: 'Crear primer chofer' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th class="col-w-50">Legajo</th>
+          <th>Chofer</th>
+          <th>DNI</th>
+          <th>Licencia</th>
+          <th>Camión asignado</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% choferes.forEach(c => { const lb = licBadge(c.licencia_vencimiento) %>
+        <tr class="<%= !c.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold text-orange">#<%= c.legajo %></td>
+          <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
+          <td><small class="text-muted"><%= c.dni || '—' %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= lb[0] %>"><%= lb[1] %></span></td>
+          <td><small class="text-muted"><%= c.camion_principal || '— sin asignar —' %></small></td>
+          <td class="text-center">
+            <% if (c.activo) { %><span class="badge rounded-pill px-3 badge-activo">Activo</span>
+            <% } else { %><span class="badge rounded-pill px-3 badge-alerta">Baja</span><% } %>
+          </td>
+          <td class="text-center">
+            <a href="/choferes/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye', { size: 15 }) %></a>
+            <a href="/choferes/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

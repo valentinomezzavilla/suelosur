@@ -29,6 +29,7 @@
           <th class="text-center">Contenedor</th>
           <th>Domicilio</th>
           <th class="text-center">Plazo</th>
+          <th class="text-center">Fin de alquiler</th>
           <th class="text-center">${opts.colDias || 'Días restantes'}</th>
           <th class="text-center">Estado</th>
           <th class="text-center"></th>
@@ -47,8 +48,9 @@
             <td class="text-center">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : '<span class="text-muted fst-italic">Sin asignar</span>'}</td>
             <td><small class="text-muted">${a.domicilio_entrega || '—'}</small></td>
             <td class="text-center"><small>${a.plazo_alquiler}d</small></td>
+            <td class="text-center fw-semibold">${a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—'}</td>
             <td class="text-center ${semaforoDias(a.dias_restantes)} fw-semibold">
-              ${opts.mostrarDias === 'planificada' ? (a.fecha_entrega_planificada ? new Date(a.fecha_entrega_planificada + 'T12:00:00').toLocaleDateString('es-AR') : '—')
+              ${opts.mostrarDias === 'planificada' ? (a.fecha_entrega_planificada ? formatFecha(a.fecha_entrega_planificada) : '—')
                 : (a.dias_restantes != null ? a.dias_restantes + 'd' : '—')}
             </td>
             <td class="text-center"><span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span></td>

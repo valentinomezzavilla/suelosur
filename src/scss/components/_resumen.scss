@@ -100,7 +100,7 @@
   transition: background 0.12s;
   margin: 0;
 
-  &:hover { background: rgba(13, 148, 136, 0.05); }
+  &:hover { background: rgba(28, 91, 173, 0.05); }
 
   input[type=radio] {
     margin-top: 4px;
@@ -108,7 +108,7 @@
   }
 
   &:has(input[type=radio]:checked) {
-    background: rgba(13, 148, 136, 0.12);
+    background: rgba(28, 91, 173, 0.12);
     outline: 1px solid $accent;
   }
 }

@@ -24,6 +24,9 @@
   }
   const t = (typeof titulo !== 'undefined' ? titulo : '') || ''
   const userIniciales = (user?.nombre||'?').split(/\s+/).map(p=>p[0]).slice(0,2).join('').toUpperCase()
+  const _ar = (typeof alertasResumen !== 'undefined' && alertasResumen) ? alertasResumen : null
+  const _urgentes = _ar ? (_ar.vencido + _ar.critico) : 0
+  const alertaBadge = () => _ar && _ar.total ? `<span class="badge rounded-pill ms-auto ${_urgentes>0?'badge-alerta':'badge-pendiente'}" style="font-size:0.65rem">${_ar.total}</span>` : ''
 %>
 
 <nav class="app-sidebar">
@@ -87,6 +90,9 @@
       <a href="/productos" class="nav-link <%= t==='Productos'?'is-active':'' %>">
         <%- ic('cart') %><span>Productos</span>
       </a>
+      <a href="/proveedores" class="nav-link <%= t==='Proveedores'?'is-active':'' %>">
+        <%- ic('store') %><span>Proveedores</span>
+      </a>
       <div class="nav-group-label">Stock</div>
       <a href="/stock" class="nav-link is-indent <%= t==='Stock'?'is-active':'' %>">
         <%- ic('arrowDown') %><span>Ingreso</span>
@@ -101,8 +107,11 @@
       <a href="/transacciones" class="nav-link <%= t==='Transacciones'?'is-active':'' %>">
         <%- ic('receipt') %><span>Transacciones</span>
       </a>
-      <a href="/compras" class="nav-link text-muted-nav">
-        <%- ic('cart') %><span>Compras <small class="badge-sprint">Sprint 5</small></span>
+      <a href="/clientes/cuentas" class="nav-link <%= t==='Cuentas corrientes'?'is-active':'' %>">
+        <%- ic('dollar') %><span>Cuentas corrientes</span>
+      </a>
+      <a href="/compras" class="nav-link <%= t==='Compras'?'is-active':'' %>">
+        <%- ic('cart') %><span>Compras</span>
       </a>
     </div>
     <% } %>
@@ -110,8 +119,14 @@
     <% if (['admin_contable','dueno'].includes(user?.rol)) { %>
     <div class="nav-section">
       <div class="nav-section-label">Contabilidad</div>
-      <a href="/cobranzas" class="nav-link <%= t==='Cobranzas'?'is-active':'' %>">
+      <a href="/cobranzas" class="nav-link <%= t==='Cuentas corrientes'?'is-active':'' %>">
         <%- ic('dollar') %><span>Cobranzas</span>
+      </a>
+      <a href="/clientes" class="nav-link <%= t==='Clientes'?'is-active':'' %>">
+        <%- ic('users') %><span>Clientes</span>
+      </a>
+      <a href="/alertas" class="nav-link <%= t==='Centro de Alertas'?'is-active':'' %>">
+        <%- ic('list') %><span>Alertas</span><%- alertaBadge() %>
       </a>
       <a href="/facturacion" class="nav-link">
         <%- ic('receipt') %><span>Facturación</span>
@@ -131,12 +146,18 @@
       <a href="/dashboard" class="nav-link <%= t==='Dashboard'?'is-active':'' %>">
         <%- ic('barChart') %><span>Dashboard</span>
       </a>
-      <a href="/circuitos" class="nav-link <%= t==='Circuitos Logísticos'?'is-active':'' %>">
-        <%- ic('map') %><span>Circuitos <small class="badge-sprint">Sprint 3</small></span>
+      <a href="/alertas" class="nav-link <%= t==='Centro de Alertas'?'is-active':'' %>">
+        <%- ic('list') %><span>Centro de Alertas</span><%- alertaBadge() %>
       </a>
-      <a href="/flota" class="nav-link"><%- ic('truck') %><span>Flota camiones</span></a>
+      <a href="/circuitos" class="nav-link <%= t==='Circuitos Logísticos'?'is-active':'' %>">
+        <%- ic('map') %><span>Circuitos</span>
+      </a>
+      <a href="/flota" class="nav-link <%= t==='Flota Camiones'?'is-active':'' %>"><%- ic('truck') %><span>Flota camiones</span></a>
       <a href="/empleados" class="nav-link <%= t==='Flota de Personal'?'is-active':'' %>">
         <%- ic('hardhat') %><span>Flota de Personal</span>
+      </a>
+      <a href="/choferes" class="nav-link <%= t==='Choferes'?'is-active':'' %>">
+        <%- ic('hardhat') %><span>Choferes</span>
       </a>
       <a href="/usuarios" class="nav-link <%= t==='Usuarios'?'is-active':'' %>">
         <%- ic('key') %><span>Usuarios</span>

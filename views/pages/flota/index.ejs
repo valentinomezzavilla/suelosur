@@ -1,0 +1,87 @@
+<%
+  const estadoBadge = { activo:'badge-activo', disponible:'badge-activo', en_viaje:'badge-en-transito', en_mantenimiento:'badge-pendiente', fuera_servicio:'badge-alerta', inactivo:'badge-alerta' }
+  const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo' }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> Flota de Camiones</h4>
+  <div class="d-flex gap-2">
+    <a href="/flota/disponibilidad" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 15 }) %> Disponibilidad</a>
+    <a href="/flota/reporte/disponibilidad" class="btn btn-sm btn-outline-secondary"><%- icon('printer', { size: 15 }) %> Reportes</a>
+    <a href="/flota/nuevo" class="btn btn-naranja">+ Nuevo Camión</a>
+  </div>
+</div>
+
+<!-- Resumen por estado -->
+<div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+  <div class="stat-card stat-card--info"><div class="stat-card__icon"><%- icon('truck',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.total %></span><span class="stat-card__label">Total activos</span></div></div>
+  <div class="stat-card stat-card--success"><div class="stat-card__icon"><%- icon('checkCircle',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= (resumen.porEstado.disponible||0) %></span><span class="stat-card__label">Disponibles</span></div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon"><%- icon('settings',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= (resumen.porEstado.en_mantenimiento||0) %></span><span class="stat-card__label">En mantenimiento</span></div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon"><%- icon('alert',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= (resumen.porEstado.fuera_servicio||0)+(resumen.porEstado.inactivo||0) %></span><span class="stat-card__label">Fuera de servicio</span></div></div>
+</div>
+
+<form method="GET" action="/flota" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm" placeholder="N°, patente, marca..."></div>
+      <div class="col-md-2"><label class="form-label">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(e => { %><option value="<%= e %>" <%= filtros.estado===e?'selected':'' %>><%= estadoLbl[e] %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Tipo</label>
+        <select name="tipo" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% opciones.tipos.forEach(t => { %><option value="<%= t %>" <%= filtros.tipo===t?'selected':'' %>><%= t %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Marca</label>
+        <select name="marca" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <% opciones.marcas.forEach(m => { %><option value="<%= m %>" <%= filtros.marca===m?'selected':'' %>><%= m %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Chofer</label>
+        <select name="chofer" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% choferes.forEach(c => { %><option value="<%= c.id %>" <%= filtros.chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %></option><% }) %>
+        </select></div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-naranja">Filtrar</button>
+        <% if (filtros.q || filtros.estado || filtros.tipo || filtros.marca || filtros.chofer) { %><a href="/flota" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!vehiculos.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🚚', mensaje: 'No hay camiones registrados.', accionHref: '/flota/nuevo', accionLabel: 'Registrar primer camión' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th class="col-w-50">N°</th><th>Patente</th><th>Vehículo</th><th>Tipo</th><th>Chofer</th><th class="text-end">Km</th><th class="text-center">Estado</th><th class="text-center">Acciones</th></tr></thead>
+      <tbody>
+        <% vehiculos.forEach(v => { %>
+        <tr class="<%= !v.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold text-orange">#<%= v.numero_interno || '—' %></td>
+          <td class="fw-semibold"><%= v.patente || '—' %></td>
+          <td class="fw-semibold"><%= v.nombre || '—' %> <% if(v.marca||v.modelo){ %><small class="text-muted d-block"><%= [v.marca,v.modelo].filter(Boolean).join(' ') %></small><% } %></td>
+          <td><small class="text-muted"><%= v.tipo_unidad || v.tipo_vehiculo || '—' %></small></td>
+          <td><small class="<%= v.chofer_nombre ? '' : 'text-muted' %>"><%= v.chofer_nombre && v.chofer_nombre.trim() ? v.chofer_nombre : '— libre —' %></small></td>
+          <td class="text-end"><small><%= (v.kilometraje||0).toLocaleString('es-AR') %></small></td>
+          <td class="text-center"><span class="badge rounded-pill px-3 <%= estadoBadge[v.estado_operativo]||'badge-pendiente' %>"><%= estadoLbl[v.estado_operativo]||v.estado_operativo %></span></td>
+          <td class="text-center">
+            <a href="/flota/<%= v.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye',{size:15}) %></a>
+            <a href="/flota/<%= v.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit',{size:15}) %></a>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

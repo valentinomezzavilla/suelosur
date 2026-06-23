@@ -15,6 +15,16 @@
 .bg-orange        { background: $accent     !important; }
 .bg-orange-soft   { background: $accent-soft!important; }
 
+// ── Iconos SVG inline (heredan color del texto) ────────────────
+.ic {
+  display: inline-block;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+// En títulos de página, un poco más separado
+.page-title .ic,
+h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
+
 // ── Iconos (size by font-size) ─────────────────────────────────
 .icon-sm  { font-size: 1.2rem; }
 .icon-md  { font-size: 1.4rem; }
@@ -42,3 +52,85 @@
 // ── Bordes ─────────────────────────────────────────────────────
 .border-divider { border-top: 1px solid #eee; }
 .border-sidebar { border-color: $dark-2 !important; }
+
+// ── Pestañas de contenido (nav-tabs) — alto contraste ─────────
+.nav-tabs {
+  border-bottom: 2px solid $border;
+  gap: 0.15rem;
+
+  .nav-link {
+    color: $ink-soft;
+    font-weight: 600;
+    font-size: 0.88rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    padding: 0.55rem 1rem;
+    background: transparent;
+    transition: color 0.12s, border-color 0.12s, background 0.12s;
+
+    &:hover {
+      color: $accent;
+      border-bottom-color: rgba(28, 91, 173, 0.4);
+      background: $accent-soft;
+    }
+
+    &.active {
+      color: $accent-dark;
+      background: transparent;
+      border-bottom-color: $accent;
+    }
+  }
+}
+
+// ── Caja de recurso asignado (empleado chofer) ────────────────
+.recurso-box {
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  padding: 0.75rem 0.85rem;
+  background: $bg-card;
+  height: 100%;
+
+  &__top {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: $muted;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+}
+
+// ── Ficha de datos (label/valor de alto contraste) ─────────────
+.ficha {
+  display: flex;
+  flex-direction: column;
+}
+.ficha-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid $border-line;
+
+  &:last-child { border-bottom: none; }
+}
+.ficha-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: $muted;
+  flex-shrink: 0;
+}
+.ficha-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: $dark;
+  text-align: right;
+  word-break: break-word;
+}

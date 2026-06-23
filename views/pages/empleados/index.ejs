@@ -4,7 +4,7 @@
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title">👷 Flota de Personal</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('hardhat', { size: 18 }) %> Flota de Personal</h4>
   <a href="/empleados/nuevo" class="btn btn-naranja">+ Nuevo Empleado</a>
 </div>
 
@@ -47,7 +47,7 @@
       <tbody>
         <% empleados.forEach(e => { %>
         <tr class="<%= !e.activo ? 'text-muted' : '' %>">
-          <td class="fw-bold text-orange">#<%= e.legajo %></td>
+          <td class="fw-semibold text-orange">#<%= e.legajo %></td>
           <td class="fw-semibold"><%= e.apellido %> <%= e.nombre %></td>
           <td><small class="text-muted"><%= e.dni || '—' %></small></td>
           <td><small class="text-muted"><%= e.cargo || '—' %></small></td>
@@ -63,12 +63,12 @@
             <% } %>
           </td>
           <td class="text-center">
-            <a href="/empleados/<%= e.id %>" class="btn btn-sm btn-outline-secondary" title="Ver">👁️</a>
-            <a href="/empleados/<%= e.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar">✏️</a>
+            <a href="/empleados/<%= e.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye', { size: 15 }) %></a>
+            <a href="/empleados/<%= e.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
             <form action="/empleados/<%= e.id %>/toggle" method="POST" class="d-inline">
               <button class="btn btn-sm <%= e.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
                       title="<%= e.activo ? 'Desactivar' : 'Activar' %>">
-                <%= e.activo ? '🚫' : '✅' %>
+                <%- e.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
               </button>
             </form>
           </td>

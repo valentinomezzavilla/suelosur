@@ -2,21 +2,30 @@
 const VentasModel       = require('../models/ventas.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel     = require('../models/clientes.model')
+const OperacionesModel  = require('../models/operaciones.model')
+const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const VentasController = {
 
   index(req, res) {
     try {
-      const { estado, id_cliente, q, sort, dir, page } = req.query
-      const paginacion = VentasModel.listar({ estado, id_cliente, q, sort, dir, page: parseInt(page) || 1, limit: 15 })
+      const { estado, id_cliente, q, sort, dir, page, preset, fechaDesde, fechaHasta, mes } = req.query
+      const periodo = resolverPeriodo({ preset, desde: fechaDesde, hasta: fechaHasta, mes })
+
+      const filtrosBase = { estado, id_cliente, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
+      const paginacion = VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 15 })
       const clientes   = VentasModel.listarClientes()
       const resumen    = VentasModel.contarPorEstado()
+      const metricas   = VentasModel.resumen(filtrosBase)
+
       res.render('pages/ventas/index', {
         titulo: 'Ventas',
         ...paginacion,
         clientes,
         resumen,
-        filtros: req.query,
+        metricas,
+        periodoLabel: etiquetaPeriodo(periodo),
+        filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
       })
     } catch (err) {
       console.error(err)
@@ -193,7 +202,13 @@ const VentasController = {
     try {
       const op = VentasModel.obtener(req.params.id)
       if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
-      res.render('pages/ventas/detalle', { titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op })
+      res.render('pages/ventas/detalle', {
+        titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
+        recursos: OperacionesModel.obtenerRecursos(op.id),
+        choferesDisp: OperacionesModel.choferesDisponibles(),
+        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',
+      })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar la orden.')

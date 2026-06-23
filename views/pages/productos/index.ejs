@@ -1,5 +1,5 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0 text-dark-title">📦 Productos</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Productos</h4>
   <a href="/productos/nuevo" class="btn btn-naranja">+ Nuevo Producto</a>
 </div>
 
@@ -34,11 +34,11 @@
             <% } %>
           </td>
           <td class="text-center">
-            <a href="/productos/<%= p.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️</a>
+            <a href="/productos/<%= p.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
             <form action="/productos/<%= p.id %>/toggle" method="POST" class="d-inline">
               <button class="btn btn-sm <%= p.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
                       title="<%= p.activo ? 'Desactivar' : 'Activar' %>">
-                <%= p.activo ? '🚫' : '✅' %>
+                <%- p.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
               </button>
             </form>
           </td>

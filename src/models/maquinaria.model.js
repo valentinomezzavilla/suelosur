@@ -37,6 +37,13 @@ const MaquinariaModel = {
   obtener(id) {
     const m = db.prepare(`SELECT * FROM maquinaria WHERE id = ?`).get(id)
     if (!m) return null
+    const asig = db.prepare(`
+      SELECT a.*, (e.nombre || ' ' || COALESCE(e.apellido,'')) AS empleado_nombre, e.legajo
+      FROM asignaciones_recurso a JOIN empleados e ON e.id = a.id_empleado
+      WHERE a.recurso_tipo = 'maquina' AND a.recurso_id = ? ORDER BY a.activo DESC, a.fecha_desde DESC
+    `).all(id)
+    m.asignaciones = asig
+    m.chofer_asignado = asig.find(a => a.activo) || null
     m.movimientos = db.prepare(`
       SELECT mv.*, u.nombre AS operario_nombre, f.patente AS camion_patente, f.nombre AS camion_nombre,
              op.nro_op, cli.nombre AS cliente_nombre, opm.domicilio_entrega, opm.zona_entrega
@@ -56,15 +63,33 @@ const MaquinariaModel = {
     return db.prepare(`SELECT * FROM maquinaria WHERE nombre = ? AND activo = 1`).get(nombre)
   },
 
-  crear({ nombre, tipo, patente, modelo, anio, estado_general, km_actuales, observaciones }) {
+  ESTADOS_OP: ['disponible', 'en_operacion', 'en_mantenimiento', 'fuera_servicio'],
+
+  patenteEnUso(patente, excludeId = null) {
+    if (!patente) return false
+    return !!db.prepare(`SELECT 1 FROM maquinaria WHERE patente = ? AND id != ?`).get(patente, excludeId || '')
+  },
+  numeroInternoEnUso(numero, excludeId = null) {
+    if (!numero) return false
+    return !!db.prepare(`SELECT 1 FROM maquinaria WHERE numero_interno = ? AND id != ?`).get(numero, excludeId || '')
+  },
+
+  crear(datos) {
+    const { nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
+            km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service } = datos
+    if (this.patenteEnUso(patente)) throw new Error(`Ya existe una máquina con la patente ${patente}.`)
+    if (numero_interno && this.numeroInternoEnUso(numero_interno)) throw new Error(`Ya existe una máquina con el número interno ${numero_interno}.`)
     const id = crypto.randomUUID()
     db.transaction(() => {
       db.prepare(`
-        INSERT INTO maquinaria (id, nombre, tipo, patente, modelo, anio, estado_general, km_actuales, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, nombre, tipo || 'bobcat', patente || null, modelo || null,
-             anio ? parseInt(anio) : null, estado_general || 'operativo',
-             km_actuales ? parseInt(km_actuales) : 0, observaciones || '')
+        INSERT INTO maquinaria (id, nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
+          km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, nombre, tipo || 'bobcat', patente || null, marca || null, modelo || null,
+             anio ? parseInt(anio) : null, estado_general || 'operativo', estado_operativo || 'disponible',
+             km_actuales ? parseInt(km_actuales) : 0, horas_uso ? parseFloat(horas_uso) : 0,
+             numero_interno ? parseInt(numero_interno) : null, observaciones || '',
+             ultimo_service || null, proximo_service || null)
       db.prepare(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'en_planta', 'Alta inicial')`
       ).run(crypto.randomUUID(), id)
     })()
@@ -72,15 +97,35 @@ const MaquinariaModel = {
   },
 
   actualizar(id, datos) {
+    if (this.patenteEnUso(datos.patente, id)) throw new Error(`Ya existe otra máquina con la patente ${datos.patente}.`)
+    if (datos.numero_interno && this.numeroInternoEnUso(datos.numero_interno, id)) throw new Error(`Ya existe otra máquina con el número interno ${datos.numero_interno}.`)
     db.prepare(`
-      UPDATE maquinaria SET nombre = ?, tipo = ?, patente = ?, modelo = ?, anio = ?,
-        estado_general = ?, km_actuales = ?, observaciones = ?,
-        ultimo_service = ?, proximo_service = ?
+      UPDATE maquinaria SET nombre = ?, tipo = ?, patente = ?, marca = ?, modelo = ?, anio = ?,
+        estado_general = ?, estado_operativo = ?, km_actuales = ?, horas_uso = ?, numero_interno = ?,
+        observaciones = ?, ultimo_service = ?, proximo_service = ?
       WHERE id = ?
-    `).run(datos.nombre, datos.tipo || 'bobcat', datos.patente || null, datos.modelo || null,
+    `).run(datos.nombre, datos.tipo || 'bobcat', datos.patente || null, datos.marca || null, datos.modelo || null,
            datos.anio ? parseInt(datos.anio) : null, datos.estado_general || 'operativo',
-           datos.km_actuales ? parseInt(datos.km_actuales) : 0, datos.observaciones || '',
-           datos.ultimo_service || null, datos.proximo_service || null, id)
+           datos.estado_operativo || 'disponible', datos.km_actuales ? parseInt(datos.km_actuales) : 0,
+           datos.horas_uso ? parseFloat(datos.horas_uso) : 0,
+           datos.numero_interno ? parseInt(datos.numero_interno) : null,
+           datos.observaciones || '', datos.ultimo_service || null, datos.proximo_service || null, id)
+  },
+
+  // Vista de disponibilidad: máquinas clasificadas por situación
+  disponibilidad() {
+    return db.prepare(`
+      SELECT m.id, m.numero_interno, m.nombre, m.tipo, m.marca, m.modelo, m.estado_operativo,
+        (SELECT (e.nombre || ' ' || COALESCE(e.apellido,'')) FROM asignaciones_recurso a JOIN empleados e ON e.id=a.id_empleado
+         WHERE a.recurso_tipo='maquina' AND a.recurso_id=m.id AND a.activo=1 LIMIT 1) AS chofer_nombre
+      FROM maquinaria m WHERE m.activo = 1 ORDER BY m.numero_interno, m.nombre
+    `).all().map(m => {
+      let situacion
+      if (['en_mantenimiento', 'fuera_servicio'].includes(m.estado_operativo)) situacion = 'mantenimiento'
+      else if (m.chofer_nombre) situacion = 'asignado'
+      else situacion = 'disponible'
+      return { ...m, situacion }
+    })
   },
 
   toggleActivo(id) {

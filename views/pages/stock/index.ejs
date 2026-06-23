@@ -1,5 +1,5 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h4 class="fw-bold mb-0 text-dark-title">🏗️ Stock de Áridos</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('layers', { size: 18 }) %> Stock de Áridos</h4>
   <button class="btn btn-naranja" data-bs-toggle="modal" data-bs-target="#modalIngreso">
     + Registrar Ingreso
   </button>
@@ -52,7 +52,7 @@
                     data-nombre="<%= item.nombre %>"
                     data-actual="<%= item.cantidad_actual %>"
                     data-minimo="<%= item.stock_minimo %>">
-              ✏️ Ajustar
+              <%- icon('edit', { size: 14 }) %> Ajustar
             </button>
           </td>
         </tr>
@@ -115,13 +115,30 @@
               <% }) %>
             </select>
           </div>
-          <div class="mb-1">
+          <div class="mb-3">
             <label class="form-label">Cantidad a ingresar</label>
             <div class="input-group">
               <input type="number" name="cantidad" id="inputCantidadIngreso"
                      class="form-control" step="1" min="1" required placeholder="0">
               <span class="input-group-text" id="unidadIngreso">—</span>
             </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Proveedor</label>
+            <input type="text" id="buscarProveedor" class="form-control form-control-sm mb-1"
+                   placeholder="Buscar por razón social o CUIT...">
+            <select name="id_proveedor" id="selectProveedorIngreso" class="form-select">
+              <option value="">— Sin proveedor —</option>
+              <% (proveedores || []).forEach(p => { %>
+                <option value="<%= p.id %>" data-search="<%= (p.nombre + ' ' + (p.cuit||'')).toLowerCase() %>">
+                  <%= p.nombre %><%= p.cuit ? ' (' + p.cuit + ')' : '' %>
+                </option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="mb-1">
+            <label class="form-label">Costo unitario (opcional)</label>
+            <input type="number" name="costo_unitario" class="form-control" step="0.01" min="0" placeholder="0">
           </div>
         </div>
         <div class="modal-footer">
@@ -132,4 +149,24 @@
     </div>
   </div>
 </div>
+
+<script>
+  // Filtro inteligente del selector de proveedor (por razón social / CUIT)
+  (function () {
+    const buscar = document.getElementById('buscarProveedor')
+    const select = document.getElementById('selectProveedorIngreso')
+    if (!buscar || !select) return
+    buscar.addEventListener('input', () => {
+      const q = buscar.value.trim().toLowerCase()
+      let firstMatch = ''
+      Array.from(select.options).forEach(opt => {
+        if (!opt.value) return
+        const hay = (opt.dataset.search || '').includes(q)
+        opt.hidden = q && !hay
+        if (hay && !firstMatch) firstMatch = opt.value
+      })
+      if (q && firstMatch) select.value = firstMatch
+    })
+  })()
+</script>
 

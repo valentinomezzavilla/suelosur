@@ -1,11 +1,12 @@
 'use strict'
 const StockModel = require('../models/stock.model')
+const ProveedoresModel = require('../models/proveedores.model')
 
 const StockController = {
   index(req, res) {
     try {
       const stock = StockModel.listar()
-      res.render('pages/stock/index', { titulo: 'Stock', stock, scripts: ['/js/stockAjuste.js'] })
+      res.render('pages/stock/index', { titulo: 'Stock', stock, proveedores: ProveedoresModel.listar(), scripts: ['/js/stockAjuste.js'] })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('back')
     }
@@ -35,7 +36,11 @@ const StockController = {
       const cantidad = parseInt(req.body.cantidad) || 0
       if (cantidad <= 0) { req.flash('error', 'Cantidad debe ser mayor a cero.'); return res.redirect('/stock') }
       const item = StockModel.obtener(req.params.id_producto)
-      StockModel.registrarIngreso(req.params.id_producto, cantidad)
+      StockModel.registrarIngreso(req.params.id_producto, cantidad, {
+        id_proveedor: req.body.id_proveedor || null,
+        costo_unitario: req.body.costo_unitario,
+        usuario: req.session.user?.id,
+      })
       req.flash('success', `Ingreso de ${cantidad} ${item?.unidad_medida || 'u.'} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')

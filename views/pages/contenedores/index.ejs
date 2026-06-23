@@ -27,11 +27,11 @@
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title">📦 Contenedores</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Contenedores</h4>
   <div class="d-flex gap-2">
-    <a href="/contenedores/circuito" class="btn btn-outline-secondary">🗺️ Circuito del día</a>
+    <a href="/contenedores/circuito" class="btn btn-outline-secondary"><%- icon('map', { size: 15 }) %> Circuito del día</a>
     <% if (user?.rol === 'dueno') { %>
-      <a href="/contenedores/configuracion" class="btn btn-outline-secondary">⚙️ Configuración</a>
+      <a href="/contenedores/configuracion" class="btn btn-outline-secondary"><%- icon('settings', { size: 15 }) %> Configuración</a>
     <% } %>
     <a href="/contenedores/nuevo" class="btn btn-naranja">+ Nuevo Contenedor</a>
   </div>
@@ -40,17 +40,17 @@
 <!-- Resumen de estados -->
 <div class="row g-2 mb-4">
   <% [
-    { key:'en_planta',   label:'En planta',    icono:'🏠' },
-    { key:'vaciado',     label:'Vaciados',     icono:'🧹' },
-    { key:'entregado',   label:'Entregados',   icono:'📦' },
-    { key:'en_alquiler', label:'En alquiler',  icono:'⏳' },
-    { key:'a_retirar',   label:'A retirar',    icono:'⚠️' },
-    { key:'en_transito', label:'En tránsito',  icono:'🚛' },
+    { key:'en_planta',   label:'En planta',    icono:'home' },
+    { key:'vaciado',     label:'Vaciados',     icono:'checkCircle' },
+    { key:'entregado',   label:'Entregados',   icono:'box' },
+    { key:'en_alquiler', label:'En alquiler',  icono:'clock' },
+    { key:'a_retirar',   label:'A retirar',    icono:'alert' },
+    { key:'en_transito', label:'En tránsito',  icono:'truck' },
   ].forEach(s => { %>
   <div class="col-6 col-md-2">
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
       <div class="card shadow-sm h-100 text-center py-2">
-        <div class="icon-sm"><%= s.icono %></div>
+        <div class="mb-1"><%- icon(s.icono, { size: 20 }) %></div>
         <div class="fw-bold fs-5"><%= conteo[s.key] %></div>
         <small class="<%= badgeEstado[s.key] %> badge rounded-pill px-2"><%= s.label %></small>
       </div>
@@ -111,7 +111,7 @@
       <tbody>
         <% contenedores.forEach(c => { %>
         <tr class="<%= !c.activo ? 'text-muted' : '' %>">
-          <td class="fw-bold text-orange">N° <%= c.numero_contenedor %></td>
+          <td class="fw-semibold text-orange">N° <%= c.numero_contenedor %></td>
           <td>
             <span class="badge rounded-pill px-3 <%= badgeEstado[c.estado_paso] || 'badge-pendiente' %>">
               <%= labelEstado[c.estado_paso] || c.estado_paso %>
@@ -140,12 +140,12 @@
             <small class="text-muted"><%= c.estado_general?.replace('_',' ') %></small>
           </td>
           <td class="text-center">
-            <a href="/contenedores/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver">👁️</a>
-            <a href="/contenedores/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar">✏️</a>
+            <a href="/contenedores/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye', { size: 15 }) %></a>
+            <a href="/contenedores/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
             <form action="/contenedores/<%= c.id %>/toggle" method="POST" class="d-inline">
               <button class="btn btn-sm <%= c.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
                       title="<%= c.activo ? 'Desactivar' : 'Activar' %>">
-                <%= c.activo ? '🚫' : '✅' %>
+                <%- c.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
               </button>
             </form>
           </td>

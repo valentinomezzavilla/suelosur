@@ -1,0 +1,327 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo' }
+  const estadoBadge = { activo:'badge-activo', disponible:'badge-activo', en_viaje:'badge-en-transito', en_mantenimiento:'badge-pendiente', fuera_servicio:'badge-alerta', inactivo:'badge-alerta' }
+  const diasHasta = (f) => { if(!f) return null; const s=String(f).slice(0,10); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null; const d=new Date(+m[1],+m[2]-1,+m[3]); const h=new Date(); return Math.round((d-new Date(h.getFullYear(),h.getMonth(),h.getDate()))/86400000) }
+  const vencBadge = (f) => { const d=diasHasta(f); if(d==null) return ['badge-pendiente','Sin fecha']; if(d<0) return ['badge-alerta','Vencido']; if(d<=30) return ['badge-alerta','En '+d+'d']; if(d<=90) return ['badge-en-transito','En '+d+'d']; return ['badge-activo','Vigente'] }
+  const tabs = [['datos','Datos'],['asignaciones','Asignaciones'],['documentos','Documentación'],['combustible','Combustible'],['mantenimiento','Mantenimiento'],['gastos','Gastos'],['gps','GPS'],['historial','Historial']]
+  const tabUrl = (t) => `/flota/${vehiculo.id}?tab=${t}`
+  const catGastoLbl = { seguro:'Seguro', impuesto:'Impuesto', peaje:'Peaje', estacionamiento:'Estacionamiento', multa:'Multa', otro:'Otro' }
+%>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <a href="/flota" class="text-muted small text-decoration-none">← Flota</a>
+    <h4 class="fw-bold mb-0 text-dark-title">
+      <%- icon('truck', { size: 18 }) %> <%= vehiculo.nombre || vehiculo.patente %>
+      <% if(vehiculo.patente){ %><span class="text-orange ms-1"><%= vehiculo.patente %></span><% } %>
+      <span class="badge rounded-pill px-3 ms-2 <%= estadoBadge[vehiculo.estado_operativo]||'badge-pendiente' %>"><%= estadoLbl[vehiculo.estado_operativo] %></span>
+    </h4>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/remitos/x/pdf" style="display:none"></a>
+    <a href="/flota/<%= vehiculo.id %>/editar" class="btn btn-sm btn-secondary-yellow">Editar</a>
+  </div>
+</div>
+
+<!-- Cambio de estado rápido -->
+<form action="/flota/<%= vehiculo.id %>/estado" method="POST" class="card shadow-sm mb-3">
+  <div class="card-body py-2 d-flex gap-2 align-items-end flex-wrap">
+    <div><label class="form-label">Cambiar estado</label>
+      <select name="estado" class="form-select form-select-sm">
+        <% estados.forEach(e => { %><option value="<%= e %>" <%= vehiculo.estado_operativo===e?'selected':'' %>><%= estadoLbl[e] %></option><% }) %>
+      </select></div>
+    <div class="flex-grow-1"><label class="form-label">Observación</label><input name="observaciones" class="form-control form-control-sm" placeholder="(opcional)"></div>
+    <button class="btn btn-sm btn-naranja">Actualizar estado</button>
+  </div>
+</form>
+
+<ul class="nav nav-tabs mb-3">
+  <% tabs.forEach(([k,label]) => { %><li class="nav-item"><a class="nav-link <%= tab===k?'active':'' %>" href="<%= tabUrl(k) %>"><%= label %></a></li><% }) %>
+</ul>
+
+<% if (tab === 'datos') {
+  const fila = (label, val) => `<div class="ficha-row"><span class="ficha-label">${label}</span><span class="ficha-value">${val || '—'}</span></div>`
+%>
+  <!-- KPIs del vehículo -->
+  <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="stat-card stat-card--info"><div class="stat-card__icon"><%- icon('settings',{size:20}) %></div>
+      <div class="stat-card__body"><span class="stat-card__value"><%= estadoLbl[vehiculo.estado_operativo] %></span><span class="stat-card__label">Estado operativo</span></div></div>
+    <div class="stat-card stat-card--neutral"><div class="stat-card__icon"><%- icon('truck',{size:20}) %></div>
+      <div class="stat-card__body"><span class="stat-card__value"><%= (vehiculo.kilometraje||0).toLocaleString('es-AR') %></span><span class="stat-card__label">Kilómetros</span></div></div>
+    <div class="stat-card stat-card--success"><div class="stat-card__icon"><%- icon('box',{size:20}) %></div>
+      <div class="stat-card__body"><span class="stat-card__value"><%= vehiculo.capacidad_carga || '—' %></span><span class="stat-card__label">Capacidad de carga</span></div></div>
+    <div class="stat-card stat-card--warning"><div class="stat-card__icon"><%- icon('clock',{size:20}) %></div>
+      <div class="stat-card__body"><span class="stat-card__value"><%= vehiculo.anio || '—' %></span><span class="stat-card__label">Año</span></div></div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold">Identificación</div>
+        <div class="card-body ficha">
+          <%- fila('N° interno', vehiculo.numero_interno ? '#' + vehiculo.numero_interno : '—') %>
+          <%- fila('Patente', vehiculo.patente) %>
+          <%- fila('Nombre', vehiculo.nombre) %>
+          <%- fila('Chofer asignado', vehiculo.chofer_nombre && vehiculo.chofer_nombre.trim() ? vehiculo.chofer_nombre : '— libre —') %>
+          <%- fila('Marca', vehiculo.marca) %>
+          <%- fila('Modelo', vehiculo.modelo) %>
+          <%- fila('Tipo de unidad', vehiculo.tipo_unidad) %>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold">Técnico</div>
+        <div class="card-body ficha">
+          <%- fila('N° de chasis', vehiculo.nro_chasis) %>
+          <%- fila('N° de motor', vehiculo.nro_motor) %>
+          <%- fila('Capacidad de carga', vehiculo.capacidad_carga) %>
+          <%- fila('Kilometraje', (vehiculo.kilometraje||0).toLocaleString('es-AR') + ' km') %>
+          <%- fila('Año', vehiculo.anio) %>
+          <%- fila('Último mant.', vehiculo.fecha_ultimo_mant ? formatFecha(vehiculo.fecha_ultimo_mant) : '—') %>
+          <%- fila('Próximo mant.', vehiculo.fecha_proximo_mant ? formatFecha(vehiculo.fecha_proximo_mant) : '—') %>
+        </div>
+      </div>
+    </div>
+    <% if (vehiculo.observaciones) { %>
+    <div class="col-12"><div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Observaciones</div>
+      <div class="card-body"><%= vehiculo.observaciones %></div></div></div>
+    <% } %>
+  </div>
+
+<% } else if (tab === 'asignaciones') { %>
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Historial de asignaciones a choferes</div>
+    <div class="card-body p-0">
+    <% if (!asignacionesRecurso.length) { %><div class="p-4 text-center text-muted">Este camión nunca fue asignado.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Chofer</th><th>Legajo</th><th>Desde</th><th>Hasta</th><th class="text-center">Estado</th></tr></thead>
+      <tbody>
+        <% asignacionesRecurso.forEach(a => { %>
+        <tr>
+          <td class="fw-semibold"><%= a.empleado_nombre %></td>
+          <td><small class="text-muted">#<%= a.legajo %></small></td>
+          <td><small><%= formatFecha(a.fecha_desde) %></small></td>
+          <td><small><%= a.fecha_hasta ? formatFecha(a.fecha_hasta) : '—' %></small></td>
+          <td class="text-center"><% if(a.activo){ %><span class="badge rounded-pill px-3 badge-activo">Activa</span><% } else { %><small class="text-muted">Finalizada</small><% } %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'documentos') { %>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Agregar documento</div>
+    <div class="card-body">
+      <form action="/flota/<%= vehiculo.id %>/documentos" method="POST" enctype="multipart/form-data">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label">Tipo *</label>
+            <input list="tiposDocV" name="tipo" class="form-control form-control-sm" placeholder="Título, Seguro, VTV, RUTA..." required>
+            <datalist id="tiposDocV"><option>Título</option><option>Cédula</option><option>Seguro</option><option>VTV</option><option>RUTA</option><option>Habilitación</option><option>Permiso especial</option></datalist>
+          </div>
+          <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Emisión</label><input type="date" name="fecha_emision" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="fecha_vencimiento" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Archivo</label><input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm"></div>
+        </div>
+        <button class="btn btn-sm btn-naranja mt-2">Guardar</button>
+      </form>
+    </div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if (!documentos.length) { %><div class="p-4 text-center text-muted">Sin documentos.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Tipo</th><th>Descripción</th><th>Vencimiento</th><th>Archivo</th><th></th></tr></thead>
+      <tbody><% documentos.forEach(d => { const lb=vencBadge(d.fecha_vencimiento) %>
+        <tr>
+          <td class="fw-semibold"><%= d.tipo %></td>
+          <td><small class="text-muted"><%= d.descripcion || '—' %></small></td>
+          <td><%= d.fecha_vencimiento ? formatFecha(d.fecha_vencimiento) : '—' %> <% if(d.fecha_vencimiento){ %><span class="badge rounded-pill px-2 <%= lb[0] %>"><%= lb[1] %></span><% } %></td>
+          <td><% if(d.archivo){ %><a href="/flota/<%= vehiculo.id %>/documentos/<%= d.id %>/ver" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('eye',{size:14}) %></a><% } else { %><small class="text-muted">—</small><% } %></td>
+          <td class="text-end"><form action="/flota/<%= vehiculo.id %>/documentos/<%= d.id %>/eliminar" method="POST" onsubmit="return confirm('¿Eliminar?')"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'combustible') { %>
+  <%- include('../../partials/periodo_filtro', { base: `/flota/${vehiculo.id}`, extra: 'tab=combustible', filtros, periodoLabel }) %>
+  <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumenComb.litros.toLocaleString('es-AR') %></span><span class="stat-card__label">Litros · <%= periodoLabel %></span></div></div>
+    <div class="stat-card stat-card--neutral"><div class="stat-card__body"><span class="stat-card__value"><%= money(resumenComb.costo) %></span><span class="stat-card__label">Costo total</span></div></div>
+    <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= resumenComb.rendimiento %></span><span class="stat-card__label">Rendimiento km/l</span></div></div>
+    <div class="stat-card stat-card--warning"><div class="stat-card__body"><span class="stat-card__value"><%= money(resumenComb.costoPorKm) %></span><span class="stat-card__label">Costo por km</span></div></div>
+  </div>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar carga</div>
+    <div class="card-body"><form action="/flota/<%= vehiculo.id %>/combustible" method="POST">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Litros</label><input type="number" step="0.01" name="litros" class="form-control form-control-sm" required></div>
+        <div class="col-md-2"><label class="form-label">Importe</label><input type="number" step="0.01" name="costo_total" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Km al cargar</label><input type="number" name="km_al_cargar" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Chofer</label>
+          <select name="id_chofer" class="form-select form-select-sm"><option value="">—</option>
+            <% choferes.forEach(c => { %><option value="<%= c.id %>"><%= c.nombre %> <%= c.apellido %></option><% }) %></select></div>
+        <div class="col-md-2"><label class="form-label">Estación</label><input name="estacion" class="form-control form-control-sm"></div>
+      </div>
+      <button class="btn btn-sm btn-naranja mt-2">Cargar</button>
+    </form></div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if(!combustible.length){ %><div class="p-4 text-center text-muted">Sin cargas en el período.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Estación</th><th>Chofer</th><th class="text-end">Litros</th><th class="text-end">Importe</th><th class="text-end">Km</th><th></th></tr></thead>
+      <tbody><% combustible.forEach(c => { %>
+        <tr><td><%= formatFecha(c.fecha) %></td><td><small class="text-muted"><%= c.estacion || '—' %></small></td>
+          <td><small><%= c.chofer_nombre || '—' %></small></td><td class="text-end"><%= c.litros %></td>
+          <td class="text-end"><%= money(c.costo_total) %></td><td class="text-end"><%= (c.km_al_cargar||0).toLocaleString('es-AR') %></td>
+          <td class="text-end"><form action="/flota/<%= vehiculo.id %>/combustible/<%= c.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'mantenimiento') { %>
+  <%- include('../../partials/periodo_filtro', { base: `/flota/${vehiculo.id}`, extra: 'tab=mantenimiento', filtros, periodoLabel }) %>
+  <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumenMant.n %></span><span class="stat-card__label">Services · <%= periodoLabel %></span></div></div>
+    <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= resumenMant.preventivos %></span><span class="stat-card__label">Preventivos</span></div></div>
+    <div class="stat-card stat-card--warning"><div class="stat-card__body"><span class="stat-card__value"><%= resumenMant.correctivos %></span><span class="stat-card__label">Correctivos</span></div></div>
+    <div class="stat-card stat-card--neutral"><div class="stat-card__body"><span class="stat-card__value"><%= money(resumenMant.costo) %></span><span class="stat-card__label">Costo total</span></div></div>
+  </div>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar mantenimiento</div>
+    <div class="card-body"><form action="/flota/<%= vehiculo.id %>/mantenimiento" method="POST" enctype="multipart/form-data">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label">Categoría</label><select name="categoria" class="form-select form-select-sm"><option value="preventivo">Preventivo</option><option value="correctivo">Correctivo</option></select></div>
+        <div class="col-md-3"><label class="form-label">Descripción / Tipo</label><input name="descripcion" class="form-control form-control-sm" placeholder="Cambio de aceite, cubiertas..."></div>
+        <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Km</label><input type="number" name="km" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Costo</label><input type="number" step="0.01" name="costo" class="form-control form-control-sm"></div>
+        <div class="col-md-3"><label class="form-label">Taller</label><input name="taller" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Próx. fecha</label><input type="date" name="proxima_fecha" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Próx. km</label><input type="number" name="proximo_km" class="form-control form-control-sm"></div>
+        <div class="col-md-3"><label class="form-label">Factura</label><input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm"></div>
+      </div>
+      <button class="btn btn-sm btn-naranja mt-2">Registrar</button>
+    </form></div>
+  </div>
+  <div class="card shadow-sm mb-3"><div class="card-body p-0">
+    <% if(!mantenimientos.length){ %><div class="p-4 text-center text-muted">Sin mantenimientos en el período.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Taller</th><th class="text-end">Km</th><th class="text-end">Costo</th><th>Factura</th><th></th></tr></thead>
+      <tbody><% mantenimientos.forEach(m => { %>
+        <tr><td><%= formatFecha(m.fecha) %></td>
+          <td><span class="badge rounded-pill px-3 <%= m.categoria==='correctivo'?'badge-alerta':'badge-activo' %>"><%= m.categoria %></span></td>
+          <td><%= m.descripcion || m.tipo_service || '—' %></td><td><small class="text-muted"><%= m.taller || '—' %></small></td>
+          <td class="text-end"><%= (m.km||0).toLocaleString('es-AR') %></td><td class="text-end"><%= money(m.costo) %></td>
+          <td><% if(m.archivo){ %><a href="/flota/<%= vehiculo.id %>/mantenimiento/<%= m.id %>/archivo" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('eye',{size:14}) %></a><% } else { %>—<% } %></td>
+          <td class="text-end"><form action="/flota/<%= vehiculo.id %>/mantenimiento/<%= m.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Reglas de alerta (por km / fecha)</div>
+    <div class="card-body">
+      <form action="/flota/<%= vehiculo.id %>/reglas" method="POST" class="row g-2 align-items-end mb-3">
+        <div class="col-md-3"><label class="form-label">Tipo / Descripción</label><input name="tipo" class="form-control form-control-sm" placeholder="Cambio de aceite" required></div>
+        <div class="col-md-2"><label class="form-label">Cada (km)</label><input type="number" name="cada_km" class="form-control form-control-sm" placeholder="10000"></div>
+        <div class="col-md-2"><label class="form-label">Cada (meses)</label><input type="number" name="cada_meses" class="form-control form-control-sm" placeholder="6"></div>
+        <div class="col-auto"><button class="btn btn-sm btn-naranja">+ Regla</button></div>
+      </form>
+      <% if (reglas.length) { %>
+      <table class="table table-sm align-middle mb-0">
+        <thead><tr><th>Tipo</th><th>Cada km</th><th>Cada meses</th><th>Alcance</th><th></th></tr></thead>
+        <tbody><% reglas.forEach(r => { %>
+          <tr><td><%= r.tipo %></td><td><%= r.cada_km || '—' %></td><td><%= r.cada_meses || '—' %></td>
+            <td><small class="text-muted"><%= r.id_vehiculo ? 'Este vehículo' : 'Global' %></small></td>
+            <td class="text-end"><% if(r.id_vehiculo){ %><form action="/flota/<%= vehiculo.id %>/reglas/<%= r.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form><% } %></td>
+          </tr><% }) %></tbody>
+      </table>
+      <% } else { %><p class="text-muted small mb-0">Sin reglas configuradas.</p><% } %>
+    </div>
+  </div>
+
+<% } else if (tab === 'gastos') { %>
+  <%- include('../../partials/periodo_filtro', { base: `/flota/${vehiculo.id}`, extra: 'tab=gastos', filtros, periodoLabel }) %>
+  <div class="card shadow-sm mb-3"><div class="card-body py-3">
+    <strong>Total del período (<%= periodoLabel %>):</strong> <span class="text-orange fw-bold"><%= money(resumenGastos.total) %></span>
+    <% Object.entries(resumenGastos.porCategoria).forEach(([k,v]) => { %>
+      <span class="badge rounded-pill px-3 badge-pendiente ms-2"><%= catGastoLbl[k]||k %>: <%= money(v) %></span>
+    <% }) %>
+  </div></div>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar gasto</div>
+    <div class="card-body"><form action="/flota/<%= vehiculo.id %>/gastos" method="POST" enctype="multipart/form-data">
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label">Categoría *</label><select name="categoria" class="form-select form-select-sm" required>
+          <% Object.entries(catGastoLbl).forEach(([k,l]) => { %><option value="<%= k %>"><%= l %></option><% }) %></select></div>
+        <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Monto</label><input type="number" step="0.01" name="monto" class="form-control form-control-sm" required></div>
+        <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="vencimiento" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Comprobante</label><input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm"></div>
+      </div>
+      <button class="btn btn-sm btn-naranja mt-2">Registrar</button>
+    </form></div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if(!gastos.length){ %><div class="p-4 text-center text-muted">Sin gastos en el período.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Vencimiento</th><th class="text-end">Monto</th><th>Comp.</th><th></th></tr></thead>
+      <tbody><% gastos.forEach(g => { const lb=vencBadge(g.vencimiento) %>
+        <tr><td><%= formatFecha(g.fecha) %></td>
+          <td><span class="badge rounded-pill px-3 badge-pendiente"><%= catGastoLbl[g.categoria]||g.categoria %></span></td>
+          <td><small class="text-muted"><%= g.descripcion || '—' %></small></td>
+          <td><%= g.vencimiento ? formatFecha(g.vencimiento) : '—' %> <% if(g.vencimiento){ %><span class="badge rounded-pill px-2 <%= lb[0] %>"><%= lb[1] %></span><% } %></td>
+          <td class="text-end fw-semibold"><%= money(g.monto) %></td>
+          <td><% if(g.archivo){ %><a href="/flota/<%= vehiculo.id %>/gastos/<%= g.id %>/archivo" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('eye',{size:14}) %></a><% } else { %>—<% } %></td>
+          <td class="text-end"><form action="/flota/<%= vehiculo.id %>/gastos/<%= g.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'gps') { %>
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">GPS y seguimiento</div>
+    <div class="card-body text-center py-5">
+      <div style="font-size:2.5rem">🛰️</div>
+      <p class="fw-semibold mb-1">Integración GPS preparada</p>
+      <p class="text-muted small mb-0">El sistema está listo para integrar un proveedor de GPS:<br>
+        ubicación actual, historial de recorridos, tiempo detenido/en movimiento y km recorridos.<br>
+        Se activa al conectar el servicio de rastreo (tabla <code>gps_posiciones</code> ya disponible).</p>
+    </div>
+  </div>
+
+<% } else if (tab === 'historial') { %>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Historial de estados</div>
+    <div class="card-body p-0">
+    <% if(!historialEstados.length){ %><div class="p-4 text-center text-muted">Sin cambios de estado.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Estado</th><th>Usuario</th><th>Observación</th></tr></thead>
+      <tbody><% historialEstados.forEach(h => { %>
+        <tr><td><small class="text-muted"><%= formatFechaHora(h.fecha) %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= estadoBadge[h.estado]||'badge-pendiente' %>"><%= estadoLbl[h.estado]||h.estado %></span></td>
+          <td><small><%= h.usuario_nombre || '—' %></small></td><td><small class="text-muted"><%= h.observaciones || '' %></small></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Auditoría</div>
+    <div class="card-body p-0">
+    <% if(!auditoria.length){ %><div class="p-4 text-center text-muted">Sin registros.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Detalle</th></tr></thead>
+      <tbody><% auditoria.forEach(a => { %>
+        <tr><td><small class="text-muted"><%= formatFechaHora(a.created_at) %></small></td>
+          <td><span class="badge rounded-pill px-3 badge-pendiente"><%= a.accion %></span></td>
+          <td><small><%= a.usuario_nombre || '—' %></small></td><td><small class="text-muted"><%= a.detalle || '' %></small></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
+<% } %>

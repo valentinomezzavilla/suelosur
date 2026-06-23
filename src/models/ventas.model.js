@@ -22,18 +22,25 @@ const VentasModel = {
     return db.prepare(`SELECT estado, COUNT(*) AS total FROM op_encabezado WHERE tipo_op IN ('M') GROUP BY estado`).all()
   },
 
-  // ── Listado con paginación, búsqueda y ordenamiento ───────────
-  listar({ estado, id_cliente, q, sort, dir, page = 1, limit = 20 } = {}) {
+  // Construye WHERE + params compartido por listar/resumen
+  _filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta } = {}) {
     const wheres = [`op.tipo_op = 'M'`]
     const params = []
     if (estado)     { wheres.push('op.estado = ?');     params.push(estado) }
     if (id_cliente) { wheres.push('op.id_cliente = ?'); params.push(id_cliente) }
+    if (fechaDesde) { wheres.push('op.fecha_emision >= ?'); params.push(fechaDesde) }
+    if (fechaHasta) { wheres.push('op.fecha_emision <= ?'); params.push(fechaHasta) }
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
       wheres.push(`(c.nombre LIKE ? OR op.observaciones LIKE ? OR CAST(op.nro_op AS TEXT) LIKE ?)`)
       params.push(term, term, term)
     }
-    const where = 'WHERE ' + wheres.join(' AND ')
+    return { where: 'WHERE ' + wheres.join(' AND '), params }
+  },
+
+  // ── Listado con paginación, búsqueda y ordenamiento ───────────
+  listar({ estado, id_cliente, q, fechaDesde, fechaHasta, sort, dir, page = 1, limit = 20 } = {}) {
+    const { where, params } = this._filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta })
 
     // Ordenamiento con whitelist (evita inyección por columna)
     const sortMap = {
@@ -50,7 +57,7 @@ const VentasModel = {
       ${where}
     `).get(...params).n
     const ops = db.prepare(`
-      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.fecha_emision, op.nro_remito,
+      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito,
              COALESCE(c.nombre, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
              (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
@@ -61,6 +68,20 @@ const VentasModel = {
       ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?
     `).all(...params, limit, offset)
     return { ops, total, page, limit, totalPaginas: Math.ceil(total / limit) || 1 }
+  },
+
+  // Métricas del período/filtros (cantidad y monto total)
+  resumen({ estado, id_cliente, q, fechaDesde, fechaHasta } = {}) {
+    const { where, params } = this._filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta })
+    const row = db.prepare(`
+      SELECT COUNT(*) AS count,
+             COALESCE(SUM((SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
+                           FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)), 0) AS total
+      FROM op_encabezado op
+      LEFT JOIN clientes c ON c.id = op.id_cliente
+      ${where}
+    `).get(...params)
+    return { count: row.count, total: row.total }
   },
 
   obtener(id) {

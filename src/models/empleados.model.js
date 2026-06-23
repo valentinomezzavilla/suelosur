@@ -4,13 +4,17 @@ const db = require('../config/db')
 
 // Campos editables del empleado (whitelist para create/update)
 const CAMPOS = [
-  'nombre', 'apellido', 'dni', 'fecha_nacimiento', 'direccion', 'telefono', 'email',
+  'nombre', 'apellido', 'dni', 'cuil', 'fecha_nacimiento', 'direccion', 'telefono', 'email',
+  'contacto_emergencia', 'contacto_emergencia_tel',
   'cargo', 'sector', 'fecha_ingreso', 'estado_laboral', 'tipo_contratacion',
-  'salario', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras',
-  'vehiculo_asignado', 'licencia_categoria', 'licencia_vencimiento', 'certificaciones',
-  'id_usuario',
+  'convenio', 'categoria_laboral', 'supervisor_id',
+  'salario', 'sueldo_basico', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras',
+  'vehiculo_asignado', 'es_chofer',
+  'licencia_numero', 'licencia_categoria', 'licencia_fecha_emision', 'licencia_vencimiento', 'licencia_organismo',
+  'certificaciones', 'id_usuario',
 ]
-const NUMERICOS = new Set(['salario', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras'])
+const NUMERICOS = new Set(['salario', 'sueldo_basico', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras'])
+const BOOLEANOS = new Set(['es_chofer'])
 
 function normalizar(datos) {
   const out = {}
@@ -18,6 +22,8 @@ function normalizar(datos) {
     let v = datos[c]
     if (NUMERICOS.has(c)) {
       out[c] = parseFloat(v) || 0
+    } else if (BOOLEANOS.has(c)) {
+      out[c] = (v === true || v === 'true' || v === 'on' || v === '1' || v === 1) ? 1 : 0
     } else {
       v = (v === undefined || v === null) ? '' : String(v).trim()
       out[c] = v === '' ? null : v
@@ -85,6 +91,46 @@ const EmpleadosModel = {
 
   toggleActivo(id) {
     db.prepare(`UPDATE empleados SET activo = NOT activo WHERE id = ?`).run(id)
+  },
+
+  // Baja lógica con motivo / reingreso
+  darBaja(id, motivo) {
+    db.prepare(`UPDATE empleados SET activo = 0, estado_laboral = 'baja', fecha_baja = date('now'), motivo_baja = ? WHERE id = ?`)
+      .run(motivo || '', id)
+  },
+
+  reingresar(id) {
+    db.prepare(`UPDATE empleados SET activo = 1, estado_laboral = 'activo', fecha_baja = NULL, motivo_baja = NULL WHERE id = ?`).run(id)
+  },
+
+  // ── Choferes (es_chofer = 1) ──────────────────────────────────
+  listarChoferes({ q, soloActivos = false } = {}) {
+    const wheres = ['e.es_chofer = 1']
+    const params = []
+    if (soloActivos) wheres.push('e.activo = 1')
+    if (q && String(q).trim()) {
+      const term = `%${String(q).trim()}%`
+      wheres.push('(e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ? OR CAST(e.legajo AS TEXT) LIKE ?)')
+      params.push(term, term, term, term)
+    }
+    return db.prepare(`
+      SELECT e.*, u.usuario AS usuario_sistema,
+        (SELECT COALESCE(v.nombre,'')||' ('||COALESCE(v.patente,'')||')'
+         FROM asignaciones_recurso a JOIN flota_vehiculos v ON v.id = a.recurso_id
+         WHERE a.id_empleado = e.id AND a.recurso_tipo = 'camion' AND a.activo = 1 LIMIT 1) AS camion_principal
+      FROM empleados e
+      LEFT JOIN users u ON u.id = e.id_usuario
+      WHERE ${wheres.join(' AND ')}
+      ORDER BY e.apellido, e.nombre
+    `).all(...params)
+  },
+
+  // Empleados candidatos a supervisor (activos, distinto de uno mismo)
+  supervisores(excludeId = null) {
+    return db.prepare(`
+      SELECT id, nombre, apellido FROM empleados
+      WHERE activo = 1 AND (id != ? OR ? IS NULL) ORDER BY apellido, nombre
+    `).all(excludeId || '', excludeId)
   },
 
   // Usuarios del sistema disponibles para vincular (no asignados a otro empleado)

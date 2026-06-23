@@ -60,16 +60,16 @@
 
             <!-- Cliente -->
             <div id="seccionCliente" style="display:none">
+
+                <div id="busquedaClienteWrapper">
+                    <%- include('../../partials/buscar_cliente') %>
+                </div>
                 <div class="carrito-seccion">
                     <label class="toggle-row">
                         <input type="checkbox" id="checkParticular">
                         <span>Cliente particular (sin datos)</span>
                     </label>
                 </div>
-                <div id="busquedaClienteWrapper">
-                    <%- include('../../partials/buscar_cliente') %>
-                </div>
-
                 <%- include('../../partials/metodo_pago') %>
             </div>
 

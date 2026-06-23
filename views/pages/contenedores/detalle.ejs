@@ -20,11 +20,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h4 class="fw-bold mb-0 text-dark-title">📦 Contenedor N° <%= contenedor.numero_contenedor %></h4>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Contenedor N° <%= contenedor.numero_contenedor %></h4>
     <small class="text-muted">Condición: <%= contenedor.estado_general?.replace('_',' ') %></small>
   </div>
   <div class="d-flex gap-2">
-    <a href="/contenedores/<%= contenedor.id %>/editar" class="btn btn-sm btn-outline-secondary">✏️ Editar</a>
+    <a href="/contenedores/<%= contenedor.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
     <a href="/contenedores" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
 </div>
@@ -42,7 +42,7 @@
               <%= labelEstado[ultimo.estado_paso] || ultimo.estado_paso %>
             </span>
           </h4>
-          <small class="text-muted">desde el <%= ultimo.fecha_movimiento %></small>
+          <small class="text-muted">desde el <%= formatFechaHora(ultimo.fecha_movimiento) %></small>
           <% if (ultimo.cliente_nombre) { %>
             <hr>
             <p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
@@ -133,7 +133,7 @@
           <tbody>
             <% contenedor.movimientos.forEach(m => { %>
             <tr>
-              <td><small class="text-muted"><%= m.fecha_movimiento %></small></td>
+              <td><small class="text-muted"><%= formatFechaHora(m.fecha_movimiento) %></small></td>
               <td>
                 <span class="badge rounded-pill px-3 <%= badgeEstado[m.estado_paso] || 'badge-pendiente' %>">
                   <%= labelEstado[m.estado_paso] || m.estado_paso %>

@@ -1,0 +1,356 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const nombre = `${chofer.nombre} ${chofer.apellido || ''}`.trim()
+  const tabs = [
+    ['datos','Datos'], ['documentos','Documentación'], ['asignaciones','Camiones'],
+    ['horario','Horario y HE'], ['pagos','Pagos'], ['historial','Auditoría'],
+  ]
+  const tabUrl = (t) => `/choferes/${chofer.id}?tab=${t}`
+  const diasHasta = (f) => { if(!f) return null; const s=String(f).slice(0,10); const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m) return null; const d=new Date(+m[1],+m[2]-1,+m[3]); const h=new Date(); return Math.round((d-new Date(h.getFullYear(),h.getMonth(),h.getDate()))/86400000) }
+  const vencBadge = (f) => { const d=diasHasta(f); if(d==null) return ['badge-pendiente','Sin fecha']; if(d<0) return ['badge-alerta','Vencido']; if(d<=30) return ['badge-alerta', 'En '+d+'d']; if(d<=90) return ['badge-en-transito','En '+d+'d']; return ['badge-activo','Vigente'] }
+  const tipoPagoLbl = { sueldo:'Sueldo', anticipo:'Anticipo', viatico:'Viático', horas_extra:'Horas extra', bonificacion:'Bonificación', descuento:'Descuento', liquidacion:'Liquidación' }
+%>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <a href="/choferes" class="text-muted small text-decoration-none">← Choferes</a>
+    <h4 class="fw-bold mb-0 text-dark-title">
+      <%- icon('hardhat', { size: 18 }) %> <span class="text-orange">#<%= chofer.legajo %></span> <%= nombre %>
+      <% if (chofer.activo) { %><span class="badge rounded-pill px-3 badge-activo ms-2">Activo</span>
+      <% } else { %><span class="badge rounded-pill px-3 badge-alerta ms-2">Baja</span><% } %>
+    </h4>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/choferes/<%= chofer.id %>/editar" class="btn btn-sm btn-secondary-yellow">Editar</a>
+    <% if (chofer.activo) { %>
+      <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('formBaja').style.display='block'">Dar de baja</button>
+    <% } else { %>
+      <form action="/choferes/<%= chofer.id %>/reingreso" method="POST" class="d-inline"><button class="btn btn-sm btn-success">Reingresar</button></form>
+    <% } %>
+  </div>
+</div>
+
+<form id="formBaja" action="/choferes/<%= chofer.id %>/baja" method="POST" class="card shadow-sm mb-3" style="display:none">
+  <div class="card-body py-2 d-flex gap-2 align-items-end">
+    <div class="flex-grow-1"><label class="form-label">Motivo de la baja</label><input name="motivo" class="form-control form-control-sm" placeholder="Motivo..."></div>
+    <button class="btn btn-sm btn-danger">Confirmar baja</button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="document.getElementById('formBaja').style.display='none'">Cancelar</button>
+  </div>
+</form>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3">
+  <% tabs.forEach(([k,label]) => { %>
+    <li class="nav-item"><a class="nav-link <%= tab===k ? 'active' : '' %>" href="<%= tabUrl(k) %>"><%= label %></a></li>
+  <% }) %>
+</ul>
+
+<% if (tab === 'datos') { %>
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold">Personal</div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 text-muted">DNI</dt><dd class="col-7"><%= chofer.dni || '—' %></dd>
+            <dt class="col-5 text-muted">CUIL/CUIT</dt><dd class="col-7"><%= chofer.cuil || '—' %></dd>
+            <dt class="col-5 text-muted">Nacimiento</dt><dd class="col-7"><%= chofer.fecha_nacimiento ? formatFecha(chofer.fecha_nacimiento) : '—' %></dd>
+            <dt class="col-5 text-muted">Teléfono</dt><dd class="col-7"><%= chofer.telefono || '—' %></dd>
+            <dt class="col-5 text-muted">Email</dt><dd class="col-7"><%= chofer.email || '—' %></dd>
+            <dt class="col-5 text-muted">Dirección</dt><dd class="col-7"><%= chofer.direccion || '—' %></dd>
+            <dt class="col-5 text-muted">Emergencia</dt><dd class="col-7"><%= chofer.contacto_emergencia || '—' %> <%= chofer.contacto_emergencia_tel ? '· '+chofer.contacto_emergencia_tel : '' %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Laboral</div>
+        <div class="card-body">
+          <dl class="row mb-0 small">
+            <dt class="col-5 text-muted">Ingreso</dt><dd class="col-7"><%= chofer.fecha_ingreso ? formatFecha(chofer.fecha_ingreso) : '—' %></dd>
+            <dt class="col-5 text-muted">Contratación</dt><dd class="col-7"><%= chofer.tipo_contratacion || '—' %></dd>
+            <dt class="col-5 text-muted">Categoría</dt><dd class="col-7"><%= chofer.categoria_laboral || '—' %></dd>
+            <dt class="col-5 text-muted">Convenio</dt><dd class="col-7"><%= chofer.convenio || '—' %></dd>
+            <dt class="col-5 text-muted">Sueldo básico</dt><dd class="col-7"><%= money(chofer.sueldo_basico) %></dd>
+            <% if (!chofer.activo && chofer.motivo_baja) { %><dt class="col-5 text-muted">Motivo baja</dt><dd class="col-7"><%= chofer.motivo_baja %></dd><% } %>
+          </dl>
+        </div>
+      </div>
+      <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Licencia de conducir</div>
+        <div class="card-body">
+          <% const lb = vencBadge(chofer.licencia_vencimiento) %>
+          <dl class="row mb-0 small">
+            <dt class="col-5 text-muted">Número</dt><dd class="col-7"><%= chofer.licencia_numero || '—' %></dd>
+            <dt class="col-5 text-muted">Categoría</dt><dd class="col-7"><%= chofer.licencia_categoria || '—' %></dd>
+            <dt class="col-5 text-muted">Vence</dt><dd class="col-7"><%= chofer.licencia_vencimiento ? formatFecha(chofer.licencia_vencimiento) : '—' %> <span class="badge rounded-pill px-2 <%= lb[0] %>"><%= lb[1] %></span></dd>
+            <dt class="col-5 text-muted">Organismo</dt><dd class="col-7"><%= chofer.licencia_organismo || '—' %></dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<% } else if (tab === 'documentos') {
+     const hasLic = chofer.licencia_numero || chofer.licencia_categoria || chofer.licencia_vencimiento || chofer.licencia_organismo
+%>
+  <% if (hasLic) { const lbL = vencBadge(chofer.licencia_vencimiento) %>
+  <div class="card shadow-sm mb-3">
+    <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+      <span><%- icon('fileText',{size:15}) %> Licencia de conducir</span>
+      <a href="/choferes/<%= chofer.id %>/editar" class="btn btn-sm btn-outline-secondary">Editar datos</a>
+    </div>
+    <div class="card-body">
+      <div class="row g-2">
+        <div class="col-md-3"><small class="text-muted d-block">Número</small><span class="fw-semibold"><%= chofer.licencia_numero || '—' %></span></div>
+        <div class="col-md-2"><small class="text-muted d-block">Categoría</small><span class="fw-semibold"><%= chofer.licencia_categoria || '—' %></span></div>
+        <div class="col-md-3"><small class="text-muted d-block">Vencimiento</small>
+          <span class="fw-semibold"><%= chofer.licencia_vencimiento ? formatFecha(chofer.licencia_vencimiento) : '—' %></span>
+          <% if (chofer.licencia_vencimiento) { %><span class="badge rounded-pill px-2 <%= lbL[0] %>"><%= lbL[1] %></span><% } %>
+        </div>
+        <div class="col-md-2"><small class="text-muted d-block">Emisión</small><span class="fw-semibold"><%= chofer.licencia_fecha_emision ? formatFecha(chofer.licencia_fecha_emision) : '—' %></span></div>
+        <div class="col-md-2"><small class="text-muted d-block">Organismo</small><span class="fw-semibold"><%= chofer.licencia_organismo || '—' %></span></div>
+      </div>
+      <p class="form-hint mb-0 mt-2">Para adjuntar el escaneo del carnet, agregalo abajo como documento tipo "Licencia".</p>
+    </div>
+  </div>
+  <% } %>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Agregar documento</div>
+    <div class="card-body">
+      <form action="/choferes/<%= chofer.id %>/documentos" method="POST" enctype="multipart/form-data">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label">Tipo *</label>
+            <input list="tiposDoc" name="tipo" class="form-control form-control-sm" placeholder="DNI, Licencia, ART..." required>
+            <datalist id="tiposDoc"><option>DNI</option><option>Licencia</option><option>Certificado médico</option><option>ART</option><option>Curso</option><option>Antecedentes</option></datalist>
+          </div>
+          <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Emisión</label><input type="date" name="fecha_emision" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="fecha_vencimiento" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Archivo</label><input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm"></div>
+        </div>
+        <button class="btn btn-sm btn-naranja mt-2">Guardar documento</button>
+      </form>
+    </div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if (!documentos.length) { %><div class="p-4 text-center text-muted">Sin documentos cargados.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Tipo</th><th>Descripción</th><th>Emisión</th><th>Vencimiento</th><th>Archivo</th><th></th></tr></thead>
+      <tbody>
+        <% documentos.forEach(d => { const lb = vencBadge(d.fecha_vencimiento) %>
+        <tr>
+          <td class="fw-semibold"><%= d.tipo %></td>
+          <td><small class="text-muted"><%= d.descripcion || '—' %></small></td>
+          <td><small><%= d.fecha_emision ? formatFecha(d.fecha_emision) : '—' %></small></td>
+          <td><%= d.fecha_vencimiento ? formatFecha(d.fecha_vencimiento) : '—' %> <% if(d.fecha_vencimiento){ %><span class="badge rounded-pill px-2 <%= lb[0] %>"><%= lb[1] %></span><% } %></td>
+          <td><% if (d.archivo) { %><a href="/choferes/<%= chofer.id %>/documentos/<%= d.id %>/ver" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('eye',{size:14}) %></a><% } else { %><small class="text-muted">—</small><% } %></td>
+          <td class="text-end">
+            <form action="/choferes/<%= chofer.id %>/documentos/<%= d.id %>/eliminar" method="POST" onsubmit="return confirm('¿Eliminar documento?')">
+              <button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'asignaciones') {
+     const actCamion = asignacionesActivas.find(a => a.recurso_tipo === 'camion')
+     const actMaquina = asignacionesActivas.find(a => a.recurso_tipo === 'maquina')
+%>
+  <!-- Recursos asignados actualmente -->
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold"><%- icon('truck',{size:15}) %> Camión asignado</div>
+        <div class="card-body">
+          <% if (actCamion) { %>
+            <p class="fw-bold mb-1"><%= actCamion.recurso_label %></p>
+            <% if (actCamion.observaciones) { %><p class="text-muted small mb-2"><%= actCamion.observaciones %></p><% } %>
+            <p class="text-muted small mb-2">Desde <%= formatFecha(actCamion.fecha_desde) %></p>
+            <form action="/choferes/<%= chofer.id %>/asignaciones/<%= actCamion.id %>/finalizar" method="POST"><button class="btn btn-sm btn-outline-danger">Liberar camión</button></form>
+          <% } else { %>
+            <p class="text-muted mb-3">Sin camión asignado.</p>
+            <form action="/choferes/<%= chofer.id %>/asignaciones" method="POST">
+              <input type="hidden" name="recurso_tipo" value="camion">
+              <div class="input-group input-group-sm">
+                <select name="recurso_id" class="form-select form-select-sm" required>
+                  <option value="">Seleccionar camión disponible...</option>
+                  <% camionesDisp.forEach(v => { %><option value="<%= v.id %>"><%= [v.numero_interno?'#'+v.numero_interno:null, v.patente, v.nombre, [v.marca,v.modelo].filter(Boolean).join(' ')].filter(Boolean).join(' · ') %></option><% }) %>
+                </select>
+                <button class="btn btn-naranja btn-sm">Asignar</button>
+              </div>
+              <% if (!camionesDisp.length) { %><small class="text-muted">No hay camiones disponibles.</small><% } %>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold"><%- icon('hardhat',{size:15}) %> Máquina asignada</div>
+        <div class="card-body">
+          <% if (actMaquina) { %>
+            <p class="fw-bold mb-1"><%= actMaquina.recurso_label %></p>
+            <% if (actMaquina.observaciones) { %><p class="text-muted small mb-2"><%= actMaquina.observaciones %></p><% } %>
+            <p class="text-muted small mb-2">Desde <%= formatFecha(actMaquina.fecha_desde) %></p>
+            <form action="/choferes/<%= chofer.id %>/asignaciones/<%= actMaquina.id %>/finalizar" method="POST"><button class="btn btn-sm btn-outline-danger">Liberar máquina</button></form>
+          <% } else { %>
+            <p class="text-muted mb-3">Sin máquina asignada.</p>
+            <form action="/choferes/<%= chofer.id %>/asignaciones" method="POST">
+              <input type="hidden" name="recurso_tipo" value="maquina">
+              <div class="input-group input-group-sm">
+                <select name="recurso_id" class="form-select form-select-sm" required>
+                  <option value="">Seleccionar máquina disponible...</option>
+                  <% maquinasDisp.forEach(m => { %><option value="<%= m.id %>"><%= [m.numero_interno?'#'+m.numero_interno:null, m.nombre, m.tipo, [m.marca,m.modelo].filter(Boolean).join(' ')].filter(Boolean).join(' · ') %></option><% }) %>
+                </select>
+                <button class="btn btn-naranja btn-sm">Asignar</button>
+              </div>
+              <% if (!maquinasDisp.length) { %><small class="text-muted">No hay máquinas disponibles.</small><% } %>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Historial de asignaciones</div>
+    <div class="card-body p-0">
+    <% if (!asignacionesHist.length) { %><div class="p-4 text-center text-muted">Sin asignaciones.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Recurso</th><th>Tipo</th><th>Desde</th><th>Hasta</th><th class="text-center">Estado</th><th></th></tr></thead>
+      <tbody>
+        <% asignacionesHist.forEach(a => { %>
+        <tr>
+          <td class="fw-semibold"><%= a.recurso_label %></td>
+          <td><span class="badge rounded-pill px-3 <%= a.recurso_tipo==='camion'?'badge-en-transito':'badge-pendiente' %>"><%= a.recurso_tipo==='camion'?'Camión':'Máquina' %></span></td>
+          <td><small><%= formatFecha(a.fecha_desde) %></small></td>
+          <td><small><%= a.fecha_hasta ? formatFecha(a.fecha_hasta) : '—' %></small></td>
+          <td class="text-center"><% if(a.activo){ %><span class="badge rounded-pill px-3 badge-activo">Activa</span><% } else { %><small class="text-muted">Finalizada</small><% } %></td>
+          <td class="text-end"><% if(a.activo){ %><form action="/choferes/<%= chofer.id %>/asignaciones/<%= a.id %>/finalizar" method="POST"><button class="btn btn-sm btn-outline-secondary">Finalizar</button></form><% } %></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+    </div>
+  </div>
+
+<% } else if (tab === 'horario') { %>
+  <%- include('../../partials/periodo_filtro', { base: `/choferes/${chofer.id}`, extra: 'tab=horario', filtros, periodoLabel }) %>
+  <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+    <div class="stat-card stat-card--neutral"><div class="stat-card__body"><span class="stat-card__value"><%= resumenHoras.jornadas %></span><span class="stat-card__label">Jornadas · <%= periodoLabel %></span></div></div>
+    <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumenHoras.normales %></span><span class="stat-card__label">Horas normales</span></div></div>
+    <div class="stat-card stat-card--warning"><div class="stat-card__body"><span class="stat-card__value"><%= resumenHoras.extra %></span><span class="stat-card__label">Horas extra</span></div></div>
+    <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= resumenHoras.extra_aprobadas %></span><span class="stat-card__label">HE aprobadas</span></div></div>
+  </div>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar jornada</div>
+    <div class="card-body">
+      <form action="/choferes/<%= chofer.id %>/horario" method="POST">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" required></div>
+          <div class="col-md-2"><label class="form-label">Ingreso</label><input type="time" name="hora_ingreso" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Egreso</label><input type="time" name="hora_egreso" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Horas extra</label><input type="number" step="0.5" min="0" name="horas_extra" class="form-control form-control-sm" value="0"></div>
+          <div class="col-md-3"><label class="form-label">Motivo HE</label><input name="motivo_extra" class="form-control form-control-sm"></div>
+          <div class="col-auto"><button class="btn btn-sm btn-naranja">Cargar</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if (!jornadas.length) { %><div class="p-4 text-center text-muted">Sin jornadas en el período.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Ingreso</th><th>Egreso</th><th class="text-end">Normales</th><th class="text-end">Extra</th><th>Motivo</th><th class="text-center">HE aprob.</th><th></th></tr></thead>
+      <tbody>
+        <% jornadas.forEach(j => { %>
+        <tr>
+          <td><%= formatFecha(j.fecha) %></td>
+          <td><small><%= j.hora_ingreso || '—' %></small></td>
+          <td><small><%= j.hora_egreso || '—' %></small></td>
+          <td class="text-end"><%= j.horas_normales %></td>
+          <td class="text-end fw-semibold"><%= j.horas_extra %></td>
+          <td><small class="text-muted"><%= j.motivo_extra || '—' %></small></td>
+          <td class="text-center">
+            <% if (j.horas_extra > 0) { %>
+              <% if (j.aprobado) { %><span class="badge rounded-pill px-2 badge-activo">Sí</span>
+              <% } else { %><form action="/choferes/<%= chofer.id %>/horario/<%= j.id %>/aprobar" method="POST"><button class="btn btn-sm btn-outline-success">Aprobar</button></form><% } %>
+            <% } else { %><small class="text-muted">—</small><% } %>
+          </td>
+          <td class="text-end"><form action="/choferes/<%= chofer.id %>/horario/<%= j.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'pagos') { %>
+  <%- include('../../partials/periodo_filtro', { base: `/choferes/${chofer.id}`, extra: 'tab=pagos', filtros, periodoLabel }) %>
+  <div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px">
+    <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumenPagos.count %></span><span class="stat-card__label">Movimientos · <%= periodoLabel %></span></div></div>
+    <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= money(resumenPagos.neto) %></span><span class="stat-card__label">Neto pagado</span></div></div>
+    <div class="stat-card stat-card--neutral"><div class="stat-card__body"><span class="stat-card__value"><%= money((resumenPagos.porTipo||{}).viatico || 0) %></span><span class="stat-card__label">Viáticos</span></div></div>
+  </div>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar pago</div>
+    <div class="card-body">
+      <form action="/choferes/<%= chofer.id %>/pagos" method="POST">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label">Tipo *</label>
+            <select name="tipo" class="form-select form-select-sm" required>
+              <% Object.entries(tipoPagoLbl).forEach(([k,l]) => { %><option value="<%= k %>"><%= l %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-2"><label class="form-label">Monto *</label><input type="number" step="0.01" min="0" name="monto" class="form-control form-control-sm" required></div>
+          <div class="col-md-2"><label class="form-label">Período</label><input name="periodo" class="form-control form-control-sm" placeholder="2026-06"></div>
+          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm"></div>
+          <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
+        </div>
+        <button class="btn btn-sm btn-naranja mt-2">Registrar pago</button>
+      </form>
+    </div>
+  </div>
+  <div class="card shadow-sm"><div class="card-body p-0">
+    <% if (!pagos.length) { %><div class="p-4 text-center text-muted">Sin pagos en el período.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Período</th><th>Descripción</th><th class="text-end">Monto</th><th></th></tr></thead>
+      <tbody>
+        <% pagos.forEach(p => { %>
+        <tr>
+          <td><%= formatFecha(p.fecha) %></td>
+          <td><span class="badge rounded-pill px-3 <%= p.tipo==='descuento'?'badge-alerta':'badge-activo' %>"><%= tipoPagoLbl[p.tipo] || p.tipo %></span></td>
+          <td><small class="text-muted"><%= p.periodo || '—' %></small></td>
+          <td><small class="text-muted"><%= p.descripcion || '—' %></small></td>
+          <td class="text-end fw-semibold <%= p.tipo==='descuento'?'text-danger':'' %>"><%= money(p.monto) %></td>
+          <td class="text-end"><form action="/choferes/<%= chofer.id %>/pagos/<%= p.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div></div>
+
+<% } else if (tab === 'historial') { %>
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Historial de cambios (auditoría)</div>
+    <div class="card-body p-0">
+    <% if (!auditoria.length) { %><div class="p-4 text-center text-muted">Sin registros.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Detalle</th></tr></thead>
+      <tbody>
+        <% auditoria.forEach(a => { %>
+        <tr>
+          <td><small class="text-muted"><%= formatFechaHora(a.created_at) %></small></td>
+          <td><span class="badge rounded-pill px-3 badge-pendiente"><%= a.accion %></span></td>
+          <td><small><%= a.usuario_nombre || '—' %></small></td>
+          <td><small class="text-muted"><%= a.detalle || '' %></small></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+    </div>
+  </div>
+<% } %>

@@ -44,7 +44,7 @@
         <tbody>
           <% porZona[zona].forEach(c => { %>
           <tr>
-            <td class="fw-bold text-orange">N° <%= c.numero_contenedor %></td>
+            <td class="fw-semibold text-orange">N° <%= c.numero_contenedor %></td>
             <td class="fw-semibold"><%= c.cliente_nombre %></td>
             <td><small class="text-muted">OP-<%= String(c.nro_op).padStart(4,'0') %></small></td>
             <td><small class="text-muted"><%= c.domicilio_entrega %></small></td>

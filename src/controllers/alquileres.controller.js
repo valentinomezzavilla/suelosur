@@ -3,6 +3,7 @@ const AlquileresModel        = require('../models/alquileres.model')
 const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const ConfigContenedoresModel = require('../models/config_contenedores.model')
+const OperacionesModel        = require('../models/operaciones.model')
 
 const AlquileresController = {
 
@@ -84,11 +85,36 @@ const AlquileresController = {
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles,
+        recursos: OperacionesModel.obtenerRecursos(alquiler.id),
+        choferesDisp: OperacionesModel.choferesDisponibles(),
+        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar el alquiler.')
       res.redirect('/alquileres/contenedores')
+    }
+  },
+
+  editar(req, res) {
+    try {
+      const alquiler = AlquileresModel.obtener(req.params.id)
+      if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
+      if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/contenedores/${alquiler.id}`) }
+      res.render('pages/alquileres/editar', { titulo: `Editar OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
+    } catch (err) {
+      console.error(err); req.flash('error', 'Error al cargar el alquiler.'); res.redirect('/alquileres/contenedores')
+    }
+  },
+
+  actualizar(req, res) {
+    try {
+      AlquileresModel.actualizar(req.params.id, req.body)
+      req.flash('success', 'Alquiler actualizado.')
+      res.redirect(`/alquileres/contenedores/${req.params.id}`)
+    } catch (err) {
+      console.error(err); req.flash('error', err.message || 'Error al actualizar.'); res.redirect(`/alquileres/contenedores/${req.params.id}/editar`)
     }
   },
 

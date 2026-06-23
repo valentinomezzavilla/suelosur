@@ -1,15 +1,51 @@
 <main id="transacciones-page">
 
+            <%
+                const tipoCorto = { 'Venta Cantera':'Cantera', 'Venta Viaje':'Viaje', 'Alquiler':'Contenedor', 'Maquinaria':'Máquina', 'Ajuste':'Ajuste' }
+                const m = metricas || { total:0, count:0, ventas:0, alquileres:0 }
+                const money = (n) => '$' + Number(n||0).toLocaleString('es-AR')
+                const presetHref = (p) => {
+                    const o = { preset: p }
+                    if (filtros.tipo && filtros.tipo !== 'todos') o.tipo = filtros.tipo
+                    if (filtros.cliente) o.cliente = filtros.cliente
+                    return '/transacciones?' + new URLSearchParams(o).toString()
+                }
+            %>
+
             <div class="page-header">
-                <h1 class="page-title">Transacciones</h1>
+                <h1 class="page-title"><%- icon('receipt', { size: 18 }) %> Transacciones</h1>
+            </div>
+
+            <!-- Métricas del período -->
+            <div class="stat-cards">
+                <div class="stat-card stat-card--neutral">
+                    <div class="stat-card__icon"><%- icon('chart', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.total) %></span><span class="stat-card__label">Total · <%= periodoLabel %></span></div>
+                </div>
+                <div class="stat-card stat-card--info">
+                    <div class="stat-card__icon"><%- icon('clipboard', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= m.count %></span><span class="stat-card__label">Operaciones</span></div>
+                </div>
+                <div class="stat-card stat-card--success">
+                    <div class="stat-card__icon"><%- icon('box', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.ventas) %></span><span class="stat-card__label">Ventas</span></div>
+                </div>
+                <div class="stat-card stat-card--warning">
+                    <div class="stat-card__icon"><%- icon('truck', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.alquileres) %></span><span class="stat-card__label">Alquileres</span></div>
+                </div>
+            </div>
+
+            <!-- Presets de período -->
+            <div class="periodo-chips">
+                <a href="<%= presetHref('hoy') %>"    class="periodo-chip <%= filtros.preset==='hoy'    ? 'is-active' : '' %>">Hoy</a>
+                <a href="<%= presetHref('semana') %>" class="periodo-chip <%= filtros.preset==='semana' ? 'is-active' : '' %>">Esta semana</a>
+                <a href="<%= presetHref('mes') %>"    class="periodo-chip <%= filtros.preset==='mes'    ? 'is-active' : '' %>">Este mes</a>
             </div>
 
             <!-- Filtros -->
             <form method="GET" action="/transacciones" class="filtros-bar filtros-bar--extended">
-                <div class="filtro-group">
-                    <label>#ID</label>
-                    <input type="number" name="id" value="<%= filtros.id %>" placeholder="Buscar por ID..." min="1">
-                </div>
+                <input type="hidden" name="preset" value="rango">
                 <div class="filtro-group">
                     <label>Tipo</label>
                     <select name="tipo">
@@ -22,18 +58,14 @@
                     </select>
                 </div>
                 <div class="filtro-group">
-                    <label>#ID Cliente</label>
-                    <input type="number" name="idCliente" value="<%= filtros.idCliente %>"
-                        placeholder="ID del cliente...">
-                </div>
-                <div class="filtro-group">
                     <label>Cliente</label>
-                    <input type="text" name="cliente" value="<%= filtros.cliente %>"
-                        placeholder="Nombre del cliente...">
-                </div>
-                <div class="filtro-group">
-                    <label>Mes (historial)</label>
-                    <input type="month" name="mes" value="<%= filtros.mes %>">
+                    <input type="text" name="cliente" value="<%= filtros.cliente %>" list="listaClientesTx"
+                        placeholder="Buscar por nombre / apellido / DNI..." autocomplete="off">
+                    <datalist id="listaClientesTx">
+                        <% (clientesLista || []).forEach(c => { %>
+                            <option value="<%= c.nombre %> <%= c.apellido || '' %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
+                        <% }) %>
+                    </datalist>
                 </div>
                 <div class="filtro-group">
                     <label>Desde</label>
@@ -53,22 +85,14 @@
                         min="0">
                 </div>
                 <button type="submit" class="btn-primary">Filtrar</button>
-                <% if (filtros.id || filtros.tipo || filtros.idCliente || filtros.cliente || filtros.fechaDesde || filtros.fechaHasta ||
-                    filtros.montoMin || filtros.montoMax || filtros.mes) { %>
-                    <a href="/transacciones" class="btn-secondary">Limpiar</a>
-                    <% } %>
+                <a href="/transacciones" class="btn-secondary">Limpiar</a>
             </form>
-
-            <div class="total-mes-bar" style="display:flex;justify-content:flex-end;gap:0.5rem;padding:0.5rem 0;font-weight:600">
-                <span>Total <% if (filtros.mes) { %>de <%= filtros.mes %><% } else { %>filtrado<% } %>:</span>
-                <span>$<%= (totalMes || 0).toLocaleString('es-AR') %></span>
-            </div>
 
             <div class="table-wrapper">
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>#ID</th>
+                            <th>Código</th>
                             <th>Tipo</th>
                             <th>Cliente</th>
                             <th>Descripción</th>
@@ -85,12 +109,12 @@
                             <% } %>
                                 <% transacciones.forEach(t=> { %>
                                     <tr>
-                                        <td>#<%= t.id %>
+                                        <td class="fw-semibold text-orange"><%= codigoTx(t) %>
                                         </td>
                                         <td>
                                             <span
                                                 class="badge badge--tipo-<%= t.tipo.toLowerCase().replace(/ /g,'-') %>">
-                                                <%= t.tipo %>
+                                                <%= tipoCorto[t.tipo] || t.tipo %>
                                             </span>
                                         </td>
                                         <td>
@@ -100,15 +124,15 @@
                                             <%= t.descripcion %>
                                         </td>
                                         <td>
-                                            <%= t.fecha %>
+                                            <%= formatFecha(t.fecha) %>
                                         </td>
                                         <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %>
                                         </td>
                                         <td>
                                             <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
-                                                data-id="<%= t.id %>" data-tipo="<%= t.tipo %>"
+                                                data-id="<%= codigoTx(t) %>" data-tipo="<%= t.tipo %>"
                                                 data-cliente="<%= t.cliente %>" data-descripcion="<%= t.descripcion %>"
-                                                data-fecha="<%= t.fecha %>" data-monto="<%= t.monto %>"
+                                                data-fecha="<%= formatFecha(t.fecha) %>" data-monto="<%= t.monto %>"
                                                 data-metodo-pago="<%= t.metodoPago || '' %>">
                                                 Ver
                                             </button>

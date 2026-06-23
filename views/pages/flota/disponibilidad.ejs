@@ -1,0 +1,86 @@
+<%
+  const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo', en_operacion:'En operación' }
+  const sitBadge = { disponible:'badge-activo', asignado:'badge-en-transito', mantenimiento:'badge-alerta' }
+  const sitLbl = { disponible:'Disponible', asignado:'Asignado', mantenimiento:'Mant./Fuera de servicio' }
+  const grupo = (arr, s) => arr.filter(x => x.situacion === s)
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('layers', { size: 18 }) %> Disponibilidad de Flota</h4>
+  <div class="d-flex gap-2">
+    <a href="/flota" class="btn btn-sm btn-outline-secondary">← Camiones</a>
+    <a href="/maquinaria" class="btn btn-sm btn-outline-secondary">Maquinaria</a>
+  </div>
+</div>
+
+<!-- Resumen -->
+<div class="row g-3 mb-1">
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header bg-white fw-semibold"><%- icon('truck',{size:15}) %> Camiones</div>
+      <div class="card-body"><div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.camDisp %></span><span class="stat-card__label">Disponibles</span></div></div>
+        <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.camAsig %></span><span class="stat-card__label">Asignados</span></div></div>
+        <div class="stat-card stat-card--danger"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.camMant %></span><span class="stat-card__label">Mant./F. servicio</span></div></div>
+      </div></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card shadow-sm"><div class="card-header bg-white fw-semibold"><%- icon('hardhat',{size:15}) %> Maquinaria</div>
+      <div class="card-body"><div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+        <div class="stat-card stat-card--success"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.maqDisp %></span><span class="stat-card__label">Disponibles</span></div></div>
+        <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.maqAsig %></span><span class="stat-card__label">Asignadas</span></div></div>
+        <div class="stat-card stat-card--danger"><div class="stat-card__body"><span class="stat-card__value"><%= resumen.maqMant %></span><span class="stat-card__label">Mant./F. servicio</span></div></div>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Camiones -->
+<div class="card shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Camiones (<%= camiones.length %>)</div>
+  <div class="card-body p-0">
+    <% if (!camiones.length) { %><div class="p-4 text-center text-muted">Sin camiones activos.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th class="col-w-50">N°</th><th>Camión</th><th>Estado</th><th>Situación</th><th>Chofer</th><th></th></tr></thead>
+      <tbody>
+        <% camiones.forEach(v => { %>
+        <tr>
+          <td class="fw-semibold text-orange">#<%= v.numero_interno || '—' %></td>
+          <td class="fw-semibold"><%= v.patente || v.nombre %> <% if(v.marca||v.modelo){ %><small class="text-muted d-block"><%= [v.marca,v.modelo].filter(Boolean).join(' ') %></small><% } %></td>
+          <td><small class="text-muted"><%= estadoLbl[v.estado_operativo] || v.estado_operativo %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= sitBadge[v.situacion] %>"><%= sitLbl[v.situacion] %></span></td>
+          <td><small class="<%= v.chofer_nombre ? '' : 'text-muted' %>"><%= v.chofer_nombre && v.chofer_nombre.trim() ? v.chofer_nombre : '—' %></small></td>
+          <td class="text-end"><a href="/flota/<%= v.id %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
+
+<!-- Maquinaria -->
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold">Maquinaria (<%= maquinas.length %>)</div>
+  <div class="card-body p-0">
+    <% if (!maquinas.length) { %><div class="p-4 text-center text-muted">Sin maquinaria activa.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th class="col-w-50">N°</th><th>Máquina</th><th>Estado</th><th>Situación</th><th>Operador</th><th></th></tr></thead>
+      <tbody>
+        <% maquinas.forEach(m => { %>
+        <tr>
+          <td class="fw-semibold text-orange">#<%= m.numero_interno || '—' %></td>
+          <td class="fw-semibold"><%= m.nombre %> <small class="text-muted d-block"><%= [m.tipo,m.marca,m.modelo].filter(Boolean).join(' ') %></small></td>
+          <td><small class="text-muted"><%= estadoLbl[m.estado_operativo] || m.estado_operativo %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= sitBadge[m.situacion] %>"><%= sitLbl[m.situacion] %></span></td>
+          <td><small class="<%= m.chofer_nombre ? '' : 'text-muted' %>"><%= m.chofer_nombre && m.chofer_nombre.trim() ? m.chofer_nombre : '—' %></small></td>
+          <td class="text-end"><a href="/maquinaria/<%= m.id %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

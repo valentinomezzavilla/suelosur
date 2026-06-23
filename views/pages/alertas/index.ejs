@@ -1,0 +1,99 @@
+<%
+  const sevBadge = { vencido:'badge-alerta', critico:'badge-alerta', alto:'badge-en-transito', medio:'badge-pendiente' }
+  const sevLbl = { vencido:'Vencido', critico:'Crítico', alto:'Alto', medio:'Medio' }
+  const moduloLbl = { choferes:'Choferes', flota:'Flota' }
+  const qs = new URLSearchParams(Object.entries(filtros).filter(([,v])=>v)).toString()
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('alert', { size: 18 }) %> Centro de Alertas</h4>
+  <div class="d-flex gap-2">
+    <a href="/alertas/export?<%= qs %>" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('printer',{size:15}) %> PDF</a>
+    <a href="/alertas/export?formato=excel&<%= qs %>" class="btn btn-sm btn-outline-secondary">Excel</a>
+  </div>
+</div>
+
+<div class="stat-cards stat-cards--5">
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon"><%- icon('alert',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.vencido %></span><span class="stat-card__label">Vencidas</span></div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon"><%- icon('clock',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.critico %></span><span class="stat-card__label">Críticas (≤30d)</span></div></div>
+  <div class="stat-card stat-card--warning"><div class="stat-card__icon"><%- icon('clock',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.alto %></span><span class="stat-card__label">Altas (≤60d)</span></div></div>
+  <div class="stat-card stat-card--neutral"><div class="stat-card__icon"><%- icon('clock',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.medio %></span><span class="stat-card__label">Medias (≤90d)</span></div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__icon"><%- icon('chart',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.total %></span><span class="stat-card__label">Total</span></div></div>
+</div>
+
+<form method="GET" action="/alertas" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Módulo</label>
+        <select name="modulo" class="form-select form-select-sm"><option value="">Todos</option>
+          <option value="choferes" <%= filtros.modulo==='choferes'?'selected':'' %>>Choferes</option>
+          <option value="flota" <%= filtros.modulo==='flota'?'selected':'' %>>Flota</option></select></div>
+      <div class="col-md-3"><label class="form-label">Severidad</label>
+        <select name="severidad" class="form-select form-select-sm"><option value="">Todas</option>
+          <% ['vencido','critico','alto','medio'].forEach(s => { %><option value="<%= s %>" <%= filtros.severidad===s?'selected':'' %>><%= sevLbl[s] %></option><% }) %></select></div>
+      <div class="col-md-3"><label class="form-label">Tipo</label>
+        <input name="tipo" value="<%= filtros.tipo || '' %>" class="form-control form-control-sm" placeholder="licencia, documento, seguro..."></div>
+      <div class="col-auto">
+        <button class="btn btn-sm btn-naranja">Filtrar</button>
+        <% if (qs) { %><a href="/alertas" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm mb-4">
+  <div class="card-body p-0">
+    <% if (!alertas.length) { %>
+      <div class="p-5 text-center text-muted">Sin alertas activas. 🎉</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Severidad</th><th>Módulo</th><th>Tipo</th><th>Entidad</th><th>Vence</th><th></th></tr></thead>
+      <tbody>
+        <% alertas.forEach(a => { %>
+        <tr>
+          <td><span class="badge rounded-pill px-3 <%= sevBadge[a.severidad] %>"><%= sevLbl[a.severidad] %></span></td>
+          <td><small class="text-muted"><%= moduloLbl[a.modulo] %></small></td>
+          <td class="fw-semibold"><%= a.titulo %></td>
+          <td><%= a.entidad_nombre %></td>
+          <td><small class="text-muted"><%= a.fecha ? formatFecha(a.fecha) + (a.dias!=null ? ' ('+a.dias+'d)' : '') : (a.km_restante!=null ? a.km_restante+' km' : '—') %></small></td>
+          <td class="text-end"><a href="<%= a.link %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
+
+<!-- Configuración de notificaciones (email diferido) -->
+<div class="card shadow-sm">
+  <div class="card-header bg-white fw-semibold">Configuración de notificaciones</div>
+  <div class="card-body">
+    <form action="/alertas/config" method="POST">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="emailActivo" name="email_activo" value="1" <%= config.email_activo==='1'?'checked':'' %>>
+            <label class="form-check-label" for="emailActivo">Enviar alertas por email</label>
+          </div>
+          <small class="text-muted">Requiere configurar SMTP (diferido).</small>
+        </div>
+        <div class="col-md-5"><label class="form-label">Destinatarios (separados por coma)</label>
+          <input name="email_destinatarios" class="form-control form-control-sm" value="<%= config.email_destinatarios || '' %>" placeholder="dueno@suelosur.com, admin@..."></div>
+        <div class="col-md-4"><label class="form-label">Umbrales de aviso (días)</label>
+          <input name="umbral_dias" class="form-control form-control-sm" value="<%= config.umbral_dias || '90,60,30' %>"></div>
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-auto"><div class="form-check"><input type="checkbox" class="form-check-input" id="al" name="alertas_licencias" value="1" <%= config.alertas_licencias==='1'?'checked':'' %>><label class="form-check-label" for="al">Licencias</label></div></div>
+        <div class="col-auto"><div class="form-check"><input type="checkbox" class="form-check-input" id="ad" name="alertas_documentos" value="1" <%= config.alertas_documentos==='1'?'checked':'' %>><label class="form-check-label" for="ad">Documentos</label></div></div>
+        <div class="col-auto"><div class="form-check"><input type="checkbox" class="form-check-input" id="am" name="alertas_mantenimiento" value="1" <%= config.alertas_mantenimiento==='1'?'checked':'' %>><label class="form-check-label" for="am">Mantenimiento</label></div></div>
+      </div>
+      <button class="btn btn-sm btn-naranja mt-3">Guardar configuración</button>
+    </form>
+  </div>
+</div>
