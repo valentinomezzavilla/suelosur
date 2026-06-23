@@ -145,12 +145,47 @@ document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('clienteSeleccionado', actualizarResumen)
   document.addEventListener('clienteDeseleccionado', actualizarResumen)
 
+  // Prevenir submit con Enter (solo confirmar con el botón)
+  form.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
+      e.preventDefault()
+    }
+  })
+
   // validacion al submit
   form.addEventListener('submit', (e) => {
+    // Solo aceptar submits originados por el botón Confirmar
+    if (!e.submitter || !e.submitter.classList.contains('btn-finalizar')) {
+      e.preventDefault()
+      return
+    }
+
     const clienteId = document.getElementById('inputClienteId')?.value
     if (!clienteId) {
       alert('Buscá y seleccioná un cliente antes de confirmar.')
       e.preventDefault()
+      return
+    }
+
+    // Validar campos obligatorios
+    const campos = [
+      { id: 'calle', nombre: 'Calle' },
+      { id: 'selectMaquinaria', nombre: 'Maquinaria' },
+    ]
+    const faltantes = campos.filter(c => !document.getElementById(c.id)?.value.trim())
+    if (faltantes.length) {
+      e.preventDefault()
+      alert('Completá los campos obligatorios: ' + faltantes.map(c => c.nombre).join(', '))
+      const primero = document.getElementById(faltantes[0].id)
+      if (primero) primero.focus()
+      return
+    }
+
+    // Validar que precio > 0
+    const total = Number(inputTotal.value) || 0
+    if (total <= 0) {
+      e.preventDefault()
+      alert('El precio total debe ser mayor a 0. Verificá la modalidad, las horas/días y el precio.')
       return
     }
   })

@@ -1,5 +1,6 @@
 <%
   const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo' }
+  const dedicLbl = { ambos:'Ventas y contenedores', ventas:'Ventas (material/viajes)', contenedores:'Alquiler de contenedores' }
 %>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> <%= titulo %></h4>
@@ -32,6 +33,13 @@
           <select name="estado_operativo" class="form-select">
             <% estados.forEach(e => { %><option value="<%= e %>" <%= vehiculo?.estado_operativo===e?'selected':'' %>><%= estadoLbl[e] %></option><% }) %>
           </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Dedicación</label>
+          <select name="dedicacion" class="form-select">
+            <% dedicaciones.forEach(d => { %><option value="<%= d %>" <%= (vehiculo?.dedicacion||'ambos')===d?'selected':'' %>><%= dedicLbl[d] %></option><% }) %>
+          </select>
+          <p class="form-text mb-0">¿A qué se destina este camión?</p>
         </div>
         <div class="col-md-4"><label class="form-label">Último mantenimiento</label><input type="date" name="fecha_ultimo_mant" class="form-control" value="<%= vehiculo?.fecha_ultimo_mant || '' %>"></div>
         <div class="col-md-4"><label class="form-label">Próximo mantenimiento</label><input type="date" name="fecha_proximo_mant" class="form-control" value="<%= vehiculo?.fecha_proximo_mant || '' %>"></div>

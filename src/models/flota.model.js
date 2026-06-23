@@ -6,11 +6,12 @@ const db = require('../config/db')
 const CAMPOS = [
   'tipo_vehiculo', 'patente', 'nombre', 'numero_interno', 'marca', 'modelo', 'anio',
   'nro_chasis', 'nro_motor', 'tipo_unidad', 'capacidad_carga', 'kilometraje', 'estado_operativo',
-  'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
+  'dedicacion', 'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
 ]
 const NUMERICOS = new Set(['anio', 'capacidad_carga', 'kilometraje', 'numero_interno'])
 
 const ESTADOS = ['activo', 'disponible', 'en_viaje', 'en_mantenimiento', 'fuera_servicio', 'inactivo']
+const DEDICACIONES = ['ambos', 'ventas', 'contenedores']
 
 function normalizar(datos) {
   const out = {}
@@ -21,11 +22,13 @@ function normalizar(datos) {
   }
   if (!out.tipo_vehiculo) out.tipo_vehiculo = 'camion'
   if (!out.estado_operativo) out.estado_operativo = 'disponible'
+  if (!out.dedicacion) out.dedicacion = 'ambos'
   return out
 }
 
 const FlotaModel = {
   ESTADOS,
+  DEDICACIONES,
 
   listar({ q, estado, tipo, marca, chofer } = {}) {
     const wheres = ['1=1']

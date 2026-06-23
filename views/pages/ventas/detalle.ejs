@@ -15,6 +15,9 @@
       <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">🖨️ Remito</a>
       <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary">📄 PDF</a>
     <% } %>
+    <% if (op.modalidad === 'flete' && op.estado !== 'entregado' && op.estado !== 'anulado') { %>
+      <a href="/ventas/<%= op.id %>/editar" class="btn btn-sm btn-naranja">✏️ Editar</a>
+    <% } %>
     <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
 </div>

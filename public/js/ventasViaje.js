@@ -89,6 +89,59 @@ document.addEventListener('DOMContentLoaded', () => {
     opFinalizar?.addEventListener('change', () => { hiddenFinalizar.value = 'true'; });
     opProgramar?.addEventListener('change', () => { hiddenFinalizar.value = 'false'; });
 
+    // ── Auto-completar chofer ↔ camión según asignación ────────
+    const selectChofer = document.getElementById('selectChofer');
+    const selectCamion = document.getElementById('selectCamion');
+    const msgAsignacion = document.getElementById('msgAsignacion');
+    let autoFillInProgress = false;
+
+    function mostrarMsgAsig(texto) {
+        if (!msgAsignacion) return;
+        msgAsignacion.textContent = texto;
+        msgAsignacion.style.display = texto ? 'block' : 'none';
+        if (texto) setTimeout(() => { msgAsignacion.style.display = 'none'; }, 5000);
+    }
+
+    selectCamion?.addEventListener('change', async () => {
+        if (autoFillInProgress) return;
+        const idCamion = selectCamion.value;
+        if (!idCamion) return;
+        try {
+            const resp = await fetch(`/ventas/api/chofer-de-camion/${encodeURIComponent(idCamion)}`);
+            const data = await resp.json();
+            if (data && data.id && selectChofer) {
+                // Solo auto-completar si la opción existe
+                const opt = Array.from(selectChofer.options).find(o => o.value === data.id);
+                if (opt) {
+                    autoFillInProgress = true;
+                    selectChofer.value = data.id;
+                    autoFillInProgress = false;
+                    mostrarMsgAsig(`✓ Chofer ${data.nombre} (asignado a este camión)`);
+                }
+            }
+        } catch (err) { console.error(err); }
+    });
+
+    selectChofer?.addEventListener('change', async () => {
+        if (autoFillInProgress) return;
+        const idChofer = selectChofer.value;
+        if (!idChofer) return;
+        try {
+            const resp = await fetch(`/ventas/api/camion-de-chofer/${encodeURIComponent(idChofer)}`);
+            const data = await resp.json();
+            if (data && data.id && selectCamion) {
+                const opt = Array.from(selectCamion.options).find(o => o.value === data.id);
+                if (opt) {
+                    autoFillInProgress = true;
+                    selectCamion.value = data.id;
+                    autoFillInProgress = false;
+                    const label = [data.numero_interno ? '#' + data.numero_interno : null, data.patente, data.nombre].filter(Boolean).join(' · ');
+                    mostrarMsgAsig(`✓ Camión ${label} (asignado a este chofer)`);
+                }
+            }
+        } catch (err) { console.error(err); }
+    });
+
     // mapa (Leaflet / OSM via MapService)
     const mapaContainerId = 'mapaViajeLeaflet';
     if (btnBuscar) {
@@ -108,8 +161,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // prevenir submit con Enter (solo confirmar con el botón)
+    const formViaje = document.getElementById('formViaje');
+    if (formViaje) {
+        formViaje.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
+                e.preventDefault();
+            }
+        });
+    }
+
     // validacion al enviar
-    document.getElementById('formViaje')?.addEventListener('submit', (e) => {
+    formViaje?.addEventListener('submit', (e) => {
+        // solo aceptar submits originados por un botón
+        if (!e.submitter || e.submitter.type !== 'submit') {
+            e.preventDefault();
+            return;
+        }
         const campos = ['#productoViaje', '#cantidadViaje', '#fechaViaje', '#calleViaje'];
 
         const clienteId = document.getElementById('inputClienteId')?.value;

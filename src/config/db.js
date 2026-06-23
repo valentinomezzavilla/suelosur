@@ -881,6 +881,9 @@ const migrations = [
 
   // ── Circuitos — chofer como empleado (además del id_chofer→users heredado) ─
   `ALTER TABLE circuitos ADD COLUMN id_empleado TEXT`,
+
+  // ── Flota — dedicación del camión (ventas / contenedores / ambos) ─
+  `ALTER TABLE flota_vehiculos ADD COLUMN dedicacion TEXT DEFAULT 'ambos'`,
 ]
 
 for (const sql of migrations) {

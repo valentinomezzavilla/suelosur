@@ -1,6 +1,27 @@
 'use strict'
-const UsuariosModel = require('../models/usuarios.model')
-const paginar       = require('../utils/paginar')
+const UsuariosModel  = require('../models/usuarios.model')
+const EmpleadosModel = require('../models/empleados.model')
+const db             = require('../config/db')
+const paginar        = require('../utils/paginar')
+
+// Crea un empleado-chofer asociado a un usuario si todavía no existe.
+function crearEmpleadoChoferSiNoExiste(idUsuario, datosUsuario) {
+  if (!idUsuario) return
+  const existe = db.prepare(`SELECT id FROM empleados WHERE id_usuario = ?`).get(idUsuario)
+  if (existe) return existe.id
+  // Separar nombre / apellido si vino en formato "Nombre Apellido"
+  const partes = (datosUsuario.nombre || '').trim().split(/\s+/)
+  const nombre = partes[0] || datosUsuario.usuario || 'Chofer'
+  const apellido = partes.slice(1).join(' ') || ''
+  return EmpleadosModel.crear({
+    nombre, apellido,
+    es_chofer: 'true',
+    cargo: 'Chofer',
+    sector: 'Operaciones',
+    id_usuario: idUsuario,
+    estado_laboral: 'activo',
+  })
+}
 
 const UsuariosController = {
   index(req, res) {
@@ -24,8 +45,18 @@ const UsuariosController = {
       if (!usuario || !nombre || !rol || !password) { req.flash('error', 'Todos los campos son obligatorios.'); return res.redirect('/usuarios/nuevo') }
       if (password !== password_confirm) { req.flash('error', 'Las contraseñas no coinciden.'); return res.redirect('/usuarios/nuevo') }
       if (UsuariosModel.existeUsuario(usuario)) { req.flash('error', `El usuario "${usuario}" ya existe.`); return res.redirect('/usuarios/nuevo') }
-      UsuariosModel.crear({ usuario, nombre, rol, password })
-      req.flash('success', `Usuario ${nombre} creado.`)
+      const idUsuario = UsuariosModel.crear({ usuario, nombre, rol, password })
+      if (rol === 'chofer') {
+        try {
+          crearEmpleadoChoferSiNoExiste(idUsuario, { usuario, nombre })
+          req.flash('success', `Usuario ${nombre} creado y registrado como chofer.`)
+        } catch (e) {
+          console.error('No se pudo crear el empleado-chofer:', e)
+          req.flash('success', `Usuario ${nombre} creado (registro de chofer falló — completalo manualmente).`)
+        }
+      } else {
+        req.flash('success', `Usuario ${nombre} creado.`)
+      }
       res.redirect('/usuarios')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/usuarios/nuevo')
@@ -48,6 +79,10 @@ const UsuariosController = {
       if (password && password !== password_confirm) { req.flash('error', 'Las contraseñas no coinciden.'); return res.redirect(`/usuarios/${id}/editar`) }
       if (UsuariosModel.existeUsuario(usuario, id)) { req.flash('error', `El usuario "${usuario}" ya está en uso.`); return res.redirect(`/usuarios/${id}/editar`) }
       UsuariosModel.actualizar(id, { usuario, nombre, rol, password: password || null })
+      // Si pasó a ser chofer, crear empleado-chofer si no existe
+      if (rol === 'chofer') {
+        try { crearEmpleadoChoferSiNoExiste(id, { usuario, nombre }) } catch (e) { console.error('crear chofer auto:', e) }
+      }
       req.flash('success', 'Usuario actualizado.')
       res.redirect('/usuarios')
     } catch (err) {

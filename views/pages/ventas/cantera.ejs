@@ -7,6 +7,9 @@
                     <a href="/ventas" class="back-link">← Ventas</a>
                     <h2 class="ventas-productos__title">Venta en Cantera</h2>
                 </div>
+                <button type="button" id="cartToggle" class="cart-toggle btn-primary">
+                    🛒 <span>Carrito</span> <span id="cartCount" class="cart-count">0</span>
+                </button>
             </div>
             <ul class="ventas-lista-productos">
                 <% productos.forEach(p => { %>
@@ -42,6 +45,7 @@
 
         <!-- Carrito -->
         <aside id="carrito" class="carrito-aside">
+            <button type="button" id="cartClose" class="cart-close" aria-label="Cerrar carrito">✕</button>
             <h3 class="carrito-title">Carrito</h3>
             <div id="cartItemsContainer"></div>
             <div id="cartTotal" class="cart-total-bar" style="display:none">
@@ -79,6 +83,8 @@
                 <button type="button" id="btnLimpiarCarrito" class="btn-secondary">Limpiar carrito</button>
             </div>
         </aside>
+
+        <div id="cartBackdrop" class="cart-backdrop"></div>
 
     </main>
 

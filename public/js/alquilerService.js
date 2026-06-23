@@ -214,11 +214,42 @@ if (checkPorFinalizar) {
     });
 }
 
+// ── Prevenir submit con Enter (solo confirmar con el botón) ────
+const formAlquiler = document.getElementById('formNuevoAlquiler');
+if (formAlquiler) {
+    formAlquiler.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
+            e.preventDefault();
+        }
+    });
+}
+
 // ── Validación al enviar ──────────────────────────────────────
-document.getElementById('formNuevoAlquiler')?.addEventListener('submit', (e) => {
+formAlquiler?.addEventListener('submit', (e) => {
+    // Solo aceptar submits originados por el botón "Confirmar"
+    if (!e.submitter || !e.submitter.classList.contains('btn-finalizar')) {
+        e.preventDefault();
+        return;
+    }
     if (!contenedorSeleccionado) { e.preventDefault(); alert('Seleccioná un contenedor.'); return; }
     const clienteId = document.getElementById('inputClienteId')?.value;
     if (!clienteId) { e.preventDefault(); alert('Buscá y seleccioná un cliente antes de confirmar.'); return; }
+
+    // Validar campos obligatorios manualmente
+    const campos = [
+        { id: 'fechaInicio', nombre: 'Fecha de inicio' },
+        { id: 'fechaFin',    nombre: 'Fecha de fin' },
+        { id: 'calle',       nombre: 'Calle' },
+        { id: 'numero',      nombre: 'Número' },
+    ];
+    const faltantes = campos.filter(c => !document.getElementById(c.id)?.value.trim());
+    if (faltantes.length) {
+        e.preventDefault();
+        alert('Completá los campos obligatorios: ' + faltantes.map(c => c.nombre).join(', '));
+        const primero = document.getElementById(faltantes[0].id);
+        if (primero) primero.focus();
+        return;
+    }
     if (typeof validarFormulario === 'function' &&
         !validarFormulario(e.target, ['#fechaInicio', '#fechaFin', '#calle', '#numero'])) {
         e.preventDefault();

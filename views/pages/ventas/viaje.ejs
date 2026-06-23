@@ -55,6 +55,35 @@
                     </div>
                 </div>
 
+                <!-- Asignación de chofer y camión -->
+                <div class="form-section">
+                    <h3 class="form-section__title">Asignación (opcional)</h3>
+                    <p class="form-hint">Al elegir uno, el otro se autocompleta si hay asignación previa.</p>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="selectChofer">Chofer</label>
+                            <select name="idChofer" id="selectChofer">
+                                <option value="">— Sin asignar —</option>
+                                <% (typeof choferes !== 'undefined' ? choferes : []).forEach(ch => { %>
+                                    <option value="<%= ch.id %>"><%= ch.nombre %> <%= ch.apellido || '' %></option>
+                                <% }) %>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="selectCamion">Camión</label>
+                            <select name="idCamion" id="selectCamion">
+                                <option value="">— Sin asignar —</option>
+                                <% (typeof camiones !== 'undefined' ? camiones : []).forEach(c => { %>
+                                    <option value="<%= c.id %>">
+                                        <%= c.numero_interno ? '#' + c.numero_interno + ' · ' : '' %><%= c.patente || '' %> <%= c.nombre ? '· ' + c.nombre : '' %>
+                                    </option>
+                                <% }) %>
+                            </select>
+                        </div>
+                    </div>
+                    <p id="msgAsignacion" class="form-hint" style="display:none;color:var(--accent)"></p>
+                </div>
+
                 <!-- Descripcion -->
                 <div class="form-section">
                     <h3 class="form-section__title">Descripcion (opcional)</h3>

@@ -105,9 +105,81 @@
   flex-direction: column;
   gap: 0.85rem;
 
+  // Mobile: panel deslizable desde la derecha (off-canvas)
   @include md-down {
-    position: static;
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(90%, 360px);
+    height: 100vh;
     max-height: none;
+    border-radius: 0;
+    border: none;
+    border-left: 1px solid $border;
+    transform: translateX(100%);
+    transition: transform 0.25s ease;
+    z-index: 1050;
+    box-shadow: -6px 0 18px rgba(0, 0, 0, 0.22);
+
+    &.is-open { transform: translateX(0); }
+  }
+}
+
+// Botón "Carrito" (solo mobile)
+.cart-toggle {
+  display: none;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+
+  @include md-down { display: inline-flex; }
+}
+
+.cart-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+
+  &--has { background: $accent-dark; }
+}
+
+// Botón cerrar dentro del panel (solo mobile)
+.cart-close {
+  @include reset-button;
+  display: none;
+  position: absolute;
+  top: 0.6rem;
+  right: 0.75rem;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: $muted;
+
+  @include md-down { display: block; }
+
+  &:hover { color: $dark; }
+}
+
+// Fondo oscuro del panel (solo mobile)
+.cart-backdrop {
+  display: none;
+
+  @include md-down {
+    &.is-open {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 1040;
+    }
   }
 }
 

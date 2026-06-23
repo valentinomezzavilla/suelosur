@@ -1,6 +1,7 @@
 <%
-  const badge = { pendiente:'badge-pendiente', despachado:'badge-en-transito' }
-  const lbl = { pendiente:'Pendiente', despachado:'En tránsito' }
+  const faseBadge = { por_iniciar:'badge-pendiente', en_curso:'badge-en-transito', en_servicio:'badge-activo' }
+  const pendientes = tareas.filter(t => t.fase !== 'en_servicio')
+  const enServicio = tareas.filter(t => t.fase === 'en_servicio')
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -8,40 +9,96 @@
     <h4 class="fw-bold mb-0 text-dark-title"><%- icon('map', { size: 18 }) %> Mi ruta del día</h4>
     <% if (empleado) { %><small class="text-muted"><%= empleado.nombre %> <%= empleado.apellido %></small><% } %>
   </div>
-  <span class="badge rounded-pill px-3 badge-activo"><%= paradas.length %> parada(s)</span>
+  <span class="badge rounded-pill px-3 badge-activo"><%= pendientes.length %> tarea(s)</span>
 </div>
 
 <% if (!empleado) { %>
   <div class="card shadow-sm"><div class="card-body text-center py-5">
     <div style="font-size:2rem">🪪</div>
     <p class="fw-semibold mb-1">Tu usuario no está vinculado a un empleado</p>
-    <p class="text-muted small mb-0">Pedile al administrador que vincule tu cuenta con tu legajo para ver tus rutas asignadas.</p>
-  </div></div>
-<% } else if (!paradas.length) { %>
-  <div class="card shadow-sm"><div class="card-body text-center py-5">
-    <div style="font-size:2rem">✅</div>
-    <p class="fw-semibold mb-1">No tenés operaciones asignadas pendientes</p>
-    <p class="text-muted small mb-0">Cuando te asignen entregas o retiros, van a aparecer acá.</p>
+    <p class="text-muted small mb-0">Pedile al administrador que vincule tu cuenta con tu legajo para ver tus tareas.</p>
   </div></div>
 <% } else { %>
-  <div class="d-flex flex-column gap-2">
-    <% paradas.forEach((p, i) => { %>
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <div>
-            <span class="badge rounded-pill px-3 <%= badge[p.estado] || 'badge-pendiente' %>"><%= lbl[p.estado] || p.estado %></span>
-            <span class="badge rounded-pill px-3 badge-rol ms-1"><%= p.tipoLabel %></span>
-            <span class="fw-bold ms-2">OP-<%= String(p.nro_op).padStart(4,'0') %></span>
+
+  <% if (hayEnCurso) { %>
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
+      <span style="font-size:1.2rem">⏳</span>
+      <span>Tenés una <strong>tarea en curso</strong>. Finalizala antes de iniciar otra.</span>
+    </div>
+  <% } %>
+
+  <!-- Tareas accionables -->
+  <% if (!pendientes.length) { %>
+    <div class="card shadow-sm mb-3"><div class="card-body text-center py-5">
+      <div style="font-size:2rem">✅</div>
+      <p class="fw-semibold mb-1">No tenés tareas pendientes</p>
+      <p class="text-muted small mb-0">Cuando te asignen viajes o contenedores, van a aparecer acá.</p>
+    </div></div>
+  <% } else { %>
+    <div class="d-flex flex-column gap-2 mb-3">
+      <% pendientes.forEach(t => { %>
+      <div class="card shadow-sm <%= t.fase==='en_curso' ? 'border-start border-4 border-warning' : '' %>">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <span style="font-size:1.1rem"><%= t.icono %></span>
+              <span class="fw-bold ms-1"><%= t.titulo %></span>
+              <span class="badge rounded-pill px-3 <%= faseBadge[t.fase] %> ms-2"><%= t.detalleFase %></span>
+              <span class="text-muted ms-2">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
+            </div>
+            <% if (t.fecha) { %><small class="text-muted"><%- icon('clock',{size:13}) %> <%= formatFecha(t.fecha) %></small><% } %>
           </div>
-          <% if (p.fecha_entrega_planificada) { %><small class="text-muted"><%- icon('clock', {size:13}) %> <%= formatFecha(p.fecha_entrega_planificada) %></small><% } %>
+
+          <p class="fw-semibold mb-1 mt-2"><%= t.cliente %><% if (t.tel) { %> <small class="text-muted">· <%= t.tel %></small><% } %></p>
+          <p class="mb-1">📍 <%= t.domicilio || 'Domicilio a coordinar' %></p>
+          <% if (t.contenedor) { %><p class="text-muted small mb-1">Contenedor N° <%= t.contenedor %></p><% } %>
+          <% if (t.camion) { %><p class="text-muted small mb-1">🚚 <%= t.camion %></p><% } %>
+          <% if (t.sinContenedor) { %><p class="text-danger small mb-1">⚠️ Sin contenedor asignado todavía.</p><% } %>
+          <% if (t.observaciones) { %><p class="text-muted small mb-1"><%= t.observaciones %></p><% } %>
+
+          <div class="mt-2">
+            <% if (t.fase === 'en_curso') { %>
+              <form action="/hoja-de-ruta/<%= t.id %>/finalizar" method="POST" class="d-inline"
+                    onsubmit="return confirm('¿Confirmás: <%= t.accionFinalizar %>?')">
+                <button class="btn btn-success"><%- icon('check',{size:15}) %> <%= t.accionFinalizar %></button>
+              </form>
+            <% } else if (t.bloqueada) { %>
+              <button class="btn btn-outline-secondary" disabled title="Finalizá la tarea en curso primero"><%= t.accionIniciar %></button>
+              <small class="text-muted ms-2">Bloqueada — hay una tarea en curso</small>
+            <% } else { %>
+              <form action="/hoja-de-ruta/<%= t.id %>/iniciar" method="POST" class="d-inline">
+                <button class="btn btn-naranja" <%= t.sinContenedor ? 'disabled' : '' %>><%= t.accionIniciar %></button>
+              </form>
+            <% } %>
+          </div>
         </div>
-        <p class="fw-semibold mb-1 mt-2"><%= p.cliente_nombre %><% if (p.tel_whatsapp) { %> <small class="text-muted">· <%= p.tel_whatsapp %></small><% } %></p>
-        <p class="mb-1">📍 <%= p.domicilio || 'Domicilio a coordinar' %></p>
-        <% if (p.camion_patente || p.camion_nombre) { %><p class="text-muted small mb-1">🚚 <%= [p.camion_nombre, p.camion_patente].filter(Boolean).join(' · ') %></p><% } %>
-        <% if (p.observaciones) { %><p class="text-muted small mb-0"><%= p.observaciones %></p><% } %>
+      </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- Contenedores en alquiler (en domicilio, todavía no toca retirar) -->
+  <% if (enServicio.length) { %>
+    <div class="card shadow-sm">
+      <div class="card-header bg-white fw-semibold">Contenedores en alquiler (en domicilio)</div>
+      <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th>OP</th><th>Cliente</th><th>Contenedor</th><th>Domicilio</th><th>Vence</th><th class="text-center">Días rest.</th></tr></thead>
+          <tbody>
+            <% enServicio.forEach(t => { %>
+            <tr>
+              <td class="fw-semibold">OP-<%= String(t.nro_op).padStart(4,'0') %></td>
+              <td><%= t.cliente %></td>
+              <td><%= t.contenedor ? 'N° '+t.contenedor : '—' %></td>
+              <td><small class="text-muted"><%= t.domicilio || '—' %></small></td>
+              <td><%= t.fin ? formatFecha(t.fin) : '—' %></td>
+              <td class="text-center"><%= t.diasRestantes != null ? t.diasRestantes + 'd' : '—' %></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
       </div>
     </div>
-    <% }) %>
-  </div>
+  <% } %>
+
 <% } %>

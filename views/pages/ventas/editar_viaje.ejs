@@ -2,12 +2,12 @@
 
         <div class="page-header">
             <div>
-                <a href="/ventas/viaje/detalle/<%= viaje.id %>" class="back-link">← Detalle viaje</a>
-                <h1 class="page-title">Editar viaje #<%= viaje.id %></h1>
+                <a href="/ventas/<%= viaje.id %>" class="back-link">← Detalle viaje</a>
+                <h1 class="page-title">Editar OP-<%= String(viaje.nro_op).padStart(4, '0') %></h1>
             </div>
         </div>
 
-        <form action="/ventas/viaje/editar/<%= viaje.id %>" method="POST" class="viaje-form-layout">
+        <form action="/ventas/<%= viaje.id %>/editar" method="POST" class="viaje-form-layout">
 
             <div class="viaje-form-main">
 
@@ -104,7 +104,7 @@
 
                 <div style="display:flex; gap:0.5rem">
                     <button type="submit" class="btn-primary-green">Guardar cambios</button>
-                    <a href="/ventas/viaje/detalle/<%= viaje.id %>" class="btn-secondary">Cancelar</a>
+                    <a href="/ventas/<%= viaje.id %>" class="btn-secondary">Cancelar</a>
                 </div>
             </aside>
 

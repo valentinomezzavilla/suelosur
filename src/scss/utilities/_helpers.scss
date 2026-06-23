@@ -1,4 +1,5 @@
 @use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
 
 // ── Colores ────────────────────────────────────────────────────
 .text-orange      { color: $accent      !important; }
@@ -52,6 +53,45 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 // ── Bordes ─────────────────────────────────────────────────────
 .border-divider { border-top: 1px solid #eee; }
 .border-sidebar { border-color: $dark-2 !important; }
+
+// Permite que un hijo flex se encoja (clave para que las tablas no desborden)
+.min-w-0 { min-width: 0; }
+
+// ═══════════════════════════════════════════════════════════════
+// Responsive / Mobile
+// ═══════════════════════════════════════════════════════════════
+@include md-down {
+  // Navbar fija para que el botón de menú esté siempre accesible
+  .app-navbar { position: sticky; top: 0; z-index: 90; }
+
+  // Tablas: scroll horizontal dentro de su contenedor (sin romper el layout)
+  .card-body.p-0,
+  .card-modern-body,
+  .table-responsive,
+  .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  // Métricas: máximo 2 columnas en mobile (aunque tengan grid inline)
+  .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+
+  // Encabezados de página: que envuelvan título + acciones
+  .page-header,
+  .d-flex.justify-content-between.align-items-center { flex-wrap: wrap; gap: 0.5rem; }
+}
+
+@include sm-down {
+  // Tablas un poco más compactas en pantallas chicas
+  .table { font-size: 0.84rem; }
+  .table thead th,
+  .table tbody td,
+  .data-table thead th,
+  .data-table tbody td { padding-left: 0.5rem; padding-right: 0.5rem; }
+
+  // Botones de acción a lo ancho en headers que envuelven
+  .page-header .d-flex.gap-2 { width: 100%; }
+
+  // Métricas a 1 columna sólo en lo más angosto si vienen muy apretadas
+  .stat-cards.stat-cards--5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+}
 
 // ── Pestañas de contenido (nav-tabs) — alto contraste ─────────
 .nav-tabs {

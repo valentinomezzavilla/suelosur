@@ -42,7 +42,7 @@ const OperacionesModel = {
   // Camiones operativos para asignar
   camionesDisponibles() {
     return db.prepare(`
-      SELECT id, nombre, patente, marca, modelo, estado_operativo FROM flota_vehiculos
+      SELECT id, nombre, patente, marca, modelo, estado_operativo, dedicacion FROM flota_vehiculos
       WHERE activo = 1 AND estado_operativo NOT IN ('inactivo','fuera_servicio')
       ORDER BY nombre
     `).all()

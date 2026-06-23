@@ -73,6 +73,7 @@ app.use('/choferes',      require('./routes/choferes.routes'))
 app.use('/flota',         require('./routes/flota.routes'))
 app.use('/alertas',       require('./routes/alertas.routes'))
 app.use('/operaciones',   require('./routes/operaciones.routes'))
+app.use('/hoja-de-ruta',  require('./routes/hojaRuta.routes'))
 app.use('/circuitos',     require('./routes/circuitos.routes'))
 
 // ── Placeholders (módulos futuros) ───────────────────────────────
@@ -82,7 +83,6 @@ const placeholder = (titulo, icono, sprint) => (req, res) =>
 app.get('/dashboard',   auth, roles('dueno'), require('./controllers/dashboard.controller').index)
 app.get('/cobranzas',   auth, roles('admin_contable','dueno'), (req, res) => res.redirect('/clientes/cuentas'))
 app.get('/facturacion', auth, roles('admin_contable','dueno'), placeholder('Facturación', '🧾', 6))
-app.get('/hoja-de-ruta',auth, roles('chofer','admin_ventas','dueno'), require('./controllers/hojaRuta.controller').index)
 
 // ── Ruta raíz ────────────────────────────────────────────────────
 app.get('/', (req, res) => {

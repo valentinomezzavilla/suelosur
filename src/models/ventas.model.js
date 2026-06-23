@@ -144,6 +144,73 @@ const VentasModel = {
     return { id, nro_op: nro, nro_remito: nro_rem }
   },
 
+  // Actualiza datos editables de un viaje (estado != entregado/anulado).
+  // Ajusta el stock pendiente si cambió la cantidad pedida.
+  actualizarViaje(id, datos) {
+    const op = db.prepare(`SELECT estado, modalidad FROM op_encabezado WHERE id = ?`).get(id)
+    if (!op) throw new Error('Orden no encontrada.')
+    if (op.estado === 'entregado') throw new Error('No se puede editar una venta ya entregada.')
+    if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
+
+    const calle  = datos.calle || null
+    const numero = datos.numero ? parseInt(datos.numero) : null
+    const fecha  = datos.fecha || null
+    const metodoPago = datos.metodoPago || null
+    const observaciones = datos.descripcion || ''
+
+    db.transaction(() => {
+      db.prepare(`
+        UPDATE op_encabezado
+        SET fecha_entrega_planificada = ?, domicilio_calle = ?, domicilio_altura = ?,
+            domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
+            observaciones = ?
+        WHERE id = ?
+      `).run(fecha, calle, numero, numero ? 0 : 1, metodoPago, observaciones, id)
+
+      // Actualizar único detalle (cantidad/precio) si corresponde
+      const detalle = db.prepare(`SELECT id, id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`).get(id)
+      if (detalle) {
+        const nuevaCant = Number(datos.cantidad) || detalle.cantidad_pedida
+        const nuevoPrecio = Number(datos.precioProducto) || 0
+        const delta = nuevaCant - detalle.cantidad_pedida
+        db.prepare(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ? WHERE id = ?`)
+          .run(nuevaCant, nuevoPrecio, detalle.id)
+        if (delta !== 0) {
+          db.prepare(`UPDATE stock SET cant_pendiente_entregar = MAX(0, cant_pendiente_entregar + ?) WHERE id_producto = ?`)
+            .run(delta, detalle.id_producto)
+        }
+      }
+    })()
+  },
+
+  // Adapta una OP a la forma que esperan las vistas viaje/edit/detalle
+  obtenerViaje(id) {
+    const op = this.obtener(id)
+    if (!op) return null
+    const detalle = (op.detalles && op.detalles[0]) || {}
+    const flete = 0
+    const subtotal = (detalle.cantidad_pedida || 0) * (detalle.precio_unitario || 0)
+    return {
+      id: op.id,
+      nro_op: op.nro_op,
+      estado: op.estado,
+      modalidad: op.modalidad,
+      clienteNombre: op.cliente_nombre,
+      telefono: op.tel_whatsapp || '',
+      fecha: op.fecha_entrega_planificada || '',
+      hora: '',
+      calle: op.domicilio_calle || '',
+      numero: op.domicilio_altura || '',
+      productoNombre: detalle.producto_nombre || '',
+      cantidad: detalle.cantidad_pedida || 1,
+      precioProducto: detalle.precio_unitario || 0,
+      precioFlete: flete,
+      precioTotal: subtotal,
+      metodoPago: op.metodo_pago || 'efectivo',
+      descripcion: op.observaciones || '',
+    }
+  },
+
   despachar(id) {
     db.prepare(`UPDATE op_encabezado SET estado = 'despachado' WHERE id = ? AND estado = 'pendiente'`).run(id)
   },

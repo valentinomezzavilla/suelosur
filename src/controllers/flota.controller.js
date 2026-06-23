@@ -56,7 +56,7 @@ const FlotaController = {
   },
 
   nuevo(req, res) {
-    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS })
+    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES })
   },
 
   crear(req, res) {
@@ -99,7 +99,7 @@ const FlotaController = {
   editar(req, res) {
     const vehiculo = FlotaModel.obtener(req.params.id)
     if (!vehiculo) { req.flash('error', 'No encontrado.'); return res.redirect('/flota') }
-    res.render('pages/flota/form', { titulo: 'Editar Camión', vehiculo, estados: FlotaModel.ESTADOS })
+    res.render('pages/flota/form', { titulo: 'Editar Camión', vehiculo, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES })
   },
 
   actualizar(req, res) {

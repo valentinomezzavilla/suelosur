@@ -3,6 +3,8 @@ const VentasModel       = require('../models/ventas.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel     = require('../models/clientes.model')
 const OperacionesModel  = require('../models/operaciones.model')
+const AsignacionesModel = require('../models/asignaciones.model')
+const db                = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const VentasController = {
@@ -124,9 +126,22 @@ const VentasController = {
       const productos  = VentasModel.listarProductos()
       const viajesHoy  = VentasModel.listarViajesPendientesHoy()
       const viajesTodos = VentasModel.listarViajesPendientes()
+      const choferes = db.prepare(`
+        SELECT e.id, e.nombre, e.apellido FROM empleados e
+        WHERE e.es_chofer = 1 AND e.activo = 1
+        ORDER BY e.apellido, e.nombre
+      `).all()
+      const camiones = db.prepare(`
+        SELECT v.id, v.numero_interno, v.patente, v.nombre, v.marca, v.modelo
+        FROM flota_vehiculos v
+        WHERE v.activo = 1
+          AND COALESCE(v.estado_operativo, 'disponible') NOT IN ('en_mantenimiento','fuera_servicio','inactivo')
+          AND COALESCE(v.dedicacion, 'ambos') IN ('ambos','ventas')
+        ORDER BY v.numero_interno, v.nombre
+      `).all()
       res.render('pages/ventas/viaje', {
         titulo: 'Venta con Viaje',
-        productos, viajesHoy, viajesTodos,
+        productos, viajesHoy, viajesTodos, choferes, camiones,
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/ventasViaje.js'],
       })
     } catch (err) {
@@ -136,12 +151,37 @@ const VentasController = {
     }
   },
 
+  // ── API: asignación chofer ↔ camión ────────────────────────────
+  // Dado un id de camión, devuelve el chofer que lo tiene asignado (si hay)
+  apiChoferDeCamion(req, res) {
+    try {
+      const chofer = AsignacionesModel.choferDeRecurso('camion', req.params.idCamion)
+      if (!chofer) return res.json(null)
+      return res.json({
+        id: chofer.id_empleado,
+        nombre: `${chofer.nombre} ${chofer.apellido || ''}`.trim(),
+        legajo: chofer.legajo,
+      })
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Error' }) }
+  },
+
+  // Dado un id de empleado/chofer, devuelve el camión que tiene asignado (si hay)
+  apiCamionDeChofer(req, res) {
+    try {
+      const asig = AsignacionesModel.recursoActivo(req.params.idChofer, 'camion')
+      if (!asig) return res.json(null)
+      const camion = db.prepare(`SELECT id, numero_interno, patente, nombre, marca, modelo FROM flota_vehiculos WHERE id = ?`).get(asig.recurso_id)
+      return res.json(camion || null)
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Error' }) }
+  },
+
   crearViaje(req, res) {
     try {
       const {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
         productoId, cantidad, precioProducto, precioFlete, precioTotal,
         metodoPago, descripcion, finalizarAhora,
+        idChofer, idCamion,
       } = req.body
 
       const cantidadNum = Number(cantidad) || 1
@@ -166,6 +206,17 @@ const VentasController = {
           precio_unitario: Number(precioProducto) || 0,
         }],
       })
+
+      // Asignar chofer y camión si se seleccionaron
+      if (idChofer || idCamion) {
+        try {
+          OperacionesModel.asignar(id_op, {
+            id_chofer: idChofer || null,
+            id_camion: idCamion || null,
+            usuario: req.session.user.id,
+          })
+        } catch (e) { console.error('asignar chofer/camion:', e) }
+      }
 
       if (esFinalizarAhora) {
         VentasModel.entregar(id_op)
@@ -213,6 +264,40 @@ const VentasController = {
       console.error(err)
       req.flash('error', 'Error al cargar la orden.')
       res.redirect('/ventas')
+    }
+  },
+
+  // ── Edición de viaje en proceso ───────────────────────────────
+  editarViaje(req, res) {
+    try {
+      const viaje = VentasModel.obtenerViaje(req.params.id)
+      if (!viaje) { req.flash('error', 'Viaje no encontrado.'); return res.redirect('/ventas') }
+      if (viaje.estado === 'entregado' || viaje.estado === 'anulado') {
+        req.flash('error', 'Solo se pueden editar viajes pendientes o despachados.')
+        return res.redirect(`/ventas/${req.params.id}`)
+      }
+      res.render('pages/ventas/editar_viaje', {
+        titulo: `Editar OP-${String(viaje.nro_op).padStart(4,'0')}`,
+        viaje,
+        calle: viaje.calle,
+        numero: viaje.numero,
+      })
+    } catch (err) {
+      console.error(err)
+      req.flash('error', 'Error al cargar el viaje para editar.')
+      res.redirect('/ventas')
+    }
+  },
+
+  actualizarViaje(req, res) {
+    try {
+      VentasModel.actualizarViaje(req.params.id, req.body)
+      req.flash('success', 'Viaje actualizado.')
+      res.redirect(`/ventas/${req.params.id}`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al actualizar.')
+      res.redirect(`/ventas/${req.params.id}/editar`)
     }
   },
 

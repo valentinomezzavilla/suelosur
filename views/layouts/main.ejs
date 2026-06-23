@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-AR">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,7 +11,8 @@
 <body>
   <div class="app-wrapper">
     <%- include('../partials/sidebar') %>
-    <div class="flex-grow-1 d-flex flex-column">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <div class="flex-grow-1 d-flex flex-column min-w-0">
       <%- include('../partials/navbar') %>
       <main class="main-content">
         <%- include('../partials/alerts') %>

@@ -13,8 +13,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const busquedaWrapper = document.getElementById('busquedaClienteWrapper');
     const checkPrecio    = document.getElementById('checkPrecioEditable');
     const inputPrecio    = document.getElementById('precioEditableInput');
+    // Panel de carrito (mobile)
+    const aside          = document.getElementById('carrito');
+    const cartToggle     = document.getElementById('cartToggle');
+    const cartClose      = document.getElementById('cartClose');
+    const cartBackdrop   = document.getElementById('cartBackdrop');
+    const cartCount      = document.getElementById('cartCount');
+
+    const abrirCarrito  = () => { aside && aside.classList.add('is-open'); cartBackdrop && cartBackdrop.classList.add('is-open'); document.body.style.overflow = 'hidden'; };
+    const cerrarCarrito = () => { aside && aside.classList.remove('is-open'); cartBackdrop && cartBackdrop.classList.remove('is-open'); document.body.style.overflow = ''; };
+    if (cartToggle)   cartToggle.addEventListener('click', abrirCarrito);
+    if (cartClose)    cartClose.addEventListener('click', cerrarCarrito);
+    if (cartBackdrop) cartBackdrop.addEventListener('click', cerrarCarrito);
 
     let carrito = [];
+
+    function actualizarContador() {
+        if (!cartCount) return;
+        const n = carrito.reduce((a, p) => a + p.cantidad, 0);
+        cartCount.textContent = n;
+        cartCount.classList.toggle('cart-count--has', n > 0);
+    }
 
     function calcularTotal() {
         return carrito.reduce((acc, p) => acc + p.precio * p.cantidad, 0);
@@ -22,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderCarrito() {
         container.innerHTML = '';
+        actualizarContador();
 
         if (carrito.length === 0) {
             container.innerHTML = '<div class="cart_empty">No hay items en el carrito</div>';
