@@ -4,14 +4,29 @@ const fs   = require('fs')
 const RemitosModel = require('../models/remitos.model')
 const { generarRemitoPDF } = require('../utils/pdfRemito')
 const { DIR_REMITOS } = require('../middlewares/upload')
+const { query } = require('../config/db')
+
+// Si el usuario es chofer, verificar que la op esté asignada a él.
+// Devuelve true si tiene permiso, false si no.
+async function choferTieneAcceso(req, opId) {
+  if (req.session.user?.rol !== 'chofer') return true
+  const emp = (await query(`SELECT id FROM empleados WHERE id_usuario = ? AND activo = 1`, [req.session.user.id])).rows[0]
+  if (!emp) return false
+  const op = (await query(`SELECT id_chofer FROM op_encabezado WHERE id = ?`, [opId])).rows[0]
+  return op && op.id_chofer === emp.id
+}
 
 const RemitosController = {
 
   // Remito en PDF (server-side, pdfkit)
   async pdf(req, res) {
     try {
+      if (!(await choferTieneAcceso(req, req.params.id))) {
+        req.flash('error', 'No tenés permiso para ver este remito.')
+        return res.redirect('/hoja-de-ruta')
+      }
       const r = await RemitosModel.obtener(req.params.id)
-      if (!r) { req.flash('error', 'Operación no encontrada.'); return res.redirect('/ventas') }
+      if (!r) { req.flash('error', 'Operación no encontrada.'); return res.redirect('back') }
       generarRemitoPDF(res, r)
     } catch (err) {
       console.error(err)
@@ -43,6 +58,10 @@ const RemitosController = {
   // Ver / descargar el remito firmado (archivo fuera de /public → auth)
   async verFirmado(req, res) {
     try {
+      if (!(await choferTieneAcceso(req, req.params.id))) {
+        req.flash('error', 'No tenés permiso para ver este remito firmado.')
+        return res.redirect('/hoja-de-ruta')
+      }
       const r = await RemitosModel.obtener(req.params.id)
       if (!r || !r.archivo_remito) { req.flash('error', 'No hay remito firmado adjunto.'); return res.redirect('back') }
       const file = path.join(DIR_REMITOS, r.archivo_remito)

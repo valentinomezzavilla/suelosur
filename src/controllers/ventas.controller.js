@@ -352,12 +352,25 @@ const VentasController = {
   async remito(req, res) {
     try {
       const op = await VentasModel.obtener(req.params.id)
-      if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
+      if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('back') }
+
+      // Si es chofer, solo puede ver remitos de operaciones asignadas a él
+      if (req.session.user?.rol === 'chofer') {
+        const emp = (await query(
+          `SELECT id FROM empleados WHERE id_usuario = ? AND activo = 1`,
+          [req.session.user.id]
+        )).rows[0]
+        if (!emp || op.id_chofer !== emp.id) {
+          req.flash('error', 'No tenés permiso para ver este remito.')
+          return res.redirect('/hoja-de-ruta')
+        }
+      }
+
       res.render('pages/ventas/remito', { titulo: `Remito OP-${String(op.nro_op).padStart(4,'0')}`, layout: false, op })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al generar el remito.')
-      res.redirect(`/ventas/${req.params.id}`)
+      res.redirect('back')
     }
   },
 
