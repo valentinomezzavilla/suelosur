@@ -8,10 +8,10 @@ const setEsChofer = (body) => { body.es_chofer = (body.cargo === 'Chofer') ? 'tr
 
 const EmpleadosController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { q, page } = req.query
-      const todos = EmpleadosModel.buscar({ q })
+      const todos = await EmpleadosModel.buscar({ q })
       const { items: empleados, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
       res.render('pages/empleados/index', {
         titulo: 'Flota de Personal', empleados, total, page: pag, limit, totalPaginas,
@@ -22,20 +22,20 @@ const EmpleadosController = {
     }
   },
 
-  nuevo(req, res) {
+  async nuevo(req, res) {
     res.render('pages/empleados/form', {
       titulo: 'Nuevo Empleado', empleado: null,
-      usuarios: EmpleadosModel.usuariosVinculables(),
+      usuarios: await EmpleadosModel.usuariosVinculables(),
     })
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       const { nombre, dni } = req.body
       if (!nombre || !nombre.trim()) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/empleados/nuevo') }
-      if (dni && EmpleadosModel.dniEnUso(dni)) { req.flash('error', `Ya existe un empleado con DNI ${dni}.`); return res.redirect('/empleados/nuevo') }
+      if (dni && await EmpleadosModel.dniEnUso(dni)) { req.flash('error', `Ya existe un empleado con DNI ${dni}.`); return res.redirect('/empleados/nuevo') }
       setEsChofer(req.body)
-      EmpleadosModel.crear(req.body)
+      await EmpleadosModel.crear(req.body)
       req.flash('success', `Empleado ${nombre} creado.`)
       res.redirect('/empleados')
     } catch (err) {
@@ -43,45 +43,45 @@ const EmpleadosController = {
     }
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const empleado = EmpleadosModel.obtener(req.params.id)
+      const empleado = await EmpleadosModel.obtener(req.params.id)
       if (!empleado) { req.flash('error', 'Empleado no encontrado.'); return res.redirect('/empleados') }
       res.render('pages/empleados/detalle', {
         titulo: `${empleado.nombre} ${empleado.apellido || ''}`.trim(), empleado,
-        asignacionesActivas: AsignacionesModel.activas(empleado.id),
-        asignacionesHist: AsignacionesModel.historialEmpleado(empleado.id),
-        camionesDisp: AsignacionesModel.camionesDisponibles(),
-        maquinasDisp: AsignacionesModel.maquinasDisponibles(),
+        asignacionesActivas: await AsignacionesModel.activas(empleado.id),
+        asignacionesHist: await AsignacionesModel.historialEmpleado(empleado.id),
+        camionesDisp: await AsignacionesModel.camionesDisponibles(),
+        maquinasDisp: await AsignacionesModel.maquinasDisponibles(),
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/empleados')
     }
   },
 
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const empleado = EmpleadosModel.obtener(req.params.id)
+      const empleado = await EmpleadosModel.obtener(req.params.id)
       if (!empleado) { req.flash('error', 'Empleado no encontrado.'); return res.redirect('/empleados') }
       res.render('pages/empleados/form', {
         titulo: 'Editar Empleado', empleado,
-        usuarios: EmpleadosModel.usuariosVinculables(empleado.id),
+        usuarios: await EmpleadosModel.usuariosVinculables(empleado.id),
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/empleados')
     }
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
       const id = req.params.id
       const { nombre, dni } = req.body
       if (!nombre || !nombre.trim()) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/empleados/${id}/editar`) }
-      if (dni && EmpleadosModel.dniEnUso(dni, id)) { req.flash('error', `Ya existe otro empleado con DNI ${dni}.`); return res.redirect(`/empleados/${id}/editar`) }
+      if (dni && await EmpleadosModel.dniEnUso(dni, id)) { req.flash('error', `Ya existe otro empleado con DNI ${dni}.`); return res.redirect(`/empleados/${id}/editar`) }
       setEsChofer(req.body)
-      EmpleadosModel.actualizar(id, req.body)
+      await EmpleadosModel.actualizar(id, req.body)
       // Si dejó de ser chofer, liberar sus asignaciones
-      if (req.body.es_chofer !== 'true') AsignacionesModel.liberarEmpleado(id)
+      if (req.body.es_chofer !== 'true') await AsignacionesModel.liberarEmpleado(id)
       req.flash('success', 'Empleado actualizado.')
       res.redirect(`/empleados/${id}`)
     } catch (err) {
@@ -89,12 +89,12 @@ const EmpleadosController = {
     }
   },
 
-  toggleActivo(req, res) {
+  async toggleActivo(req, res) {
     try {
-      const emp = EmpleadosModel.obtener(req.params.id)
-      EmpleadosModel.toggleActivo(req.params.id)
+      const emp = await EmpleadosModel.obtener(req.params.id)
+      await EmpleadosModel.toggleActivo(req.params.id)
       // Al desactivar, liberar las asignaciones de recursos
-      if (emp && emp.activo) AsignacionesModel.liberarEmpleado(req.params.id)
+      if (emp && emp.activo) await AsignacionesModel.liberarEmpleado(req.params.id)
       req.flash('success', 'Estado del empleado actualizado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -103,10 +103,10 @@ const EmpleadosController = {
   },
 
   // ── Asignación de recursos (camión / máquina) ─────────────────
-  asignarRecurso(req, res) {
+  async asignarRecurso(req, res) {
     const back = `/empleados/${req.params.id}`
     try {
-      AsignacionesModel.asignar({
+      await AsignacionesModel.asignar({
         id_empleado: req.params.id,
         recurso_tipo: req.body.recurso_tipo,
         recurso_id: req.body.recurso_id,
@@ -119,8 +119,8 @@ const EmpleadosController = {
     res.redirect(back)
   },
 
-  finalizarAsignacion(req, res) {
-    try { AsignacionesModel.finalizar(req.params.asigId); req.flash('success', 'Asignación liberada.') }
+  async finalizarAsignacion(req, res) {
+    try { await AsignacionesModel.finalizar(req.params.asigId); req.flash('success', 'Asignación liberada.') }
     catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(`/empleados/${req.params.id}`)
   },

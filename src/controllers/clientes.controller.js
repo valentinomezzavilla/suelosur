@@ -6,13 +6,13 @@ const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const ClientesController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { nombre, dni, id, q, page } = req.query
       let todos
-      if (q && q.trim())                todos = ClientesModel.buscarLive(q, 500)
-      else if (nombre || dni || id)     todos = ClientesModel.buscar({ id, nombre, dni })
-      else                              todos = ClientesModel.listar()
+      if (q && q.trim())                todos = await ClientesModel.buscarLive(q, 500)
+      else if (nombre || dni || id)     todos = await ClientesModel.buscar({ id, nombre, dni })
+      else                              todos = await ClientesModel.listar()
       const { items: clientes, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
       res.render('pages/clientes/index', {
         titulo: 'Clientes', clientes, total, page: pag, limit, totalPaginas,
@@ -24,15 +24,17 @@ const ClientesController = {
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────
-  cuentas(req, res) {
+  async cuentas(req, res) {
     try {
-      const conCuenta = ClientesModel.listarCuentas().map(c => ({
+      const cuentasRaw = await ClientesModel.listarCuentas()
+      const conCuenta = await Promise.all(cuentasRaw.map(async c => ({
         ...c,
         telefono: c.telefono || c.tel_whatsapp,
         saldo: c.saldo ?? 0,
-        movimientos: ClientesModel.movimientos(c.id),
-      }))
-      const sinCuenta = ClientesModel.sinCuenta().map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
+        movimientos: await ClientesModel.movimientos(c.id),
+      })))
+      const sinCuentaRaw = await ClientesModel.sinCuenta()
+      const sinCuenta = sinCuentaRaw.map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
       res.render('pages/clientes/cuentas', {
         titulo: 'Cuentas corrientes', conCuenta, sinCuenta, scripts: ['/js/modalAbonar.js'],
       })
@@ -41,14 +43,14 @@ const ClientesController = {
     }
   },
 
-  cuentaDetalle(req, res) {
+  async cuentaDetalle(req, res) {
     try {
-      const cli = ClientesModel.obtener(req.params.id)
+      const cli = await ClientesModel.obtener(req.params.id)
       if (!cli) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes/cuentas') }
       const periodo = resolverPeriodo({
         preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
       })
-      const estado = ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
+      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
@@ -62,14 +64,14 @@ const ClientesController = {
     }
   },
 
-  cuentaPdf(req, res) {
+  async cuentaPdf(req, res) {
     try {
-      const cli = ClientesModel.obtener(req.params.id)
+      const cli = await ClientesModel.obtener(req.params.id)
       if (!cli) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes/cuentas') }
       const periodo = resolverPeriodo({
         preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
       })
-      const estado = ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
+      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
       const { generarEstadoCuentaPDF } = require('../utils/pdfEstadoCuenta')
       generarEstadoCuentaPDF(res, { cliente: cli, estado, periodoLabel: etiquetaPeriodo(periodo) })
     } catch (err) {
@@ -77,7 +79,7 @@ const ClientesController = {
     }
   },
 
-  registrarMovimiento(req, res) {
+  async registrarMovimiento(req, res) {
     const back = `/clientes/cuentas/${req.params.id}`
     try {
       const { clase, monto, descripcion, signo } = req.body
@@ -87,7 +89,7 @@ const ClientesController = {
       if (clase === 'pago')       { tipo = 'pago';   signed =  m; desc = descripcion || 'Pago / abono de deuda' }
       else if (clase === 'cargo') { tipo = 'deuda';  signed = -m; desc = descripcion || 'Cargo manual' }
       else                        { tipo = 'ajuste'; signed = (signo === 'neg' ? -m : m); desc = descripcion || 'Ajuste de saldo' }
-      ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed })
+      await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed })
       req.flash('success', 'Movimiento registrado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error al registrar el movimiento.')
@@ -95,9 +97,9 @@ const ClientesController = {
     res.redirect(back)
   },
 
-  deshabilitarCuenta(req, res) {
+  async deshabilitarCuenta(req, res) {
     try {
-      ClientesModel.deshabilitarCuenta(req.params.id)
+      await ClientesModel.deshabilitarCuenta(req.params.id)
       req.flash('success', 'Cuenta corriente deshabilitada.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -105,15 +107,15 @@ const ClientesController = {
     res.redirect('back')
   },
 
-  nuevo(req, res) {
+  async nuevo(req, res) {
     res.render('pages/clientes/form', { titulo: 'Nuevo Cliente', cliente: null })
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       const { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuentaCorriente } = req.body
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/clientes/nuevo') }
-      ClientesModel.crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
+      await ClientesModel.crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
       req.flash('success', 'Cliente creado.')
       res.redirect('/clientes')
     } catch (err) {
@@ -121,13 +123,13 @@ const ClientesController = {
     }
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const cli = ClientesModel.obtener(req.params.id)
+      const cli = await ClientesModel.obtener(req.params.id)
       if (!cli) { req.flash('error', 'No encontrado.'); return res.redirect('/clientes') }
       const cliente = { ...cli, cuentaCorriente: !!cli.cuenta_corriente, telefono: cli.telefono || cli.tel_whatsapp, direccion: cli.domicilio_ppal, saldo: cli.saldo ?? 0 }
-      const movimientos   = ClientesModel.movimientos(cliente.id)
-      const transacciones = TransaccionesModel.filtrar({ clienteId: cliente.id, limit: 1000 }).rows
+      const movimientos   = await ClientesModel.movimientos(cliente.id)
+      const transacciones = (await TransaccionesModel.filtrar({ clienteId: cliente.id, limit: 1000 })).rows
       const alquileres    = []
       const deudasCC      = transacciones
         .filter(t => t.metodo_pago === 'cuenta_corriente')
@@ -138,9 +140,9 @@ const ClientesController = {
     }
   },
 
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const cliente = ClientesModel.obtener(req.params.id)
+      const cliente = await ClientesModel.obtener(req.params.id)
       if (!cliente) { req.flash('error', 'No encontrado.'); return res.redirect('/clientes') }
       res.render('pages/clientes/form', { titulo: 'Editar Cliente', cliente })
     } catch (err) {
@@ -148,11 +150,11 @@ const ClientesController = {
     }
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
       const { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuentaCorriente } = req.body
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/clientes/${req.params.id}/editar`) }
-      ClientesModel.actualizar(req.params.id, { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
+      await ClientesModel.actualizar(req.params.id, { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
       req.flash('success', 'Cliente actualizado.')
       res.redirect('/clientes')
     } catch (err) {
@@ -160,9 +162,9 @@ const ClientesController = {
     }
   },
 
-  toggleActivo(req, res) {
+  async toggleActivo(req, res) {
     try {
-      ClientesModel.toggleActivo(req.params.id)
+      await ClientesModel.toggleActivo(req.params.id)
       req.flash('success', 'Estado actualizado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -170,11 +172,11 @@ const ClientesController = {
     res.redirect('/clientes')
   },
 
-  eliminar(req, res) {
+  async eliminar(req, res) {
     try {
-      const chk = ClientesModel.puedeEliminar(req.params.id)
+      const chk = await ClientesModel.puedeEliminar(req.params.id)
       if (!chk.ok) { req.flash('error', `No se puede eliminar: ${chk.motivo}`); return res.redirect('back') }
-      ClientesModel.eliminar(req.params.id)
+      await ClientesModel.eliminar(req.params.id)
       req.flash('success', 'Cliente eliminado (baja lógica). Se conserva el historial.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error al eliminar el cliente.')
@@ -182,9 +184,9 @@ const ClientesController = {
     res.redirect('/clientes')
   },
 
-  habilitarCuenta(req, res) {
+  async habilitarCuenta(req, res) {
     try {
-      ClientesModel.habilitarCuenta(req.params.id)
+      await ClientesModel.habilitarCuenta(req.params.id)
       req.flash('success', 'Cuenta corriente habilitada.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -192,11 +194,11 @@ const ClientesController = {
     res.redirect('/clientes')
   },
 
-  abonar(req, res) {
+  async abonar(req, res) {
     try {
       const monto = Number(req.body.monto)
       if (!monto || monto <= 0) { req.flash('error', 'Monto inválido.'); return res.redirect('/clientes') }
-      ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion: 'Pago / abono de deuda', monto })
+      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion: 'Pago / abono de deuda', monto })
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -205,12 +207,12 @@ const ClientesController = {
   },
 
   // API JSON para buscar clientes desde el front (buscarCliente.js)
-  buscarApi(req, res) {
+  async buscarApi(req, res) {
     try {
       const { id, dni, nombre, q } = req.query
       let resultados
-      if (q && q.trim())            resultados = ClientesModel.buscarLive(q)
-      else if (id || dni || nombre) resultados = ClientesModel.buscar({ id, dni, nombre })
+      if (q && q.trim())            resultados = await ClientesModel.buscarLive(q)
+      else if (id || dni || nombre) resultados = await ClientesModel.buscar({ id, dni, nombre })
       else return res.json([])
       res.json(resultados.map(c => ({
         id: c.id, numero: c.numero, nombre: c.nombre, apellido: c.apellido || '',
@@ -223,12 +225,12 @@ const ClientesController = {
     }
   },
 
-  crearApi(req, res) {
+  async crearApi(req, res) {
     try {
       const { nombre, apellido, dni, telefono, email } = req.body
       if (!nombre || !apellido || !telefono) return res.status(400).json({ error: 'Nombre, apellido y teléfono son obligatorios.' })
-      const id    = ClientesModel.crear({ nombre, apellido, dni, telefono, email })
-      const nuevo = ClientesModel.obtener(id)
+      const id    = await ClientesModel.crear({ nombre, apellido, dni, telefono, email })
+      const nuevo = await ClientesModel.obtener(id)
       res.json({
         id: nuevo.id, numero: nuevo.numero, nombre: nuevo.nombre, apellido: nuevo.apellido || '',
         nombreCompleto: ClientesModel.nombreCompleto(nuevo),

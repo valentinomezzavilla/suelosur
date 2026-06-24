@@ -1,56 +1,56 @@
 'use strict'
 // Proveedores — CRUD + búsqueda inteligente (razón social / CUIT).
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const ProveedoresModel = {
   // Solo activos (para selectores). Para el listado admin usar listarTodos.
-  listar() {
-    return db.prepare(`SELECT * FROM proveedores WHERE activo = 1 ORDER BY nombre`).all()
+  async listar() {
+    return (await query(`SELECT * FROM proveedores WHERE activo = 1 ORDER BY nombre`)).rows
   },
 
-  listarTodos({ q } = {}) {
+  async listarTodos({ q } = {}) {
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      return db.prepare(`SELECT * FROM proveedores WHERE nombre LIKE ? OR cuit LIKE ? OR email LIKE ? ORDER BY activo DESC, nombre`).all(term, term, term)
+      return (await query(`SELECT * FROM proveedores WHERE nombre LIKE ? OR cuit LIKE ? OR email LIKE ? ORDER BY activo DESC, nombre`, [term, term, term])).rows
     }
-    return db.prepare(`SELECT * FROM proveedores ORDER BY activo DESC, nombre`).all()
+    return (await query(`SELECT * FROM proveedores ORDER BY activo DESC, nombre`)).rows
   },
 
-  obtener(id) {
-    return db.prepare(`SELECT * FROM proveedores WHERE id = ?`).get(id)
+  async obtener(id) {
+    return (await query(`SELECT * FROM proveedores WHERE id = ?`, [id])).rows[0]
   },
 
-  crear({ nombre, cuit, domicilio, telefono, email }) {
+  async crear({ nombre, cuit, domicilio, telefono, email }) {
     const id = crypto.randomUUID()
-    db.prepare(`INSERT INTO proveedores (id, nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(id, nombre, cuit || null, domicilio || null, telefono || null, email || null)
+    await query(`INSERT INTO proveedores (id, nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, nombre, cuit || null, domicilio || null, telefono || null, email || null])
     return id
   },
 
-  actualizar(id, { nombre, cuit, domicilio, telefono, email }) {
-    db.prepare(`UPDATE proveedores SET nombre = ?, cuit = ?, domicilio = ?, telefono = ?, email = ? WHERE id = ?`)
-      .run(nombre, cuit || null, domicilio || null, telefono || null, email || null, id)
+  async actualizar(id, { nombre, cuit, domicilio, telefono, email }) {
+    await query(`UPDATE proveedores SET nombre = ?, cuit = ?, domicilio = ?, telefono = ?, email = ? WHERE id = ?`,
+      [nombre, cuit || null, domicilio || null, telefono || null, email || null, id])
   },
 
-  toggleActivo(id) {
-    db.prepare(`UPDATE proveedores SET activo = NOT activo WHERE id = ?`).run(id)
+  async toggleActivo(id) {
+    await query(`UPDATE proveedores SET activo = 1 - activo WHERE id = ?`, [id])
   },
 
   // Cantidad de ingresos de stock asociados (para mostrar trazabilidad)
-  contarIngresos(id) {
-    return db.prepare(`SELECT COUNT(*) AS n FROM stock_ingresos WHERE id_proveedor = ?`).get(id).n
+  async contarIngresos(id) {
+    return (await query(`SELECT COUNT(*) AS n FROM stock_ingresos WHERE id_proveedor = ?`, [id])).rows[0]?.n || 0
   },
 
-  buscarLive(q, limit = 8) {
+  async buscarLive(q, limit = 8) {
     const s = String(q || '').trim()
     if (!s) return []
     const term = `%${s}%`
-    return db.prepare(`
+    return (await query(`
       SELECT * FROM proveedores
       WHERE activo = 1 AND (nombre LIKE ? OR cuit LIKE ?)
       ORDER BY nombre LIMIT ?
-    `).all(term, term, limit)
+    `, [term, term, limit])).rows
   },
 }
 

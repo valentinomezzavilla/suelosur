@@ -2,10 +2,10 @@
 const ConfigContenedoresModel = require('../models/config_contenedores.model')
 
 const ConfigContenedoresController = {
-  index(req, res) {
+  async index(req, res) {
     try {
-      const config = ConfigContenedoresModel.obtenerTodos()
-      const precios = ConfigContenedoresModel.obtenerPrecios()
+      const config = await ConfigContenedoresModel.obtenerTodos()
+      const precios = await ConfigContenedoresModel.obtenerPrecios()
       res.render('pages/contenedores/configuracion', {
         titulo: 'Configuración — Contenedores',
         config, precios,
@@ -17,10 +17,10 @@ const ConfigContenedoresController = {
     }
   },
 
-  guardar(req, res) {
+  async guardar(req, res) {
     try {
       const { precio_dia, precio_alquiler, plazo_minimo, plazo_maximo, costo_extra_dia, tiempo_entre_alquileres } = req.body
-      ConfigContenedoresModel.guardar({
+      await ConfigContenedoresModel.guardar({
         precio_dia: precio_dia || '30000',
         precio_alquiler: precio_alquiler || '250000',
         plazo_minimo: plazo_minimo || '4',

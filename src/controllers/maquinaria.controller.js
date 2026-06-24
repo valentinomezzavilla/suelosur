@@ -3,25 +3,25 @@ const MaquinariaModel = require('../models/maquinaria.model')
 
 const MaquinariaController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { estado_paso, estado_general } = req.query
-      const maquinas = MaquinariaModel.listar({ estado_paso, estado_general })
-      const resumen  = MaquinariaModel.resumenPorEstado()
+      const maquinas = await MaquinariaModel.listar({ estado_paso, estado_general })
+      const resumen  = await MaquinariaModel.resumenPorEstado()
       res.render('pages/maquinaria/index', { titulo: 'Maquinaria', maquinas, resumen, filtros: req.query })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('back')
     }
   },
 
-  nuevo(req, res) {
+  async nuevo(req, res) {
     res.render('pages/maquinaria/form', { titulo: 'Nueva Maquinaria', maquina: null, estadosOp: MaquinariaModel.ESTADOS_OP })
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       if (!req.body.nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/maquinaria/nuevo') }
-      MaquinariaModel.crear(req.body)
+      await MaquinariaModel.crear(req.body)
       req.flash('success', `Maquinaria "${req.body.nombre}" creada.`)
       res.redirect('/maquinaria')
     } catch (err) {
@@ -29,9 +29,9 @@ const MaquinariaController = {
     }
   },
 
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const maquina = MaquinariaModel.obtener(req.params.id)
+      const maquina = await MaquinariaModel.obtener(req.params.id)
       if (!maquina) { req.flash('error', 'No encontrada.'); return res.redirect('/maquinaria') }
       res.render('pages/maquinaria/form', { titulo: 'Editar Maquinaria', maquina, estadosOp: MaquinariaModel.ESTADOS_OP })
     } catch (err) {
@@ -39,9 +39,9 @@ const MaquinariaController = {
     }
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
-      MaquinariaModel.actualizar(req.params.id, req.body)
+      await MaquinariaModel.actualizar(req.params.id, req.body)
       req.flash('success', 'Maquinaria actualizada.')
       res.redirect(`/maquinaria/${req.params.id}`)
     } catch (err) {
@@ -49,9 +49,9 @@ const MaquinariaController = {
     }
   },
 
-  toggleActivo(req, res) {
+  async toggleActivo(req, res) {
     try {
-      MaquinariaModel.toggleActivo(req.params.id)
+      await MaquinariaModel.toggleActivo(req.params.id)
       req.flash('success', 'Estado actualizado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
@@ -59,23 +59,23 @@ const MaquinariaController = {
     res.redirect('/maquinaria')
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const maquina = MaquinariaModel.obtener(req.params.id)
+      const maquina = await MaquinariaModel.obtener(req.params.id)
       if (!maquina) { req.flash('error', 'No encontrada.'); return res.redirect('/maquinaria') }
-      const operarios = MaquinariaModel.operarios()
-      const camiones  = MaquinariaModel.camiones()
+      const operarios = await MaquinariaModel.operarios()
+      const camiones  = await MaquinariaModel.camiones()
       res.render('pages/maquinaria/detalle', { titulo: maquina.nombre, maquina, operarios, camiones })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/maquinaria')
     }
   },
 
-  registrarMovimiento(req, res) {
+  async registrarMovimiento(req, res) {
     try {
       const { estado_paso, id_operario, id_camion, observaciones, fecha_movimiento, horas_trabajadas, km_registrados } = req.body
       if (!estado_paso) { req.flash('error', 'Indicá el nuevo estado.'); return res.redirect(`/maquinaria/${req.params.id}`) }
-      MaquinariaModel.registrarMovimiento({ id_maquinaria: req.params.id, estado_paso, id_operario: id_operario || null, id_camion: id_camion || null, observaciones, fecha_movimiento: fecha_movimiento || null, horas_trabajadas, km_registrados })
+      await MaquinariaModel.registrarMovimiento({ id_maquinaria: req.params.id, estado_paso, id_operario: id_operario || null, id_camion: id_camion || null, observaciones, fecha_movimiento: fecha_movimiento || null, horas_trabajadas, km_registrados })
       req.flash('success', `Movimiento registrado: ${estado_paso.replace('_',' ')}.`)
       res.redirect(`/maquinaria/${req.params.id}`)
     } catch (err) {
@@ -83,9 +83,9 @@ const MaquinariaController = {
     }
   },
 
-  registrarMantenimiento(req, res) {
+  async registrarMantenimiento(req, res) {
     try {
-      MaquinariaModel.registrarMantenimiento({ id_maquinaria: req.params.id, ...req.body })
+      await MaquinariaModel.registrarMantenimiento({ id_maquinaria: req.params.id, ...req.body })
       req.flash('success', 'Mantenimiento registrado.')
       res.redirect(`/maquinaria/${req.params.id}`)
     } catch (err) {

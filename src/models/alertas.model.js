@@ -5,7 +5,7 @@
 // mantenimiento (km/fecha), camiones inactivos, choferes sin asignación.
 // Severidad por días restantes: vencido / critico(≤30) / alto(≤60) / medio(≤90).
 // ─────────────────────────────────────────────────────────────────
-const db = require('../config/db')
+const { query } = require('../config/db')
 
 const HOY = () => {
   const d = new Date()
@@ -36,15 +36,15 @@ const SEV_ORDER = { vencido: 0, critico: 1, alto: 2, medio: 3 }
 const AlertasModel = {
 
   // Devuelve TODAS las alertas activas (array plano, ordenado por urgencia).
-  listar({ modulo, tipo, severidad: sevFiltro } = {}) {
+  async listar({ modulo, tipo, severidad: sevFiltro } = {}) {
     const out = []
     const push = (a) => { if (a.severidad) out.push(a) }
 
     // ── Licencias de choferes/empleados ───────────────────────────
-    db.prepare(`
+    ;(await query(`
       SELECT id, nombre, apellido, licencia_vencimiento, es_chofer
       FROM empleados WHERE activo = 1 AND licencia_vencimiento IS NOT NULL AND licencia_vencimiento != ''
-    `).all().forEach(e => {
+    `)).rows.forEach(e => {
       const dias = diasHasta(e.licencia_vencimiento)
       push({
         modulo: 'choferes', tipo: 'licencia',
@@ -56,13 +56,13 @@ const AlertasModel = {
     })
 
     // ── Documentos (empleados y vehículos) ────────────────────────
-    db.prepare(`
+    ;(await query(`
       SELECT d.*,
         CASE WHEN d.entidad_tipo='empleado' THEN (SELECT nombre||' '||COALESCE(apellido,'') FROM empleados WHERE id=d.entidad_id)
              ELSE (SELECT COALESCE(nombre,'')||' ('||COALESCE(patente,'')||')' FROM flota_vehiculos WHERE id=d.entidad_id) END AS nom
       FROM documentos d
       WHERE d.fecha_vencimiento IS NOT NULL AND d.fecha_vencimiento != ''
-    `).all().forEach(d => {
+    `)).rows.forEach(d => {
       const dias = diasHasta(d.fecha_vencimiento)
       push({
         modulo: d.entidad_tipo === 'empleado' ? 'choferes' : 'flota',
@@ -76,11 +76,11 @@ const AlertasModel = {
     })
 
     // ── Gastos con vencimiento (seguros, impuestos) ───────────────
-    db.prepare(`
+    ;(await query(`
       SELECT g.*, (SELECT COALESCE(nombre,'')||' ('||COALESCE(patente,'')||')' FROM flota_vehiculos WHERE id=g.id_vehiculo) AS nom
       FROM gastos_vehiculo g
       WHERE g.vencimiento IS NOT NULL AND g.vencimiento != ''
-    `).all().forEach(g => {
+    `)).rows.forEach(g => {
       const dias = diasHasta(g.vencimiento)
       push({
         modulo: 'flota', tipo: g.categoria === 'seguro' ? 'seguro' : 'gasto',
@@ -92,15 +92,16 @@ const AlertasModel = {
     })
 
     // ── Mantenimiento por fecha (reglas cada_meses) ───────────────
-    db.prepare(`SELECT * FROM config_mantenimiento WHERE cada_meses IS NOT NULL`).all().forEach(regla => {
+    const reglasFecha = (await query(`SELECT * FROM config_mantenimiento WHERE cada_meses IS NOT NULL`)).rows
+    for (const regla of reglasFecha) {
       const vehiculos = regla.id_vehiculo
-        ? db.prepare(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE id = ?`).all(regla.id_vehiculo)
-        : db.prepare(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE activo = 1`).all()
-      vehiculos.forEach(v => {
-        const ultimo = db.prepare(`
+        ? (await query(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE id = ?`, [regla.id_vehiculo])).rows
+        : (await query(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE activo = 1`)).rows
+      for (const v of vehiculos) {
+        const ultimo = (await query(`
           SELECT fecha FROM mantenimiento_vehiculo WHERE id_vehiculo = ? ORDER BY fecha DESC LIMIT 1
-        `).get(v.id)
-        if (!ultimo || !ultimo.fecha) return
+        `, [v.id])).rows[0]
+        if (!ultimo || !ultimo.fecha) continue
         const prox = new Date(String(ultimo.fecha).slice(0, 10))
         prox.setMonth(prox.getMonth() + regla.cada_meses)
         const iso = prox.toISOString().slice(0, 10)
@@ -112,18 +113,19 @@ const AlertasModel = {
           entidad_id: v.id, entidad_nombre: `${v.nombre || ''} (${v.patente || ''})`,
           fecha: iso, link: `/flota/${v.id}`,
         })
-      })
-    })
+      }
+    }
 
     // ── Mantenimiento por km (reglas cada_km) ─────────────────────
-    db.prepare(`SELECT * FROM config_mantenimiento WHERE cada_km IS NOT NULL`).all().forEach(regla => {
+    const reglasKm = (await query(`SELECT * FROM config_mantenimiento WHERE cada_km IS NOT NULL`)).rows
+    for (const regla of reglasKm) {
       const vehiculos = regla.id_vehiculo
-        ? db.prepare(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE id = ?`).all(regla.id_vehiculo)
-        : db.prepare(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE activo = 1`).all()
-      vehiculos.forEach(v => {
-        const ultimo = db.prepare(`
+        ? (await query(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE id = ?`, [regla.id_vehiculo])).rows
+        : (await query(`SELECT id, nombre, patente, kilometraje FROM flota_vehiculos WHERE activo = 1`)).rows
+      for (const v of vehiculos) {
+        const ultimo = (await query(`
           SELECT COALESCE(km,0) AS km FROM mantenimiento_vehiculo WHERE id_vehiculo = ? ORDER BY fecha DESC LIMIT 1
-        `).get(v.id)
+        `, [v.id])).rows[0]
         const kmBase = ultimo ? ultimo.km : 0
         const kmProx = kmBase + regla.cada_km
         const restante = kmProx - (v.kilometraje || 0)
@@ -139,14 +141,14 @@ const AlertasModel = {
           entidad_id: v.id, entidad_nombre: `${v.nombre || ''} (${v.patente || ''})`,
           fecha: null, link: `/flota/${v.id}`,
         })
-      })
-    })
+      }
+    }
 
     // ── Camiones inactivos / fuera de servicio ────────────────────
-    db.prepare(`
+    ;(await query(`
       SELECT id, nombre, patente, estado_operativo FROM flota_vehiculos
       WHERE activo = 1 AND estado_operativo IN ('inactivo','fuera_servicio')
-    `).all().forEach(v => {
+    `)).rows.forEach(v => {
       push({
         modulo: 'flota', tipo: 'inactivo', severidad: 'medio', dias: null,
         titulo: `Camión ${v.estado_operativo === 'inactivo' ? 'inactivo' : 'fuera de servicio'}`,
@@ -156,11 +158,11 @@ const AlertasModel = {
     })
 
     // ── Choferes sin asignación de camión ─────────────────────────
-    db.prepare(`
+    ;(await query(`
       SELECT e.id, e.nombre, e.apellido FROM empleados e
       WHERE e.activo = 1 AND e.es_chofer = 1
         AND NOT EXISTS (SELECT 1 FROM asignaciones_recurso a WHERE a.id_empleado = e.id AND a.recurso_tipo = 'camion' AND a.activo = 1)
-    `).all().forEach(e => {
+    `)).rows.forEach(e => {
       push({
         modulo: 'choferes', tipo: 'sin_asignacion', severidad: 'medio', dias: null,
         titulo: 'Chofer sin camión asignado',
@@ -179,8 +181,8 @@ const AlertasModel = {
   },
 
   // Conteos por severidad + total (para badges/dashboard).
-  resumen(filtros = {}) {
-    const todas = this.listar(filtros)
+  async resumen(filtros = {}) {
+    const todas = await this.listar(filtros)
     const r = { total: todas.length, vencido: 0, critico: 0, alto: 0, medio: 0, choferes: 0, flota: 0 }
     todas.forEach(a => { r[a.severidad]++; r[a.modulo]++ })
     return r

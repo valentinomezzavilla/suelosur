@@ -1,6 +1,6 @@
 'use strict'
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query } = require('../config/db')
 
 // Campos editables del empleado (whitelist para create/update)
 const CAMPOS = [
@@ -35,76 +35,76 @@ function normalizar(datos) {
 
 const EmpleadosModel = {
 
-  listar() {
-    return db.prepare(`
+  async listar() {
+    return (await query(`
       SELECT e.*, u.usuario AS usuario_sistema
       FROM empleados e
       LEFT JOIN users u ON u.id = e.id_usuario
       ORDER BY e.apellido, e.nombre
-    `).all()
+    `)).rows
   },
 
-  buscar({ q } = {}) {
-    if (!q || !String(q).trim()) return this.listar()
+  async buscar({ q } = {}) {
+    if (!q || !String(q).trim()) return await this.listar()
     const term = `%${String(q).trim()}%`
-    return db.prepare(`
+    return (await query(`
       SELECT e.*, u.usuario AS usuario_sistema
       FROM empleados e
       LEFT JOIN users u ON u.id = e.id_usuario
       WHERE e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ?
          OR e.cargo LIKE ? OR e.sector LIKE ? OR CAST(e.legajo AS TEXT) LIKE ?
       ORDER BY e.apellido, e.nombre
-    `).all(term, term, term, term, term, term)
+    `, [term, term, term, term, term, term])).rows
   },
 
-  obtener(id) {
-    return db.prepare(`
+  async obtener(id) {
+    return (await query(`
       SELECT e.*, u.usuario AS usuario_sistema, u.nombre AS usuario_nombre
       FROM empleados e
       LEFT JOIN users u ON u.id = e.id_usuario
       WHERE e.id = ?
-    `).get(id)
+    `, [id])).rows[0]
   },
 
-  proximoLegajo() {
-    const r = db.prepare(`SELECT COALESCE(MAX(legajo), 0) AS m FROM empleados`).get()
-    return (r.m || 0) + 1
+  async proximoLegajo() {
+    const r = (await query(`SELECT COALESCE(MAX(legajo), 0) AS m FROM empleados`)).rows[0]
+    return (r?.m || 0) + 1
   },
 
-  crear(datos) {
+  async crear(datos) {
     const id = crypto.randomUUID()
-    const legajo = this.proximoLegajo()
+    const legajo = await this.proximoLegajo()
     const d = normalizar(datos)
     const cols = ['id', 'legajo', ...CAMPOS]
     const vals = [id, legajo, ...CAMPOS.map(c => d[c])]
     const placeholders = cols.map(() => '?').join(', ')
-    db.prepare(`INSERT INTO empleados (${cols.join(', ')}) VALUES (${placeholders})`).run(...vals)
+    await query(`INSERT INTO empleados (${cols.join(', ')}) VALUES (${placeholders})`, vals)
     return id
   },
 
-  actualizar(id, datos) {
+  async actualizar(id, datos) {
     const d = normalizar(datos)
     const sets = CAMPOS.map(c => `${c} = ?`).join(', ')
     const vals = [...CAMPOS.map(c => d[c]), id]
-    db.prepare(`UPDATE empleados SET ${sets} WHERE id = ?`).run(...vals)
+    await query(`UPDATE empleados SET ${sets} WHERE id = ?`, vals)
   },
 
-  toggleActivo(id) {
-    db.prepare(`UPDATE empleados SET activo = NOT activo WHERE id = ?`).run(id)
+  async toggleActivo(id) {
+    await query(`UPDATE empleados SET activo = 1 - activo WHERE id = ?`, [id])
   },
 
   // Baja lógica con motivo / reingreso
-  darBaja(id, motivo) {
-    db.prepare(`UPDATE empleados SET activo = 0, estado_laboral = 'baja', fecha_baja = date('now'), motivo_baja = ? WHERE id = ?`)
-      .run(motivo || '', id)
+  async darBaja(id, motivo) {
+    await query(`UPDATE empleados SET activo = 0, estado_laboral = 'baja', fecha_baja = LEFT(to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), 10), motivo_baja = ? WHERE id = ?`,
+      [motivo || '', id])
   },
 
-  reingresar(id) {
-    db.prepare(`UPDATE empleados SET activo = 1, estado_laboral = 'activo', fecha_baja = NULL, motivo_baja = NULL WHERE id = ?`).run(id)
+  async reingresar(id) {
+    await query(`UPDATE empleados SET activo = 1, estado_laboral = 'activo', fecha_baja = NULL, motivo_baja = NULL WHERE id = ?`, [id])
   },
 
   // ── Choferes (es_chofer = 1) ──────────────────────────────────
-  listarChoferes({ q, soloActivos = false } = {}) {
+  async listarChoferes({ q, soloActivos = false } = {}) {
     const wheres = ['e.es_chofer = 1']
     const params = []
     if (soloActivos) wheres.push('e.activo = 1')
@@ -113,7 +113,7 @@ const EmpleadosModel = {
       wheres.push('(e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ? OR CAST(e.legajo AS TEXT) LIKE ?)')
       params.push(term, term, term, term)
     }
-    return db.prepare(`
+    return (await query(`
       SELECT e.*, u.usuario AS usuario_sistema,
         (SELECT COALESCE(v.nombre,'')||' ('||COALESCE(v.patente,'')||')'
          FROM asignaciones_recurso a JOIN flota_vehiculos v ON v.id = a.recurso_id
@@ -122,33 +122,33 @@ const EmpleadosModel = {
       LEFT JOIN users u ON u.id = e.id_usuario
       WHERE ${wheres.join(' AND ')}
       ORDER BY e.apellido, e.nombre
-    `).all(...params)
+    `, params)).rows
   },
 
   // Empleados candidatos a supervisor (activos, distinto de uno mismo)
-  supervisores(excludeId = null) {
-    return db.prepare(`
+  async supervisores(excludeId = null) {
+    return (await query(`
       SELECT id, nombre, apellido FROM empleados
       WHERE activo = 1 AND (id != ? OR ? IS NULL) ORDER BY apellido, nombre
-    `).all(excludeId || '', excludeId)
+    `, [excludeId || '', excludeId])).rows
   },
 
   // Usuarios del sistema disponibles para vincular (no asignados a otro empleado)
-  usuariosVinculables(empleadoId = null) {
-    return db.prepare(`
+  async usuariosVinculables(empleadoId = null) {
+    return (await query(`
       SELECT u.id, u.usuario, u.nombre, u.rol
       FROM users u
       WHERE u.activo = 1
         AND (u.id NOT IN (SELECT id_usuario FROM empleados WHERE id_usuario IS NOT NULL AND id != ?)
              OR ? IS NULL)
       ORDER BY u.nombre
-    `).all(empleadoId || '', empleadoId)
+    `, [empleadoId || '', empleadoId])).rows
   },
 
-  dniEnUso(dni, excludeId = null) {
+  async dniEnUso(dni, excludeId = null) {
     if (!dni) return false
-    if (excludeId) return !!db.prepare(`SELECT 1 FROM empleados WHERE dni = ? AND id != ?`).get(dni, excludeId)
-    return !!db.prepare(`SELECT 1 FROM empleados WHERE dni = ?`).get(dni)
+    if (excludeId) return !!(await query(`SELECT 1 FROM empleados WHERE dni = ? AND id != ?`, [dni, excludeId])).rows[0]
+    return !!(await query(`SELECT 1 FROM empleados WHERE dni = ?`, [dni])).rows[0]
   },
 }
 

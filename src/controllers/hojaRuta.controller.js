@@ -1,24 +1,24 @@
 'use strict'
-const db = require('../config/db')
+const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
 
 // Empleado vinculado al usuario logueado
-function empleadoDe(userId) {
-  return db.prepare(`SELECT id, nombre, apellido FROM empleados WHERE id_usuario = ? AND activo = 1`).get(userId)
+async function empleadoDe(userId) {
+  return (await query(`SELECT id, nombre, apellido FROM empleados WHERE id_usuario = ? AND activo = 1`, [userId])).rows[0]
 }
 
 // Último estado de movimiento de un contenedor
-function estadoCont(id_contenedor) {
+async function estadoCont(id_contenedor) {
   if (!id_contenedor) return null
-  return db.prepare(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1`).get(id_contenedor)?.estado_paso || null
+  return (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1`, [id_contenedor])).rows[0]?.estado_paso || null
 }
 
 // Fecha de la entrega (primer movimiento 'entregado') de un contenedor en una OP
-function fechaEntrega(id_contenedor, id_oc) {
-  const m = db.prepare(`SELECT fecha_movimiento FROM movimiento_contenedor WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'entregado' ORDER BY fecha_movimiento ASC LIMIT 1`).get(id_contenedor, id_oc)
+async function fechaEntrega(id_contenedor, id_oc) {
+  const m = (await query(`SELECT fecha_movimiento FROM movimiento_contenedor WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'entregado' ORDER BY fecha_movimiento ASC LIMIT 1`, [id_contenedor, id_oc])).rows[0]
   return m ? String(m.fecha_movimiento).slice(0, 10) : null
 }
 
@@ -30,23 +30,23 @@ function diasRestantes(finISO) {
 }
 
 // ¿El chofer tiene una tarea en curso? (entrega despachada o retiro en tránsito)
-function tieneEnCurso(empId) {
-  const desp = db.prepare(`SELECT 1 FROM op_encabezado WHERE id_chofer = ? AND estado = 'despachado' LIMIT 1`).get(empId)
+async function tieneEnCurso(empId) {
+  const desp = (await query(`SELECT 1 FROM op_encabezado WHERE id_chofer = ? AND estado = 'despachado' LIMIT 1`, [empId])).rows[0]
   if (desp) return true
-  const ret = db.prepare(`
+  const ret = (await query(`
     SELECT 1 FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
     WHERE op.id_chofer = ? AND op.tipo_op = 'C' AND op.estado = 'entregado'
       AND (SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = oc.id_contenedor ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1) = 'en_transito'
-    LIMIT 1`).get(empId)
+    LIMIT 1`, [empId])).rows[0]
   return !!ret
 }
 
 // Construye la lista de tareas del día del chofer
-function construirTareas(empId) {
+async function construirTareas(empId) {
   const tareas = []
 
   // ── Viajes (venta con flete) ──────────────────────────────────
-  db.prepare(`
+  const viajes = (await query(`
     SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada, op.observaciones,
            op.domicilio_calle, op.domicilio_altura,
            COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
@@ -55,7 +55,8 @@ function construirTareas(empId) {
     LEFT JOIN clientes c ON c.id = op.id_cliente
     LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
     WHERE op.id_chofer = ? AND op.tipo_op = 'M' AND op.modalidad = 'flete' AND op.estado IN ('pendiente','despachado')
-  `).all(empId).forEach(o => tareas.push({
+  `, [empId])).rows
+  viajes.forEach(o => tareas.push({
     id: o.id, tipo: 'viaje', icono: '🚚', titulo: 'Entrega de viaje',
     cliente: o.cliente, tel: o.tel_whatsapp,
     domicilio: [o.domicilio_calle, o.domicilio_altura].filter(Boolean).join(' ').trim(),
@@ -67,7 +68,7 @@ function construirTareas(empId) {
   }))
 
   // ── Contenedores (entrega y retiro) ───────────────────────────
-  db.prepare(`
+  const contenedores = (await query(`
     SELECT op.id, op.nro_op, op.estado, oc.id AS id_oc, oc.id_contenedor, oc.domicilio_entrega, oc.plazo_alquiler,
            cont.numero_contenedor, COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
            v.nombre AS camion, v.patente
@@ -77,7 +78,9 @@ function construirTareas(empId) {
     LEFT JOIN clientes c ON c.id = op.id_cliente
     LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
     WHERE op.id_chofer = ? AND op.tipo_op = 'C' AND op.estado IN ('pendiente','despachado','entregado')
-  `).all(empId).forEach(o => {
+  `, [empId])).rows
+
+  for (const o of contenedores) {
     const base = {
       id: o.id, cliente: o.cliente, tel: o.tel_whatsapp,
       domicilio: o.domicilio_entrega || '', camion: [o.camion, o.patente].filter(Boolean).join(' · '),
@@ -90,12 +93,13 @@ function construirTareas(empId) {
       tareas.push({ ...base, tipo: 'contenedor_entrega', icono: '📦', titulo: 'Entrega de contenedor',
         fase: 'en_curso', detalleFase: 'En camino', accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
     } else if (o.estado === 'entregado') {
-      const ec = estadoCont(o.id_contenedor)
+      const ec = await estadoCont(o.id_contenedor)
       if (ec === 'en_transito') {
         tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
           fase: 'en_curso', detalleFase: 'Volviendo a planta', accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
       } else if (['entregado', 'en_alquiler'].includes(ec)) {
-        const fin = (() => { const fe = fechaEntrega(o.id_contenedor, o.id_oc); if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
+        const fe = await fechaEntrega(o.id_contenedor, o.id_oc)
+        const fin = (() => { if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
         const dr = diasRestantes(fin)
         if (dr != null && dr <= 0) {
           tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
@@ -106,7 +110,7 @@ function construirTareas(empId) {
         }
       }
     }
-  })
+  }
 
   const hayEnCurso = tareas.some(t => t.fase === 'en_curso')
   tareas.forEach(t => { t.bloqueada = hayEnCurso && t.fase === 'por_iniciar' })
@@ -118,38 +122,38 @@ function construirTareas(empId) {
 
 const HojaRutaController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
-      const empleado = empleadoDe(req.session.user.id)
-      const data = empleado ? construirTareas(empleado.id) : { tareas: [], hayEnCurso: false }
+      const empleado = await empleadoDe(req.session.user.id)
+      const data = empleado ? await construirTareas(empleado.id) : { tareas: [], hayEnCurso: false }
       res.render('pages/hoja_ruta', { titulo: 'Hoja de Ruta', empleado, tareas: data.tareas, hayEnCurso: data.hayEnCurso })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar la hoja de ruta.'); res.redirect('/') }
   },
 
   // Verifica que la OP pertenezca al chofer logueado; devuelve {emp, op} o null
-  _validar(req) {
-    const emp = empleadoDe(req.session.user.id)
+  async _validar(req) {
+    const emp = await empleadoDe(req.session.user.id)
     if (!emp) return null
-    const op = db.prepare(`SELECT id, tipo_op, modalidad, estado, id_chofer, id_cliente FROM op_encabezado WHERE id = ?`).get(req.params.id)
+    const op = (await query(`SELECT id, tipo_op, modalidad, estado, id_chofer, id_cliente FROM op_encabezado WHERE id = ?`, [req.params.id])).rows[0]
     if (!op || op.id_chofer !== emp.id) return null
     return { emp, op }
   },
 
-  iniciar(req, res) {
+  async iniciar(req, res) {
     const back = '/hoja-de-ruta'
     try {
-      const v = HojaRutaController._validar(req)
+      const v = await HojaRutaController._validar(req)
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
-      if (tieneEnCurso(v.emp.id)) { req.flash('error', 'Ya tenés una tarea en curso. Finalizala antes de iniciar otra.'); return res.redirect(back) }
+      if (await tieneEnCurso(v.emp.id)) { req.flash('error', 'Ya tenés una tarea en curso. Finalizala antes de iniciar otra.'); return res.redirect(back) }
       const { op } = v
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'pendiente') {
-        VentasModel.despachar(op.id); req.flash('success', 'Viaje iniciado. Buen camino.')
+        await VentasModel.despachar(op.id); req.flash('success', 'Viaje iniciado. Buen camino.')
       } else if (op.tipo_op === 'C' && op.estado === 'pendiente') {
-        const oc = db.prepare(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`).get(op.id)
+        const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
         if (!oc?.id_contenedor) { req.flash('error', 'El contenedor aún no está asignado. Avisá a la oficina.'); return res.redirect(back) }
-        AlquileresModel.despachar(op.id); req.flash('success', 'Entrega iniciada.')
+        await AlquileresModel.despachar(op.id); req.flash('success', 'Entrega iniciada.')
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
-        AlquileresModel.registrarRetiro(op.id); req.flash('success', 'Retiro iniciado.')
+        await AlquileresModel.registrarRetiro(op.id); req.flash('success', 'Retiro iniciado.')
       } else {
         req.flash('error', 'Esta tarea no se puede iniciar en su estado actual.')
       }
@@ -157,43 +161,43 @@ const HojaRutaController = {
     res.redirect(back)
   },
 
-  finalizar(req, res) {
+  async finalizar(req, res) {
     const back = '/hoja-de-ruta'
     try {
-      const v = HojaRutaController._validar(req)
+      const v = await HojaRutaController._validar(req)
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
       const { op } = v
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
-        const full = VentasModel.obtener(op.id)
-        VentasModel.entregar(op.id)
-        TransaccionesModel.crear({
+        const full = await VentasModel.obtener(op.id)
+        await VentasModel.entregar(op.id)
+        await TransaccionesModel.crear({
           tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
           cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,
           descripcion: full.observaciones || 'Venta con viaje', metodo_pago: full.metodo_pago || 'efectivo',
         })
         if (full.metodo_pago === 'cuenta_corriente' && full.id_cliente) {
-          ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}`, monto: -(full.total || 0) })
+          await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}`, monto: -(full.total || 0) })
         }
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {
-        const al = AlquileresModel.obtener(op.id)
-        AlquileresModel.entregar(op.id)
+        const al = await AlquileresModel.obtener(op.id)
+        await AlquileresModel.entregar(op.id)
         const monto = al.detalle?.precio_alquiler || 0
-        TransaccionesModel.crear({
+        await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: al.nro_remito,
           cliente_id: al.id_cliente, cliente: al.cliente_nombre, monto,
           descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, metodo_pago: al.metodo_pago || 'efectivo',
         })
         if (al.metodo_pago === 'cuenta_corriente' && al.id_cliente) {
-          ClientesModel.agregarMovimiento(al.id_cliente, { tipo: 'deuda', descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, monto: -monto })
+          await ClientesModel.agregarMovimiento(al.id_cliente, { tipo: 'deuda', descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, monto: -monto })
         }
         req.flash('success', 'Contenedor entregado. Comenzó el período de alquiler.')
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
-        const oc = db.prepare(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`).get(op.id)
-        if (estadoCont(oc?.id_contenedor) !== 'en_transito') {
+        const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
+        if (await estadoCont(oc?.id_contenedor) !== 'en_transito') {
           req.flash('error', 'Primero tenés que iniciar el retiro.'); return res.redirect(back)
         }
-        AlquileresModel.devolverAPlanta(op.id)
+        await AlquileresModel.devolverAPlanta(op.id)
         req.flash('success', 'Contenedor retirado y devuelto a planta. ¡Tarea completada!')
       } else {
         req.flash('error', 'Esta tarea no se puede finalizar en su estado actual.')

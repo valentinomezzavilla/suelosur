@@ -1,71 +1,72 @@
-<div class="card shadow-sm login-card">
+<div class="login-card">
 
-      <!-- Header -->
-      <div class="login-header">
-        <div class="brand-name mb-1">SUELOSUR</div>
-        <small class="sub">Sistema de Gestión Integral</small>
+  <div class="login-logo-wrap">
+    <img src="/img/suelosurjpg.jpg" class="login-logo" alt="Suelosur">
+  </div>
+
+  <h1 class="login-title">Suelo Sur SAS</h1>
+  <p class="login-subtitle">Sistema Gestión Empresarial</p>
+  <p class="login-desc">Áridos, contenedores y <span class="login-desc-accent">movimientos de suelo</span></p>
+
+  <% if (error && error.length > 0) { %>
+    <div class="alert alert-danger py-2 small mb-3 text-start">❌ <%= error[0] %></div>
+  <% } %>
+
+  <form action="/auth/login" method="POST" class="login-form">
+    <div class="login-field">
+      <label class="login-label" for="inputUsuario">Usuario</label>
+      <input
+        id="inputUsuario"
+        type="text"
+        name="usuario"
+        class="login-input"
+        required
+        autofocus
+        autocomplete="username"
+      >
+    </div>
+
+    <div class="login-field">
+      <label class="login-label" for="inputPassword">Contraseña</label>
+      <div class="login-pwd-wrap">
+        <input
+          id="inputPassword"
+          type="password"
+          name="password"
+          class="login-input"
+          placeholder="••••••••"
+          required
+          autocomplete="current-password"
+        >
+        <button type="button" class="login-eye" id="togglePwd" aria-label="Mostrar contraseña">
+          <svg id="eyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
       </div>
+    </div>
 
-      <div class="card-body p-4">
-        <% if (error && error.length > 0) { %>
-          <div class="alert alert-danger py-2 small">❌ <%= error[0] %></div>
-        <% } %>
+    <button type="submit" class="login-submit">Ingresar</button>
+  </form>
 
-        <form action="/auth/login" method="POST">
-          <div class="mb-3">
-            <label class="form-label fw-semibold small">Usuario</label>
-            <input
-              type="text"
-              name="usuario"
-              class="form-control login-input"
-              placeholder="nombre de usuario"
-              required
-              autofocus
-              autocomplete="username"
-            >
-          </div>
-          <div class="mb-4">
-            <label class="form-label fw-semibold small">Contraseña</label>
-            <input
-              type="password"
-              name="password"
-              class="form-control login-input"
-              placeholder="••••••••"
-              required
-            >
-          </div>
-          <button type="submit" class="btn w-100 login-submit">
-            Ingresar al sistema
-          </button>
-        </form>
-      </div>
-
-      <!-- Credenciales de prueba -->
-      <div class="mx-3 mb-3 p-3 rounded box-credenciales">
-        <p class="fw-bold small mb-2 text-secondary">🔑 Credenciales de prueba <span class="text-muted fw-normal">(contraseña: suelosur123)</span></p>
-        <div class="d-flex flex-column gap-2">
-          <% [
-            { usuario: 'valentino',      rol: 'Dueño'          },
-            { usuario: 'admin_ventas',   rol: 'Admin Ventas'   },
-            { usuario: 'admin_contable', rol: 'Admin Contable' },
-            { usuario: 'chofer',         rol: 'Chofer'         },
-          ].forEach(u => { %>
-          <div class="d-flex justify-content-between align-items-center">
-            <small>
-              <button type="button"
-                      class="btn btn-sm btn-link p-0 fw-semibold text-decoration-none text-orange"
-                      onclick="document.querySelector('[name=usuario]').value='<%= u.usuario %>'; document.querySelector('[name=password]').value='suelosur123'">
-                <%= u.usuario %>
-              </button>
-            </small>
-            <span class="badge badge-rol"><%= u.rol %></span>
-          </div>
-          <% }) %>
-        </div>
-      </div>
-
-      <div class="text-center pb-3">
-        <small class="login-footer">VM Software Solutions — 2025</small>
-      </div>
+  <p class="login-footer">
+    ¿Problemas para acceder?
+    <a href="mailto:admin@suelosur.com" class="login-footer-link">Contactá al administrador.</a>
+  </p>
 
 </div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('togglePwd');
+    var inp = document.getElementById('inputPassword');
+    var eyeOpen  = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    var eyeClosed = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    btn.addEventListener('click', function () {
+      var shown = inp.type === 'text';
+      inp.type = shown ? 'password' : 'text';
+      document.getElementById('eyeIcon').innerHTML = shown ? eyeOpen : eyeClosed;
+    });
+  })();
+</script>

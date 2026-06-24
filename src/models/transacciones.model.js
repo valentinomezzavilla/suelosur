@@ -1,6 +1,6 @@
 'use strict'
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -18,22 +18,22 @@ const TransaccionesModel = {
   PREFIJO,
   codigo: codigoTransaccion,
 
-  crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago }) {
+  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago }) {
     const id = crypto.randomUUID()
-    const { n } = db.prepare(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`).get(tipo)
-    db.prepare(`
+    const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
+    await query(`
       INSERT INTO transacciones (id, tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
-           cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo')
+    `, [id, tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
+        cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo'])
     return id
   },
 
-  listar() {
-    return db.prepare(`SELECT * FROM transacciones ORDER BY created_at DESC`).all()
+  async listar() {
+    return (await query(`SELECT * FROM transacciones ORDER BY created_at DESC`)).rows
   },
 
-  filtrar({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax, page = 1, limit = 20, sortBy = 'created_at', sortDir = 'DESC' } = {}) {
+  async filtrar({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax, page = 1, limit = 20, sortBy = 'created_at', sortDir = 'DESC' } = {}) {
     const wheres = []
     const params = []
     if (id)         { wheres.push('id = ?');                  params.push(id) }
@@ -51,15 +51,15 @@ const TransaccionesModel = {
     const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC'
     const offset = (page - 1) * limit
 
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM transacciones ${where}`).get(...params).n
-    const sumaTotal = db.prepare(`SELECT COALESCE(SUM(monto), 0) AS s FROM transacciones ${where}`).get(...params).s
-    const rows = db.prepare(`SELECT * FROM transacciones ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`).all(...params, limit, offset)
+    const total = (await query(`SELECT COUNT(*) AS n FROM transacciones ${where}`, params)).rows[0]?.n || 0
+    const sumaTotal = (await query(`SELECT COALESCE(SUM(monto), 0) AS s FROM transacciones ${where}`, params)).rows[0]?.s || 0
+    const rows = (await query(`SELECT * FROM transacciones ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`, [...params, limit, offset])).rows
 
     return { rows, total, sumaTotal, page, limit, totalPaginas: Math.ceil(total / limit) }
   },
 
   // Métricas agregadas del período/filtros (para las cards)
-  resumen({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
+  async resumen({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
     const wheres = []
     const params = []
     if (id)         { wheres.push('id = ?');                 params.push(id) }
@@ -72,7 +72,7 @@ const TransaccionesModel = {
     if (montoMax)   { wheres.push('monto <= ?');             params.push(Number(montoMax)) }
     const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
 
-    const rows = db.prepare(`SELECT tipo, COUNT(*) AS c, COALESCE(SUM(monto),0) AS s FROM transacciones ${where} GROUP BY tipo`).all(...params)
+    const rows = (await query(`SELECT tipo, COUNT(*) AS c, COALESCE(SUM(monto),0) AS s FROM transacciones ${where} GROUP BY tipo`, params)).rows
     let total = 0, count = 0
     const porTipo = {}
     rows.forEach(r => { total += r.s; count += r.c; porTipo[r.tipo] = { monto: r.s, count: r.c } })

@@ -1,42 +1,43 @@
 'use strict'
 // Gastos del vehículo: seguros, impuestos, peajes, estacionamientos, multas, otros.
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query } = require('../config/db')
 
 const GastosVehiculoModel = {
 
-  listar(id_vehiculo, { desde, hasta, categoria } = {}) {
+  async listar(id_vehiculo, { desde, hasta, categoria } = {}) {
     const wheres = ['id_vehiculo = ?']
     const params = [id_vehiculo]
     if (desde) { wheres.push('fecha >= ?'); params.push(desde) }
     if (hasta) { wheres.push('fecha <= ?'); params.push(hasta) }
     if (categoria) { wheres.push('categoria = ?'); params.push(categoria) }
-    return db.prepare(`SELECT * FROM gastos_vehiculo WHERE ${wheres.join(' AND ')} ORDER BY fecha DESC, created_at DESC`).all(...params)
+    return (await query(`SELECT * FROM gastos_vehiculo WHERE ${wheres.join(' AND ')} ORDER BY fecha DESC, created_at DESC`, params)).rows
   },
 
-  crear({ id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo }) {
+  async crear({ id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo }) {
     const id = crypto.randomUUID()
-    db.prepare(`
+    await query(`
       INSERT INTO gastos_vehiculo (id, id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, id_vehiculo, categoria, descripcion || '', parseFloat(monto) || 0,
-           fecha || new Date().toISOString().slice(0, 10), vencimiento || null, estado || 'pagado', archivo || null)
+    `, [id, id_vehiculo, categoria, descripcion || '', parseFloat(monto) || 0,
+        fecha || new Date().toISOString().slice(0, 10), vencimiento || null, estado || 'pagado', archivo || null])
     return id
   },
 
-  obtener(id) { return db.prepare(`SELECT * FROM gastos_vehiculo WHERE id = ?`).get(id) },
-  eliminar(id) {
-    const g = this.obtener(id)
-    db.prepare(`DELETE FROM gastos_vehiculo WHERE id = ?`).run(id)
+  async obtener(id) { return (await query(`SELECT * FROM gastos_vehiculo WHERE id = ?`, [id])).rows[0] },
+
+  async eliminar(id) {
+    const g = await this.obtener(id)
+    await query(`DELETE FROM gastos_vehiculo WHERE id = ?`, [id])
     return g ? g.archivo : null
   },
 
-  resumen(id_vehiculo, { desde, hasta } = {}) {
+  async resumen(id_vehiculo, { desde, hasta } = {}) {
     const wheres = ['id_vehiculo = ?']
     const params = [id_vehiculo]
     if (desde) { wheres.push('fecha >= ?'); params.push(desde) }
     if (hasta) { wheres.push('fecha <= ?'); params.push(hasta) }
-    const rows = db.prepare(`SELECT categoria, COALESCE(SUM(monto),0) AS total FROM gastos_vehiculo WHERE ${wheres.join(' AND ')} GROUP BY categoria`).all(...params)
+    const rows = (await query(`SELECT categoria, COALESCE(SUM(monto),0) AS total FROM gastos_vehiculo WHERE ${wheres.join(' AND ')} GROUP BY categoria`, params)).rows
     const porCategoria = {}
     let total = 0
     rows.forEach(r => { porCategoria[r.categoria] = r.total; total += r.total })

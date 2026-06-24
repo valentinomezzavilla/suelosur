@@ -1,7 +1,7 @@
 'use strict'
 // Flota de camiones — CRUD + estados operativos con historial.
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const CAMPOS = [
   'tipo_vehiculo', 'patente', 'nombre', 'numero_interno', 'marca', 'modelo', 'anio',
@@ -30,7 +30,7 @@ const FlotaModel = {
   ESTADOS,
   DEDICACIONES,
 
-  listar({ q, estado, tipo, marca, chofer } = {}) {
+  async listar({ q, estado, tipo, marca, chofer } = {}) {
     const wheres = ['1=1']
     const params = []
     if (estado) { wheres.push('v.estado_operativo = ?'); params.push(estado) }
@@ -42,104 +42,105 @@ const FlotaModel = {
       wheres.push('(v.nombre LIKE ? OR v.patente LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR CAST(v.numero_interno AS TEXT) LIKE ?)')
       params.push(term, term, term, term, term)
     }
-    return db.prepare(`
+    return (await query(`
       SELECT v.*,
         (SELECT (e.nombre || ' ' || COALESCE(e.apellido,'')) FROM asignaciones_recurso a JOIN empleados e ON e.id=a.id_empleado
          WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 LIMIT 1) AS chofer_nombre
       FROM flota_vehiculos v
       WHERE ${wheres.join(' AND ')} ORDER BY v.activo DESC, v.numero_interno, v.nombre
-    `).all(...params)
+    `, params)).rows
   },
 
-  obtener(id) {
-    return db.prepare(`
+  async obtener(id) {
+    return (await query(`
       SELECT v.*,
         (SELECT (e.nombre || ' ' || COALESCE(e.apellido,'')) FROM asignaciones_recurso a JOIN empleados e ON e.id=a.id_empleado
          WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 LIMIT 1) AS chofer_nombre,
         (SELECT a.id_empleado FROM asignaciones_recurso a WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 LIMIT 1) AS chofer_id
       FROM flota_vehiculos v WHERE v.id = ?
-    `).get(id)
+    `, [id])).rows[0]
   },
 
   // Validaciones de unicidad
-  patenteEnUso(patente, excludeId = null) {
+  async patenteEnUso(patente, excludeId = null) {
     if (!patente) return false
-    return !!db.prepare(`SELECT 1 FROM flota_vehiculos WHERE patente = ? AND id != ?`).get(patente, excludeId || '')
+    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE patente = ? AND id != ?`, [patente, excludeId || ''])).rows[0]
   },
-  numeroInternoEnUso(numero, excludeId = null) {
+  async numeroInternoEnUso(numero, excludeId = null) {
     if (!numero) return false
-    return !!db.prepare(`SELECT 1 FROM flota_vehiculos WHERE numero_interno = ? AND id != ?`).get(numero, excludeId || '')
+    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE numero_interno = ? AND id != ?`, [numero, excludeId || ''])).rows[0]
   },
 
-  crear(datos) {
+  async crear(datos) {
     const d = normalizar(datos)
-    if (this.patenteEnUso(d.patente)) throw new Error(`Ya existe un camión con la patente ${d.patente}.`)
-    if (this.numeroInternoEnUso(d.numero_interno)) throw new Error(`Ya existe un camión con el número interno ${d.numero_interno}.`)
+    if (await this.patenteEnUso(d.patente)) throw new Error(`Ya existe un camión con la patente ${d.patente}.`)
+    if (await this.numeroInternoEnUso(d.numero_interno)) throw new Error(`Ya existe un camión con el número interno ${d.numero_interno}.`)
     const id = crypto.randomUUID()
     const cols = ['id', ...CAMPOS]
-    db.prepare(`INSERT INTO flota_vehiculos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`)
-      .run(id, ...CAMPOS.map(c => d[c]))
-    this.registrarEstado(id, d.estado_operativo, null, 'Alta inicial')
+    await query(`INSERT INTO flota_vehiculos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+      [id, ...CAMPOS.map(c => d[c])])
+    await this.registrarEstado(id, d.estado_operativo, null, 'Alta inicial')
     return id
   },
 
-  actualizar(id, datos) {
+  async actualizar(id, datos) {
     const d = normalizar(datos)
-    if (this.patenteEnUso(d.patente, id)) throw new Error(`Ya existe otro camión con la patente ${d.patente}.`)
-    if (this.numeroInternoEnUso(d.numero_interno, id)) throw new Error(`Ya existe otro camión con el número interno ${d.numero_interno}.`)
-    db.prepare(`UPDATE flota_vehiculos SET ${CAMPOS.map(c => `${c}=?`).join(',')} WHERE id = ?`)
-      .run(...CAMPOS.map(c => d[c]), id)
+    if (await this.patenteEnUso(d.patente, id)) throw new Error(`Ya existe otro camión con la patente ${d.patente}.`)
+    if (await this.numeroInternoEnUso(d.numero_interno, id)) throw new Error(`Ya existe otro camión con el número interno ${d.numero_interno}.`)
+    await query(`UPDATE flota_vehiculos SET ${CAMPOS.map(c => `${c}=?`).join(',')} WHERE id = ?`,
+      [...CAMPOS.map(c => d[c]), id])
   },
 
-  toggleActivo(id) {
-    db.prepare(`UPDATE flota_vehiculos SET activo = NOT activo WHERE id = ?`).run(id)
+  async toggleActivo(id) {
+    await query(`UPDATE flota_vehiculos SET activo = 1 - activo WHERE id = ?`, [id])
   },
 
-  registrarEstado(id, estado, usuarioId, obs) {
-    db.prepare(`INSERT INTO estado_vehiculo_hist (id, id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?, ?)`)
-      .run(crypto.randomUUID(), id, estado, usuarioId || null, obs || '')
+  async registrarEstado(id, estado, usuarioId, obs) {
+    await query(`INSERT INTO estado_vehiculo_hist (id, id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), id, estado, usuarioId || null, obs || ''])
   },
 
-  cambiarEstado(id, estado, usuarioId, obs) {
+  async cambiarEstado(id, estado, usuarioId, obs) {
     if (!ESTADOS.includes(estado)) throw new Error('Estado inválido.')
-    db.transaction(() => {
-      db.prepare(`UPDATE flota_vehiculos SET estado_operativo = ? WHERE id = ?`).run(estado, id)
-      this.registrarEstado(id, estado, usuarioId, obs)
-    })()
+    await transaction(async (q) => {
+      await q(`UPDATE flota_vehiculos SET estado_operativo = ? WHERE id = ?`, [estado, id])
+      await q(`INSERT INTO estado_vehiculo_hist (id, id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?, ?)`,
+        [crypto.randomUUID(), id, estado, usuarioId || null, obs || ''])
+    })
   },
 
-  historialEstados(id) {
-    return db.prepare(`
+  async historialEstados(id) {
+    return (await query(`
       SELECT h.*, u.nombre AS usuario_nombre FROM estado_vehiculo_hist h
       LEFT JOIN users u ON u.id = h.id_usuario
       WHERE h.id_vehiculo = ? ORDER BY h.fecha DESC
-    `).all(id)
+    `, [id])).rows
   },
 
   // Métricas de disponibilidad de flota (para dashboard/reportes)
-  resumenFlota() {
-    const rows = db.prepare(`SELECT estado_operativo AS estado, COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1 GROUP BY estado_operativo`).all()
+  async resumenFlota() {
+    const rows = (await query(`SELECT estado_operativo AS estado, COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1 GROUP BY estado_operativo`)).rows
     const porEstado = {}
     rows.forEach(r => { porEstado[r.estado] = r.n })
-    const total = db.prepare(`SELECT COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1`).get().n
+    const total = (await query(`SELECT COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1`)).rows[0]?.n || 0
     return { total, porEstado }
   },
 
   // Opciones para filtros (tipos de unidad y marcas existentes)
-  opcionesFiltro() {
-    const tipos  = db.prepare(`SELECT DISTINCT tipo_unidad AS v FROM flota_vehiculos WHERE tipo_unidad IS NOT NULL AND tipo_unidad != '' ORDER BY tipo_unidad`).all().map(r => r.v)
-    const marcas = db.prepare(`SELECT DISTINCT marca AS v FROM flota_vehiculos WHERE marca IS NOT NULL AND marca != '' ORDER BY marca`).all().map(r => r.v)
+  async opcionesFiltro() {
+    const tipos  = (await query(`SELECT DISTINCT tipo_unidad AS v FROM flota_vehiculos WHERE tipo_unidad IS NOT NULL AND tipo_unidad != '' ORDER BY tipo_unidad`)).rows.map(r => r.v)
+    const marcas = (await query(`SELECT DISTINCT marca AS v FROM flota_vehiculos WHERE marca IS NOT NULL AND marca != '' ORDER BY marca`)).rows.map(r => r.v)
     return { tipos, marcas }
   },
 
   // Vista de disponibilidad: camiones clasificados por situación
-  disponibilidad() {
-    return db.prepare(`
+  async disponibilidad() {
+    return (await query(`
       SELECT v.id, v.numero_interno, v.patente, v.nombre, v.marca, v.modelo, v.estado_operativo,
         (SELECT (e.nombre || ' ' || COALESCE(e.apellido,'')) FROM asignaciones_recurso a JOIN empleados e ON e.id=a.id_empleado
          WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 LIMIT 1) AS chofer_nombre
       FROM flota_vehiculos v WHERE v.activo = 1 ORDER BY v.numero_interno, v.nombre
-    `).all().map(v => {
+    `)).rows.map(v => {
       let situacion
       if (['en_mantenimiento', 'fuera_servicio', 'inactivo'].includes(v.estado_operativo)) situacion = 'mantenimiento'
       else if (v.chofer_nombre) situacion = 'asignado'

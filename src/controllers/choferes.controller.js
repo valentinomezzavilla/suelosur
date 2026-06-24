@@ -18,26 +18,29 @@ const uid = (req) => req.session.user?.id
 
 const ChoferesController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { q } = req.query
-      const choferes = EmpleadosModel.listarChoferes({ q })
+      const choferes = await EmpleadosModel.listarChoferes({ q })
       res.render('pages/choferes/index', { titulo: 'Choferes', choferes, filtros: { q: q || '' } })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar choferes.'); res.redirect('/') }
   },
 
-  dashboard(req, res) {
+  async dashboard(req, res) {
     try {
-      const choferes = EmpleadosModel.listarChoferes({})
+      const choferes = await EmpleadosModel.listarChoferes({})
       const activos  = choferes.filter(c => c.activo).length
       const sinCamion = choferes.filter(c => c.activo && !c.camion_principal).length
-      const alertas = AlertasModel.listar({ modulo: 'choferes' })
+      const alertas = await AlertasModel.listar({ modulo: 'choferes' })
       const licenciasPorVencer = alertas.filter(a => a.tipo === 'licencia').length
       const docsVencidos = alertas.filter(a => a.tipo === 'documento' && a.severidad === 'vencido').length
       // HE del mes (todas las jornadas de choferes en el mes actual)
       const periodo = resolverPeriodo({ preset: 'mes' })
       let heMes = 0
-      choferes.forEach(c => { heMes += ControlHorarioModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta }).extra })
+      for (const c of choferes) {
+        const r = await ControlHorarioModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta })
+        heMes += r.extra
+      }
       res.render('pages/choferes/dashboard', {
         titulo: 'Choferes', metricas: { activos, total: choferes.length, sinCamion, licenciasPorVencer, docsVencidos, heMes },
         alertas: alertas.slice(0, 12),
@@ -45,24 +48,24 @@ const ChoferesController = {
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar el dashboard.'); res.redirect('/choferes') }
   },
 
-  nuevo(req, res) {
-    res.render('pages/choferes/form', { titulo: 'Nuevo Chofer', chofer: null, supervisores: EmpleadosModel.supervisores() })
+  async nuevo(req, res) {
+    res.render('pages/choferes/form', { titulo: 'Nuevo Chofer', chofer: null, supervisores: await EmpleadosModel.supervisores() })
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       if (!req.body.nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/choferes/nuevo') }
       req.body.es_chofer = 'true'
-      const id = EmpleadosModel.crear(req.body)
+      const id = await EmpleadosModel.crear(req.body)
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: id, accion: 'crear', usuario: uid(req), detalle: { nombre: req.body.nombre } })
       req.flash('success', 'Chofer creado.')
       res.redirect(`/choferes/${id}`)
     } catch (err) { console.error(err); req.flash('error', 'Error al crear el chofer.'); res.redirect('/choferes/nuevo') }
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const chofer = EmpleadosModel.obtener(req.params.id)
+      const chofer = await EmpleadosModel.obtener(req.params.id)
       if (!chofer) { req.flash('error', 'Chofer no encontrado.'); return res.redirect('/choferes') }
       const tab = req.query.tab || 'datos'
       const periodo = resolverPeriodo({ preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes })
@@ -70,53 +73,53 @@ const ChoferesController = {
       res.render('pages/choferes/detalle', {
         titulo: `${chofer.nombre} ${chofer.apellido || ''}`.trim(),
         chofer, tab,
-        supervisores: EmpleadosModel.supervisores(chofer.id),
-        documentos: DocumentosModel.listar(ENTIDAD, chofer.id),
-        asignacionesActivas: AsignacionesModel.activas(chofer.id),
-        asignacionesHist: AsignacionesModel.historialEmpleado(chofer.id),
-        camionesDisp: AsignacionesModel.camionesDisponibles(),
-        maquinasDisp: AsignacionesModel.maquinasDisponibles(),
-        jornadas: ControlHorarioModel.listar(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
-        resumenHoras: ControlHorarioModel.resumen(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
-        pagos: PagosModel.listar(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
-        resumenPagos: PagosModel.resumen(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
-        auditoria: historial(ENTIDAD, chofer.id),
+        supervisores: await EmpleadosModel.supervisores(chofer.id),
+        documentos: await DocumentosModel.listar(ENTIDAD, chofer.id),
+        asignacionesActivas: await AsignacionesModel.activas(chofer.id),
+        asignacionesHist: await AsignacionesModel.historialEmpleado(chofer.id),
+        camionesDisp: await AsignacionesModel.camionesDisponibles(),
+        maquinasDisp: await AsignacionesModel.maquinasDisponibles(),
+        jornadas: await ControlHorarioModel.listar(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
+        resumenHoras: await ControlHorarioModel.resumen(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
+        pagos: await PagosModel.listar(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
+        resumenPagos: await PagosModel.resumen(chofer.id, { desde: periodo.desde, hasta: periodo.hasta }),
+        auditoria: await historial(ENTIDAD, chofer.id),
         periodoLabel: etiquetaPeriodo(periodo),
         filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
       })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar el chofer.'); res.redirect('/choferes') }
   },
 
-  editar(req, res) {
-    const chofer = EmpleadosModel.obtener(req.params.id)
+  async editar(req, res) {
+    const chofer = await EmpleadosModel.obtener(req.params.id)
     if (!chofer) { req.flash('error', 'No encontrado.'); return res.redirect('/choferes') }
-    res.render('pages/choferes/form', { titulo: 'Editar Chofer', chofer, supervisores: EmpleadosModel.supervisores(chofer.id) })
+    res.render('pages/choferes/form', { titulo: 'Editar Chofer', chofer, supervisores: await EmpleadosModel.supervisores(chofer.id) })
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
       if (!req.body.nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/choferes/${req.params.id}/editar`) }
       req.body.es_chofer = 'true'
-      EmpleadosModel.actualizar(req.params.id, req.body)
+      await EmpleadosModel.actualizar(req.params.id, req.body)
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req) })
       req.flash('success', 'Chofer actualizado.')
       res.redirect(`/choferes/${req.params.id}`)
     } catch (err) { console.error(err); req.flash('error', 'Error al actualizar.'); res.redirect(`/choferes/${req.params.id}/editar`) }
   },
 
-  darBaja(req, res) {
+  async darBaja(req, res) {
     try {
-      EmpleadosModel.darBaja(req.params.id, req.body.motivo)
-      AsignacionesModel.liberarEmpleado(req.params.id)
+      await EmpleadosModel.darBaja(req.params.id, req.body.motivo)
+      await AsignacionesModel.liberarEmpleado(req.params.id)
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'baja', usuario: uid(req), detalle: { motivo: req.body.motivo } })
       req.flash('success', 'Chofer dado de baja. Se liberaron sus asignaciones.')
     } catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(`/choferes/${req.params.id}`)
   },
 
-  reingresar(req, res) {
+  async reingresar(req, res) {
     try {
-      EmpleadosModel.reingresar(req.params.id)
+      await EmpleadosModel.reingresar(req.params.id)
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'reingreso', usuario: uid(req) })
       req.flash('success', 'Chofer reingresado.')
     } catch (err) { console.error(err); req.flash('error', 'Error.') }
@@ -124,12 +127,12 @@ const ChoferesController = {
   },
 
   // ── Documentos ────────────────────────────────────────────────
-  subirDocumento(req, res) {
+  async subirDocumento(req, res) {
     const back = `/choferes/${req.params.id}?tab=documentos`
     try {
       const { tipo, descripcion, fecha_emision, fecha_vencimiento } = req.body
       if (!tipo) { req.flash('error', 'Indicá el tipo de documento.'); return res.redirect(back) }
-      DocumentosModel.crear({
+      await DocumentosModel.crear({
         entidad_tipo: ENTIDAD, entidad_id: req.params.id, tipo, descripcion,
         archivo: req.file ? req.file.filename : null, fecha_emision, fecha_vencimiento,
       })
@@ -139,9 +142,9 @@ const ChoferesController = {
     res.redirect(back)
   },
 
-  verDocumento(req, res) {
+  async verDocumento(req, res) {
     try {
-      const doc = DocumentosModel.obtener(req.params.docId)
+      const doc = await DocumentosModel.obtener(req.params.docId)
       if (!doc || !doc.archivo) { req.flash('error', 'Sin archivo.'); return res.redirect('back') }
       const file = path.join(DIR_DOCUMENTOS, doc.archivo)
       if (!fs.existsSync(file)) { req.flash('error', 'Archivo no encontrado.'); return res.redirect('back') }
@@ -149,9 +152,9 @@ const ChoferesController = {
     } catch (err) { console.error(err); res.redirect('back') }
   },
 
-  eliminarDocumento(req, res) {
+  async eliminarDocumento(req, res) {
     try {
-      const archivo = DocumentosModel.eliminar(req.params.docId)
+      const archivo = await DocumentosModel.eliminar(req.params.docId)
       if (archivo) { const f = path.join(DIR_DOCUMENTOS, archivo); if (fs.existsSync(f)) { try { fs.unlinkSync(f) } catch (_) {} } }
       req.flash('success', 'Documento eliminado.')
     } catch (err) { console.error(err); req.flash('error', 'Error.') }
@@ -159,69 +162,69 @@ const ChoferesController = {
   },
 
   // ── Asignaciones de recursos (camión / máquina) ───────────────
-  asignarRecurso(req, res) {
+  async asignarRecurso(req, res) {
     const back = `/choferes/${req.params.id}?tab=asignaciones`
     try {
       const { recurso_tipo, recurso_id, observaciones } = req.body
-      AsignacionesModel.asignar({ id_empleado: req.params.id, recurso_tipo, recurso_id, observaciones })
+      await AsignacionesModel.asignar({ id_empleado: req.params.id, recurso_tipo, recurso_id, observaciones })
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { asignacion: recurso_tipo } })
       req.flash('success', `${recurso_tipo === 'maquina' ? 'Máquina' : 'Camión'} asignado.`)
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al asignar.') }
     res.redirect(back)
   },
 
-  finalizarAsignacion(req, res) {
-    try { AsignacionesModel.finalizar(req.params.asigId); req.flash('success', 'Asignación finalizada.') }
+  async finalizarAsignacion(req, res) {
+    try { await AsignacionesModel.finalizar(req.params.asigId); req.flash('success', 'Asignación finalizada.') }
     catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(`/choferes/${req.params.id}?tab=asignaciones`)
   },
 
   // ── Control horario ───────────────────────────────────────────
-  cargarJornada(req, res) {
+  async cargarJornada(req, res) {
     const back = `/choferes/${req.params.id}?tab=horario`
     try {
-      ControlHorarioModel.crear({ id_empleado: req.params.id, ...req.body })
+      await ControlHorarioModel.crear({ id_empleado: req.params.id, ...req.body })
       req.flash('success', 'Jornada registrada.')
     } catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(back)
   },
 
-  aprobarJornada(req, res) {
-    try { ControlHorarioModel.aprobar(req.params.jorId, uid(req)); req.flash('success', 'Horas extra aprobadas.') }
+  async aprobarJornada(req, res) {
+    try { await ControlHorarioModel.aprobar(req.params.jorId, uid(req)); req.flash('success', 'Horas extra aprobadas.') }
     catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(`/choferes/${req.params.id}?tab=horario`)
   },
 
-  eliminarJornada(req, res) {
-    try { ControlHorarioModel.eliminar(req.params.jorId) } catch (err) { console.error(err) }
+  async eliminarJornada(req, res) {
+    try { await ControlHorarioModel.eliminar(req.params.jorId) } catch (err) { console.error(err) }
     res.redirect(`/choferes/${req.params.id}?tab=horario`)
   },
 
   // ── Pagos ─────────────────────────────────────────────────────
-  registrarPago(req, res) {
+  async registrarPago(req, res) {
     const back = `/choferes/${req.params.id}?tab=pagos`
     try {
       const { tipo, monto } = req.body
       if (!tipo || !(parseFloat(monto) > 0)) { req.flash('error', 'Tipo y monto válidos requeridos.'); return res.redirect(back) }
-      PagosModel.crear({ id_empleado: req.params.id, ...req.body })
+      await PagosModel.crear({ id_empleado: req.params.id, ...req.body })
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { pago: tipo, monto } })
       req.flash('success', 'Pago registrado.')
     } catch (err) { console.error(err); req.flash('error', 'Error.') }
     res.redirect(back)
   },
 
-  eliminarPago(req, res) {
-    try { PagosModel.eliminar(req.params.pagoId) } catch (err) { console.error(err) }
+  async eliminarPago(req, res) {
+    try { await PagosModel.eliminar(req.params.pagoId) } catch (err) { console.error(err) }
     res.redirect(`/choferes/${req.params.id}?tab=pagos`)
   },
 
   // ── Reportes ──────────────────────────────────────────────────
-  reporte(req, res) {
+  async reporte(req, res) {
     try {
       const tipo = req.params.tipo            // horas | pagos | licencias | documentacion
       const formato = req.query.formato || 'pdf'
       const periodo = resolverPeriodo({ preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta })
-      const choferes = EmpleadosModel.listarChoferes({})
+      const choferes = await EmpleadosModel.listarChoferes({})
       let titulo = '', columnas = [], filas = []
 
       if (tipo === 'horas') {
@@ -233,10 +236,10 @@ const ChoferesController = {
           { header: 'H. extra', key: 'extra', align: 'right' },
           { header: 'HE aprob.', key: 'aprob', align: 'right' },
         ]
-        filas = choferes.map(c => {
-          const r = ControlHorarioModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta })
-          return { chofer: `${c.nombre} ${c.apellido || ''}`.trim(), jornadas: r.jornadas, normales: r.normales, extra: r.extra, aprob: r.extra_aprobadas }
-        })
+        for (const c of choferes) {
+          const r = await ControlHorarioModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta })
+          filas.push({ chofer: `${c.nombre} ${c.apellido || ''}`.trim(), jornadas: r.jornadas, normales: r.normales, extra: r.extra, aprob: r.extra_aprobadas })
+        }
       } else if (tipo === 'pagos') {
         titulo = 'Pagos por chofer'
         columnas = [
@@ -244,10 +247,10 @@ const ChoferesController = {
           { header: 'Movimientos', key: 'count', align: 'right' },
           { header: 'Neto', key: 'neto', align: 'right', money: true },
         ]
-        filas = choferes.map(c => {
-          const r = PagosModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta })
-          return { chofer: `${c.nombre} ${c.apellido || ''}`.trim(), count: r.count, neto: r.neto }
-        })
+        for (const c of choferes) {
+          const r = await PagosModel.resumen(c.id, { desde: periodo.desde, hasta: periodo.hasta })
+          filas.push({ chofer: `${c.nombre} ${c.apellido || ''}`.trim(), count: r.count, neto: r.neto })
+        }
       } else if (tipo === 'licencias') {
         titulo = 'Licencias de conducir'
         columnas = [
@@ -269,12 +272,13 @@ const ChoferesController = {
           { header: 'Emisión', key: 'emi' },
           { header: 'Vencimiento', key: 'venc' },
         ]
-        choferes.forEach(c => {
-          DocumentosModel.listar(ENTIDAD, c.id).forEach(d => filas.push({
+        for (const c of choferes) {
+          const docs = await DocumentosModel.listar(ENTIDAD, c.id)
+          docs.forEach(d => filas.push({
             chofer: `${c.nombre} ${c.apellido || ''}`.trim(), doc: d.tipo,
             emi: d.fecha_emision || '—', venc: d.fecha_vencimiento || '—',
           }))
-        })
+        }
       }
 
       const nombreArchivo = `choferes-${tipo}`

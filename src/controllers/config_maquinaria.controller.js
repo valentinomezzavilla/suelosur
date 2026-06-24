@@ -3,14 +3,14 @@ const ConfigMaquinariaModel = require('../models/config_maquinaria.model')
 const MaquinariaModel       = require('../models/maquinaria.model')
 
 const ConfigMaquinariaController = {
-  index(req, res) {
+  async index(req, res) {
     try {
-      const defaults   = ConfigMaquinariaModel.obtenerDefaults()
-      const maquinaria = MaquinariaModel.listar()
+      const defaults   = await ConfigMaquinariaModel.obtenerDefaults()
+      const maquinaria = await MaquinariaModel.listar()
       const overrides  = {}
-      maquinaria.forEach(m => {
-        overrides[m.id] = ConfigMaquinariaModel.precioEfectivo(m.id)
-      })
+      await Promise.all(maquinaria.map(async m => {
+        overrides[m.id] = await ConfigMaquinariaModel.precioEfectivo(m.id)
+      }))
       res.render('pages/maquinaria/configuracion', {
         titulo: 'Configuración — Maquinaria',
         defaults, maquinaria, overrides,
@@ -22,10 +22,10 @@ const ConfigMaquinariaController = {
     }
   },
 
-  guardar(req, res) {
+  async guardar(req, res) {
     try {
       const { precio_por_hora_default, precio_por_dia_default, modo_precio_default } = req.body
-      ConfigMaquinariaModel.guardarGlobal({
+      await ConfigMaquinariaModel.guardarGlobal({
         precio_por_hora_default: precio_por_hora_default || '15000',
         precio_por_dia_default: precio_por_dia_default || '80000',
         modo_precio_default: modo_precio_default || 'hora',
@@ -39,11 +39,11 @@ const ConfigMaquinariaController = {
     }
   },
 
-  guardarPorMaquinaria(req, res) {
+  async guardarPorMaquinaria(req, res) {
     try {
       const { idMaquinaria } = req.params
       const { precio_por_hora, precio_por_dia, modo_precio } = req.body
-      ConfigMaquinariaModel.guardarPorMaquinaria(idMaquinaria, {
+      await ConfigMaquinariaModel.guardarPorMaquinaria(idMaquinaria, {
         precio_por_hora: precio_por_hora || '',
         precio_por_dia: precio_por_dia || '',
         modo_precio: modo_precio || '',

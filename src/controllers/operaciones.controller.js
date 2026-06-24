@@ -2,9 +2,9 @@
 const OperacionesModel = require('../models/operaciones.model')
 
 const OperacionesController = {
-  asignarRecursos(req, res) {
+  async asignarRecursos(req, res) {
     try {
-      OperacionesModel.asignar(req.params.id, {
+      await OperacionesModel.asignar(req.params.id, {
         id_chofer: req.body.id_chofer || null,
         id_camion: req.body.id_camion || null,
         usuario: req.session.user?.id,

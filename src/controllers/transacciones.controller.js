@@ -7,7 +7,7 @@ const TIPOS = ['Venta Cantera', 'Venta Viaje', 'Alquiler', 'Maquinaria', 'Ajuste
 const POR_PAGINA = 20
 
 const TransaccionesController = {
-  index(req, res) {
+  async index(req, res) {
     try {
       const { id, tipo, idCliente, cliente, fechaDesde, fechaHasta, montoMin, montoMax, mes, preset, sortBy, sortDir } = req.query
 
@@ -21,12 +21,12 @@ const TransaccionesController = {
       }
 
       const pagina = Math.max(1, Number(req.query.page) || 1)
-      const resultado = TransaccionesModel.filtrar({
+      const resultado = await TransaccionesModel.filtrar({
         ...baseFiltros,
         page: pagina, limit: POR_PAGINA,
         sortBy: sortBy || 'created_at', sortDir: sortDir || 'DESC',
       })
-      const metricas = TransaccionesModel.resumen(baseFiltros)
+      const metricas = await TransaccionesModel.resumen(baseFiltros)
 
       const filtros = {
         id: id||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'',
@@ -40,7 +40,7 @@ const TransaccionesController = {
         transacciones: resultado.rows,
         filtros,
         tipos: TIPOS,
-        clientesLista: ClientesModel.listar(),
+        clientesLista: await ClientesModel.listar(),
         metricas,
         periodoLabel: etiquetaPeriodo(periodo),
         totalMes: resultado.sumaTotal,

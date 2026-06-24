@@ -1,12 +1,12 @@
 'use strict'
 // Recursos (camión + chofer) asociados a una operación (op_encabezado).
-const db = require('../config/db')
+const { query } = require('../config/db')
 const { registrarAuditoria } = require('../utils/auditoria')
 
 const OperacionesModel = {
 
-  obtenerRecursos(opId) {
-    return db.prepare(`
+  async obtenerRecursos(opId) {
+    return (await query(`
       SELECT op.id_chofer, op.id_camion, op.asignacion_fecha, op.asignacion_usuario, op.estado,
              (e.nombre || ' ' || COALESCE(e.apellido,'')) AS chofer_nombre,
              (COALESCE(v.nombre,'') || CASE WHEN v.patente IS NOT NULL THEN ' (' || v.patente || ')' ELSE '' END) AS camion_label,
@@ -16,15 +16,15 @@ const OperacionesModel = {
       LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
       LEFT JOIN users u ON u.id = op.asignacion_usuario
       WHERE op.id = ?
-    `).get(opId)
+    `, [opId])).rows[0]
   },
 
-  asignar(opId, { id_chofer, id_camion, usuario }) {
-    db.prepare(`
+  async asignar(opId, { id_chofer, id_camion, usuario }) {
+    await query(`
       UPDATE op_encabezado
-      SET id_chofer = ?, id_camion = ?, asignacion_fecha = datetime('now'), asignacion_usuario = ?
+      SET id_chofer = ?, id_camion = ?, asignacion_fecha = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), asignacion_usuario = ?
       WHERE id = ?
-    `).run(id_chofer || null, id_camion || null, usuario || null, opId)
+    `, [id_chofer || null, id_camion || null, usuario || null, opId])
     registrarAuditoria({
       entidad_tipo: 'operacion', entidad_id: opId, accion: 'modificar', usuario,
       detalle: { id_chofer, id_camion },
@@ -32,20 +32,20 @@ const OperacionesModel = {
   },
 
   // Choferes activos (es_chofer) para asignar
-  choferesDisponibles() {
-    return db.prepare(`
+  async choferesDisponibles() {
+    return (await query(`
       SELECT id, nombre, apellido FROM empleados
       WHERE activo = 1 AND es_chofer = 1 ORDER BY apellido, nombre
-    `).all()
+    `)).rows
   },
 
   // Camiones operativos para asignar
-  camionesDisponibles() {
-    return db.prepare(`
+  async camionesDisponibles() {
+    return (await query(`
       SELECT id, nombre, patente, marca, modelo, estado_operativo, dedicacion FROM flota_vehiculos
       WHERE activo = 1 AND estado_operativo NOT IN ('inactivo','fuera_servicio')
       ORDER BY nombre
-    `).all()
+    `)).rows
   },
 }
 

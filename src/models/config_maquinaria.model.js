@@ -1,28 +1,28 @@
 'use strict'
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const ConfigMaquinariaModel = {
 
-  obtenerGlobales() {
-    return db.prepare(`SELECT clave, valor FROM config_maquinaria WHERE id_maquinaria IS NULL ORDER BY clave`).all()
+  async obtenerGlobales() {
+    return (await query(`SELECT clave, valor FROM config_maquinaria WHERE id_maquinaria IS NULL ORDER BY clave`)).rows
   },
 
-  obtenerPorMaquinaria(idMaquinaria) {
-    return db.prepare(`SELECT clave, valor FROM config_maquinaria WHERE id_maquinaria = ? ORDER BY clave`).all(idMaquinaria)
+  async obtenerPorMaquinaria(idMaquinaria) {
+    return (await query(`SELECT clave, valor FROM config_maquinaria WHERE id_maquinaria = ? ORDER BY clave`, [idMaquinaria])).rows
   },
 
-  obtenerValor(clave, idMaquinaria) {
+  async obtenerValor(clave, idMaquinaria) {
     if (idMaquinaria) {
-      const row = db.prepare(`SELECT valor FROM config_maquinaria WHERE id_maquinaria = ? AND clave = ?`).get(idMaquinaria, clave)
+      const row = (await query(`SELECT valor FROM config_maquinaria WHERE id_maquinaria = ? AND clave = ?`, [idMaquinaria, clave])).rows[0]
       if (row) return row.valor
     }
-    const global = db.prepare(`SELECT valor FROM config_maquinaria WHERE id_maquinaria IS NULL AND clave = ?`).get(clave)
+    const global = (await query(`SELECT valor FROM config_maquinaria WHERE id_maquinaria IS NULL AND clave = ?`, [clave])).rows[0]
     return global ? global.valor : null
   },
 
-  obtenerDefaults() {
-    const rows = this.obtenerGlobales()
+  async obtenerDefaults() {
+    const rows = await this.obtenerGlobales()
     const cfg = {}
     rows.forEach(r => { cfg[r.clave] = r.valor })
     return {
@@ -32,10 +32,10 @@ const ConfigMaquinariaModel = {
     }
   },
 
-  precioEfectivo(idMaquinaria) {
-    const defaults = this.obtenerDefaults()
+  async precioEfectivo(idMaquinaria) {
+    const defaults = await this.obtenerDefaults()
     if (!idMaquinaria) return defaults
-    const overrides = this.obtenerPorMaquinaria(idMaquinaria)
+    const overrides = await this.obtenerPorMaquinaria(idMaquinaria)
     const cfg = {}
     overrides.forEach(r => { cfg[r.clave] = r.valor })
     return {
@@ -45,30 +45,30 @@ const ConfigMaquinariaModel = {
     }
   },
 
-  guardarGlobal(datos) {
-    const upd = db.prepare(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria IS NULL AND clave = ?`)
-    const ins = db.prepare(`INSERT OR IGNORE INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, NULL, ?, ?)`)
-    db.transaction(() => {
-      Object.entries(datos).forEach(([clave, valor]) => {
-        const result = upd.run(String(valor), clave)
-        if (result.changes === 0) ins.run(crypto.randomUUID(), clave, String(valor))
-      })
-    })()
+  async guardarGlobal(datos) {
+    await transaction(async (q) => {
+      for (const [clave, valor] of Object.entries(datos)) {
+        const result = await q(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria IS NULL AND clave = ?`, [String(valor), clave])
+        if (result.rowCount === 0) {
+          await q(`INSERT INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, NULL, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), clave, String(valor)])
+        }
+      }
+    })
   },
 
-  guardarPorMaquinaria(idMaquinaria, datos) {
-    const upd = db.prepare(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria = ? AND clave = ?`)
-    const ins = db.prepare(`INSERT OR IGNORE INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, ?, ?, ?)`)
-    db.transaction(() => {
-      Object.entries(datos).forEach(([clave, valor]) => {
+  async guardarPorMaquinaria(idMaquinaria, datos) {
+    await transaction(async (q) => {
+      for (const [clave, valor] of Object.entries(datos)) {
         if (!valor && valor !== '0') {
-          db.prepare(`DELETE FROM config_maquinaria WHERE id_maquinaria = ? AND clave = ?`).run(idMaquinaria, clave)
-          return
+          await q(`DELETE FROM config_maquinaria WHERE id_maquinaria = ? AND clave = ?`, [idMaquinaria, clave])
+          continue
         }
-        const result = upd.run(String(valor), idMaquinaria, clave)
-        if (result.changes === 0) ins.run(crypto.randomUUID(), idMaquinaria, clave, String(valor))
-      })
-    })()
+        const result = await q(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria = ? AND clave = ?`, [String(valor), idMaquinaria, clave])
+        if (result.rowCount === 0) {
+          await q(`INSERT INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), idMaquinaria, clave, String(valor)])
+        }
+      }
+    })
   },
 }
 

@@ -2,7 +2,7 @@
 const express = require('express')
 const router  = express.Router()
 const bcrypt  = require('bcryptjs')
-const db      = require('../config/db')
+const { query } = require('../config/db')
 
 router.get('/login', (req, res) => {
   if (req.session.user) return res.redirect('/')
@@ -12,7 +12,7 @@ router.get('/login', (req, res) => {
 router.post('/login', async (req, res) => {
   const { usuario, password } = req.body
   try {
-    const user = db.prepare('SELECT * FROM users WHERE usuario = ? AND activo = 1').get(usuario)
+    const user = (await query('SELECT * FROM users WHERE usuario = ? AND activo = 1', [usuario])).rows[0]
     if (!user || !(await bcrypt.compare(password, user.password_hash))) {
       req.flash('error', 'Usuario o contraseña incorrectos.')
       return res.redirect('/auth/login')

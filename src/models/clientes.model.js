@@ -1,25 +1,25 @@
 'use strict'
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const ClientesModel = {
 
-  listar() {
-    return db.prepare(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`).all()
+  async listar() {
+    return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`)).rows
   },
 
-  obtener(id) {
-    return db.prepare(`SELECT * FROM clientes WHERE id = ?`).get(id)
+  async obtener(id) {
+    return (await query(`SELECT * FROM clientes WHERE id = ?`, [id])).rows[0]
   },
 
   // Autocomplete: un único término busca en numero/dni/nombre/apellido/razón social.
   // Prioriza coincidencias exactas (N°, DNI, nombre/apellido) y luego orden alfabético.
-  buscarLive(q, limit = 8) {
+  async buscarLive(q, limit = 8) {
     const s = String(q || '').trim()
     if (!s) return []
     const term = `%${s}%`
     const exact = s.toLowerCase()
-    return db.prepare(`
+    return (await query(`
       SELECT * FROM clientes
       WHERE activo = 1 AND (
         nombre LIKE ? OR apellido LIKE ? OR (nombre || ' ' || apellido) LIKE ?
@@ -31,11 +31,11 @@ const ClientesModel = {
                   OR lower(nombre || ' ' || apellido) = ? THEN 0 ELSE 1 END,
         apellido, nombre
       LIMIT ?
-    `).all(term, term, term, term, term, exact, exact, exact, exact, exact, limit)
+    `, [term, term, term, term, term, exact, exact, exact, exact, exact, limit])).rows
   },
 
   // Búsqueda estricta: si vienen varios criterios, TODOS deben corresponder al mismo cliente (AND).
-  buscar({ id, dni, nombre, numero } = {}) {
+  async buscar({ id, dni, nombre, numero } = {}) {
     const wheres = []
     const params = []
 
@@ -50,29 +50,29 @@ const ClientesModel = {
     if (nombre)        { wheres.push('(nombre LIKE ? OR apellido LIKE ?)'); params.push(`%${nombre}%`, `%${nombre}%`) }
 
     if (!wheres.length) {
-      return db.prepare(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`).all()
+      return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`)).rows
     }
-    return db.prepare(`SELECT * FROM clientes WHERE ${wheres.join(' AND ')} ORDER BY apellido, nombre`).all(...params)
+    return (await query(`SELECT * FROM clientes WHERE ${wheres.join(' AND ')} ORDER BY apellido, nombre`, params)).rows
   },
 
-  proximoNumero() {
-    const r = db.prepare(`SELECT COALESCE(MAX(numero), 0) AS m FROM clientes`).get()
+  async proximoNumero() {
+    const r = (await query(`SELECT COALESCE(MAX(numero), 0) AS m FROM clientes`)).rows[0]
     return (r.m || 0) + 1
   },
 
-  crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente }) {
+  async crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente }) {
     const id = crypto.randomUUID()
-    const numero = this.proximoNumero()
-    db.prepare(`
+    const numero = await this.proximoNumero()
+    await query(`
       INSERT INTO clientes (id, numero, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, numero, nombre, apellido || '', domicilio_ppal || null, zona || null,
-           tel_whatsapp || null, telefono || null, email || null, dni || null,
-           tipo_cliente || null, cuenta_corriente ? 1 : 0)
+    `, [id, numero, nombre, apellido || '', domicilio_ppal || null, zona || null,
+        tel_whatsapp || null, telefono || null, email || null, dni || null,
+        tipo_cliente || null, cuenta_corriente ? 1 : 0])
     return id
   },
 
-  actualizar(id, datos) {
+  async actualizar(id, datos) {
     const fields = []
     const values = []
     const map = { nombre:1, apellido:1, domicilio_ppal:1, zona:1, tel_whatsapp:1, telefono:1, email:1, dni:1, tipo_cliente:1 }
@@ -85,81 +85,83 @@ const ClientesModel = {
     }
     if (!fields.length) return
     values.push(id)
-    db.prepare(`UPDATE clientes SET ${fields.join(', ')} WHERE id = ?`).run(...values)
+    await query(`UPDATE clientes SET ${fields.join(', ')} WHERE id = ?`, values)
   },
 
-  toggleActivo(id) {
-    db.prepare(`UPDATE clientes SET activo = NOT activo WHERE id = ?`).run(id)
+  async toggleActivo(id) {
+    await query(`UPDATE clientes SET activo = 1 - activo WHERE id = ?`, [id])
   },
 
   // ¿Se puede dar de baja? Revisa operaciones activas, alquileres vigentes y saldo CC.
-  puedeEliminar(id) {
-    const cli = this.obtener(id)
+  async puedeEliminar(id) {
+    const cli = await this.obtener(id)
     if (!cli) return { ok: false, motivo: 'Cliente no encontrado.' }
     if (Math.abs(cli.saldo || 0) > 0.009) {
       return { ok: false, motivo: `Tiene saldo pendiente en cuenta corriente (${cli.saldo < 0 ? 'debe' : 'a favor'} $${Math.abs(cli.saldo).toLocaleString('es-AR')}).` }
     }
-    const opsActivas = db.prepare(`
+    const opsActivas = (await query(`
       SELECT COUNT(*) AS n FROM op_encabezado
       WHERE id_cliente = ? AND (estado IN ('pendiente','despachado')
             OR (tipo_op IN ('C','MA') AND estado = 'entregado'))
-    `).get(id).n
+    `, [id])).rows[0]?.n || 0
     if (opsActivas > 0) {
       return { ok: false, motivo: `Tiene ${opsActivas} operación(es) activa(s) o alquiler(es) vigente(s).` }
     }
     return { ok: true }
   },
 
-  eliminar(id) {
+  async eliminar(id) {
     // Baja lógica: conserva historial transaccional
-    db.prepare(`UPDATE clientes SET activo = 0 WHERE id = ?`).run(id)
+    await query(`UPDATE clientes SET activo = 0 WHERE id = ?`, [id])
   },
 
-  habilitarCuenta(id) {
-    db.prepare(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`).run(id)
+  async habilitarCuenta(id) {
+    await query(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`, [id])
   },
 
-  agregarMovimiento(id, { tipo, descripcion, monto }) {
+  async agregarMovimiento(id, { tipo, descripcion, monto }) {
     const movId = crypto.randomUUID()
-    db.prepare(`INSERT INTO movimientos_cuenta (id, cliente_id, tipo, descripcion, monto) VALUES (?, ?, ?, ?, ?)`
-    ).run(movId, id, tipo, descripcion, Number(monto))
-    db.prepare(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`).run(Number(monto), id)
+    await query(`INSERT INTO movimientos_cuenta (id, cliente_id, tipo, descripcion, monto) VALUES (?, ?, ?, ?, ?)`,
+      [movId, id, tipo, descripcion, Number(monto)])
+    await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return movId
   },
 
-  movimientos(clienteId) {
-    return db.prepare(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at DESC`).all(clienteId)
+  async movimientos(clienteId) {
+    return (await query(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at DESC`, [clienteId])).rows
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────
-  listarCuentas() {
-    return db.prepare(`SELECT * FROM clientes WHERE activo = 1 AND cuenta_corriente = 1 ORDER BY apellido, nombre`).all()
+  async listarCuentas() {
+    return (await query(`SELECT * FROM clientes WHERE activo = 1 AND cuenta_corriente = 1 ORDER BY apellido, nombre`)).rows
   },
 
-  sinCuenta() {
-    return db.prepare(`SELECT * FROM clientes WHERE activo = 1 AND (cuenta_corriente = 0 OR cuenta_corriente IS NULL) ORDER BY apellido, nombre`).all()
+  async sinCuenta() {
+    return (await query(`SELECT * FROM clientes WHERE activo = 1 AND (cuenta_corriente = 0 OR cuenta_corriente IS NULL) ORDER BY apellido, nombre`)).rows
   },
 
-  deshabilitarCuenta(id) {
-    db.prepare(`UPDATE clientes SET cuenta_corriente = 0 WHERE id = ?`).run(id)
+  async deshabilitarCuenta(id) {
+    await query(`UPDATE clientes SET cuenta_corriente = 0 WHERE id = ?`, [id])
   },
 
   // Estado de cuenta de un período: movimientos + saldo inicial/final + totales.
   // Convención de signo: monto < 0 = débito (deuda), monto > 0 = crédito (pago/ajuste a favor).
-  estadoCuenta(clienteId, { desde, hasta } = {}) {
+  async estadoCuenta(clienteId, { desde, hasta } = {}) {
     const wheres = ['cliente_id = ?']
     const params = [clienteId]
-    if (desde) { wheres.push('date(created_at) >= date(?)'); params.push(desde) }
-    if (hasta) { wheres.push('date(created_at) <= date(?)'); params.push(hasta) }
-    const movimientos = db.prepare(
-      `SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`
-    ).all(...params)
+    if (desde) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(desde) }
+    if (hasta) { wheres.push('LEFT(created_at, 10) <= ?'); params.push(hasta) }
+    const movimientos = (await query(
+      `SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`,
+      params
+    )).rows
 
     let saldoInicial = 0
     if (desde) {
-      saldoInicial = db.prepare(
-        `SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_cuenta WHERE cliente_id = ? AND date(created_at) < date(?)`
-      ).get(clienteId, desde).s
+      saldoInicial = (await query(
+        `SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_cuenta WHERE cliente_id = ? AND LEFT(created_at, 10) < ?`,
+        [clienteId, desde]
+      )).rows[0]?.s || 0
     }
 
     let debitos = 0, creditos = 0

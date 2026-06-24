@@ -1,43 +1,45 @@
 'use strict'
 // Combustible — cargas + consumo/rendimiento por vehículo.
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const CombustibleModel = {
 
-  listar(id_vehiculo, { desde, hasta } = {}) {
+  async listar(id_vehiculo, { desde, hasta } = {}) {
     const wheres = ['c.id_vehiculo = ?']
     const params = [id_vehiculo]
     if (desde) { wheres.push('c.fecha >= ?'); params.push(desde) }
     if (hasta) { wheres.push('c.fecha <= ?'); params.push(hasta) }
-    return db.prepare(`
+    return (await query(`
       SELECT c.*, e.nombre AS chofer_nombre
       FROM combustible c LEFT JOIN empleados e ON e.id = c.id_chofer
       WHERE ${wheres.join(' AND ')}
       ORDER BY c.fecha DESC, c.created_at DESC
-    `).all(...params)
+    `, params)).rows
   },
 
-  crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha }) {
+  async crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha }) {
     const id = crypto.randomUUID()
-    db.transaction(() => {
-      db.prepare(`
+    await transaction(async (q) => {
+      await q(`
         INSERT INTO combustible (id, id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(id, id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
-             parseInt(km_al_cargar) || 0, estacion || null, fecha || new Date().toISOString().slice(0, 10))
+      `, [id, id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
+          parseInt(km_al_cargar) || 0, estacion || null, fecha || new Date().toISOString().slice(0, 10)])
       // Actualizar km del vehículo si la carga reporta un km mayor
       const km = parseInt(km_al_cargar) || 0
-      if (km) db.prepare(`UPDATE flota_vehiculos SET kilometraje = MAX(kilometraje, ?) WHERE id = ?`).run(km, id_vehiculo)
-    })()
+      if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])
+    })
     return id
   },
 
-  eliminar(id) { db.prepare(`DELETE FROM combustible WHERE id = ?`).run(id) },
+  async eliminar(id) {
+    await query(`DELETE FROM combustible WHERE id = ?`, [id])
+  },
 
   // Consumo: km recorridos entre cargas / litros. Rendimiento promedio km/l y costo/km.
-  resumen(id_vehiculo, { desde, hasta } = {}) {
-    const cargas = this.listar(id_vehiculo, { desde, hasta }).slice().reverse() // ascendente por fecha
+  async resumen(id_vehiculo, { desde, hasta } = {}) {
+    const cargas = (await this.listar(id_vehiculo, { desde, hasta })).slice().reverse() // ascendente por fecha
     let litros = 0, costo = 0
     cargas.forEach(c => { litros += c.litros || 0; costo += c.costo_total || 0 })
     // km recorridos = max km - min km (de las cargas con km > 0)

@@ -6,37 +6,37 @@ const { generarExcel } = require('../utils/excel')
 
 const AlertasController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { modulo, tipo, severidad } = req.query
-      const alertas = AlertasModel.listar({ modulo, tipo, severidad })
+      const alertas = await AlertasModel.listar({ modulo, tipo, severidad })
       res.render('pages/alertas/index', {
         titulo: 'Centro de Alertas',
         alertas,
-        resumen: AlertasModel.resumen(),
-        config: Notif.getConfig(),
+        resumen: await AlertasModel.resumen(),
+        config: await Notif.getConfig(),
         filtros: { modulo: modulo || '', tipo: tipo || '', severidad: severidad || '' },
       })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar alertas.'); res.redirect('/') }
   },
 
-  guardarConfig(req, res) {
+  async guardarConfig(req, res) {
     try {
-      Notif.setConfig('email_activo', req.body.email_activo ? '1' : '0')
-      Notif.setConfig('email_destinatarios', req.body.email_destinatarios || '')
-      Notif.setConfig('umbral_dias', req.body.umbral_dias || '90,60,30')
-      Notif.setConfig('alertas_licencias', req.body.alertas_licencias ? '1' : '0')
-      Notif.setConfig('alertas_documentos', req.body.alertas_documentos ? '1' : '0')
-      Notif.setConfig('alertas_mantenimiento', req.body.alertas_mantenimiento ? '1' : '0')
+      await Notif.setConfig('email_activo', req.body.email_activo ? '1' : '0')
+      await Notif.setConfig('email_destinatarios', req.body.email_destinatarios || '')
+      await Notif.setConfig('umbral_dias', req.body.umbral_dias || '90,60,30')
+      await Notif.setConfig('alertas_licencias', req.body.alertas_licencias ? '1' : '0')
+      await Notif.setConfig('alertas_documentos', req.body.alertas_documentos ? '1' : '0')
+      await Notif.setConfig('alertas_mantenimiento', req.body.alertas_mantenimiento ? '1' : '0')
       req.flash('success', 'Configuración de notificaciones guardada.')
     } catch (err) { console.error(err); req.flash('error', 'Error al guardar.') }
     res.redirect('/alertas')
   },
 
-  exportar(req, res) {
+  async exportar(req, res) {
     try {
       const { modulo, tipo, severidad, formato } = req.query
-      const alertas = AlertasModel.listar({ modulo, tipo, severidad })
+      const alertas = await AlertasModel.listar({ modulo, tipo, severidad })
       const columnas = [
         { header: 'Severidad', key: 'severidad' },
         { header: 'Módulo', key: 'modulo' },

@@ -1,20 +1,20 @@
 'use strict'
 const crypto = require('crypto')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const ConfigContenedoresModel = {
 
-  obtenerTodos() {
-    return db.prepare(`SELECT clave, valor, descripcion FROM config_contenedores ORDER BY clave`).all()
+  async obtenerTodos() {
+    return (await query(`SELECT clave, valor, descripcion FROM config_contenedores ORDER BY clave`)).rows
   },
 
-  obtenerValor(clave) {
-    const row = db.prepare(`SELECT valor FROM config_contenedores WHERE clave = ?`).get(clave)
+  async obtenerValor(clave) {
+    const row = (await query(`SELECT valor FROM config_contenedores WHERE clave = ?`, [clave])).rows[0]
     return row ? row.valor : null
   },
 
-  obtenerPrecios() {
-    const rows = this.obtenerTodos()
+  async obtenerPrecios() {
+    const rows = await this.obtenerTodos()
     const cfg = {}
     rows.forEach(r => { cfg[r.clave] = r.valor })
     return {
@@ -27,15 +27,15 @@ const ConfigContenedoresModel = {
     }
   },
 
-  guardar(datos) {
-    const upd = db.prepare(`UPDATE config_contenedores SET valor = ? WHERE clave = ?`)
-    const ins = db.prepare(`INSERT OR IGNORE INTO config_contenedores (id, clave, valor) VALUES (?, ?, ?)`)
-    db.transaction(() => {
-      Object.entries(datos).forEach(([clave, valor]) => {
-        const result = upd.run(String(valor), clave)
-        if (result.changes === 0) ins.run(crypto.randomUUID(), clave, String(valor))
-      })
-    })()
+  async guardar(datos) {
+    await transaction(async (q) => {
+      for (const [clave, valor] of Object.entries(datos)) {
+        const result = await q(`UPDATE config_contenedores SET valor = ? WHERE clave = ?`, [String(valor), clave])
+        if (result.rowCount === 0) {
+          await q(`INSERT INTO config_contenedores (id, clave, valor) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), clave, String(valor)])
+        }
+      }
+    })
   },
 }
 

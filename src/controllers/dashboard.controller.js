@@ -7,16 +7,16 @@ const AlertasModel = require('../models/alertas.model')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const DashboardController = {
-  index(req, res) {
+  async index(req, res) {
     try {
       const periodo = resolverPeriodo({ preset: 'mes' })
       const filtros = { fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
-      const ventas = VentasModel.resumen(filtros)
-      const trans  = TransaccionesModel.resumen(filtros)
-      const flota  = FlotaModel.resumenFlota()
-      const choferes = EmpleadosModel.listarChoferes({ soloActivos: true }).length
-      const alertas = AlertasModel.resumen()
-      const topAlertas = AlertasModel.listar({}).slice(0, 8)
+      const ventas = await VentasModel.resumen(filtros)
+      const trans  = await TransaccionesModel.resumen(filtros)
+      const flota  = await FlotaModel.resumenFlota()
+      const choferes = (await EmpleadosModel.listarChoferes({ soloActivos: true })).length
+      const alertas = await AlertasModel.resumen()
+      const topAlertas = (await AlertasModel.listar({})).slice(0, 8)
 
       res.render('pages/dashboard', {
         titulo: 'Dashboard',

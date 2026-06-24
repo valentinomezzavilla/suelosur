@@ -7,9 +7,9 @@ const OperacionesModel        = require('../models/operaciones.model')
 
 const AlquileresController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
-      const grupos = AlquileresModel.listarPorEstado()
+      const grupos = await AlquileresModel.listarPorEstado()
       res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos })
     } catch (err) {
       console.error(err)
@@ -18,10 +18,10 @@ const AlquileresController = {
     }
   },
 
-  nuevo(req, res) {
+  async nuevo(req, res) {
     try {
-      const { disponibles, porLiberar } = AlquileresModel.contenedoresDisponibles()
-      const configPrecios = ConfigContenedoresModel.obtenerPrecios()
+      const { disponibles, porLiberar } = await AlquileresModel.contenedoresDisponibles()
+      const configPrecios = await ConfigContenedoresModel.obtenerPrecios()
       res.render('pages/alquileres/nuevo', {
         titulo: 'Nuevo Alquiler de Contenedor',
         disponibles, porLiberar, configPrecios,
@@ -34,7 +34,7 @@ const AlquileresController = {
     }
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
@@ -53,7 +53,7 @@ const AlquileresController = {
 
       let result
       if (esProgramado) {
-        result = AlquileresModel.crearProgramado({
+        result = await AlquileresModel.crearProgramado({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
           zona_entrega, plazo_alquiler, precio_alquiler,
@@ -61,7 +61,7 @@ const AlquileresController = {
           observaciones, alquiler_actual_id,
         })
       } else {
-        result = AlquileresModel.crear({
+        result = await AlquileresModel.crear({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, observaciones,
@@ -77,17 +77,17 @@ const AlquileresController = {
     }
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const alquiler = AlquileresModel.obtener(req.params.id)
+      const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
-      const { disponibles } = AlquileresModel.contenedoresDisponibles()
+      const { disponibles } = await AlquileresModel.contenedoresDisponibles()
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles,
-        recursos: OperacionesModel.obtenerRecursos(alquiler.id),
-        choferesDisp: OperacionesModel.choferesDisponibles(),
-        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursos: await OperacionesModel.obtenerRecursos(alquiler.id),
+        choferesDisp: await OperacionesModel.choferesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles(),
         recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {
@@ -97,9 +97,9 @@ const AlquileresController = {
     }
   },
 
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const alquiler = AlquileresModel.obtener(req.params.id)
+      const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
       if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/contenedores/${alquiler.id}`) }
       res.render('pages/alquileres/editar', { titulo: `Editar OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
@@ -108,9 +108,9 @@ const AlquileresController = {
     }
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
-      AlquileresModel.actualizar(req.params.id, req.body)
+      await AlquileresModel.actualizar(req.params.id, req.body)
       req.flash('success', 'Alquiler actualizado.')
       res.redirect(`/alquileres/contenedores/${req.params.id}`)
     } catch (err) {
@@ -118,11 +118,11 @@ const AlquileresController = {
     }
   },
 
-  asignarContenedor(req, res) {
+  async asignarContenedor(req, res) {
     try {
       const { id_contenedor } = req.body
       if (!id_contenedor) { req.flash('error', 'Seleccioná un contenedor.'); return res.redirect(`/alquileres/contenedores/${req.params.id}`) }
-      AlquileresModel.asignarContenedor(req.params.id, id_contenedor)
+      await AlquileresModel.asignarContenedor(req.params.id, id_contenedor)
       req.flash('success', 'Contenedor asignado.')
     } catch (err) {
       console.error(err)
@@ -131,9 +131,9 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
-  despachar(req, res) {
+  async despachar(req, res) {
     try {
-      AlquileresModel.despachar(req.params.id)
+      await AlquileresModel.despachar(req.params.id)
       req.flash('success', 'Contenedor despachado — movimiento "en tránsito" registrado.')
     } catch (err) {
       console.error(err)
@@ -142,12 +142,12 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
-  entregar(req, res) {
+  async entregar(req, res) {
     try {
-      const alquiler = AlquileresModel.obtener(req.params.id)
-      AlquileresModel.entregar(req.params.id)
+      const alquiler = await AlquileresModel.obtener(req.params.id)
+      await AlquileresModel.entregar(req.params.id)
       if (alquiler) {
-        TransaccionesModel.crear({
+        await TransaccionesModel.crear({
           tipo: 'Alquiler',
           id_op_encabezado: alquiler.id,
           nro_remito: alquiler.nro_remito,
@@ -158,7 +158,7 @@ const AlquileresController = {
           metodo_pago: alquiler.metodo_pago || 'efectivo',
         })
         if (alquiler.metodo_pago === 'cuenta_corriente' && alquiler.id_cliente) {
-          ClientesModel.agregarMovimiento(alquiler.id_cliente, {
+          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'deuda',
             descripcion: `Alquiler contenedor #${alquiler.detalle?.numero_contenedor || '?'}`,
             monto: -(alquiler.detalle?.precio_alquiler || 0),
@@ -173,9 +173,9 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
-  retirar(req, res) {
+  async retirar(req, res) {
     try {
-      AlquileresModel.registrarRetiro(req.params.id)
+      await AlquileresModel.registrarRetiro(req.params.id)
       req.flash('success', 'Retiro registrado.')
     } catch (err) {
       console.error(err)
@@ -184,12 +184,12 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
-  devolverAPlanta(req, res) {
+  async devolverAPlanta(req, res) {
     try {
-      const alquiler = AlquileresModel.obtener(req.params.id)
-      AlquileresModel.devolverAPlanta(req.params.id)
+      const alquiler = await AlquileresModel.obtener(req.params.id)
+      await AlquileresModel.devolverAPlanta(req.params.id)
       if (alquiler?.detalle?.alquiler_siguiente_id) {
-        AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
+        await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
       req.flash('success', 'Contenedor devuelto a planta — ciclo completado.')
     } catch (err) {
@@ -199,9 +199,9 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
-  anular(req, res) {
+  async anular(req, res) {
     try {
-      AlquileresModel.anular(req.params.id)
+      await AlquileresModel.anular(req.params.id)
       req.flash('success', 'Alquiler anulado.')
     } catch (err) {
       console.error(err)

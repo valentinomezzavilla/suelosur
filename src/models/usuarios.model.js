@@ -1,44 +1,44 @@
 'use strict'
 const crypto = require('crypto')
 const bcrypt = require('bcryptjs')
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const UsuariosModel = {
 
-  listar() {
-    return db.prepare(`SELECT id, usuario, nombre, rol, activo, created_at FROM users ORDER BY nombre`).all()
+  async listar() {
+    return (await query(`SELECT id, usuario, nombre, rol, activo, created_at FROM users ORDER BY nombre`)).rows
   },
 
-  obtener(id) {
-    return db.prepare(`SELECT id, usuario, nombre, rol, activo FROM users WHERE id = ?`).get(id)
+  async obtener(id) {
+    return (await query(`SELECT id, usuario, nombre, rol, activo FROM users WHERE id = ?`, [id])).rows[0]
   },
 
-  crear({ usuario, nombre, rol, password }) {
+  async crear({ usuario, nombre, rol, password }) {
     const id = crypto.randomUUID()
     const hash = bcrypt.hashSync(password, 10)
-    db.prepare(`INSERT INTO users (id, usuario, password_hash, nombre, rol) VALUES (?, ?, ?, ?, ?)`
-    ).run(id, usuario, hash, nombre, rol)
+    await query(`INSERT INTO users (id, usuario, password_hash, nombre, rol) VALUES (?, ?, ?, ?, ?)`,
+      [id, usuario, hash, nombre, rol])
     return id
   },
 
-  actualizar(id, { usuario, nombre, rol, password }) {
+  async actualizar(id, { usuario, nombre, rol, password }) {
     if (password) {
       const hash = bcrypt.hashSync(password, 10)
-      db.prepare(`UPDATE users SET usuario = ?, nombre = ?, rol = ?, password_hash = ? WHERE id = ?`
-      ).run(usuario, nombre, rol, hash, id)
+      await query(`UPDATE users SET usuario = ?, nombre = ?, rol = ?, password_hash = ? WHERE id = ?`,
+        [usuario, nombre, rol, hash, id])
     } else {
-      db.prepare(`UPDATE users SET usuario = ?, nombre = ?, rol = ? WHERE id = ?`
-      ).run(usuario, nombre, rol, id)
+      await query(`UPDATE users SET usuario = ?, nombre = ?, rol = ? WHERE id = ?`,
+        [usuario, nombre, rol, id])
     }
   },
 
-  toggleActivo(id) {
-    db.prepare(`UPDATE users SET activo = NOT activo WHERE id = ?`).run(id)
+  async toggleActivo(id) {
+    await query(`UPDATE users SET activo = 1 - activo WHERE id = ?`, [id])
   },
 
-  existeUsuario(usuario, excludeId = null) {
-    if (excludeId) return db.prepare(`SELECT 1 FROM users WHERE usuario = ? AND id != ?`).get(usuario, excludeId)
-    return db.prepare(`SELECT 1 FROM users WHERE usuario = ?`).get(usuario)
+  async existeUsuario(usuario, excludeId = null) {
+    if (excludeId) return (await query(`SELECT 1 FROM users WHERE usuario = ? AND id != ?`, [usuario, excludeId])).rows[0]
+    return (await query(`SELECT 1 FROM users WHERE usuario = ?`, [usuario])).rows[0]
   },
 }
 

@@ -8,9 +8,9 @@ const OperacionesModel          = require('../models/operaciones.model')
 
 const AlquileresMaquinariaController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
-      const grupos = AlquileresMaquinariaModel.listarPorEstado()
+      const grupos = await AlquileresMaquinariaModel.listarPorEstado()
       res.render('pages/alquileres/maquinaria_index', { titulo: 'Alquileres — Maquinaria', grupos })
     } catch (err) {
       console.error(err)
@@ -19,11 +19,11 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  nuevo(req, res) {
+  async nuevo(req, res) {
     try {
-      const disponibles  = MaquinariaModel.disponibles()
-      const choferes     = MaquinariaModel.choferes()
-      const configDefaults = ConfigMaquinariaModel.obtenerDefaults()
+      const disponibles  = await MaquinariaModel.disponibles()
+      const choferes     = await MaquinariaModel.choferes()
+      const configDefaults = await ConfigMaquinariaModel.obtenerDefaults()
       res.render('pages/alquileres/maquinaria_nuevo', {
         titulo: 'Nuevo Alquiler de Maquinaria',
         disponibles, choferes, configDefaults,
@@ -36,7 +36,7 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  crear(req, res) {
+  async crear(req, res) {
     try {
       const { clienteId, calle, numero, zona_entrega, plazo_alquiler, modo_precio, precio_por_hora, horas_pactadas, precio_total, id_maquinaria, id_chofer, metodoPago, observaciones } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
@@ -46,7 +46,7 @@ const AlquileresMaquinariaController = {
       }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
-      const { nro_op } = AlquileresMaquinariaModel.crear({
+      const { nro_op } = await AlquileresMaquinariaModel.crear({
         id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
         domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
         zona_entrega, plazo_alquiler,
@@ -65,17 +65,17 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const alquiler    = AlquileresMaquinariaModel.obtener(req.params.id)
+      const alquiler    = await AlquileresMaquinariaModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/maquinaria') }
-      const disponibles = MaquinariaModel.disponibles()
+      const disponibles = await MaquinariaModel.disponibles()
       res.render('pages/alquileres/maquinaria_detalle', {
         titulo: `Alquiler Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles,
-        recursos: OperacionesModel.obtenerRecursos(alquiler.id),
-        choferesDisp: OperacionesModel.choferesDisponibles(),
-        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursos: await OperacionesModel.obtenerRecursos(alquiler.id),
+        choferesDisp: await OperacionesModel.choferesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles(),
         recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {
@@ -85,9 +85,9 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const alquiler = AlquileresMaquinariaModel.obtener(req.params.id)
+      const alquiler = await AlquileresMaquinariaModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/maquinaria') }
       if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/maquinaria/${alquiler.id}`) }
       res.render('pages/alquileres/maquinaria_editar', { titulo: `Editar Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
@@ -96,9 +96,9 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
-      AlquileresMaquinariaModel.actualizar(req.params.id, req.body)
+      await AlquileresMaquinariaModel.actualizar(req.params.id, req.body)
       req.flash('success', 'Alquiler actualizado.')
       res.redirect(`/alquileres/maquinaria/${req.params.id}`)
     } catch (err) {
@@ -106,11 +106,11 @@ const AlquileresMaquinariaController = {
     }
   },
 
-  asignarMaquinaria(req, res) {
+  async asignarMaquinaria(req, res) {
     try {
       const { id_maquinaria } = req.body
       if (!id_maquinaria) { req.flash('error', 'Seleccioná una máquina.'); return res.redirect(`/alquileres/maquinaria/${req.params.id}`) }
-      AlquileresMaquinariaModel.asignarMaquinaria(req.params.id, id_maquinaria)
+      await AlquileresMaquinariaModel.asignarMaquinaria(req.params.id, id_maquinaria)
       req.flash('success', 'Maquinaria asignada.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error al asignar.')
@@ -118,9 +118,9 @@ const AlquileresMaquinariaController = {
     res.redirect(`/alquileres/maquinaria/${req.params.id}`)
   },
 
-  despachar(req, res) {
+  async despachar(req, res) {
     try {
-      AlquileresMaquinariaModel.despachar(req.params.id)
+      await AlquileresMaquinariaModel.despachar(req.params.id)
       req.flash('success', 'Maquinaria despachada.')
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
@@ -128,12 +128,12 @@ const AlquileresMaquinariaController = {
     res.redirect(`/alquileres/maquinaria/${req.params.id}`)
   },
 
-  entregar(req, res) {
+  async entregar(req, res) {
     try {
-      const alquiler = AlquileresMaquinariaModel.obtener(req.params.id)
-      AlquileresMaquinariaModel.entregar(req.params.id)
+      const alquiler = await AlquileresMaquinariaModel.obtener(req.params.id)
+      await AlquileresMaquinariaModel.entregar(req.params.id)
       if (alquiler) {
-        TransaccionesModel.crear({
+        await TransaccionesModel.crear({
           tipo: 'Maquinaria',
           id_op_encabezado: alquiler.id,
           nro_remito: alquiler.nro_remito,
@@ -144,7 +144,7 @@ const AlquileresMaquinariaController = {
           metodo_pago: alquiler.metodo_pago || 'efectivo',
         })
         if (alquiler.metodo_pago === 'cuenta_corriente' && alquiler.id_cliente) {
-          ClientesModel.agregarMovimiento(alquiler.id_cliente, {
+          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'deuda',
             descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'}`,
             monto: -(alquiler.detalle?.precio_total || 0),
@@ -158,9 +158,9 @@ const AlquileresMaquinariaController = {
     res.redirect(`/alquileres/maquinaria/${req.params.id}`)
   },
 
-  retirar(req, res) {
+  async retirar(req, res) {
     try {
-      AlquileresMaquinariaModel.registrarRetiro(req.params.id)
+      await AlquileresMaquinariaModel.registrarRetiro(req.params.id)
       req.flash('success', 'Trabajo finalizado — pendiente retiro.')
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
@@ -168,9 +168,9 @@ const AlquileresMaquinariaController = {
     res.redirect(`/alquileres/maquinaria/${req.params.id}`)
   },
 
-  devolverAPlanta(req, res) {
+  async devolverAPlanta(req, res) {
     try {
-      AlquileresMaquinariaModel.devolverAPlanta(req.params.id)
+      await AlquileresMaquinariaModel.devolverAPlanta(req.params.id)
       req.flash('success', 'Maquinaria devuelta a planta.')
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
@@ -178,9 +178,9 @@ const AlquileresMaquinariaController = {
     res.redirect(`/alquileres/maquinaria/${req.params.id}`)
   },
 
-  anular(req, res) {
+  async anular(req, res) {
     try {
-      AlquileresMaquinariaModel.anular(req.params.id)
+      await AlquileresMaquinariaModel.anular(req.params.id)
       req.flash('success', 'Alquiler anulado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error al anular.')

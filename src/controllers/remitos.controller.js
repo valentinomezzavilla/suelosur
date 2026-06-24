@@ -8,9 +8,9 @@ const { DIR_REMITOS } = require('../middlewares/upload')
 const RemitosController = {
 
   // Remito en PDF (server-side, pdfkit)
-  pdf(req, res) {
+  async pdf(req, res) {
     try {
-      const r = RemitosModel.obtener(req.params.id)
+      const r = await RemitosModel.obtener(req.params.id)
       if (!r) { req.flash('error', 'Operación no encontrada.'); return res.redirect('/ventas') }
       generarRemitoPDF(res, r)
     } catch (err) {
@@ -21,8 +21,8 @@ const RemitosController = {
   },
 
   // Guardar remito firmado subido (multer ya guardó el archivo)
-  subirFirmado(req, res) {
-    const r = RemitosModel.obtener(req.params.id)
+  async subirFirmado(req, res) {
+    const r = await RemitosModel.obtener(req.params.id)
     const back = r ? RemitosModel.urlOperacion(r) : '/ventas'
     try {
       if (!req.file) { req.flash('error', 'No se recibió ningún archivo.'); return res.redirect(back) }
@@ -31,7 +31,7 @@ const RemitosController = {
         const prev = path.join(DIR_REMITOS, r.archivo_remito)
         if (fs.existsSync(prev)) { try { fs.unlinkSync(prev) } catch (_) {} }
       }
-      RemitosModel.guardarArchivo(req.params.id, req.file.filename)
+      await RemitosModel.guardarArchivo(req.params.id, req.file.filename)
       req.flash('success', 'Remito firmado adjuntado correctamente.')
     } catch (err) {
       console.error(err)
@@ -41,9 +41,9 @@ const RemitosController = {
   },
 
   // Ver / descargar el remito firmado (archivo fuera de /public → auth)
-  verFirmado(req, res) {
+  async verFirmado(req, res) {
     try {
-      const r = RemitosModel.obtener(req.params.id)
+      const r = await RemitosModel.obtener(req.params.id)
       if (!r || !r.archivo_remito) { req.flash('error', 'No hay remito firmado adjunto.'); return res.redirect('back') }
       const file = path.join(DIR_REMITOS, r.archivo_remito)
       if (!fs.existsSync(file)) { req.flash('error', 'El archivo no se encuentra.'); return res.redirect('back') }
@@ -56,14 +56,14 @@ const RemitosController = {
   },
 
   // Eliminar el remito firmado adjunto
-  eliminarFirmado(req, res) {
-    const r = RemitosModel.obtener(req.params.id)
+  async eliminarFirmado(req, res) {
+    const r = await RemitosModel.obtener(req.params.id)
     const back = r ? RemitosModel.urlOperacion(r) : '/ventas'
     try {
       if (r && r.archivo_remito) {
         const file = path.join(DIR_REMITOS, r.archivo_remito)
         if (fs.existsSync(file)) { try { fs.unlinkSync(file) } catch (_) {} }
-        RemitosModel.guardarArchivo(req.params.id, null)
+        await RemitosModel.guardarArchivo(req.params.id, null)
         req.flash('success', 'Remito firmado eliminado.')
       }
     } catch (err) {

@@ -4,15 +4,15 @@
 // Normaliza material (M), contenedor (C) y maquinaria (MA) a una
 // misma forma para PDF / vista / remito firmado.
 // ─────────────────────────────────────────────────────────────────
-const db = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const TIPO_LABEL = { M: 'Venta de áridos', C: 'Alquiler de contenedor', MA: 'Alquiler de maquinaria' }
 
 const RemitosModel = {
 
   // Devuelve un objeto normalizado o null si la OP no existe.
-  obtener(opId) {
-    const op = db.prepare(`
+  async obtener(opId) {
+    const op = (await query(`
       SELECT op.*, COALESCE(c.nombre, 'Particular') AS cliente_nombre,
              c.apellido AS cliente_apellido, c.tel_whatsapp, c.telefono AS cliente_telefono,
              c.domicilio_ppal, c.dni AS cliente_dni,
@@ -21,7 +21,7 @@ const RemitosModel = {
       LEFT JOIN clientes c ON c.id = op.id_cliente
       JOIN users u ON u.id = op.id_administrativo
       WHERE op.id = ?
-    `).get(opId)
+    `, [opId])).rows[0]
     if (!op) return null
 
     const r = {
@@ -49,11 +49,11 @@ const RemitosModel = {
     }
 
     if (op.tipo_op === 'M') {
-      const dets = db.prepare(`
+      const dets = (await query(`
         SELECT d.cantidad_pedida, d.precio_unitario, p.nombre AS producto, p.unidad_medida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         WHERE d.id_orden_pedido = ?
-      `).all(opId)
+      `, [opId])).rows
       r.items = dets.map(d => ({
         descripcion: d.producto,
         unidad: d.unidad_medida,
@@ -66,11 +66,11 @@ const RemitosModel = {
         r.entrega = { domicilio: calle || op.domicilio_ppal || '', zona: '', plazo: null }
       }
     } else if (op.tipo_op === 'C') {
-      const d = db.prepare(`
+      const d = (await query(`
         SELECT oc.*, cont.numero_contenedor
         FROM op_detalle_contenedor oc LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
         WHERE oc.id_orden_pedido = ? LIMIT 1
-      `).get(opId)
+      `, [opId])).rows[0]
       if (d) {
         r.items = [{
           descripcion: `Alquiler de contenedor de obra${d.numero_contenedor ? ' N° ' + d.numero_contenedor : ''}`,
@@ -83,11 +83,11 @@ const RemitosModel = {
         }
       }
     } else if (op.tipo_op === 'MA') {
-      const d = db.prepare(`
+      const d = (await query(`
         SELECT opm.*, maq.nombre AS maquinaria_nombre
         FROM op_detalle_maquinaria opm LEFT JOIN maquinaria maq ON maq.id = opm.id_maquinaria
         WHERE opm.id_orden_pedido = ? LIMIT 1
-      `).get(opId)
+      `, [opId])).rows[0]
       if (d) {
         r.items = [{
           descripcion: `Alquiler de maquinaria${d.maquinaria_nombre ? ' — ' + d.maquinaria_nombre : ''}`,
@@ -107,8 +107,8 @@ const RemitosModel = {
     return r
   },
 
-  guardarArchivo(opId, filename) {
-    db.prepare(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`).run(filename, opId)
+  async guardarArchivo(opId, filename) {
+    await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [filename, opId])
   },
 
   // Ruta de "volver" coherente con el tipo de operación.

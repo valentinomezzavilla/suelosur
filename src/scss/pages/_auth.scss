@@ -3,52 +3,157 @@
 
 .auth-body {
   min-height: 100vh;
-  background: $bg-app;
+  background: #0d1b35;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 1.25rem;
 }
 
+// ── Card principal ─────────────────────────────────────────────
 .login-card {
-  border-radius: $radius-xl;
-  overflow: hidden;
+  background: #fff;
+  border-radius: 20px;
   width: 100%;
   max-width: 420px;
-}
-
-.login-header {
-  background: $dark;
-  color: #fff;
+  padding: 2.75rem 2.25rem 2rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
   text-align: center;
-  padding: 1.75rem 1.5rem 1.5rem;
+}
 
-  .brand-name {
-    color: #fff;
-    font-weight: 800;
-    font-size: 1.6rem;
-    letter-spacing: 2px;
-    line-height: 1.15;
-  }
+// ── Logo ───────────────────────────────────────────────────────
+.login-logo-wrap {
+  margin-bottom: 1.25rem;
+}
 
-  .sub {
-    color: $muted-light;
-    font-size: 0.78rem;
-    letter-spacing: 0.3px;
+.login-logo {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+}
+
+// ── Textos de cabecera ─────────────────────────────────────────
+.login-title {
+  font-size: 1.55rem;
+  font-weight: 700;
+  color: $dark;
+  margin: 0 0 0.2rem;
+  letter-spacing: -0.3px;
+}
+
+.login-subtitle {
+  font-size: 0.88rem;
+  color: $muted;
+  margin: 0 0 0.15rem;
+}
+
+.login-desc {
+  font-size: 0.84rem;
+  color: $muted;
+  margin: 0 0 1.75rem;
+}
+
+.login-desc-accent {
+  color: $accent;
+}
+
+// ── Formulario ─────────────────────────────────────────────────
+.login-form {
+  text-align: left;
+}
+
+.login-field {
+  margin-bottom: 1rem;
+
+  &:last-of-type { margin-bottom: 1.5rem; }
+}
+
+.login-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: $dark;
+  margin-bottom: 0.4rem;
+}
+
+.login-input {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background: #eef3fd;
+  border: 1.5px solid transparent;
+  border-radius: $radius-md;
+  font-size: 0.9rem;
+  color: $dark;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+
+  &::placeholder { color: $muted-light; }
+
+  &:focus {
+    outline: none;
+    background: #fff;
+    border-color: $accent;
+    box-shadow: $focus-ring;
   }
 }
 
-.login-input  { border-radius: $radius-md; }
+// ── Campo contraseña con ojo ────────────────────────────────────
+.login-pwd-wrap {
+  position: relative;
 
+  .login-input {
+    padding-right: 2.75rem;
+  }
+}
+
+.login-eye {
+  position: absolute;
+  right: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: $muted;
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  transition: color 0.12s;
+
+  &:hover { color: $accent; }
+}
+
+// ── Botón principal ────────────────────────────────────────────
 .login-submit {
-  background: $accent;
+  display: block;
+  width: 100%;
+  padding: 0.8rem;
+  background: #0d1b35;
+  color: #fff;
   border: none;
   border-radius: $radius-md;
-  padding: 0.7rem;
-  color: #fff;
+  font-size: 1rem;
   font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.1px;
+  transition: background 0.15s;
 
-  &:hover { background: $accent-dark; color: #fff; }
+  &:hover  { background: #0a1528; }
+  &:active { background: #071020; }
 }
 
-.login-footer { color: $muted-light; }
+// ── Pie de página ──────────────────────────────────────────────
+.login-footer {
+  margin-top: 1.5rem;
+  font-size: 0.8rem;
+  color: $muted;
+  text-align: center;
+}
+
+.login-footer-link {
+  color: $accent;
+  text-decoration: none;
+
+  &:hover { text-decoration: underline; }
+}

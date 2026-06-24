@@ -1,13 +1,13 @@
 'use strict'
 const UsuariosModel  = require('../models/usuarios.model')
 const EmpleadosModel = require('../models/empleados.model')
-const db             = require('../config/db')
+const { query }      = require('../config/db')
 const paginar        = require('../utils/paginar')
 
 // Crea un empleado-chofer asociado a un usuario si todavía no existe.
-function crearEmpleadoChoferSiNoExiste(idUsuario, datosUsuario) {
+async function crearEmpleadoChoferSiNoExiste(idUsuario, datosUsuario) {
   if (!idUsuario) return
-  const existe = db.prepare(`SELECT id FROM empleados WHERE id_usuario = ?`).get(idUsuario)
+  const existe = (await query(`SELECT id FROM empleados WHERE id_usuario = ?`, [idUsuario])).rows[0]
   if (existe) return existe.id
   // Separar nombre / apellido si vino en formato "Nombre Apellido"
   const partes = (datosUsuario.nombre || '').trim().split(/\s+/)
@@ -24,9 +24,9 @@ function crearEmpleadoChoferSiNoExiste(idUsuario, datosUsuario) {
 }
 
 const UsuariosController = {
-  index(req, res) {
+  async index(req, res) {
     try {
-      const todos = UsuariosModel.listar()
+      const todos = await UsuariosModel.listar()
       const { items: usuarios, total, page, limit, totalPaginas } = paginar(todos, req.query.page, 15)
       res.render('pages/usuarios/index', {
         titulo: 'Usuarios', usuarios, total, page, limit, totalPaginas, filtros: req.query,
@@ -36,19 +36,19 @@ const UsuariosController = {
       console.error(err); req.flash('error', 'Error.'); res.redirect('back')
     }
   },
-  nuevo(req, res) {
+  async nuevo(req, res) {
     res.render('pages/usuarios/form', { titulo: 'Nuevo Usuario', usuario: null })
   },
-  crear(req, res) {
+  async crear(req, res) {
     try {
       const { usuario, nombre, rol, password, password_confirm } = req.body
       if (!usuario || !nombre || !rol || !password) { req.flash('error', 'Todos los campos son obligatorios.'); return res.redirect('/usuarios/nuevo') }
       if (password !== password_confirm) { req.flash('error', 'Las contraseñas no coinciden.'); return res.redirect('/usuarios/nuevo') }
-      if (UsuariosModel.existeUsuario(usuario)) { req.flash('error', `El usuario "${usuario}" ya existe.`); return res.redirect('/usuarios/nuevo') }
-      const idUsuario = UsuariosModel.crear({ usuario, nombre, rol, password })
+      if (await UsuariosModel.existeUsuario(usuario)) { req.flash('error', `El usuario "${usuario}" ya existe.`); return res.redirect('/usuarios/nuevo') }
+      const idUsuario = await UsuariosModel.crear({ usuario, nombre, rol, password })
       if (rol === 'chofer') {
         try {
-          crearEmpleadoChoferSiNoExiste(idUsuario, { usuario, nombre })
+          await crearEmpleadoChoferSiNoExiste(idUsuario, { usuario, nombre })
           req.flash('success', `Usuario ${nombre} creado y registrado como chofer.`)
         } catch (e) {
           console.error('No se pudo crear el empleado-chofer:', e)
@@ -62,26 +62,26 @@ const UsuariosController = {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/usuarios/nuevo')
     }
   },
-  editar(req, res) {
+  async editar(req, res) {
     try {
-      const usuario = UsuariosModel.obtener(req.params.id)
+      const usuario = await UsuariosModel.obtener(req.params.id)
       if (!usuario) { req.flash('error', 'No encontrado.'); return res.redirect('/usuarios') }
       res.render('pages/usuarios/form', { titulo: 'Editar Usuario', usuario })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/usuarios')
     }
   },
-  actualizar(req, res) {
+  async actualizar(req, res) {
     try {
       const { usuario, nombre, rol, password, password_confirm } = req.body
       const id = req.params.id
       if (!usuario || !nombre || !rol) { req.flash('error', 'Usuario, nombre y rol son obligatorios.'); return res.redirect(`/usuarios/${id}/editar`) }
       if (password && password !== password_confirm) { req.flash('error', 'Las contraseñas no coinciden.'); return res.redirect(`/usuarios/${id}/editar`) }
-      if (UsuariosModel.existeUsuario(usuario, id)) { req.flash('error', `El usuario "${usuario}" ya está en uso.`); return res.redirect(`/usuarios/${id}/editar`) }
-      UsuariosModel.actualizar(id, { usuario, nombre, rol, password: password || null })
+      if (await UsuariosModel.existeUsuario(usuario, id)) { req.flash('error', `El usuario "${usuario}" ya está en uso.`); return res.redirect(`/usuarios/${id}/editar`) }
+      await UsuariosModel.actualizar(id, { usuario, nombre, rol, password: password || null })
       // Si pasó a ser chofer, crear empleado-chofer si no existe
       if (rol === 'chofer') {
-        try { crearEmpleadoChoferSiNoExiste(id, { usuario, nombre }) } catch (e) { console.error('crear chofer auto:', e) }
+        try { await crearEmpleadoChoferSiNoExiste(id, { usuario, nombre }) } catch (e) { console.error('crear chofer auto:', e) }
       }
       req.flash('success', 'Usuario actualizado.')
       res.redirect('/usuarios')
@@ -89,10 +89,10 @@ const UsuariosController = {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/usuarios')
     }
   },
-  toggleActivo(req, res) {
+  async toggleActivo(req, res) {
     try {
       if (req.params.id === req.session.user.id) { req.flash('error', 'No podés desactivar tu propia cuenta.'); return res.redirect('/usuarios') }
-      UsuariosModel.toggleActivo(req.params.id)
+      await UsuariosModel.toggleActivo(req.params.id)
       req.flash('success', 'Estado del usuario actualizado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')

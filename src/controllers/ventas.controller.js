@@ -4,21 +4,21 @@ const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel     = require('../models/clientes.model')
 const OperacionesModel  = require('../models/operaciones.model')
 const AsignacionesModel = require('../models/asignaciones.model')
-const db                = require('../config/db')
+const { query }         = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
 const VentasController = {
 
-  index(req, res) {
+  async index(req, res) {
     try {
       const { estado, id_cliente, q, sort, dir, page, preset, fechaDesde, fechaHasta, mes } = req.query
       const periodo = resolverPeriodo({ preset, desde: fechaDesde, hasta: fechaHasta, mes })
 
       const filtrosBase = { estado, id_cliente, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
-      const paginacion = VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 15 })
-      const clientes   = VentasModel.listarClientes()
-      const resumen    = VentasModel.contarPorEstado()
-      const metricas   = VentasModel.resumen(filtrosBase)
+      const paginacion = await VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 15 })
+      const clientes   = await VentasModel.listarClientes()
+      const resumen    = await VentasModel.contarPorEstado()
+      const metricas   = await VentasModel.resumen(filtrosBase)
 
       res.render('pages/ventas/index', {
         titulo: 'Ventas',
@@ -37,9 +37,9 @@ const VentasController = {
   },
 
   // ── Venta en cantera ─────────────────────────────────────────
-  cantera(req, res) {
+  async cantera(req, res) {
     try {
-      const productos = VentasModel.listarProductos()
+      const productos = await VentasModel.listarProductos()
       res.render('pages/ventas/cantera', {
         titulo: 'Venta en Cantera',
         productos,
@@ -52,7 +52,7 @@ const VentasController = {
     }
   },
 
-  finalizarCantera(req, res) {
+  async finalizarCantera(req, res) {
     try {
       const { clienteId, clienteNombre, items, metodoPago, precioTotal } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
@@ -69,7 +69,7 @@ const VentasController = {
         precio_unitario: p.precio,
       }))
 
-      const { id: id_op, nro_op, nro_remito } = VentasModel.crear({
+      const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
         id_cliente:          clienteIdClean,
         cliente_nombre_libre: !clienteIdClean ? nombre : null,
         id_administrativo:   req.session.user.id,
@@ -80,9 +80,9 @@ const VentasController = {
         detalles,
       })
 
-      VentasModel.entregar(id_op)
+      await VentasModel.entregar(id_op)
 
-      TransaccionesModel.crear({
+      await TransaccionesModel.crear({
         tipo:            'Venta Cantera',
         id_op_encabezado: id_op,
         nro_remito,
@@ -94,7 +94,7 @@ const VentasController = {
       })
 
       if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
-        ClientesModel.agregarMovimiento(clienteIdClean, {
+        await ClientesModel.agregarMovimiento(clienteIdClean, {
           tipo: 'deuda',
           descripcion: `Venta Cantera: ${desc}`,
           monto: -total,
@@ -109,7 +109,7 @@ const VentasController = {
     }
   },
 
-  confirmacionCantera(req, res) {
+  async confirmacionCantera(req, res) {
     const { tipo, cliente, total, remito } = req.query
     res.render('pages/ventas/confirmacion', {
       titulo: 'Venta confirmada',
@@ -121,24 +121,24 @@ const VentasController = {
   },
 
   // ── Venta con viaje (flete) ───────────────────────────────────
-  viaje(req, res) {
+  async viaje(req, res) {
     try {
-      const productos  = VentasModel.listarProductos()
-      const viajesHoy  = VentasModel.listarViajesPendientesHoy()
-      const viajesTodos = VentasModel.listarViajesPendientes()
-      const choferes = db.prepare(`
+      const productos  = await VentasModel.listarProductos()
+      const viajesHoy  = await VentasModel.listarViajesPendientesHoy()
+      const viajesTodos = await VentasModel.listarViajesPendientes()
+      const choferes = (await query(`
         SELECT e.id, e.nombre, e.apellido FROM empleados e
         WHERE e.es_chofer = 1 AND e.activo = 1
         ORDER BY e.apellido, e.nombre
-      `).all()
-      const camiones = db.prepare(`
+      `)).rows
+      const camiones = (await query(`
         SELECT v.id, v.numero_interno, v.patente, v.nombre, v.marca, v.modelo
         FROM flota_vehiculos v
         WHERE v.activo = 1
           AND COALESCE(v.estado_operativo, 'disponible') NOT IN ('en_mantenimiento','fuera_servicio','inactivo')
           AND COALESCE(v.dedicacion, 'ambos') IN ('ambos','ventas')
         ORDER BY v.numero_interno, v.nombre
-      `).all()
+      `)).rows
       res.render('pages/ventas/viaje', {
         titulo: 'Venta con Viaje',
         productos, viajesHoy, viajesTodos, choferes, camiones,
@@ -153,9 +153,9 @@ const VentasController = {
 
   // ── API: asignación chofer ↔ camión ────────────────────────────
   // Dado un id de camión, devuelve el chofer que lo tiene asignado (si hay)
-  apiChoferDeCamion(req, res) {
+  async apiChoferDeCamion(req, res) {
     try {
-      const chofer = AsignacionesModel.choferDeRecurso('camion', req.params.idCamion)
+      const chofer = await AsignacionesModel.choferDeRecurso('camion', req.params.idCamion)
       if (!chofer) return res.json(null)
       return res.json({
         id: chofer.id_empleado,
@@ -166,16 +166,16 @@ const VentasController = {
   },
 
   // Dado un id de empleado/chofer, devuelve el camión que tiene asignado (si hay)
-  apiCamionDeChofer(req, res) {
+  async apiCamionDeChofer(req, res) {
     try {
-      const asig = AsignacionesModel.recursoActivo(req.params.idChofer, 'camion')
+      const asig = await AsignacionesModel.recursoActivo(req.params.idChofer, 'camion')
       if (!asig) return res.json(null)
-      const camion = db.prepare(`SELECT id, numero_interno, patente, nombre, marca, modelo FROM flota_vehiculos WHERE id = ?`).get(asig.recurso_id)
+      const camion = (await query(`SELECT id, numero_interno, patente, nombre, marca, modelo FROM flota_vehiculos WHERE id = ?`, [asig.recurso_id])).rows[0]
       return res.json(camion || null)
     } catch (err) { console.error(err); res.status(500).json({ error: 'Error' }) }
   },
 
-  crearViaje(req, res) {
+  async crearViaje(req, res) {
     try {
       const {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
@@ -190,7 +190,7 @@ const VentasController = {
       const total     = Number(precioTotal) || 0
 
       // Crear OP tipo M con modalidad flete
-      const { id: id_op, nro_op, nro_remito } = VentasModel.crear({
+      const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
         id_cliente:          clienteId || null,
         cliente_nombre_libre: !clienteId ? clienteNombre : null,
         id_administrativo:   req.session.user.id,
@@ -210,7 +210,7 @@ const VentasController = {
       // Asignar chofer y camión si se seleccionaron
       if (idChofer || idCamion) {
         try {
-          OperacionesModel.asignar(id_op, {
+          await OperacionesModel.asignar(id_op, {
             id_chofer: idChofer || null,
             id_camion: idCamion || null,
             usuario: req.session.user.id,
@@ -219,8 +219,8 @@ const VentasController = {
       }
 
       if (esFinalizarAhora) {
-        VentasModel.entregar(id_op)
-        TransaccionesModel.crear({
+        await VentasModel.entregar(id_op)
+        await TransaccionesModel.crear({
           tipo:            'Venta Viaje',
           id_op_encabezado: id_op,
           nro_remito,
@@ -231,7 +231,7 @@ const VentasController = {
           metodo_pago:     metodoPago || 'efectivo',
         })
         if (metodoPago === 'cuenta_corriente' && clienteId) {
-          ClientesModel.agregarMovimiento(clienteId, {
+          await ClientesModel.agregarMovimiento(clienteId, {
             tipo: 'deuda',
             descripcion: `Venta Viaje: ${direccion}`,
             monto: -total,
@@ -249,15 +249,15 @@ const VentasController = {
   },
 
   // ── Detalle ───────────────────────────────────────────────────
-  detalle(req, res) {
+  async detalle(req, res) {
     try {
-      const op = VentasModel.obtener(req.params.id)
+      const op = await VentasModel.obtener(req.params.id)
       if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
       res.render('pages/ventas/detalle', {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
-        recursos: OperacionesModel.obtenerRecursos(op.id),
-        choferesDisp: OperacionesModel.choferesDisponibles(),
-        camionesDisp: OperacionesModel.camionesDisponibles(),
+        recursos: await OperacionesModel.obtenerRecursos(op.id),
+        choferesDisp: await OperacionesModel.choferesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles(),
         recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',
       })
     } catch (err) {
@@ -268,9 +268,9 @@ const VentasController = {
   },
 
   // ── Edición de viaje en proceso ───────────────────────────────
-  editarViaje(req, res) {
+  async editarViaje(req, res) {
     try {
-      const viaje = VentasModel.obtenerViaje(req.params.id)
+      const viaje = await VentasModel.obtenerViaje(req.params.id)
       if (!viaje) { req.flash('error', 'Viaje no encontrado.'); return res.redirect('/ventas') }
       if (viaje.estado === 'entregado' || viaje.estado === 'anulado') {
         req.flash('error', 'Solo se pueden editar viajes pendientes o despachados.')
@@ -289,9 +289,9 @@ const VentasController = {
     }
   },
 
-  actualizarViaje(req, res) {
+  async actualizarViaje(req, res) {
     try {
-      VentasModel.actualizarViaje(req.params.id, req.body)
+      await VentasModel.actualizarViaje(req.params.id, req.body)
       req.flash('success', 'Viaje actualizado.')
       res.redirect(`/ventas/${req.params.id}`)
     } catch (err) {
@@ -301,9 +301,9 @@ const VentasController = {
     }
   },
 
-  despachar(req, res) {
+  async despachar(req, res) {
     try {
-      VentasModel.despachar(req.params.id)
+      await VentasModel.despachar(req.params.id)
       req.flash('success', 'Orden marcada como despachada.')
     } catch (err) {
       console.error(err)
@@ -312,13 +312,13 @@ const VentasController = {
     res.redirect(`/ventas/${req.params.id}`)
   },
 
-  entregar(req, res) {
+  async entregar(req, res) {
     try {
-      const op = VentasModel.obtener(req.params.id)
-      VentasModel.entregar(req.params.id)
+      const op = await VentasModel.obtener(req.params.id)
+      await VentasModel.entregar(req.params.id)
       // Registrar transacción al entregar
       if (op) {
-        TransaccionesModel.crear({
+        await TransaccionesModel.crear({
           tipo:            op.modalidad === 'flete' ? 'Venta Viaje' : 'Venta Cantera',
           id_op_encabezado: op.id,
           nro_remito:      op.nro_remito,
@@ -338,9 +338,9 @@ const VentasController = {
     }
   },
 
-  anular(req, res) {
+  async anular(req, res) {
     try {
-      VentasModel.anular(req.params.id)
+      await VentasModel.anular(req.params.id)
       req.flash('warning', 'Orden anulada. Stock pendiente liberado.')
     } catch (err) {
       console.error(err)
@@ -349,9 +349,9 @@ const VentasController = {
     res.redirect('/ventas')
   },
 
-  remito(req, res) {
+  async remito(req, res) {
     try {
-      const op = VentasModel.obtener(req.params.id)
+      const op = await VentasModel.obtener(req.params.id)
       if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
       res.render('pages/ventas/remito', { titulo: `Remito OP-${String(op.nro_op).padStart(4,'0')}`, layout: false, op })
     } catch (err) {
@@ -362,11 +362,11 @@ const VentasController = {
   },
 
   // ── API JSON para búsqueda de clientes desde el front ────────
-  buscarClientesApi(req, res) {
+  async buscarClientesApi(req, res) {
     try {
       const { id, dni, nombre } = req.query
       if (!id && !dni && !nombre) return res.json([])
-      const resultados = ClientesModel.buscar({ id, dni, nombre })
+      const resultados = await ClientesModel.buscar({ id, dni, nombre })
       res.json(resultados.map(c => ({
         id: c.id,
         numero: c.numero,
@@ -384,14 +384,14 @@ const VentasController = {
     }
   },
 
-  crearClienteApi(req, res) {
+  async crearClienteApi(req, res) {
     try {
       const { nombre, apellido, dni, telefono, email } = req.body
       if (!nombre || !apellido || !telefono) {
         return res.status(400).json({ error: 'Nombre, apellido y teléfono son obligatorios.' })
       }
-      const id = ClientesModel.crear({ nombre, apellido, dni, telefono, email })
-      const nuevo = ClientesModel.obtener(id)
+      const id = await ClientesModel.crear({ nombre, apellido, dni, telefono, email })
+      const nuevo = await ClientesModel.obtener(id)
       res.json({
         id: nuevo.id,
         numero: nuevo.numero,
