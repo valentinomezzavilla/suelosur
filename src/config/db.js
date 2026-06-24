@@ -11,6 +11,15 @@ const bcrypt  = require('bcryptjs')
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  max: 10,                       // máximo de conexiones simultáneas
+  idleTimeoutMillis: 30000,      // cerrar conexiones idle a los 30s
+  connectionTimeoutMillis: 10000,// timeout para conectar (10s)
+  statement_timeout: 30000,      // matar queries que tarden +30s
+})
+
+// Evitar que un error suelto del pool tire el proceso
+pool.on('error', (err) => {
+  console.error('Pool PG error (idle client):', err.message)
 })
 
 // Convierte placeholders ? → $1, $2, ... para PostgreSQL

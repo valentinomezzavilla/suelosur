@@ -127,22 +127,36 @@ const EmpleadosModel = {
 
   // Empleados candidatos a supervisor (activos, distinto de uno mismo)
   async supervisores(excludeId = null) {
+    if (excludeId) {
+      return (await query(`
+        SELECT id, nombre, apellido FROM empleados
+        WHERE activo = 1 AND id != ? ORDER BY apellido, nombre
+      `, [excludeId])).rows
+    }
     return (await query(`
       SELECT id, nombre, apellido FROM empleados
-      WHERE activo = 1 AND (id != ? OR ? IS NULL) ORDER BY apellido, nombre
-    `, [excludeId || '', excludeId])).rows
+      WHERE activo = 1 ORDER BY apellido, nombre
+    `)).rows
   },
 
   // Usuarios del sistema disponibles para vincular (no asignados a otro empleado)
   async usuariosVinculables(empleadoId = null) {
+    if (empleadoId) {
+      return (await query(`
+        SELECT u.id, u.usuario, u.nombre, u.rol
+        FROM users u
+        WHERE u.activo = 1
+          AND u.id NOT IN (SELECT id_usuario FROM empleados WHERE id_usuario IS NOT NULL AND id != ?)
+        ORDER BY u.nombre
+      `, [empleadoId])).rows
+    }
     return (await query(`
       SELECT u.id, u.usuario, u.nombre, u.rol
       FROM users u
       WHERE u.activo = 1
-        AND (u.id NOT IN (SELECT id_usuario FROM empleados WHERE id_usuario IS NOT NULL AND id != ?)
-             OR ? IS NULL)
+        AND u.id NOT IN (SELECT id_usuario FROM empleados WHERE id_usuario IS NOT NULL)
       ORDER BY u.nombre
-    `, [empleadoId || '', empleadoId])).rows
+    `)).rows
   },
 
   async dniEnUso(dni, excludeId = null) {
