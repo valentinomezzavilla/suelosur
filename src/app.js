@@ -19,12 +19,21 @@ app.use(express.json())
 app.use(methodOverride((req) => req.query._method || (req.body && req.body._method)))
 app.use(express.static(path.join(__dirname, '..', 'public')))
 
+// ── Trust proxy (Render / Heroku / etc. usan reverse proxy HTTPS) ─
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1)
+}
+
 // ── Sesión ───────────────────────────────────────────────────────
 app.use(session({
   secret: process.env.SESSION_SECRET || 'suelosur-dev-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 1000 * 60 * 60 * 8 } // 8 horas
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 8, // 8 horas
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+  },
 }))
 
 // ── Flash messages ───────────────────────────────────────────────
