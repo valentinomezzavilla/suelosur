@@ -82,3 +82,198 @@
     </div>
   </div>
 </div>
+
+<!-- ── Accesos rápidos ──────────────────────────────────────────── -->
+<div class="mt-4">
+  <div class="dashboard-section-title">Accesos rápidos</div>
+  <div class="module-grid">
+
+    <% if (['admin_ventas','dueno'].includes(user.rol)) { %>
+
+    <a href="/ventas" class="module-card" style="--mc:#e8912a;--mc-soft:#fff3e8">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 22V12h6v10"/>
+        </svg>
+      </div>
+      <div class="mc-name">Ventas</div>
+      <div class="mc-desc">Cantera y viajes de áridos</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/alquileres/contenedores" class="module-card" style="--mc:#1c5bad;--mc-soft:#e9f1fb">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="mc-name">Alq. Contenedores</div>
+      <div class="mc-desc">Gestión de alquileres activos</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/alquileres/maquinaria" class="module-card" style="--mc:#16a34a;--mc-soft:#f0fdf4">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+      </div>
+      <div class="mc-name">Alq. Maquinaria</div>
+      <div class="mc-desc">Bobcat y equipos pesados</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/clientes" class="module-card" style="--mc:#7c3aed;--mc-soft:#f5f3ff">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+      </div>
+      <div class="mc-name">Clientes</div>
+      <div class="mc-desc">Cartera y cuenta corriente</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/contenedores" class="module-card" style="--mc:#475569;--mc-soft:#f1f5f9">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+      </div>
+      <div class="mc-name">Contenedores</div>
+      <div class="mc-desc">Catálogo físico y estados</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/maquinaria" class="module-card" style="--mc:#d97706;--mc-soft:#fffbeb">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+      </div>
+      <div class="mc-name">Maquinaria</div>
+      <div class="mc-desc">Catálogo y mantenimiento</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/stock" class="module-card" style="--mc:#dc2626;--mc-soft:#fef2f2">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
+        </svg>
+      </div>
+      <div class="mc-name">Stock</div>
+      <div class="mc-desc">Control de áridos en depósito</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/transacciones" class="module-card" style="--mc:#4f46e5;--mc-soft:#eef2ff">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <div class="mc-name">Transacciones</div>
+      <div class="mc-desc">Historial financiero completo</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/compras" class="module-card" style="--mc:#ca8a04;--mc-soft:#fefce8">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
+          <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+      </div>
+      <div class="mc-name">Compras</div>
+      <div class="mc-desc">Órdenes y proveedores</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/clientes/cuentas" class="module-card" style="--mc:#0891b2;--mc-soft:#ecfeff">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="1" x2="12" y2="23"/>
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+        </svg>
+      </div>
+      <div class="mc-name">Cuentas Corrientes</div>
+      <div class="mc-desc">Cobranzas y saldos de clientes</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <% } %>
+
+    <% if (user.rol === 'dueno') { %>
+
+    <a href="/circuitos" class="module-card" style="--mc:#0d9488;--mc-soft:#f0fdfa">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+          <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+        </svg>
+      </div>
+      <div class="mc-name">Circuitos</div>
+      <div class="mc-desc">Logística y rutas del día</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/flota" class="module-card" style="--mc:#0d1b35;--mc-soft:#e8edf5">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="1" y="6" width="14" height="11" rx="1"/>
+          <polygon points="15 9 19 9 22 12 22 17 15 17 15 9"/>
+          <circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>
+        </svg>
+      </div>
+      <div class="mc-name">Flota Camiones</div>
+      <div class="mc-desc">Estado y mantenimiento</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/empleados" class="module-card" style="--mc:#16a34a;--mc-soft:#f0fdf4">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/>
+          <path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/>
+          <path d="M4 15v-3a8 8 0 0 1 16 0v3"/>
+        </svg>
+      </div>
+      <div class="mc-name">Flota de Personal</div>
+      <div class="mc-desc">Empleados y choferes</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/alertas" class="module-card" style="--mc:#e74c3c;--mc-soft:#fef2f2">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+        </svg>
+      </div>
+      <div class="mc-name">Centro de Alertas</div>
+      <div class="mc-desc">Vencimientos y documentos</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <a href="/usuarios" class="module-card" style="--mc:#9333ea;--mc-soft:#faf5ff">
+      <div class="mc-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="15" r="4"/>
+          <line x1="10.85" y1="12.15" x2="19" y2="4"/>
+          <line x1="18" y1="5" x2="20" y2="7"/><line x1="15" y1="8" x2="17" y2="10"/>
+        </svg>
+      </div>
+      <div class="mc-name">Usuarios</div>
+      <div class="mc-desc">Control de accesos y roles</div>
+      <div class="mc-arrow">Ir al módulo →</div>
+    </a>
+
+    <% } %>
+
+  </div>
+</div>

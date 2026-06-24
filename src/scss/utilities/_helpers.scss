@@ -2,8 +2,9 @@
 @use '../abstracts/mixins'    as *;
 
 // ── Colores ────────────────────────────────────────────────────
-.text-orange      { color: $accent      !important; }
-.text-orange-dark { color: $accent-dark !important; }
+.text-orange      { color: $orange      !important; }
+.text-orange-dark { color: $orange-dark !important; }
+.text-accent      { color: $accent      !important; }
 .text-dark-title  { color: $dark        !important; }
 .text-green       { color: $success     !important; }
 .text-blue        { color: $info        !important; }

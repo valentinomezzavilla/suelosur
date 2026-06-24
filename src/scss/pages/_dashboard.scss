@@ -1,0 +1,104 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ── Grid de accesos rápidos (dashboard) ───────────────────────
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.875rem;
+
+  @include sm-down {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.module-card {
+  display: flex;
+  flex-direction: column;
+  background: $bg-card;
+  border: 1.5px solid $border;
+  border-radius: $radius-xl;
+  padding: 1.25rem 1.15rem;
+  text-decoration: none;
+  color: $dark;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+
+  // Franja de acento superior (aparece en hover)
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: var(--mc, #{$border});
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: $shadow-lg;
+    border-color: var(--mc, #{$border});
+    color: $dark;
+
+    &::after { opacity: 1; }
+
+    .mc-arrow {
+      opacity: 1;
+      transform: translateX(4px);
+    }
+  }
+}
+
+.mc-icon {
+  width: 46px;
+  height: 46px;
+  border-radius: $radius-lg;
+  background: var(--mc-soft, #{$bg-app});
+  color: var(--mc, #{$muted});
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.9rem;
+  flex-shrink: 0;
+}
+
+.mc-name {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: $dark;
+  line-height: 1.3;
+  margin-bottom: 0.25rem;
+}
+
+.mc-desc {
+  font-size: 0.73rem;
+  color: $muted;
+  line-height: 1.45;
+  flex: 1;
+}
+
+.mc-arrow {
+  margin-top: 0.85rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--mc, #{$muted});
+  letter-spacing: 0.1px;
+  opacity: 0;
+  transition: opacity 0.16s, transform 0.16s;
+}
+
+// ── Separador de sección en el dashboard ──────────────────────
+.dashboard-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: $muted;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid $border-soft;
+}

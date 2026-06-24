@@ -7,7 +7,12 @@ $accent:        #1c5bad;  // azul corporativo (logo)
 $accent-dark:   #154a8e;
 $accent-soft:   #e9f1fb;
 
-// Amarillo / dorado del logo (acento secundario, realces)
+// Naranja del logo (acento primario visual — UI principal)
+$orange:      #e8912a;
+$orange-dark: #c97520;
+$orange-soft: #fff3e8;
+
+// Amarillo / dorado (compat — preferir $orange en código nuevo)
 $brand-yellow:      #f5b301;
 $brand-yellow-dark: #d99a00;
 $brand-yellow-soft: #fff6e0;
@@ -29,7 +34,7 @@ $bg-app:        #f4f6f9;
 $bg-card:       #ffffff;
 $bg-card-alt:   #f8fafb;
 
-$sidebar-bg:    #0e1013;  // negro corporativo
+$sidebar-bg:    #0d1b35;  // azul marino corporativo (logo login)
 $sidebar-border:rgba(255, 255, 255, 0.06);
 $sidebar-text:  rgba(255, 255, 255, 0.72);
 $sidebar-muted: rgba(255, 255, 255, 0.32);
