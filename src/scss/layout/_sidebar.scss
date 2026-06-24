@@ -49,20 +49,36 @@
   padding: 1.25rem;
   border-bottom: 1px solid $sidebar-border;
 
-  .brand-mark {
-    width: 34px;
-    height: 34px;
+  .brand-logo-link {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    text-decoration: none;
     border-radius: $radius-md;
-    background: $orange;
-    color: #fff;
-    font-weight: 800;
-    font-size: 1.05rem;
+    transition: opacity 0.15s;
+
+    &:hover { opacity: 0.85; }
+  }
+
+  .brand-logo-wrap {
+    width: 36px;
+    height: 36px;
+    border-radius: $radius-md;
+    background: #fff;
     display: flex;
     align-items: center;
     justify-content: center;
-    letter-spacing: -0.5px;
+    overflow: hidden;
     flex-shrink: 0;
-    box-shadow: 0 2px 8px rgba(232, 145, 42, 0.4);
+    padding: 3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .brand-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
   }
 
   .brand-name {
