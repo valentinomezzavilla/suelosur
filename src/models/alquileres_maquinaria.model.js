@@ -4,7 +4,7 @@ const { query, transaction } = require('../config/db')
 
 const SQL_ULTIMO_MOV_MAQ = `
   SELECT m.* FROM (
-    SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_maquinaria ORDER BY fecha_movimiento DESC, rowid DESC) AS rn
+    SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_maquinaria ORDER BY fecha_movimiento DESC, id DESC) AS rn
     FROM movimiento_maquinaria m
   ) m WHERE m.rn = 1
 `
@@ -19,9 +19,9 @@ const AlquileresMaquinariaModel = {
              opm.plazo_alquiler, opm.precio_total, opm.horas_pactadas, opm.id_maquinaria,
              maq.nombre AS maquinaria_nombre, maq.tipo AS maquinaria_tipo,
              um.estado_paso AS maquinaria_estado, um.fecha_movimiento AS fecha_entrega_real,
-             LEFT(um.fecha_movimiento, 10)::date + (opm.plazo_alquiler || ' days')::interval AS fecha_fin_estimada,
-             CAST((LEFT(um.fecha_movimiento, 10)::date + (opm.plazo_alquiler || ' days')::interval - CURRENT_DATE) AS INTEGER) AS dias_restantes,
-             CAST((CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS INTEGER) AS dias_en_estado
+             (LEFT(um.fecha_movimiento, 10)::date + opm.plazo_alquiler) AS fecha_fin_estimada,
+             ((LEFT(um.fecha_movimiento, 10)::date + opm.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       LEFT JOIN op_detalle_maquinaria opm ON opm.id_orden_pedido = op.id
@@ -68,7 +68,7 @@ const AlquileresMaquinariaModel = {
 
       op.estadoMaquinaria = (await query(`
         SELECT estado_paso, fecha_movimiento FROM movimiento_maquinaria
-        WHERE id_maquinaria = ? ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1
+        WHERE id_maquinaria = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1
       `, [op.detalle.id_maquinaria])).rows[0]
     } else {
       op.movimientos = []; op.estadoMaquinaria = null

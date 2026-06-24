@@ -24,7 +24,7 @@ const MaquinariaModel = {
              um.estado_paso, um.fecha_movimiento,
              op.nro_op, cli.nombre AS cliente_nombre,
              opm.domicilio_entrega, opm.zona_entrega, opm.plazo_alquiler,
-             CAST((NOW() - um.fecha_movimiento::timestamp) AS INTEGER) AS dias_en_estado
+             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM maquinaria m
       LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_maquinaria = m.id
       LEFT JOIN op_detalle_maquinaria opm ON opm.id = um.id_op_maquinaria

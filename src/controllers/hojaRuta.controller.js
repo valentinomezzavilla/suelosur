@@ -13,7 +13,7 @@ async function empleadoDe(userId) {
 // Último estado de movimiento de un contenedor
 async function estadoCont(id_contenedor) {
   if (!id_contenedor) return null
-  return (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1`, [id_contenedor])).rows[0]?.estado_paso || null
+  return (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1`, [id_contenedor])).rows[0]?.estado_paso || null
 }
 
 // Fecha de la entrega (primer movimiento 'entregado') de un contenedor en una OP
@@ -36,7 +36,7 @@ async function tieneEnCurso(empId) {
   const ret = (await query(`
     SELECT 1 FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
     WHERE op.id_chofer = ? AND op.tipo_op = 'C' AND op.estado = 'entregado'
-      AND (SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = oc.id_contenedor ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1) = 'en_transito'
+      AND (SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = oc.id_contenedor ORDER BY fecha_movimiento DESC, id DESC LIMIT 1) = 'en_transito'
     LIMIT 1`, [empId])).rows[0]
   return !!ret
 }

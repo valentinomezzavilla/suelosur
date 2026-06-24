@@ -4,7 +4,7 @@ const { query, transaction } = require('../config/db')
 
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
-    SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_contenedor ORDER BY fecha_movimiento DESC, rowid DESC) AS rn
+    SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_contenedor ORDER BY fecha_movimiento DESC, id DESC) AS rn
     FROM movimiento_contenedor m
   ) m WHERE m.rn = 1
 `
@@ -19,9 +19,9 @@ const AlquileresModel = {
              oc.plazo_alquiler, oc.precio_alquiler, oc.id_contenedor,
              cont.numero_contenedor,
              um.estado_paso AS contenedor_estado, um.fecha_movimiento AS fecha_entrega_real,
-             LEFT(um.fecha_movimiento, 10)::date + (oc.plazo_alquiler || ' days')::interval AS fecha_fin_estimada,
-             CAST((LEFT(um.fecha_movimiento, 10)::date + (oc.plazo_alquiler || ' days')::interval - CURRENT_DATE) AS INTEGER) AS dias_restantes,
-             CAST((CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS INTEGER) AS dias_en_estado
+             (LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) AS fecha_fin_estimada,
+             ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
@@ -63,12 +63,12 @@ const AlquileresModel = {
         LEFT JOIN users u ON u.id = m.id_chofer
         LEFT JOIN flota_vehiculos f ON f.id = m.id_camion
         WHERE m.id_contenedor = ? AND m.id_op_contenedor = ?
-        ORDER BY m.fecha_movimiento ASC, m.rowid ASC
+        ORDER BY m.fecha_movimiento ASC, m.id ASC
       `, [op.detalle.id_contenedor, op.detalle.id])).rows
 
       op.estadoContenedor = (await query(`
         SELECT estado_paso, fecha_movimiento FROM movimiento_contenedor
-        WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, rowid DESC LIMIT 1
+        WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1
       `, [op.detalle.id_contenedor])).rows[0]
 
       const movEntrega = (await query(`
@@ -218,8 +218,8 @@ const AlquileresModel = {
              op.id AS alquiler_actual_id, op.nro_op,
              cli.nombre AS cliente_actual,
              oc.plazo_alquiler,
-             LEFT(um.fecha_movimiento, 10)::date + (oc.plazo_alquiler || ' days')::interval AS fecha_liberacion,
-             CAST(EXTRACT(EPOCH FROM (LEFT(um.fecha_movimiento, 10)::date + (oc.plazo_alquiler || ' days')::interval - NOW())) / 3600 AS INTEGER) AS horas_restantes
+             (LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) AS fecha_liberacion,
+             ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
       FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       JOIN op_detalle_contenedor oc ON oc.id_contenedor = c.id AND oc.id = um.id_op_contenedor
@@ -228,7 +228,7 @@ const AlquileresModel = {
       WHERE c.activo = 1
         AND c.estado_general = 'operativo'
         AND um.estado_paso IN ('entregado','en_alquiler','a_retirar')
-        AND (LEFT(um.fecha_movimiento, 10)::date + (oc.plazo_alquiler || ' days')::interval - CURRENT_DATE) BETWEEN 0 AND 2
+        AND ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) BETWEEN 0 AND 2
         AND oc.alquiler_siguiente_id IS NULL
       ORDER BY horas_restantes ASC
     `)).rows
