@@ -181,6 +181,47 @@ async function initDB() {
     )
   `)
 
+  // Catálogos referenciados por op_detalle_*: deben crearse ANTES
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS contenedores (
+      id                   TEXT PRIMARY KEY,
+      numero_contenedor    INTEGER NOT NULL UNIQUE,
+      estado_general       TEXT NOT NULL DEFAULT 'operativo'
+                             CHECK (estado_general IN ('operativo','en_reparacion','baja')),
+      fecha_ultima_pintada TEXT,
+      observaciones        TEXT DEFAULT '',
+      activo               INTEGER DEFAULT 1,
+      created_at           TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS maquinaria (
+      id              TEXT PRIMARY KEY,
+      nombre          TEXT NOT NULL,
+      tipo            TEXT NOT NULL DEFAULT 'bobcat'
+                        CHECK (tipo IN ('bobcat','minicargadora','retroexcavadora','otro')),
+      patente         TEXT,
+      modelo          TEXT,
+      anio            INTEGER,
+      estado_general  TEXT NOT NULL DEFAULT 'operativo'
+                        CHECK (estado_general IN ('operativo','en_servicio','baja')),
+      km_actuales     INTEGER DEFAULT 0,
+      ultimo_service  TEXT,
+      proximo_service TEXT,
+      observaciones   TEXT DEFAULT '',
+      activo          INTEGER DEFAULT 1,
+      precio_por_hora REAL DEFAULT 0,
+      precio_por_dia  REAL DEFAULT 0,
+      modo_precio     TEXT DEFAULT 'hora',
+      numero_interno  INTEGER,
+      horas_uso       REAL DEFAULT 0,
+      estado_operativo TEXT DEFAULT 'disponible',
+      marca           TEXT,
+      created_at      TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_contenedor (
       id                   TEXT PRIMARY KEY,
@@ -218,21 +259,8 @@ async function initDB() {
   `)
 
   // ─────────────────────────────────────────────────────────────────
-  // BLOQUE 3 — CONTENEDORES
+  // BLOQUE 3 — CONTENEDORES (movimientos; tabla principal creada arriba)
   // ─────────────────────────────────────────────────────────────────
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS contenedores (
-      id                   TEXT PRIMARY KEY,
-      numero_contenedor    INTEGER NOT NULL UNIQUE,
-      estado_general       TEXT NOT NULL DEFAULT 'operativo'
-                             CHECK (estado_general IN ('operativo','en_reparacion','baja')),
-      fecha_ultima_pintada TEXT,
-      observaciones        TEXT DEFAULT '',
-      activo               INTEGER DEFAULT 1,
-      created_at           TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
-    )
-  `)
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS movimiento_contenedor (
       id               TEXT PRIMARY KEY,
@@ -251,35 +279,8 @@ async function initDB() {
   `)
 
   // ─────────────────────────────────────────────────────────────────
-  // BLOQUE 4 — MAQUINARIA
+  // BLOQUE 4 — MAQUINARIA (movimientos; tabla principal creada arriba)
   // ─────────────────────────────────────────────────────────────────
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS maquinaria (
-      id              TEXT PRIMARY KEY,
-      nombre          TEXT NOT NULL,
-      tipo            TEXT NOT NULL DEFAULT 'bobcat'
-                        CHECK (tipo IN ('bobcat','minicargadora','retroexcavadora','otro')),
-      patente         TEXT,
-      modelo          TEXT,
-      anio            INTEGER,
-      estado_general  TEXT NOT NULL DEFAULT 'operativo'
-                        CHECK (estado_general IN ('operativo','en_servicio','baja')),
-      km_actuales     INTEGER DEFAULT 0,
-      ultimo_service  TEXT,
-      proximo_service TEXT,
-      observaciones   TEXT DEFAULT '',
-      activo          INTEGER DEFAULT 1,
-      precio_por_hora REAL DEFAULT 0,
-      precio_por_dia  REAL DEFAULT 0,
-      modo_precio     TEXT DEFAULT 'hora',
-      numero_interno  INTEGER,
-      horas_uso       REAL DEFAULT 0,
-      estado_operativo TEXT DEFAULT 'disponible',
-      marca           TEXT,
-      created_at      TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
-    )
-  `)
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS movimiento_maquinaria (
       id               TEXT PRIMARY KEY,
