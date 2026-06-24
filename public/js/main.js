@@ -20,6 +20,19 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.app-sidebar .nav-link, .sidebar-logout').forEach(a => a.addEventListener('click', close))
   window.addEventListener('resize', () => { if (window.innerWidth >= 768) close() })
 
+  // ── Toggle ver/ocultar contraseña en inputs type=password ───
+  document.querySelectorAll('.pwd-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const wrap = btn.closest('.pwd-input-wrap')
+      const inp = wrap?.querySelector('input')
+      if (!inp) return
+      const isPwd = inp.type === 'password'
+      inp.type = isPwd ? 'text' : 'password'
+      btn.textContent = isPwd ? '🙈' : '👁️'
+      btn.setAttribute('aria-label', isPwd ? 'Ocultar contraseña' : 'Mostrar contraseña')
+    })
+  })
+
   // ── Mostrar fecha DD/MM/YYYY al lado de inputs date ──────────
   // (el navegador muestra el formato según su localización; este hint
   //  garantiza que el usuario vea DD/MM/YYYY sin depender del browser)

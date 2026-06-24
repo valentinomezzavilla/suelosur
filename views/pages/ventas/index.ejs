@@ -154,7 +154,7 @@
           <td><%= op.cliente_nombre %></td>
           <td><small class="text-muted"><%= tipoOperacion(op) %></small></td>
           <td><small class="text-muted"><%= formatFecha(op.fecha_emision) %></small></td>
-          <td class="text-end fw-semibold">$<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+          <td class="text-end fw-semibold"><%= money(op.total) %></td>
           <td class="text-center">
             <span class="badge rounded-pill px-3 py-1 <%= badgeMap[op.estado] %>"><%= labelEstado[op.estado] || op.estado %></span>
           </td>

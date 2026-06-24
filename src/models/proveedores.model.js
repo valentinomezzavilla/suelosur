@@ -12,7 +12,7 @@ const ProveedoresModel = {
   async listarTodos({ q } = {}) {
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      return (await query(`SELECT * FROM proveedores WHERE nombre LIKE ? OR cuit LIKE ? OR email LIKE ? ORDER BY activo DESC, nombre`, [term, term, term])).rows
+      return (await query(`SELECT * FROM proveedores WHERE nombre ILIKE? OR cuit ILIKE? OR email ILIKE? ORDER BY activo DESC, nombre`, [term, term, term])).rows
     }
     return (await query(`SELECT * FROM proveedores ORDER BY activo DESC, nombre`)).rows
   },
@@ -48,7 +48,7 @@ const ProveedoresModel = {
     const term = `%${s}%`
     return (await query(`
       SELECT * FROM proveedores
-      WHERE activo = 1 AND (nombre LIKE ? OR cuit LIKE ?)
+      WHERE activo = 1 AND (nombre ILIKE? OR cuit ILIKE?)
       ORDER BY nombre LIMIT ?
     `, [term, term, limit])).rows
   },

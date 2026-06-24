@@ -51,8 +51,8 @@ const EmpleadosModel = {
       SELECT e.*, u.usuario AS usuario_sistema
       FROM empleados e
       LEFT JOIN users u ON u.id = e.id_usuario
-      WHERE e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ?
-         OR e.cargo LIKE ? OR e.sector LIKE ? OR CAST(e.legajo AS TEXT) LIKE ?
+      WHERE e.nombre ILIKE? OR e.apellido ILIKE? OR e.dni ILIKE?
+         OR e.cargo ILIKE? OR e.sector ILIKE? OR CAST(e.legajo AS TEXT) ILIKE?
       ORDER BY e.apellido, e.nombre
     `, [term, term, term, term, term, term])).rows
   },
@@ -110,7 +110,7 @@ const EmpleadosModel = {
     if (soloActivos) wheres.push('e.activo = 1')
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      wheres.push('(e.nombre LIKE ? OR e.apellido LIKE ? OR e.dni LIKE ? OR CAST(e.legajo AS TEXT) LIKE ?)')
+      wheres.push('(e.nombre ILIKE? OR e.apellido ILIKE? OR e.dni ILIKE? OR CAST(e.legajo AS TEXT) ILIKE?)')
       params.push(term, term, term, term)
     }
     return (await query(`

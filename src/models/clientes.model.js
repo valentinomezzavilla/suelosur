@@ -5,7 +5,7 @@ const { query, transaction } = require('../config/db')
 const ClientesModel = {
 
   async listar() {
-    return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`)).rows
+    return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY numero ASC NULLS LAST, apellido, nombre`)).rows
   },
 
   async obtener(id) {
@@ -22,8 +22,8 @@ const ClientesModel = {
     return (await query(`
       SELECT * FROM clientes
       WHERE activo = 1 AND (
-        nombre LIKE ? OR apellido LIKE ? OR (nombre || ' ' || apellido) LIKE ?
-        OR dni LIKE ? OR CAST(numero AS TEXT) LIKE ?
+        nombre ILIKE? OR apellido ILIKE? OR (nombre || ' ' || apellido) ILIKE?
+        OR dni ILIKE? OR CAST(numero AS TEXT) ILIKE?
       )
       ORDER BY
         CASE WHEN CAST(numero AS TEXT) = ? OR lower(dni) = ?
@@ -47,7 +47,7 @@ const ClientesModel = {
     if (numId != null) { wheres.push('numero = ?'); params.push(Number(numId)) }
     if (uuid)          { wheres.push('id = ?');     params.push(uuid) }
     if (dni)           { wheres.push('dni = ?');    params.push(String(dni).trim()) }
-    if (nombre)        { wheres.push('(nombre LIKE ? OR apellido LIKE ?)'); params.push(`%${nombre}%`, `%${nombre}%`) }
+    if (nombre)        { wheres.push('(nombre ILIKE? OR apellido ILIKE?)'); params.push(`%${nombre}%`, `%${nombre}%`) }
 
     if (!wheres.length) {
       return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`)).rows
@@ -129,6 +129,14 @@ const ClientesModel = {
 
   async movimientos(clienteId) {
     return (await query(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at DESC`, [clienteId])).rows
+  },
+
+  async movimientosFiltrados(clienteId, { fechaDesde, fechaHasta } = {}) {
+    const wheres = ['cliente_id = ?']
+    const params = [clienteId]
+    if (fechaDesde) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(fechaDesde) }
+    if (fechaHasta) { wheres.push('LEFT(created_at, 10) <= ?'); params.push(fechaHasta) }
+    return (await query(`SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`, params)).rows
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────

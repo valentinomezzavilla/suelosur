@@ -1,9 +1,12 @@
 'use strict'
+const path = require('path')
+const fs   = require('fs')
 const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
+const { DIR_REMITOS } = require('../middlewares/upload')
 
 // Empleado vinculado al usuario logueado
 async function empleadoDe(userId) {
@@ -167,6 +170,19 @@ const HojaRutaController = {
       const v = await HojaRutaController._validar(req)
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
       const { op } = v
+
+      // Para finalizar entrega de venta o contenedor, el chofer debe subir el remito firmado
+      const esEntrega = (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado')
+                     || (op.tipo_op === 'C' && op.estado === 'despachado')
+      if (esEntrega && !req.file) {
+        req.flash('error', 'Tenés que adjuntar el remito firmado (foto o PDF) para confirmar la entrega.')
+        return res.redirect(back)
+      }
+      // Guardar archivo del remito firmado si vino
+      if (req.file) {
+        await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [req.file.filename, op.id])
+      }
+
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
         const full = await VentasModel.obtener(op.id)
         await VentasModel.entregar(op.id)
@@ -204,6 +220,17 @@ const HojaRutaController = {
       }
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al finalizar la tarea.') }
     res.redirect(back)
+  },
+
+  // Servir el archivo del remito firmado (imagen/pdf)
+  async verRemitoFirmado(req, res) {
+    try {
+      const r = (await query(`SELECT archivo_remito FROM op_encabezado WHERE id = ?`, [req.params.id])).rows[0]
+      if (!r || !r.archivo_remito) { req.flash('error', 'No hay remito firmado adjunto.'); return res.redirect('back') }
+      const file = path.join(DIR_REMITOS, r.archivo_remito)
+      if (!fs.existsSync(file)) { req.flash('error', 'Archivo no encontrado.'); return res.redirect('back') }
+      res.sendFile(file)
+    } catch (err) { console.error(err); res.redirect('back') }
   },
 }
 

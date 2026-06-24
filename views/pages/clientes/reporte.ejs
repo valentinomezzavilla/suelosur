@@ -1,0 +1,85 @@
+<div class="page-header">
+  <div>
+    <a href="/clientes" class="back-link">← Clientes</a>
+    <h1 class="page-title">Reporte de cliente</h1>
+    <small class="text-muted">
+      #<%= cliente.numero || '—' %> · <%= cliente.nombre %> <%= cliente.apellido || '' %>
+      <% if (cliente.dni) { %>· DNI <%= cliente.dni %><% } %>
+    </small>
+  </div>
+</div>
+
+<div class="config-page">
+  <form action="/clientes/<%= cliente.id %>/reporte" method="POST" target="_blank" class="config-form">
+
+    <div class="form-section">
+      <h3 class="form-section__title">Período</h3>
+      <p class="form-hint">Dejá vacío para incluir todo el historial.</p>
+      <div class="form-row-2">
+        <div class="form-group">
+          <label for="fechaDesde">Desde</label>
+          <input type="date" name="fechaDesde" id="fechaDesde" value="<%= filtros.fechaDesde %>">
+        </div>
+        <div class="form-group">
+          <label for="fechaHasta">Hasta</label>
+          <input type="date" name="fechaHasta" id="fechaHasta" value="<%= filtros.fechaHasta %>">
+        </div>
+      </div>
+
+      <div class="form-row-2" style="margin-top:0.5rem">
+        <button type="button" class="btn-secondary btn-sm" onclick="setPreset('mes')">Mes actual</button>
+        <button type="button" class="btn-secondary btn-sm" onclick="setPreset('anio')">Año actual</button>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Qué incluir</h3>
+      <div class="form-group">
+        <label class="toggle-row">
+          <input type="checkbox" name="incluir" value="transacciones" checked>
+          <span><strong>Transacciones</strong> (ventas, alquileres, pagos del cliente)</span>
+        </label>
+        <label class="toggle-row">
+          <input type="checkbox" name="incluir" value="movimientos" checked>
+          <span><strong>Movimientos de cuenta corriente</strong> (deudas, pagos, ajustes)</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Filtrar por tipo de transacción</h3>
+      <div class="form-group">
+        <select name="tipo" class="form-select">
+          <option value="todos">— Todos los tipos —</option>
+          <option value="Venta Cantera">Venta Cantera</option>
+          <option value="Venta Viaje">Venta Viaje</option>
+          <option value="Alquiler">Alquiler</option>
+          <option value="Maquinaria">Maquinaria</option>
+          <option value="Ajuste">Ajuste</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="config-actions">
+      <button type="submit" class="btn-primary">📄 Generar reporte PDF</button>
+      <a href="/clientes" class="btn-secondary">Cancelar</a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+  function setPreset(p) {
+    const hoy = new Date()
+    const desde = document.getElementById('fechaDesde')
+    const hasta = document.getElementById('fechaHasta')
+    const fmt = d => d.toISOString().slice(0, 10)
+    if (p === 'mes') {
+      desde.value = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+      hasta.value = fmt(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0))
+    } else if (p === 'anio') {
+      desde.value = fmt(new Date(hoy.getFullYear(), 0, 1))
+      hasta.value = fmt(new Date(hoy.getFullYear(), 11, 31))
+    }
+  }
+</script>

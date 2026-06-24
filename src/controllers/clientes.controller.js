@@ -3,6 +3,8 @@ const ClientesModel = require('../models/clientes.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const paginar       = require('../utils/paginar')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
+const { generarTablaPDF } = require('../utils/pdfTabla')
+const { fmtFecha } = require('../utils/fecha')
 
 const ClientesController = {
 
@@ -239,6 +241,96 @@ const ClientesController = {
       })
     } catch (err) {
       console.error(err); res.status(500).json({ error: 'Error.' })
+    }
+  },
+
+  // ── Reportes por cliente ──────────────────────────────────────
+  // Página con form de filtros
+  async reporteForm(req, res) {
+    try {
+      const cliente = await ClientesModel.obtener(req.params.id)
+      if (!cliente) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes') }
+      res.render('pages/clientes/reporte', {
+        titulo: `Reporte — ${ClientesModel.nombreCompleto(cliente)}`,
+        cliente,
+        filtros: { fechaDesde: '', fechaHasta: '', tipo: 'todos', incluir: ['transacciones','movimientos'] },
+      })
+    } catch (err) { console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes') }
+  },
+
+  // POST: genera y descarga el PDF
+  async reportePDF(req, res) {
+    try {
+      const cliente = await ClientesModel.obtener(req.params.id)
+      if (!cliente) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes') }
+
+      const { fechaDesde, fechaHasta, tipo } = req.body
+      const incluir = Array.isArray(req.body.incluir) ? req.body.incluir : (req.body.incluir ? [req.body.incluir] : [])
+      const desdeISO = fechaDesde || null
+      const hastaISO = fechaHasta || null
+
+      // Transacciones
+      const txAll = await TransaccionesModel.filtrar({
+        clienteId: cliente.id,
+        tipo: tipo && tipo !== 'todos' ? tipo : null,
+        fechaDesde: desdeISO, fechaHasta: hastaISO,
+        page: 1, limit: 9999,
+      })
+      const transacciones = txAll.rows || []
+      const totalTransacciones = transacciones.reduce((acc, t) => acc + Number(t.monto || 0), 0)
+
+      // Movimientos de cuenta corriente
+      const movs = await ClientesModel.movimientosFiltrados(cliente.id, { fechaDesde: desdeISO, fechaHasta: hastaISO })
+      const totalDeuda = movs.filter(m => m.tipo === 'deuda').reduce((a, m) => a + Number(m.monto || 0), 0)
+      const totalPagos = movs.filter(m => m.tipo === 'pago').reduce((a, m) => a + Number(m.monto || 0), 0)
+
+      // Construir tablas para el PDF (combinamos secciones)
+      const columnas = [
+        { header: 'Fecha',       key: 'fecha',  width: 0.13 },
+        { header: 'Tipo',        key: 'tipo',   width: 0.18 },
+        { header: 'Descripción', key: 'desc',   width: 0.45 },
+        { header: 'Monto',       key: 'monto',  align: 'right', money: true, width: 0.18 },
+      ]
+      const filas = []
+      if (incluir.includes('transacciones')) {
+        transacciones.forEach(t => filas.push({
+          fecha: fmtFecha(t.fecha || t.created_at),
+          tipo:  t.tipo || '—',
+          desc:  t.descripcion || `Remito ${t.nro_remito || '—'}`,
+          monto: Number(t.monto || 0),
+        }))
+      }
+      if (incluir.includes('movimientos')) {
+        movs.forEach(m => filas.push({
+          fecha: fmtFecha(m.created_at),
+          tipo:  m.tipo === 'pago' ? 'Pago' : m.tipo === 'deuda' ? 'Deuda' : 'Ajuste',
+          desc:  m.descripcion || '—',
+          monto: Number(m.monto || 0),
+        }))
+      }
+
+      const periodoTxt = [desdeISO && `desde ${fmtFecha(desdeISO)}`, hastaISO && `hasta ${fmtFecha(hastaISO)}`]
+        .filter(Boolean).join(' ') || 'sin filtro de fechas'
+
+      const saldoActual = Number(cliente.saldo || 0)
+      const saldoTxt = saldoActual < 0 ? `Debe $${Math.abs(saldoActual).toLocaleString('es-AR')}`
+                    : saldoActual > 0 ? `A favor $${saldoActual.toLocaleString('es-AR')}`
+                    : 'Al día'
+
+      const subtitulo = `Cliente: #${cliente.numero || '—'} ${ClientesModel.nombreCompleto(cliente)} · ${periodoTxt} · Saldo: ${saldoTxt}`
+        + ` · Transacciones: $${totalTransacciones.toLocaleString('es-AR')}`
+        + ` · Pagos: $${totalPagos.toLocaleString('es-AR')}`
+        + ` · Deudas: $${Math.abs(totalDeuda).toLocaleString('es-AR')}`
+
+      return generarTablaPDF(res, {
+        titulo: 'Reporte de cliente',
+        subtitulo,
+        columnas, filas,
+        nombreArchivo: `reporte-cliente-${cliente.numero || cliente.id}`,
+      })
+    } catch (err) {
+      console.error(err); req.flash('error', 'Error al generar el reporte.')
+      res.redirect(`/clientes/${req.params.id}/reporte`)
     }
   },
 }

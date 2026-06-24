@@ -5,8 +5,14 @@
 // ═══════════════════════════════════════════════════════════════════
 
 const crypto = require('crypto')
-const { Pool } = require('pg')
+const { Pool, types } = require('pg')
 const bcrypt  = require('bcryptjs')
+
+// Parsear NUMERIC / BIGINT / INT8 como números JS (no como strings).
+// Sin esto, sumas como "$1500" se ven como "1500" sin formato porque toLocaleString()
+// sobre un string no aplica el separador de miles.
+types.setTypeParser(1700, (v) => v == null ? null : parseFloat(v)) // NUMERIC
+types.setTypeParser(20,   (v) => v == null ? null : parseInt(v, 10)) // BIGINT / int8
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

@@ -39,7 +39,7 @@ const FlotaModel = {
     if (chofer) { wheres.push(`EXISTS (SELECT 1 FROM asignaciones_recurso a WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 AND a.id_empleado=?)`); params.push(chofer) }
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      wheres.push('(v.nombre LIKE ? OR v.patente LIKE ? OR v.marca LIKE ? OR v.modelo LIKE ? OR CAST(v.numero_interno AS TEXT) LIKE ?)')
+      wheres.push('(v.nombre ILIKE? OR v.patente ILIKE? OR v.marca ILIKE? OR v.modelo ILIKE? OR CAST(v.numero_interno AS TEXT) ILIKE?)')
       params.push(term, term, term, term, term)
     }
     return (await query(`

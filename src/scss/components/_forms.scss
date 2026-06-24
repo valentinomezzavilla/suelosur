@@ -1,6 +1,26 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// Wrapper para inputs de contraseña con botón ver/ocultar
+.pwd-input-wrap {
+  position: relative;
+  .form-control { padding-right: 2.6rem; }
+}
+.pwd-toggle-btn {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: $muted;
+  &:hover { color: $dark; }
+}
+
 .form-control:focus,
 .form-select:focus {
   border-color: $accent;

@@ -56,10 +56,32 @@
           <% if (t.sinContenedor) { %><p class="text-danger small mb-1">⚠️ Sin contenedor asignado todavía.</p><% } %>
           <% if (t.observaciones) { %><p class="text-muted small mb-1"><%= t.observaciones %></p><% } %>
 
+          <!-- Ver remito (siempre disponible para revisarlo antes/durante el viaje) -->
+          <% if ((t.tipo === 'viaje' || t.tipo === 'contenedor_entrega')) { %>
+            <p class="mt-2 mb-1">
+              <a href="/ventas/<%= t.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">
+                <%- icon('receipt',{size:14}) %> Ver remito
+              </a>
+              <a href="/remitos/<%= t.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary ms-1">
+                <%- icon('receipt',{size:14}) %> Descargar PDF
+              </a>
+            </p>
+          <% } %>
+
           <div class="mt-2">
             <% if (t.fase === 'en_curso') { %>
-              <form action="/hoja-de-ruta/<%= t.id %>/finalizar" method="POST" class="d-inline"
+              <% const requiereFirmado = (t.tipo === 'viaje' || t.tipo === 'contenedor_entrega') %>
+              <form action="/hoja-de-ruta/<%= t.id %>/finalizar" method="POST"
+                    enctype="multipart/form-data"
                     onsubmit="return confirm('¿Confirmás: <%= t.accionFinalizar %>?')">
+                <% if (requiereFirmado) { %>
+                  <div class="mb-2">
+                    <label class="form-label fw-semibold mb-1">📷 Remito firmado *</label>
+                    <input type="file" name="remito_firmado" accept="image/*,application/pdf" capture="environment"
+                           class="form-control form-control-sm" required>
+                    <small class="text-muted">Sacá una foto del remito firmado o subí un archivo (PDF/JPG/PNG)</small>
+                  </div>
+                <% } %>
                 <button class="btn btn-success"><%- icon('check',{size:15}) %> <%= t.accionFinalizar %></button>
               </form>
             <% } else if (t.bloqueada) { %>
