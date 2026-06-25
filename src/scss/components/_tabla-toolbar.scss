@@ -1,0 +1,83 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ─── Toolbar de tabla (buscador + filtros) ───────────────────────
+.tabla-toolbar {
+  &__row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  &__search {
+    display: flex;
+    gap: 0.35rem;
+    flex: 1;
+    min-width: 200px;
+    max-width: 480px;
+
+    .form-control {
+      flex: 1;
+    }
+  }
+
+  &__filtros-btn { flex-shrink: 0; }
+
+  &__extras {
+    margin-left: auto;
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+
+  &__filtros-form {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    padding: 0.85rem;
+    background: $bg-card-alt;
+    border-radius: $radius-md;
+    border: 1px solid $border;
+  }
+
+  &__filtro {
+    min-width: 160px;
+    flex: 1 1 160px;
+
+    &-actions {
+      display: flex;
+      gap: 0.4rem;
+      flex-shrink: 0;
+      flex: 0 0 auto;
+    }
+  }
+
+  @include sm-down {
+    &__search { max-width: 100%; }
+    &__filtro { min-width: 100%; }
+  }
+}
+
+// ─── Header ordenable ────────────────────────────────────────────
+.th-sort {
+  &__link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: inherit;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.1s;
+
+    &:hover { color: $accent; }
+    &.is-active { color: $accent; }
+  }
+
+  &__arrow {
+    font-size: 0.75em;
+    opacity: 0.55;
+    .is-active & { opacity: 1; }
+  }
+}

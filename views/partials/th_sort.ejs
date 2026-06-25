@@ -1,0 +1,31 @@
+<%
+  // Encabezado de tabla clickeable para ordenar.
+  // Parámetros:
+  //   sortKey:     identificador interno (ej: 'nombre', 'fecha', 'total')
+  //   sortLabel:   texto visible
+  //   currentSort: filtros.sort actual
+  //   currentDir:  filtros.dir actual ('ASC' | 'DESC')
+  //   filtros:     objeto con resto de query params para preservar
+  //   align:       'left' | 'right' | 'center' (default 'left')
+  const _key   = sortKey
+  const _label = sortLabel
+  const _curS  = typeof currentSort !== 'undefined' ? currentSort : ''
+  const _curD  = typeof currentDir  !== 'undefined' ? String(currentDir).toUpperCase() : 'DESC'
+  const _f     = typeof filtros !== 'undefined' && filtros ? filtros : {}
+  const _align = typeof align !== 'undefined' ? align : 'left'
+  const isActive = _curS === _key
+  const nextDir  = isActive ? (_curD === 'ASC' ? 'DESC' : 'ASC') : 'ASC'
+  // Construir querystring preservando filtros
+  const params = {}
+  Object.entries(_f).forEach(([k, v]) => { if (v !== '' && v != null && k !== 'page' && k !== 'sort' && k !== 'dir') params[k] = v })
+  params.sort = _key
+  params.dir  = nextDir
+  const qs = new URLSearchParams(params).toString()
+  const arrow = !isActive ? '⇅' : (_curD === 'ASC' ? '↑' : '↓')
+%>
+<th class="th-sort text-<%= _align %>">
+  <a href="?<%= qs %>" class="th-sort__link <%= isActive ? 'is-active' : '' %>">
+    <%= _label %>
+    <span class="th-sort__arrow"><%= arrow %></span>
+  </a>
+</th>

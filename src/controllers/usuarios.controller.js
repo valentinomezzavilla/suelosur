@@ -26,10 +26,38 @@ async function crearEmpleadoChoferSiNoExiste(idUsuario, datosUsuario) {
 const UsuariosController = {
   async index(req, res) {
     try {
-      const todos = await UsuariosModel.listar()
-      const { items: usuarios, total, page, limit, totalPaginas } = paginar(todos, req.query.page, 15)
+      const { q, sort, dir, rol, estado, page } = req.query
+      let todos = await UsuariosModel.listar()
+      if (q && q.trim()) {
+        const term = q.trim().toLowerCase()
+        todos = todos.filter(u =>
+          (u.nombre || '').toLowerCase().includes(term) ||
+          (u.usuario || '').toLowerCase().includes(term)
+        )
+      }
+      if (rol)               todos = todos.filter(u => u.rol === rol)
+      if (estado === 'activo')   todos = todos.filter(u => !!u.activo)
+      if (estado === 'inactivo') todos = todos.filter(u => !u.activo)
+
+      const sortMap = {
+        usuario: (u) => (u.usuario || '').toLowerCase(),
+        nombre:  (u) => (u.nombre || '').toLowerCase(),
+        rol:     (u) => (u.rol || ''),
+      }
+      const sortKey = sortMap[sort] ? sort : 'nombre'
+      const dirNorm = String(dir || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
+      const getter = sortMap[sortKey]
+      todos = [...todos].sort((a, b) => {
+        const va = getter(a), vb = getter(b)
+        if (va < vb) return dirNorm === 'ASC' ? -1 : 1
+        if (va > vb) return dirNorm === 'ASC' ?  1 : -1
+        return 0
+      })
+
+      const { items: usuarios, total, page: pag, limit, totalPaginas } = paginar(todos, page, 20)
       res.render('pages/usuarios/index', {
-        titulo: 'Usuarios', usuarios, total, page, limit, totalPaginas, filtros: req.query,
+        titulo: 'Usuarios', usuarios, total, page: pag, limit, totalPaginas,
+        filtros: { q: q||'', rol: rol||'', estado: estado||'', sort: sortKey, dir: dirNorm },
         scripts: ['/js/usuarios.js'],
       })
     } catch (err) {

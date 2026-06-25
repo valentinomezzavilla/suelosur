@@ -6,36 +6,40 @@
   </div>
 </div>
 
-<form method="GET" action="/clientes" class="card shadow-sm mb-3">
-  <div class="card-body py-2">
-    <div class="row g-2 align-items-end">
-      <div class="col-md-6">
-        <label class="form-label">Buscar</label>
-        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
-               placeholder="N° de cliente, apellido, nombre o DNI..." autofocus>
-      </div>
-      <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
-        <% if (filtros.q) { %><a href="/clientes" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
-      </div>
-    </div>
-  </div>
-</form>
+<%- include('../../partials/tabla_toolbar', {
+  action: '/clientes',
+  placeholder: 'Buscar por #, nombre, apellido o DNI...',
+  qValue: filtros.q,
+  hiddenFilters: { sort: filtros.sort, dir: filtros.dir },
+  filtros: [
+    { name: 'tipo', label: 'Tipo de cliente', selected: filtros.tipo, options: [
+      { value: 'Empresa', label: 'Empresa' },
+      { value: 'Particular', label: 'Particular' },
+      { value: 'Obra', label: 'Obra' },
+    ]},
+    { name: 'cuentaCorriente', label: 'Cuenta corriente', selected: filtros.cuentaCorriente, options: [
+      { value: 'si', label: 'Con cuenta corriente' },
+      { value: 'no', label: 'Sin cuenta corriente' },
+    ]},
+  ],
+}) %>
 
 <div class="card shadow-sm">
   <div class="card-body p-0">
     <% if (!clientes.length) { %>
-      <%- include('../../partials/empty_state', { icono: '👥', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/clientes/nuevo', accionLabel: 'Crear primer cliente' }) %>
+      <%- include('../../partials/empty_state', { icono: '👥', mensaje: filtros.q || filtros.tipo || filtros.cuentaCorriente ? 'No hay clientes que coincidan con tu búsqueda.' : 'Aún no hay datos para mostrar.', accionHref: '/clientes/nuevo', accionLabel: 'Crear primer cliente' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th class="col-w-50">#</th>
-          <th>Nombre</th>
+          <%- include('../../partials/th_sort', { sortKey: 'numero',   sortLabel: '#',          currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'nombre',   sortLabel: 'Nombre',     currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'apellido', sortLabel: 'Apellido',   currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
           <th>Tipo</th>
           <th>Zona</th>
-          <th>WhatsApp</th>
+          <%- include('../../partials/th_sort', { sortKey: 'telefono', sortLabel: 'WhatsApp',   currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
           <th>Domicilio</th>
+          <%- include('../../partials/th_sort', { sortKey: 'saldo',    sortLabel: 'Saldo',      currentSort: filtros.sort, currentDir: filtros.dir, filtros, align: 'right' }) %>
           <th class="text-center">Estado</th>
           <th class="text-center">Acciones</th>
         </tr>
@@ -44,11 +48,22 @@
         <% clientes.forEach(c => { %>
         <tr class="<%= !c.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold text-orange">#<%= c.numero %></td>
-          <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
+          <td class="fw-semibold"><%= c.nombre %></td>
+          <td><%= c.apellido || '' %></td>
           <td><small class="text-muted"><%= c.tipo_cliente || '—' %></small></td>
           <td><small class="text-muted"><%= c.zona || '—' %></small></td>
           <td><small><%= c.tel_whatsapp || '—' %></small></td>
           <td><small class="text-muted"><%= c.domicilio_ppal || '—' %></small></td>
+          <td class="text-end">
+            <% const s = Number(c.saldo || 0) %>
+            <% if (s < 0) { %>
+              <span class="text-danger fw-semibold">$<%= Math.abs(s).toLocaleString('es-AR') %></span>
+            <% } else if (s > 0) { %>
+              <span class="text-success fw-semibold">$<%= s.toLocaleString('es-AR') %></span>
+            <% } else { %>
+              <span class="text-muted">$0</span>
+            <% } %>
+          </td>
           <td class="text-center">
             <% if (c.activo) { %>
               <span class="badge rounded-pill px-3 badge-activo">Activo</span>

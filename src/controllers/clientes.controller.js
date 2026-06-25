@@ -10,15 +10,40 @@ const ClientesController = {
 
   async index(req, res) {
     try {
-      const { nombre, dni, id, q, page } = req.query
+      const { nombre, dni, id, q, page, sort, dir, tipo, cuentaCorriente } = req.query
       let todos
       if (q && q.trim())                todos = await ClientesModel.buscarLive(q, 500)
       else if (nombre || dni || id)     todos = await ClientesModel.buscar({ id, nombre, dni })
       else                              todos = await ClientesModel.listar()
-      const { items: clientes, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
+
+      // Filtros adicionales
+      if (tipo && tipo !== '')          todos = todos.filter(c => (c.tipo_cliente || '').toLowerCase() === String(tipo).toLowerCase())
+      if (cuentaCorriente === 'si')     todos = todos.filter(c => !!c.cuenta_corriente)
+      if (cuentaCorriente === 'no')     todos = todos.filter(c => !c.cuenta_corriente)
+
+      // Ordenamiento dinámico (sort)
+      const sortMap = {
+        numero:   (c) => c.numero || 0,
+        nombre:   (c) => (c.nombre || '').toLowerCase(),
+        apellido: (c) => (c.apellido || '').toLowerCase(),
+        dni:      (c) => (c.dni || ''),
+        telefono: (c) => (c.telefono || c.tel_whatsapp || ''),
+        saldo:    (c) => Number(c.saldo || 0),
+      }
+      const sortKey = sortMap[sort] ? sort : 'numero'
+      const dirNorm = String(dir || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
+      const getter = sortMap[sortKey]
+      todos = [...todos].sort((a, b) => {
+        const va = getter(a), vb = getter(b)
+        if (va < vb) return dirNorm === 'ASC' ? -1 : 1
+        if (va > vb) return dirNorm === 'ASC' ?  1 : -1
+        return 0
+      })
+
+      const { items: clientes, total, page: pag, limit, totalPaginas } = paginar(todos, page, 20)
       res.render('pages/clientes/index', {
         titulo: 'Clientes', clientes, total, page: pag, limit, totalPaginas,
-        filtros: { id: id||'', nombre: nombre||'', dni: dni||'', q: q||'' },
+        filtros: { id: id||'', nombre: nombre||'', dni: dni||'', q: q||'', tipo: tipo||'', cuentaCorriente: cuentaCorriente||'', sort: sortKey, dir: dirNorm },
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('back')

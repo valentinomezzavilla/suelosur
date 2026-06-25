@@ -1,39 +1,56 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
+<div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('key', { size: 18 }) %> Usuarios</h4>
   <a href="/usuarios/nuevo" class="btn btn-naranja">+ Nuevo Usuario</a>
 </div>
 
+<%- include('../../partials/tabla_toolbar', {
+  action: '/usuarios',
+  placeholder: 'Buscar por nombre o usuario...',
+  qValue: filtros.q,
+  hiddenFilters: { sort: filtros.sort, dir: filtros.dir },
+  filtros: [
+    { name: 'rol', label: 'Rol', selected: filtros.rol, options: [
+      { value: 'dueno',          label: 'Dueño' },
+      { value: 'admin_ventas',   label: 'Admin Ventas' },
+      { value: 'admin_contable', label: 'Admin Contable' },
+      { value: 'chofer',         label: 'Chofer' },
+    ]},
+    { name: 'estado', label: 'Estado', selected: filtros.estado, options: [
+      { value: 'activo',   label: 'Activos' },
+      { value: 'inactivo', label: 'Inactivos' },
+    ]},
+  ],
+}) %>
+
 <div class="card shadow-sm">
   <div class="card-body p-0">
     <% if (!usuarios.length) { %>
-      <%- include('../../partials/empty_state', { icono: '🔑', mensaje: 'Aún no hay datos para mostrar.', accionHref: '/usuarios/nuevo', accionLabel: 'Crear primer usuario' }) %>
+      <%- include('../../partials/empty_state', { icono: '🔑', mensaje: filtros.q || filtros.rol || filtros.estado ? 'No hay usuarios que coincidan.' : 'Aún no hay datos para mostrar.', accionHref: '/usuarios/nuevo', accionLabel: 'Crear primer usuario' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th>Nombre</th>
-          <th>Usuario</th>
-          <th>Rol</th>
+          <%- include('../../partials/th_sort', { sortKey: 'nombre',  sortLabel: 'Nombre',  currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'usuario', sortLabel: 'Usuario', currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'rol',     sortLabel: 'Rol',     currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
           <th class="text-center">Estado</th>
           <th class="text-center">Acciones</th>
         </tr>
       </thead>
       <tbody>
+        <%
+          const rolLabels = {
+            dueno: '👑 Dueño',
+            admin_ventas: '📋 Admin Ventas',
+            admin_contable: '💰 Admin Contable',
+            chofer: '🚛 Chofer'
+          }
+        %>
         <% usuarios.forEach(u => { %>
         <tr class="<%= !u.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold"><%= u.nombre %></td>
           <td><code><%= u.usuario %></code></td>
-          <td>
-            <%
-              const rolLabels = {
-                dueno: '👑 Dueño',
-                admin_ventas: '📋 Admin Ventas',
-                admin_contable: '💰 Admin Contable',
-                chofer: '🚛 Chofer'
-              }
-            %>
-            <small><%= rolLabels[u.rol] || u.rol %></small>
-          </td>
+          <td><small><%= rolLabels[u.rol] || u.rol %></small></td>
           <td class="text-center">
             <% if (u.activo) { %>
               <span class="badge rounded-pill px-3 badge-activo">Activo</span>

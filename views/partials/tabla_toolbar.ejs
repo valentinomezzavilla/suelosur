@@ -1,0 +1,70 @@
+<%
+  // Barra superior reutilizable para tablas. Parámetros:
+  //   action:        URL del form (string, ej: '/clientes')
+  //   placeholder:   placeholder del buscador (default 'Buscar...')
+  //   qValue:        valor actual del campo q
+  //   hiddenFilters: objeto con filtros adicionales a mantener (preset, fechaDesde, etc.)
+  //   filtros:       array de definiciones de filtro [{ name, label, options:[{value,label}], selected }]
+  //   extraButtons:  HTML adicional (botones a la derecha)
+  const _action        = typeof action !== 'undefined' ? action : ''
+  const _placeholder   = typeof placeholder !== 'undefined' ? placeholder : 'Buscar...'
+  const _q             = typeof qValue !== 'undefined' ? (qValue || '') : ''
+  const _hidden        = typeof hiddenFilters !== 'undefined' && hiddenFilters ? hiddenFilters : {}
+  const _filtros       = typeof filtros !== 'undefined' && filtros ? filtros : []
+  const _extraButtons  = typeof extraButtons !== 'undefined' ? extraButtons : ''
+  const _idCollapse    = 'tablaFiltros_' + Math.random().toString(36).slice(2, 8)
+  const hayFiltrosUsados = _filtros.some(f => f.selected && f.selected !== '')
+%>
+<div class="tabla-toolbar mb-3">
+  <form action="<%= _action %>" method="GET" class="tabla-toolbar__row">
+    <% Object.entries(_hidden).forEach(([k, v]) => { if (v !== '' && v != null) { %>
+      <input type="hidden" name="<%= k %>" value="<%= v %>">
+    <% } }) %>
+    <div class="tabla-toolbar__search">
+      <input type="text" name="q" value="<%= _q %>" class="form-control" placeholder="<%= _placeholder %>" autocomplete="off">
+      <button type="submit" class="btn btn-naranja btn-sm" title="Buscar"><%- icon('eye',{size:14}) %></button>
+      <% if (_q || hayFiltrosUsados) { %>
+        <a href="<%= _action %>" class="btn btn-outline-secondary btn-sm" title="Limpiar">✕</a>
+      <% } %>
+    </div>
+
+    <% if (_filtros.length) { %>
+      <button type="button" class="btn btn-outline-secondary btn-sm tabla-toolbar__filtros-btn"
+              data-bs-toggle="collapse" data-bs-target="#<%= _idCollapse %>">
+        🔽 Filtros<% if (hayFiltrosUsados) { %> <span class="badge bg-warning text-dark ms-1"><%= _filtros.filter(f => f.selected && f.selected !== '').length %></span><% } %>
+      </button>
+    <% } %>
+
+    <% if (_extraButtons) { %><div class="tabla-toolbar__extras"><%- _extraButtons %></div><% } %>
+  </form>
+
+  <% if (_filtros.length) { %>
+    <div class="collapse <%= hayFiltrosUsados ? 'show' : '' %>" id="<%= _idCollapse %>">
+      <form action="<%= _action %>" method="GET" class="tabla-toolbar__filtros-form mt-2">
+        <% if (_q) { %><input type="hidden" name="q" value="<%= _q %>"><% } %>
+        <% Object.entries(_hidden).forEach(([k, v]) => { if (v !== '' && v != null) { %>
+          <input type="hidden" name="<%= k %>" value="<%= v %>">
+        <% } }) %>
+        <% _filtros.forEach(f => { %>
+          <div class="tabla-toolbar__filtro">
+            <label class="form-label form-label-sm mb-1"><%= f.label %></label>
+            <% if (f.type === 'date') { %>
+              <input type="date" name="<%= f.name %>" value="<%= f.selected || '' %>" class="form-control form-control-sm">
+            <% } else { %>
+              <select name="<%= f.name %>" class="form-select form-select-sm">
+                <option value="">— Todos —</option>
+                <% (f.options || []).forEach(opt => { %>
+                  <option value="<%= opt.value %>" <%= String(f.selected || '') === String(opt.value) ? 'selected' : '' %>><%= opt.label %></option>
+                <% }) %>
+              </select>
+            <% } %>
+          </div>
+        <% }) %>
+        <div class="tabla-toolbar__filtro tabla-toolbar__filtro-actions">
+          <button type="submit" class="btn btn-naranja btn-sm">Aplicar</button>
+          <a href="<%= _action %>?<%= _q ? 'q=' + encodeURIComponent(_q) : '' %>" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+        </div>
+      </form>
+    </div>
+  <% } %>
+</div>

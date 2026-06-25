@@ -12,7 +12,7 @@ const EmpleadosController = {
     try {
       const { q, page } = req.query
       const todos = await EmpleadosModel.buscar({ q })
-      const { items: empleados, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
+      const { items: empleados, total, page: pag, limit, totalPaginas } = paginar(todos, page, 20)
       res.render('pages/empleados/index', {
         titulo: 'Flota de Personal', empleados, total, page: pag, limit, totalPaginas,
         filtros: { q: q || '' },
