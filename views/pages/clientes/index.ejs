@@ -57,7 +57,7 @@
             <% } %>
           </td>
           <td class="text-center">
-            <a href="/clientes/<%= c.id %>/reporte" class="btn btn-sm btn-outline-primary" title="Generar reporte PDF"><%- icon('receipt', { size: 15 }) %></a>
+            <a href="/clientes/<%= c.id %>/reporte" class="btn btn-sm btn-outline-primary" title="Generar reporte PDF"><%- icon('fileText', { size: 15 }) %></a>
             <a href="/clientes/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
             <% if (c.activo) { %>
               <form action="/clientes/<%= c.id %>/eliminar" method="POST" class="d-inline"
