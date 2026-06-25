@@ -17,18 +17,32 @@ const ClientesModel = {
   async buscarLive(q, limit = 8) {
     const s = String(q || '').trim()
     if (!s) return []
-    const term = `%${s}%`
-    const exact = s.toLowerCase()
+    // Quitar acentos del término para hacer la búsqueda accent-insensitive
+    const sinAcentos = (str) => String(str || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    const termPlain = sinAcentos(s)
+    const term = `%${termPlain}%`
+    const exact = termPlain.toLowerCase()
+
+    // translate() reemplaza acentos en el campo para que matchee con el término sin acentos.
+    // No depende de la extensión unaccent (que puede no estar disponible en planes free).
+    const SIN_ACENTOS = `translate(COALESCE({col}, ''), 'áéíóúÁÉÍÓÚñÑüÜ', 'aeiouAEIOUnNuU')`
+    const sa = (col) => SIN_ACENTOS.replace('{col}', col)
+
     return (await query(`
       SELECT * FROM clientes
       WHERE activo = 1 AND (
-        nombre ILIKE? OR apellido ILIKE? OR (nombre || ' ' || apellido) ILIKE?
-        OR dni ILIKE? OR CAST(numero AS TEXT) ILIKE?
+        ${sa('nombre')}   ILIKE ?
+        OR ${sa('apellido')} ILIKE ?
+        OR ${sa("nombre || ' ' || apellido")} ILIKE ?
+        OR COALESCE(dni, '') ILIKE ?
+        OR CAST(COALESCE(numero, 0) AS TEXT) ILIKE ?
       )
       ORDER BY
-        CASE WHEN CAST(numero AS TEXT) = ? OR lower(dni) = ?
-                  OR lower(nombre) = ? OR lower(apellido) = ?
-                  OR lower(nombre || ' ' || apellido) = ? THEN 0 ELSE 1 END,
+        CASE WHEN CAST(COALESCE(numero, 0) AS TEXT) = ?
+                  OR lower(COALESCE(dni, '')) = ?
+                  OR lower(${sa('nombre')}) = ?
+                  OR lower(${sa('apellido')}) = ?
+                  OR lower(${sa("nombre || ' ' || apellido")}) = ? THEN 0 ELSE 1 END,
         apellido, nombre
       LIMIT ?
     `, [term, term, term, term, term, exact, exact, exact, exact, exact, limit])).rows
@@ -47,7 +61,7 @@ const ClientesModel = {
     if (numId != null) { wheres.push('numero = ?'); params.push(Number(numId)) }
     if (uuid)          { wheres.push('id = ?');     params.push(uuid) }
     if (dni)           { wheres.push('dni = ?');    params.push(String(dni).trim()) }
-    if (nombre)        { wheres.push('(nombre ILIKE? OR apellido ILIKE?)'); params.push(`%${nombre}%`, `%${nombre}%`) }
+    if (nombre)        { wheres.push('(nombre ILIKE ? OR apellido ILIKE ?)'); params.push(`%${nombre}%`, `%${nombre}%`) }
 
     if (!wheres.length) {
       return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY apellido, nombre`)).rows

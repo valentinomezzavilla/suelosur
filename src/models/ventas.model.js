@@ -32,7 +32,7 @@ const VentasModel = {
     if (fechaHasta) { wheres.push('op.fecha_emision <= ?'); params.push(fechaHasta) }
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      wheres.push(`(c.nombre ILIKE? OR op.observaciones ILIKE? OR CAST(op.nro_op AS TEXT) ILIKE?)`)
+      wheres.push(`(c.nombre ILIKE ? OR op.observaciones ILIKE ? OR CAST(op.nro_op AS TEXT) ILIKE ?)`)
       params.push(term, term, term)
     }
     return { where: 'WHERE ' + wheres.join(' AND '), params }

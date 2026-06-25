@@ -923,6 +923,29 @@ async function initDB() {
     )
   }
 
+  // ─────────────────────────────────────────────────────────────────
+  // Backfill: todo usuario con rol chofer debe tener un empleado vinculado.
+  // Necesario para que el chofer pueda ver remitos/tareas de sus ops asignadas.
+  // ─────────────────────────────────────────────────────────────────
+  const choferesSinEmpleado = (await pool.query(`
+    SELECT u.id, u.usuario, u.nombre
+    FROM users u
+    WHERE u.rol = 'chofer' AND u.activo = 1
+      AND NOT EXISTS (SELECT 1 FROM empleados e WHERE e.id_usuario = u.id)
+  `)).rows
+  for (const u of choferesSinEmpleado) {
+    const partes = String(u.nombre || u.usuario).trim().split(/\s+/)
+    const nombre = partes[0] || u.usuario
+    const apellido = partes.slice(1).join(' ') || ''
+    const empId = crypto.randomUUID()
+    const proxLegajo = (await pool.query(`SELECT COALESCE(MAX(legajo), 0) + 1 AS n FROM empleados`)).rows[0].n
+    await pool.query(`
+      INSERT INTO empleados (id, legajo, nombre, apellido, es_chofer, cargo, sector, id_usuario, estado_laboral, activo)
+      VALUES ($1, $2, $3, $4, 1, 'Chofer', 'Operaciones', $5, 'activo', 1)
+    `, [empId, proxLegajo, nombre, apellido, u.id])
+    console.log(`  ↳ Empleado-chofer creado para usuario "${u.usuario}"`)
+  }
+
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 

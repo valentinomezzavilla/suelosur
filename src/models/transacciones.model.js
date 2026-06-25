@@ -39,7 +39,7 @@ const TransaccionesModel = {
     if (id)         { wheres.push('id = ?');                  params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?');  params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');          params.push(clienteId) }
-    if (cliente)    { wheres.push('cliente ILIKE?');          params.push(`%${cliente}%`) }
+    if (cliente)    { wheres.push('cliente ILIKE ?');          params.push(`%${cliente}%`) }
     if (fechaDesde) { wheres.push('fecha >= ?');              params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('fecha <= ?');              params.push(fechaHasta) }
     if (montoMin)   { wheres.push('monto >= ?');              params.push(Number(montoMin)) }
@@ -65,7 +65,7 @@ const TransaccionesModel = {
     if (id)         { wheres.push('id = ?');                 params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?'); params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');         params.push(clienteId) }
-    if (cliente)    { wheres.push('cliente ILIKE?');         params.push(`%${cliente}%`) }
+    if (cliente)    { wheres.push('cliente ILIKE ?');         params.push(`%${cliente}%`) }
     if (fechaDesde) { wheres.push('fecha >= ?');             params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('fecha <= ?');             params.push(fechaHasta) }
     if (montoMin)   { wheres.push('monto >= ?');             params.push(Number(montoMin)) }

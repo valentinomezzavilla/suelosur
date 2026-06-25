@@ -20,6 +20,9 @@
     left: 0;
     bottom: 0;
     width: $sidebar-w-mobile;
+    height: 100vh;
+    height: 100dvh; // viewport dinámico para mobile (descuenta barras del navegador)
+    min-height: 0;
     transform: translateX(-100%);
     transition: transform 0.25s ease;
     box-shadow: 4px 0 16px rgba(0, 0, 0, 0.2);
@@ -220,16 +223,29 @@
   align-items: center;
   gap: 0.7rem;
   padding: 0.85rem 1.25rem;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.7);
   text-decoration: none;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   border-top: 1px solid $sidebar-border;
   transition: color 0.12s, background 0.12s;
   margin-top: auto;
+  flex-shrink: 0; // que no se reduzca en mobile
 
   &:hover {
     color: $danger;
     background: rgba(231, 76, 60, 0.05);
+  }
+
+  @include md-down {
+    background: rgba(231, 76, 60, 0.12);
+    color: #ffb4b4;
+    font-weight: 600;
+    border-top: 1px solid rgba(231, 76, 60, 0.3);
+
+    &:hover, &:active {
+      color: #fff;
+      background: rgba(231, 76, 60, 0.25);
+    }
   }
 }
 
