@@ -11,7 +11,12 @@
   <!-- Controles (no se imprimen) -->
   <div class="mb-3 no-print d-flex gap-2 align-items-center">
     <button onclick="window.print()" class="btn btn-sm remito-print-btn">🖨️ Imprimir / Guardar PDF</button>
-    <a href="/ventas/<%= op.id %>" class="btn btn-sm btn-outline-secondary">← Volver a la OP</a>
+    <%
+      // Si el usuario es chofer, vuelve a su hoja de ruta (no tiene acceso al detalle de la OP)
+      const volverUrl = (typeof user !== 'undefined' && user?.rol === 'chofer') ? '/hoja-de-ruta' : `/ventas/${op.id}`
+      const volverTxt = (typeof user !== 'undefined' && user?.rol === 'chofer') ? '← Volver a mi ruta' : '← Volver a la OP'
+    %>
+    <a href="<%= volverUrl %>" class="btn btn-sm btn-outline-secondary"><%= volverTxt %></a>
     <span class="ms-auto badge badge-activo px-3 py-2">✅ Entrega confirmada</span>
   </div>
 
