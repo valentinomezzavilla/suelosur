@@ -44,6 +44,14 @@ async function tieneEnCurso(empId) {
   return !!ret
 }
 
+// Helper: ¿la fecha es posterior a hoy? (compara solo la parte YYYY-MM-DD)
+function esFutura(fechaISO) {
+  if (!fechaISO) return false
+  const f = String(fechaISO).slice(0, 10)
+  const hoy = new Date().toISOString().slice(0, 10)
+  return f > hoy
+}
+
 // Construye la lista de tareas del día del chofer
 async function construirTareas(empId) {
   const tareas = []
@@ -59,20 +67,27 @@ async function construirTareas(empId) {
     LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
     WHERE op.id_chofer = ? AND op.tipo_op = 'M' AND op.modalidad = 'flete' AND op.estado IN ('pendiente','despachado')
   `, [empId])).rows
-  viajes.forEach(o => tareas.push({
-    id: o.id, tipo: 'viaje', icono: '🚚', titulo: 'Entrega de viaje',
-    cliente: o.cliente, tel: o.tel_whatsapp,
-    domicilio: [o.domicilio_calle, o.domicilio_altura].filter(Boolean).join(' ').trim(),
-    camion: [o.camion, o.patente].filter(Boolean).join(' · '),
-    nro_op: o.nro_op, fecha: o.fecha_entrega_planificada, observaciones: o.observaciones,
-    fase: o.estado === 'despachado' ? 'en_curso' : 'por_iniciar',
-    accionIniciar: 'Iniciar viaje', accionFinalizar: 'Confirmar entrega',
-    detalleFase: o.estado === 'despachado' ? 'En camino' : 'Por salir',
-  }))
+  viajes.forEach(o => {
+    const enCurso = o.estado === 'despachado'
+    // Si está en curso (despachado), siempre va a HOY, sin importar la fecha planificada
+    const programado = !enCurso && esFutura(o.fecha_entrega_planificada)
+    tareas.push({
+      id: o.id, tipo: 'viaje', icono: '🚚', titulo: 'Entrega de viaje',
+      cliente: o.cliente, tel: o.tel_whatsapp,
+      domicilio: [o.domicilio_calle, o.domicilio_altura].filter(Boolean).join(' ').trim(),
+      camion: [o.camion, o.patente].filter(Boolean).join(' · '),
+      nro_op: o.nro_op, fecha: o.fecha_entrega_planificada, observaciones: o.observaciones,
+      fase: enCurso ? 'en_curso' : 'por_iniciar',
+      programado,
+      accionIniciar: 'Iniciar viaje', accionFinalizar: 'Confirmar entrega',
+      detalleFase: enCurso ? 'En camino' : (programado ? 'Programado' : 'Por salir'),
+    })
+  })
 
   // ── Contenedores (entrega y retiro) ───────────────────────────
   const contenedores = (await query(`
-    SELECT op.id, op.nro_op, op.estado, oc.id AS id_oc, oc.id_contenedor, oc.domicilio_entrega, oc.plazo_alquiler,
+    SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada,
+           oc.id AS id_oc, oc.id_contenedor, oc.domicilio_entrega, oc.plazo_alquiler,
            cont.numero_contenedor, COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
            v.nombre AS camion, v.patente
     FROM op_encabezado op
@@ -88,10 +103,14 @@ async function construirTareas(empId) {
       id: o.id, cliente: o.cliente, tel: o.tel_whatsapp,
       domicilio: o.domicilio_entrega || '', camion: [o.camion, o.patente].filter(Boolean).join(' · '),
       nro_op: o.nro_op, contenedor: o.numero_contenedor, sinContenedor: !o.id_contenedor,
+      fecha: o.fecha_entrega_planificada,
     }
+    const programadoFuturo = esFutura(o.fecha_entrega_planificada)
     if (o.estado === 'pendiente') {
       tareas.push({ ...base, tipo: 'contenedor_entrega', icono: '📦', titulo: 'Entrega de contenedor',
-        fase: 'por_iniciar', detalleFase: 'Por salir', accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
+        fase: 'por_iniciar', programado: programadoFuturo,
+        detalleFase: programadoFuturo ? 'Programado' : 'Por salir',
+        accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
     } else if (o.estado === 'despachado') {
       tareas.push({ ...base, tipo: 'contenedor_entrega', icono: '📦', titulo: 'Entrega de contenedor',
         fase: 'en_curso', detalleFase: 'En camino', accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
@@ -116,11 +135,16 @@ async function construirTareas(empId) {
   }
 
   const hayEnCurso = tareas.some(t => t.fase === 'en_curso')
-  tareas.forEach(t => { t.bloqueada = hayEnCurso && t.fase === 'por_iniciar' })
+  tareas.forEach(t => { t.bloqueada = hayEnCurso && t.fase === 'por_iniciar' && !t.programado })
   // Orden: en_curso → por_iniciar → en_servicio
   const peso = { en_curso: 0, por_iniciar: 1, en_servicio: 2 }
   tareas.sort((a, b) => peso[a.fase] - peso[b.fase])
-  return { tareas, hayEnCurso }
+
+  // Separar en HOY (incluye en_curso y en_servicio) vs PRÓXIMOS (programados a futuro)
+  const hoy      = tareas.filter(t => !t.programado)
+  const proximos = tareas.filter(t =>  t.programado).sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')))
+
+  return { tareas, hoy, proximos, hayEnCurso }
 }
 
 const HojaRutaController = {
@@ -128,9 +152,36 @@ const HojaRutaController = {
   async index(req, res) {
     try {
       const empleado = await empleadoDe(req.session.user.id)
-      const data = empleado ? await construirTareas(empleado.id) : { tareas: [], hayEnCurso: false }
-      res.render('pages/hoja_ruta', { titulo: 'Hoja de Ruta', empleado, tareas: data.tareas, hayEnCurso: data.hayEnCurso })
+      const data = empleado
+        ? await construirTareas(empleado.id)
+        : { tareas: [], hoy: [], proximos: [], hayEnCurso: false }
+      res.render('pages/hoja_ruta', {
+        titulo: 'Hoja de Ruta', empleado,
+        tareas: data.tareas, // compat
+        hoy: data.hoy, proximos: data.proximos,
+        hayEnCurso: data.hayEnCurso,
+      })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar la hoja de ruta.'); res.redirect('/') }
+  },
+
+  // Reprogramar una tarea futura para hoy
+  async realizarHoy(req, res) {
+    const back = '/hoja-de-ruta'
+    try {
+      const v = await HojaRutaController._validar(req)
+      if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
+      const { op } = v
+      if (op.estado !== 'pendiente') {
+        req.flash('error', 'Solo se pueden reprogramar tareas pendientes.')
+        return res.redirect(back)
+      }
+      await query(
+        `UPDATE op_encabezado SET fecha_entrega_planificada = to_char(CURRENT_DATE, 'YYYY-MM-DD') WHERE id = ?`,
+        [op.id]
+      )
+      req.flash('success', 'Tarea reprogramada para hoy. Ya podés iniciarla.')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al reprogramar.') }
+    res.redirect(back)
   },
 
   // Verifica que la OP pertenezca al chofer logueado; devuelve {emp, op} o null

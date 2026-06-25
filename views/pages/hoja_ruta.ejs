@@ -1,7 +1,9 @@
 <%
   const faseBadge = { por_iniciar:'badge-pendiente', en_curso:'badge-en-transito', en_servicio:'badge-activo' }
-  const pendientes = tareas.filter(t => t.fase !== 'en_servicio')
-  const enServicio = tareas.filter(t => t.fase === 'en_servicio')
+  // HOY: tareas no programadas a futuro y que NO estén en servicio (los en servicio van a su tabla aparte)
+  const pendientes = (typeof hoy !== 'undefined' ? hoy : tareas).filter(t => t.fase !== 'en_servicio')
+  const enServicio = (typeof hoy !== 'undefined' ? hoy : tareas).filter(t => t.fase === 'en_servicio')
+  const proximosList = typeof proximos !== 'undefined' ? proximos : []
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -9,7 +11,10 @@
     <h4 class="fw-bold mb-0 text-dark-title"><%- icon('map', { size: 18 }) %> Mi ruta del día</h4>
     <% if (empleado) { %><small class="text-muted"><%= empleado.nombre %> <%= empleado.apellido %></small><% } %>
   </div>
-  <span class="badge rounded-pill px-3 badge-activo"><%= pendientes.length %> tarea(s)</span>
+  <div class="text-end">
+    <span class="badge rounded-pill px-3 badge-activo"><%= pendientes.length %> hoy</span>
+    <% if (proximosList.length) { %><span class="badge rounded-pill px-3 badge-pendiente ms-1"><%= proximosList.length %> próximos</span><% } %>
+  </div>
 </div>
 
 <% if (!empleado) { %>
@@ -27,12 +32,13 @@
     </div>
   <% } %>
 
-  <!-- Tareas accionables -->
+  <!-- ── HOY ─────────────────────────────────────────────────── -->
+  <h5 class="fw-bold mb-2 mt-3">📅 Hoy</h5>
   <% if (!pendientes.length) { %>
-    <div class="card shadow-sm mb-3"><div class="card-body text-center py-5">
+    <div class="card shadow-sm mb-3"><div class="card-body text-center py-4">
       <div style="font-size:2rem">✅</div>
-      <p class="fw-semibold mb-1">No tenés tareas pendientes</p>
-      <p class="text-muted small mb-0">Cuando te asignen viajes o contenedores, van a aparecer acá.</p>
+      <p class="fw-semibold mb-1">No tenés tareas para hoy</p>
+      <p class="text-muted small mb-0">Cuando te asignen viajes o contenedores para hoy, van a aparecer acá.</p>
     </div></div>
   <% } else { %>
     <div class="d-flex flex-column gap-2 mb-3">
@@ -156,6 +162,48 @@
               <form action="/hoja-de-ruta/<%= t.id %>/iniciar" method="POST" class="d-inline">
                 <button class="btn btn-naranja" <%= t.sinContenedor ? 'disabled' : '' %>><%= t.accionIniciar %></button>
               </form>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <!-- ── PRÓXIMOS VIAJES (planificados para otro día) ──────────── -->
+  <% if (proximosList.length) { %>
+    <h5 class="fw-bold mb-2 mt-4">🗓️ Próximos viajes</h5>
+    <div class="d-flex flex-column gap-2 mb-3">
+      <% proximosList.forEach(t => { %>
+      <div class="card shadow-sm" style="opacity:0.92">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <div>
+              <span style="font-size:1.1rem"><%= t.icono %></span>
+              <span class="fw-bold ms-1"><%= t.titulo %></span>
+              <span class="badge rounded-pill px-3 badge-pendiente ms-2">Programado</span>
+              <span class="text-muted ms-2">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
+            </div>
+            <% if (t.fecha) { %>
+              <small class="text-muted fw-semibold"><%- icon('clock',{size:13}) %> <%= formatFecha(t.fecha) %></small>
+            <% } %>
+          </div>
+
+          <p class="fw-semibold mb-1 mt-2"><%= t.cliente %><% if (t.tel) { %> <small class="text-muted">· <%= t.tel %></small><% } %></p>
+          <p class="mb-1">📍 <%= t.domicilio || 'Domicilio a coordinar' %></p>
+          <% if (t.contenedor) { %><p class="text-muted small mb-1">Contenedor N° <%= t.contenedor %></p><% } %>
+          <% if (t.camion) { %><p class="text-muted small mb-1">🚚 <%= t.camion %></p><% } %>
+          <% if (t.observaciones) { %><p class="text-muted small mb-1"><%= t.observaciones %></p><% } %>
+
+          <div class="mt-2 d-flex gap-2 flex-wrap">
+            <form action="/hoja-de-ruta/<%= t.id %>/realizar-hoy" method="POST" class="d-inline"
+                  onsubmit="return confirm('¿Reprogramar esta tarea para hoy? Va a quedar disponible para iniciarla ahora.')">
+              <button class="btn btn-naranja btn-sm">📅 Realizar hoy</button>
+            </form>
+            <% if (t.tipo === 'viaje' || t.tipo === 'contenedor_entrega') { %>
+              <a href="/ventas/<%= t.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">
+                <%- icon('receipt',{size:14}) %> Ver remito
+              </a>
             <% } %>
           </div>
         </div>
