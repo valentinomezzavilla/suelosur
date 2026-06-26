@@ -1,172 +1,330 @@
 <%
-  // viaje_en_curso.ejs — Vista del chofer durante un viaje con mapa GPS
+  // viaje_en_curso.ejs — Vista de navegación estilo Google Maps
 %>
 
 <style>
-  .viaje-container {
+  .viaje-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - 80px);
-    gap: 0;
-  }
-
-  .viaje-header {
     background: #fff;
-    padding: 1rem;
-    border-bottom: 1px solid #e5e7eb;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    z-index: 10;
+    z-index: 1000;
   }
 
-  .viaje-header h4 {
-    margin: 0 0 0.5rem 0;
-    font-weight: 600;
-    display: flex;
-    gap: 0.5rem;
-    align-items: center;
-  }
-
-  .viaje-info {
-    font-size: 0.9rem;
-    color: #6b7280;
-  }
-
-  .viaje-destino {
-    margin-top: 0.5rem;
-    font-weight: 500;
+  .viaje-map-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
   }
 
   #map {
-    flex: 1;
-    min-height: 0;
+    width: 100%;
+    height: 100%;
   }
 
-  .viaje-controls {
+  .viaje-header-top {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    z-index: 20;
+  }
+
+  .viaje-back-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-size: 20px;
+    transition: all 0.2s;
+  }
+
+  .viaje-back-btn:hover {
     background: #fff;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .viaje-info-top {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .viaje-info-top .destino {
+    font-weight: 600;
+    color: #1a1a1a;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .viaje-info-top .cliente {
+    color: #666;
+    font-size: 0.85rem;
+  }
+
+  .viaje-bottom-sheet {
+    background: #fff;
+    padding: 1.5rem;
+    border-radius: 1.5rem 1.5rem 0 0;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.1);
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .viaje-destination-card {
+    background: #f5f5f5;
     padding: 1rem;
-    border-top: 1px solid #e5e7eb;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
     display: flex;
     gap: 1rem;
-    align-items: center;
-    flex-wrap: wrap;
+    align-items: flex-start;
   }
 
-  .viaje-estado {
-    font-size: 0.9rem;
-    padding: 0.5rem 1rem;
-    border-radius: 0.25rem;
-    background: #f3f4f6;
-  }
-
-  .viaje-estado.rastreando {
-    background: #dcfce7;
-    color: #166534;
-  }
-
-  .viaje-estado.error {
-    background: #fee2e2;
-    color: #991b1b;
-  }
-
-  .distancia-info {
-    display: flex;
-    gap: 1.5rem;
-    font-size: 0.9rem;
-    margin-left: auto;
-  }
-
-  .distancia-info div {
+  .viaje-destination-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 50%;
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    justify-content: center;
+    color: white;
+    font-size: 20px;
+    flex-shrink: 0;
   }
 
-  .btn-group {
+  .viaje-destination-info {
+    flex: 1;
+  }
+
+  .viaje-destination-info h4 {
+    margin: 0 0 0.25rem 0;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #1a1a1a;
+  }
+
+  .viaje-destination-info p {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+  }
+
+  .viaje-route-info {
     display: flex;
-    gap: 0.5rem;
+    gap: 2rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #e0e0e0;
   }
 
-  .spinner {
+  .viaje-route-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .viaje-route-stat .value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1a1a1a;
+    line-height: 1;
+  }
+
+  .viaje-route-stat .label {
+    font-size: 0.8rem;
+    color: #999;
+    margin-top: 0.25rem;
+    font-weight: 500;
+  }
+
+  .viaje-status {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background: #f0f4ff;
+    border-left: 3px solid #667eea;
+    border-radius: 0.5rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.9rem;
+  }
+
+  .viaje-status .spinner {
     display: inline-block;
-    width: 0.75rem;
-    height: 0.75rem;
-    border: 2px solid #e5e7eb;
-    border-top: 2px solid #3b82f6;
+    width: 0.6rem;
+    height: 0.6rem;
+    border: 2px solid #e0e0e0;
+    border-top: 2px solid #667eea;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
+  }
+
+  .viaje-status.active {
+    background: #e8f5e9;
+    border-left-color: #4caf50;
+  }
+
+  .viaje-status.active .spinner {
+    border-top-color: #4caf50;
+  }
+
+  .viaje-status.error {
+    background: #ffebee;
+    border-left-color: #f44336;
+  }
+
+  .viaje-status.error .spinner {
+    display: none;
   }
 
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
 
-  .gps-warning {
-    display: none;
-    padding: 0.75rem 1rem;
-    background: #fef3c7;
-    border: 1px solid #fcd34d;
-    border-radius: 0.375rem;
-    margin-bottom: 1rem;
-    color: #92400e;
-    font-size: 0.9rem;
+  .viaje-actions {
+    display: flex;
+    gap: 0.75rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e0e0e0;
   }
 
-  .gps-warning.show {
-    display: block;
+  .viaje-actions .btn {
+    flex: 1;
+    padding: 0.875rem 1rem;
+    border-radius: 0.5rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    transition: all 0.3s;
+  }
+
+  .viaje-actions .btn-secondary {
+    background: #f5f5f5;
+    color: #333;
+  }
+
+  .viaje-actions .btn-secondary:active {
+    background: #e0e0e0;
+  }
+
+  .viaje-actions .btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    flex: 1.5;
+  }
+
+  .viaje-actions .btn-primary:active {
+    opacity: 0.9;
+  }
+
+  .viaje-actions .btn-danger {
+    background: #ffebee;
+    color: #f44336;
+  }
+
+  .viaje-actions .btn-danger:active {
+    background: #ffcdd2;
+  }
+
+  /* Scroll suave para bottom sheet */
+  .viaje-bottom-sheet {
+    scrollbar-width: thin;
+    scrollbar-color: #ccc #f5f5f5;
+  }
+
+  .viaje-bottom-sheet::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .viaje-bottom-sheet::-webkit-scrollbar-track {
+    background: #f5f5f5;
+  }
+
+  .viaje-bottom-sheet::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
   }
 </style>
 
-<div class="viaje-container">
-  <div class="viaje-header">
-    <div class="gps-warning" id="gpsWarning">
-      📍 Solicitar permiso de GPS para rastrear tu ubicación...
-    </div>
+<div class="viaje-wrapper">
+  <!-- Mapa a pantalla completa -->
+  <div class="viaje-map-container">
+    <div id="map"></div>
 
-    <h4>
-      <%- icon('map', { size: 18 }) %>
-      Viaje en curso — OP-<%= String(op.nro_op).padStart(4,'0') %>
-    </h4>
-
-    <div class="viaje-info">
-      <span class="viaje-cliente"><%= op.cliente %></span>
-      <% if (op.tel) { %><span class="text-muted"> · <%= op.tel %></span><% } %>
-    </div>
-
-    <div class="viaje-destino">
-      📍 <%= op.domicilio || 'Domicilio a coordinar' %>
-    </div>
-
-    <% if (op.camion) { %>
-      <div class="viaje-info text-muted small">
-        🚚 <%= op.camion %>
+    <!-- Header flotante con destino -->
+    <div class="viaje-header-top">
+      <button class="viaje-back-btn" onclick="window.history.back()">←</button>
+      <div class="viaje-info-top">
+        <div class="destino">📍 <%= op.domicilio || 'Destino' %></div>
+        <div class="cliente"><%= op.cliente %></div>
       </div>
-    <% } %>
+    </div>
   </div>
 
-  <!-- Mapa Leaflet -->
-  <div id="map"></div>
-
-  <!-- Controles y estado -->
-  <div class="viaje-controles">
-    <div class="viaje-estado" id="statusGPS">
-      <span class="spinner"></span> Inicializando GPS...
-    </div>
-
-    <div class="distancia-info">
-      <div>
-        <span>📏 Distancia:</span>
-        <strong id="distancia">—</strong>
-      </div>
-      <div>
-        <span>⏱ Duración est.:</span>
-        <strong id="duracion">—</strong>
+  <!-- Bottom Sheet - Información de viaje -->
+  <div class="viaje-bottom-sheet">
+    <!-- Tarjeta de destino -->
+    <div class="viaje-destination-card">
+      <div class="viaje-destination-icon">📍</div>
+      <div class="viaje-destination-info">
+        <h4><%= op.domicilio || 'Destino' %></h4>
+        <p><%= op.cliente %><% if (op.tel) { %> · <%= op.tel %><% } %></p>
       </div>
     </div>
 
-    <div class="btn-group" style="margin-left: auto;">
-      <a href="/hoja-de-ruta" class="btn btn-sm btn-outline-secondary">← Volver</a>
-      <button type="button" class="btn btn-sm btn-success" onclick="window.mostrarFinalizarModal()">
-        <%- icon('check', {size:14}) %> Finalizar viaje
+    <!-- Información de ruta -->
+    <div class="viaje-route-info">
+      <div class="viaje-route-stat">
+        <div class="value" id="distancia">—</div>
+        <div class="label">Distancia</div>
+      </div>
+      <div class="viaje-route-stat">
+        <div class="value" id="duracion">—</div>
+        <div class="label">Duración est.</div>
+      </div>
+      <div class="viaje-route-stat">
+        <div class="value" id="velocidad">0</div>
+        <div class="label">km/h</div>
+      </div>
+    </div>
+
+    <!-- Estado de GPS -->
+    <div class="viaje-status" id="statusGPS">
+      <span class="spinner"></span>
+      <span>Inicializando GPS...</span>
+    </div>
+
+    <!-- Acciones -->
+    <div class="viaje-actions">
+      <a href="/hoja-de-ruta" class="btn btn-secondary">← Volver</a>
+      <button type="button" class="btn btn-primary" onclick="window.mostrarFinalizarModal()">
+        ✓ Finalizar
       </button>
     </div>
   </div>
@@ -174,7 +332,7 @@
 
 <!-- Modal para finalizar viaje -->
 <div class="modal fade" id="finalizarModal" tabindex="-1">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Confirmar entrega</h5>
@@ -182,97 +340,39 @@
       </div>
       <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data">
         <div class="modal-body">
-          <label class="form-label fw-semibold mb-1">📷 Remito firmado *</label>
+          <label class="form-label fw-semibold mb-2">📷 Remito firmado *</label>
           <input type="file" name="remito_firmado" accept="image/*,application/pdf" capture="environment"
                  class="form-control form-control-sm remito-input" required>
-          <small class="text-muted d-block mb-2">Sacá una foto del remito firmado o subí un archivo (PDF/JPG/PNG)</small>
+          <small class="text-muted d-block mb-3">Foto o PDF del remito firmado</small>
 
           <!-- Preview -->
-          <div class="remito-preview" style="display:none; margin-top:1rem">
-            <div class="remito-preview__info text-muted small mb-1">
+          <div class="remito-preview" style="display:none">
+            <div class="remito-preview__info text-muted small mb-2">
               <span class="remito-preview__name fw-semibold"></span>
               <span class="remito-preview__size"></span>
             </div>
             <img class="remito-preview__img" alt="Vista previa"
-                 style="display:none; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #e5e7eb; margin-bottom:1rem">
+                 style="display:none; max-width:100%; max-height:200px; border-radius:8px; border:1px solid #e0e0e0; margin-bottom:1rem">
             <div class="remito-preview__pdf" style="display:none; padding:0.75rem; background:#f3f4f6; border-radius:8px; text-align:center; margin-bottom:1rem">
               📄 <span class="remito-preview__pdf-name"></span>
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary remito-preview__clear">
-              Cambiar archivo
+              Cambiar
             </button>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-success"><%- icon('check',{size:15}) %> Confirmar entrega</button>
+          <button type="submit" class="btn btn-success">Confirmar entrega</button>
         </div>
       </form>
     </div>
   </div>
 </div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  const modal = new bootstrap.Modal(document.getElementById('finalizarModal'), { backdrop: 'static' });
-
-  // Mostrar modal de finalizar con el botón
-  window.mostrarFinalizarModal = () => {
-    modal.show();
-  };
-
-  // Lógica de preview de remito
-  const remitoInput = document.querySelector('.remito-input');
-  const preview = document.querySelector('.remito-preview');
-  const img = document.querySelector('.remito-preview__img');
-  const pdf = document.querySelector('.remito-preview__pdf');
-  const pdfName = document.querySelector('.remito-preview__pdf-name');
-  const nameEl = document.querySelector('.remito-preview__name');
-  const sizeEl = document.querySelector('.remito-preview__size');
-  const clearBtn = document.querySelector('.remito-preview__clear');
-  let currentUrl = null;
-
-  function reset() {
-    if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; }
-    preview.style.display = 'none';
-    img.style.display = 'none'; img.src = '';
-    pdf.style.display = 'none'; pdfName.textContent = '';
-    remitoInput.value = '';
-  }
-
-  remitoInput.addEventListener('change', function() {
-    if (!remitoInput.files || !remitoInput.files[0]) { reset(); return; }
-    const f = remitoInput.files[0];
-    const kb = (f.size / 1024).toFixed(0);
-    const mb = (f.size / 1024 / 1024).toFixed(1);
-    const size = f.size > 1024 * 1024 ? (mb + ' MB') : (kb + ' KB');
-    nameEl.textContent = f.name;
-    sizeEl.textContent = ' · ' + size;
-    preview.style.display = 'block';
-
-    if (currentUrl) URL.revokeObjectURL(currentUrl);
-    currentUrl = URL.createObjectURL(f);
-
-    if (f.type.startsWith('image/')) {
-      img.src = currentUrl; img.style.display = 'block';
-      pdf.style.display = 'none';
-    } else if (f.type === 'application/pdf') {
-      pdfName.textContent = f.name;
-      pdf.style.display = 'block';
-      img.style.display = 'none';
-    }
-  });
-  clearBtn.addEventListener('click', reset);
-});
-</script>
-
 <!-- Leaflet CSS + JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-<!-- OSRM (routing) -->
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
 <script>
 (function() {
@@ -284,81 +384,61 @@ document.addEventListener('DOMContentLoaded', () => {
   let map;
   let userMarker;
   let destMarker;
-  let route;
   let currentLat, currentLng;
+  let currentSpeed = 0;
   let watchId;
 
   const statusEl = document.getElementById('statusGPS');
-  const gpsWarning = document.getElementById('gpsWarning');
   const distanciaEl = document.getElementById('distancia');
   const duracionEl = document.getElementById('duracion');
+  const velocidadEl = document.getElementById('velocidad');
 
-  // ─────────────────────────────────────────────────────────────
-  // Inicializar mapa
-  // ─────────────────────────────────────────────────────────────
   function initMap() {
-    map = L.map('map').setView([-31.4, -64.2], 13); // Centro de Córdoba por defecto
-
+    map = L.map('map').setView([-31.4, -64.2], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors',
+      attribution: '© OpenStreetMap',
       maxZoom: 19
     }).addTo(map);
 
     // Pin del usuario (azul)
     userMarker = L.circleMarker([0, 0], {
-      radius: 8,
-      fillColor: '#3b82f6',
+      radius: 10,
+      fillColor: '#667eea',
       color: '#fff',
-      weight: 2,
+      weight: 3,
       opacity: 1,
-      fillOpacity: 0.8
+      fillOpacity: 0.9
     }).addTo(map);
 
-    // Pin del destino (rojo)
+    // Pin del destino (púrpura)
     if (destLat && destLng) {
       destMarker = L.marker([destLat, destLng], {
         icon: L.icon({
-          iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2RjMjYyNiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA0LjQxIDMuMDUgOC4xOCA3IDkuMzd2LTEuNUg2djJoMnYyaDF2LTJ1aDE2LTIgMTB2LTJIMjEuNDh2MS41QzIwLjk1IDIwLjE4IDIzIDI4IDEyIDE2VjIuNDggMTIgMnoiLz48L3N2Zz4=',
+          iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23764ba2"><path d="M12 2c-4.4 0-8 3.6-8 8 0 5.5 8 14 8 14s8-8.5 8-14c0-4.4-3.6-8-8-8zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>',
           iconSize: [32, 32],
-          iconAnchor: [16, 32],
-          popupAnchor: [0, -32]
+          iconAnchor: [16, 32]
         })
-      }).addTo(map).bindPopup('📍 Destino');
+      }).addTo(map);
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Solicitar GPS
-  // ─────────────────────────────────────────────────────────────
   function startTracking() {
     if (!navigator.geolocation) {
-      statusEl.innerHTML = '❌ GPS no disponible en este dispositivo';
-      statusEl.className = 'viaje-estado error';
+      statusEl.innerHTML = '❌ GPS no disponible';
+      statusEl.classList.add('error');
       return;
     }
 
-    gpsWarning.classList.add('show');
-
-    // Obtener ubicación inicial
     navigator.geolocation.getCurrentPosition(
       (pos) => onGPSSuccess(pos),
       (err) => onGPSError(err),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 
-    // Rastrear continuamente
     watchId = navigator.geolocation.watchPosition(
       (pos) => onGPSSuccess(pos),
       (err) => onGPSError(err),
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 5000
-      }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
     );
   }
 
@@ -366,49 +446,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const { latitude, longitude, accuracy } = position.coords;
     currentLat = latitude;
     currentLng = longitude;
+    currentSpeed = position.coords.speed || 0;
 
-    // Actualizar marcador del usuario
     userMarker.setLatLng([latitude, longitude]);
-
-    // Centrar mapa en usuario
     map.panTo([latitude, longitude]);
 
-    // Actualizar estado
-    statusEl.innerHTML = '✅ GPS activo';
-    statusEl.className = 'viaje-estado rastreando';
-    gpsWarning.classList.remove('show');
+    velocidadEl.textContent = Math.round(currentSpeed * 3.6); // m/s a km/h
 
-    // Enviar ubicación al servidor
+    statusEl.innerHTML = '✓ GPS activo';
+    statusEl.classList.remove('error');
+    statusEl.classList.add('active');
+
     saveLocation(latitude, longitude, accuracy);
 
-    // Calcular ruta si tenemos destino
     if (destLat && destLng) {
       updateRoute(latitude, longitude, destLat, destLng);
     }
   }
 
   function onGPSError(error) {
-    let msg = 'Error en GPS: ';
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        msg += 'Permiso denegado. Por favor, permite el acceso al GPS.';
-        break;
-      case error.POSITION_UNAVAILABLE:
-        msg += 'Posición no disponible.';
-        break;
-      case error.TIMEOUT:
-        msg += 'Timeout esperando GPS.';
-        break;
-      default:
-        msg += 'Error desconocido.';
-    }
+    let msg = 'GPS no disponible';
+    if (error.code === 1) msg = 'Permiso denegado';
+    else if (error.code === 2) msg = 'Posición no disponible';
+    else if (error.code === 3) msg = 'Timeout del GPS';
+
     statusEl.innerHTML = '⚠️ ' + msg;
-    statusEl.className = 'viaje-estado error';
+    statusEl.classList.add('error');
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Guardar ubicación en servidor
-  // ─────────────────────────────────────────────────────────────
   async function saveLocation(lat, lng, accuracy) {
     try {
       await fetch(`/hoja-de-ruta/${opId}/ubicacion`, {
@@ -421,14 +486,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Calcular ruta con OSRM (OpenSource Routing Machine)
-  // ─────────────────────────────────────────────────────────────
   async function updateRoute(startLat, startLng, endLat, endLng) {
     if (!startLat || !startLng || !endLat || !endLng) return;
 
     try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&steps=true&geometries=geojson`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&geometries=geojson`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Error en OSRM');
 
@@ -436,42 +498,32 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!data.routes || !data.routes[0]) return;
 
       const route = data.routes[0];
-      const distance = (route.distance / 1000).toFixed(1); // km
-      const duration = Math.round(route.duration / 60); // minutos
+      const distance = (route.distance / 1000).toFixed(1);
+      const duration = Math.round(route.duration / 60);
 
       distanciaEl.textContent = `${distance} km`;
       duracionEl.textContent = `${duration} min`;
 
-      // Dibujar la ruta en el mapa
       const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
       if (window.routePolyline) {
         map.removeLayer(window.routePolyline);
       }
       window.routePolyline = L.polyline(coords, {
-        color: '#3b82f6',
-        weight: 3,
-        opacity: 0.7,
-        dashArray: '5, 5'
+        color: '#667eea',
+        weight: 4,
+        opacity: 0.8
       }).addTo(map);
 
-      // Ajustar vista
-      const bounds = L.latLngBounds([
-        [startLat, startLng],
-        [endLat, endLng],
-        ...coords
-      ]);
-      map.fitBounds(bounds, { padding: [50, 50] });
+      const bounds = L.latLngBounds([[startLat, startLng], [endLat, endLng], ...coords]);
+      map.fitBounds(bounds, { padding: [100, 100] });
     } catch (err) {
       console.error('Error calculando ruta:', err);
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Geocodificar destino si no tiene coords
-  // ─────────────────────────────────────────────────────────────
   async function geocodeDestination() {
-    if (destLat && destLng) return; // Ya tiene coordenadas
-    if (!domicilio) return; // Sin dirección
+    if (destLat && destLng) return;
+    if (!domicilio) return;
 
     try {
       const query = encodeURIComponent(domicilio + ', Córdoba, Argentina');
@@ -480,7 +532,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (data && data[0]) {
         const { lat, lon } = data[0];
-        // Guardar coordenadas en el servidor
         await fetch(`/hoja-de-ruta/${opId}/geocodificar`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -492,20 +543,56 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────
-  // Inicialización
-  // ─────────────────────────────────────────────────────────────
+  // Modal de finalización
   document.addEventListener('DOMContentLoaded', () => {
+    const modal = new bootstrap.Modal(document.getElementById('finalizarModal'), { backdrop: 'static' });
+    window.mostrarFinalizarModal = () => modal.show();
+
+    // Preview de remito
+    const remitoInput = document.querySelector('.remito-input');
+    const preview = document.querySelector('.remito-preview');
+    const img = document.querySelector('.remito-preview__img');
+    const pdf = document.querySelector('.remito-preview__pdf');
+    const pdfName = document.querySelector('.remito-preview__pdf-name');
+    const nameEl = document.querySelector('.remito-preview__name');
+    const sizeEl = document.querySelector('.remito-preview__size');
+    const clearBtn = document.querySelector('.remito-preview__clear');
+    let currentUrl = null;
+
+    function reset() {
+      if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; }
+      preview.style.display = 'none';
+      img.style.display = 'none'; img.src = '';
+      pdf.style.display = 'none'; pdfName.textContent = '';
+      remitoInput.value = '';
+    }
+
+    remitoInput.addEventListener('change', function() {
+      if (!remitoInput.files || !remitoInput.files[0]) { reset(); return; }
+      const f = remitoInput.files[0];
+      const size = f.size > 1024 * 1024 ? ((f.size / 1024 / 1024).toFixed(1) + ' MB') : ((f.size / 1024).toFixed(0) + ' KB');
+      nameEl.textContent = f.name;
+      sizeEl.textContent = ' · ' + size;
+      preview.style.display = 'block';
+
+      if (currentUrl) URL.revokeObjectURL(currentUrl);
+      currentUrl = URL.createObjectURL(f);
+
+      if (f.type.startsWith('image/')) {
+        img.src = currentUrl; img.style.display = 'block'; pdf.style.display = 'none';
+      } else if (f.type === 'application/pdf') {
+        pdfName.textContent = f.name; pdf.style.display = 'block'; img.style.display = 'none';
+      }
+    });
+    clearBtn.addEventListener('click', reset);
+
     initMap();
     geocodeDestination();
     startTracking();
   });
 
-  // Detener rastreo al cerrar la página
   window.addEventListener('beforeunload', () => {
-    if (watchId) {
-      navigator.geolocation.clearWatch(watchId);
-    }
+    if (watchId) navigator.geolocation.clearWatch(watchId);
   });
 })();
 </script>
