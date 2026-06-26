@@ -17,15 +17,18 @@ const ContenedoresController = {
   },
 
   async nuevo(req, res) {
-    res.render('pages/contenedores/form', { titulo: 'Nuevo Contenedor', contenedor: null })
+    const proximoNumero = await ContenedoresModel.proximoNumero()
+    res.render('pages/contenedores/form', { titulo: 'Nuevo Contenedor', contenedor: null, proximoNumero })
   },
 
   async crear(req, res) {
     try {
-      const numero = parseInt(req.body.numero_contenedor)
-      if (!numero || numero <= 0) { req.flash('error', 'El número es obligatorio.'); return res.redirect('/contenedores/nuevo') }
-      if (await ContenedoresModel.obtenerPorNumero(numero)) { req.flash('error', `Ya existe el contenedor N° ${numero}.`); return res.redirect('/contenedores/nuevo') }
-      await ContenedoresModel.crear({ numero_contenedor: numero, estado_general: req.body.estado_general, fecha_ultima_pintada: req.body.fecha_ultima_pintada, observaciones: req.body.observaciones })
+      // El número es autoincrementable: lo asigna el modelo, no el usuario.
+      const { numero } = await ContenedoresModel.crear({
+        estado_general: req.body.estado_general,
+        fecha_ultima_pintada: req.body.fecha_ultima_pintada,
+        observaciones: req.body.observaciones,
+      })
       req.flash('success', `Contenedor N° ${numero} creado.`)
       res.redirect('/contenedores')
     } catch (err) {
@@ -47,10 +50,8 @@ const ContenedoresController = {
 
   async actualizar(req, res) {
     try {
-      const numero = parseInt(req.body.numero_contenedor)
-      const existente = await ContenedoresModel.obtenerPorNumero(numero)
-      if (existente && existente.id !== req.params.id) { req.flash('error', `Ya existe el N° ${numero}.`); return res.redirect(`/contenedores/${req.params.id}/editar`) }
-      await ContenedoresModel.actualizar(req.params.id, { numero_contenedor: numero, estado_general: req.body.estado_general, fecha_ultima_pintada: req.body.fecha_ultima_pintada, observaciones: req.body.observaciones })
+      // El número de contenedor no se modifica (es autoincrementable e inmutable).
+      await ContenedoresModel.actualizar(req.params.id, { estado_general: req.body.estado_general, fecha_ultima_pintada: req.body.fecha_ultima_pintada, observaciones: req.body.observaciones })
       req.flash('success', 'Contenedor actualizado.')
       res.redirect('/contenedores')
     } catch (err) {

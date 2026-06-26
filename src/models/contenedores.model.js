@@ -52,20 +52,31 @@ const ContenedoresModel = {
     return (await query(`SELECT * FROM contenedores WHERE numero_contenedor = ?`, [numero])).rows[0]
   },
 
-  async crear({ numero_contenedor, estado_general, fecha_ultima_pintada, observaciones }) {
+  // Próximo número de contenedor disponible (para mostrarlo en el formulario)
+  async proximoNumero() {
+    const r = (await query(`SELECT COALESCE(MAX(numero_contenedor), 0) + 1 AS n FROM contenedores`)).rows[0]
+    return parseInt(r.n) || 1
+  },
+
+  // El número es autoincrementable: se calcula dentro de la transacción
+  // para evitar duplicados ante creaciones simultáneas.
+  async crear({ estado_general, fecha_ultima_pintada, observaciones } = {}) {
     const id = crypto.randomUUID()
+    let numero
     await transaction(async (q) => {
+      numero = parseInt((await q(`SELECT COALESCE(MAX(numero_contenedor), 0) + 1 AS n FROM contenedores`)).rows[0].n) || 1
       await q(`INSERT INTO contenedores (id, numero_contenedor, estado_general, fecha_ultima_pintada, observaciones) VALUES (?, ?, ?, ?, ?)`,
-        [id, numero_contenedor, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || ''])
+        [id, numero, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || ''])
       await q(`INSERT INTO movimiento_contenedor (id, id_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_planta', 'Alta inicial')`,
         [crypto.randomUUID(), id])
     })
-    return id
+    return { id, numero }
   },
 
-  async actualizar(id, { numero_contenedor, estado_general, fecha_ultima_pintada, observaciones }) {
-    await query(`UPDATE contenedores SET numero_contenedor = ?, estado_general = ?, fecha_ultima_pintada = ?, observaciones = ? WHERE id = ?`,
-      [numero_contenedor, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || '', id])
+  // El número de contenedor es inmutable (autoincrementable): no se actualiza.
+  async actualizar(id, { estado_general, fecha_ultima_pintada, observaciones }) {
+    await query(`UPDATE contenedores SET estado_general = ?, fecha_ultima_pintada = ?, observaciones = ? WHERE id = ?`,
+      [estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || '', id])
   },
 
   async toggleActivo(id) {

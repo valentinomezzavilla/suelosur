@@ -9,10 +9,13 @@
 
       <div class="row g-3 mb-3">
         <div class="col-md-6">
-          <label class="form-label">Número de contenedor *</label>
-          <input type="number" name="numero_contenedor" class="form-control" min="1"
-                 value="<%= contenedor?.numero_contenedor || '' %>" required autofocus>
-          <small class="text-muted">No tiene tope, podés crear los que necesites.</small>
+          <label class="form-label">Número de contenedor</label>
+          <input type="text" class="form-control bg-light"
+                 value="N° <%= contenedor ? contenedor.numero_contenedor : (typeof proximoNumero !== 'undefined' ? proximoNumero : '') %>"
+                 readonly tabindex="-1">
+          <small class="text-muted">
+            <%= contenedor ? 'El número no se puede modificar.' : 'Se asigna automáticamente al crear.' %>
+          </small>
         </div>
         <div class="col-md-6">
           <label class="form-label">Condición general</label>
