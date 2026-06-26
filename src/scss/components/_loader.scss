@@ -1,0 +1,95 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Loader con logo animado — reemplaza el spinner clásico.
+// Uso: overlay a pantalla completa durante cargas (login, navegación).
+//   <div class="app-loader" id="appLoader"> ... </div>
+//   .app-loader.is-active  → visible
+// ═══════════════════════════════════════════════════════════════
+
+.app-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.1rem;
+  background: rgba(13, 27, 53, 0.82);   // mismo azul del fondo de login
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s ease, visibility 0.25s ease;
+
+  &.is-active {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+// ── Núcleo: logo + anillo girando ──────────────────────────────
+.app-loader__core {
+  position: relative;
+  width: 84px;
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Anillo naranja que gira alrededor del logo
+.app-loader__ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(232, 145, 42, 0.18);
+  border-top-color: $orange;
+  animation: app-loader-spin 0.9s linear infinite;
+}
+
+// Logo con pulso suave
+.app-loader__logo {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: 10px;
+  animation: app-loader-pulse 1.6s ease-in-out infinite;
+}
+
+.app-loader__text {
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  opacity: 0.85;
+  animation: app-loader-fade 1.6s ease-in-out infinite;
+}
+
+@keyframes app-loader-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes app-loader-pulse {
+  0%, 100% { transform: scale(1);    opacity: 1;   }
+  50%      { transform: scale(0.88); opacity: 0.7; }
+}
+
+@keyframes app-loader-fade {
+  0%, 100% { opacity: 0.85; }
+  50%      { opacity: 0.45; }
+}
+
+// Variante embebida (no pantalla completa) para usar dentro de tarjetas/contenedores
+.app-loader--inline {
+  position: static;
+  background: transparent;
+  backdrop-filter: none;
+  opacity: 1;
+  visibility: visible;
+  padding: 2rem 0;
+
+  .app-loader__core { width: 64px; height: 64px; }
+  .app-loader__logo { width: 36px; height: 36px; }
+  .app-loader__text { color: $muted; }
+}
