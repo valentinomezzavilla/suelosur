@@ -365,14 +365,22 @@ const HojaRutaController = {
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
       const { op } = v
 
-      // Para finalizar entrega de venta o contenedor, el chofer debe subir el remito firmado
+      // Para finalizar una entrega, el cliente debe firmar digitalmente.
       const esEntrega = (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado')
                      || (op.tipo_op === 'C' && op.estado === 'despachado')
-      if (esEntrega && !req.file) {
-        req.flash('error', 'Tenés que adjuntar el remito firmado (foto o PDF) para confirmar la entrega.')
+      if (esEntrega && !req.body.firma_cliente) {
+        req.flash('error', 'Falta la firma del cliente para confirmar la entrega.')
         return res.redirect(back)
       }
-      // Guardar archivo del remito firmado si vino
+      // Guardar la firma del cliente (PNG en base64 → archivo) y la aclaración
+      if (req.body.firma_cliente) {
+        const filename = HojaRutaController._guardarFirma(req.body.firma_cliente, op.id)
+        if (filename) {
+          await query(`UPDATE op_encabezado SET firma_cliente = ?, firma_aclaracion = ? WHERE id = ?`,
+            [filename, (req.body.firma_aclaracion || '').trim() || null, op.id])
+        }
+      }
+      // Guardar archivo del remito firmado si el chofer adjuntó uno (opcional)
       if (req.file) {
         await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [req.file.filename, op.id])
       }
@@ -414,6 +422,21 @@ const HojaRutaController = {
       }
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al finalizar la tarea.') }
     res.redirect(back)
+  },
+
+  // Decodifica una firma PNG en base64 (dataURL) y la guarda como archivo.
+  // Devuelve el nombre del archivo, o null si el dato no es válido.
+  _guardarFirma(dataUrl, opId) {
+    try {
+      const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl).trim())
+      if (!m) return null
+      const buf = Buffer.from(m[1], 'base64')
+      if (!buf.length || buf.length > 2 * 1024 * 1024) return null // sanity (máx 2MB)
+      const base = String(opId).replace(/[^a-z0-9-]/gi, '')
+      const filename = `firma-${base}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.png`
+      fs.writeFileSync(path.join(DIR_REMITOS, filename), buf)
+      return filename
+    } catch (err) { console.error('Error guardando firma:', err); return null }
   },
 
   // Servir el archivo del remito firmado (imagen/pdf)

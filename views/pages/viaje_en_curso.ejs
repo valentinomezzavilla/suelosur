@@ -270,6 +270,25 @@
     background: #ccc;
     border-radius: 3px;
   }
+
+  /* ── Pad de firma ── */
+  .firma-wrap {
+    position: relative;
+  }
+  .firma-canvas {
+    width: 100%;
+    height: 180px;
+    border: 2px dashed #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    display: block;
+    touch-action: none;
+  }
+  .firma-clear {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+  }
 </style>
 
 <div class="viaje-wrapper">
@@ -338,15 +357,29 @@
         <h5 class="modal-title">Confirmar entrega</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data">
+      <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data" id="finalizarForm" data-no-loader>
         <div class="modal-body">
-          <label class="form-label fw-semibold mb-2">📷 Remito firmado *</label>
+          <!-- ── Firma del cliente (obligatoria) ── -->
+          <label class="form-label fw-semibold mb-1">✍️ Firma del cliente *</label>
+          <small class="text-muted d-block mb-1">Pedile al cliente que firme con el dedo en el recuadro</small>
+          <div class="firma-wrap">
+            <canvas id="firmaCanvas" class="firma-canvas"></canvas>
+            <button type="button" class="btn btn-sm btn-outline-secondary firma-clear" id="firmaClear">Limpiar</button>
+          </div>
+          <input type="hidden" name="firma_cliente" id="firmaInput">
+
+          <label class="form-label fw-semibold mb-1 mt-3">Aclaración (nombre de quien recibe) *</label>
+          <input type="text" name="firma_aclaracion" class="form-control form-control-sm" id="firmaNombre"
+                 placeholder="Nombre y apellido" required autocomplete="off">
+
+          <!-- ── Foto del remito (opcional) ── -->
+          <label class="form-label fw-semibold mb-1 mt-3">📷 Foto del remito <span class="text-muted fw-normal">(opcional)</span></label>
           <input type="file" name="remito_firmado" accept="image/*,application/pdf" capture="environment"
-                 class="form-control form-control-sm remito-input" required>
-          <small class="text-muted d-block mb-3">Foto o PDF del remito firmado</small>
+                 class="form-control form-control-sm remito-input">
+          <small class="text-muted d-block">Si querés, adjuntá una foto o PDF del remito en papel</small>
 
           <!-- Preview -->
-          <div class="remito-preview" style="display:none">
+          <div class="remito-preview" style="display:none; margin-top:0.75rem">
             <div class="remito-preview__info text-muted small mb-2">
               <span class="remito-preview__name fw-semibold"></span>
               <span class="remito-preview__size"></span>
@@ -373,6 +406,7 @@
 <!-- Leaflet + OpenStreetMap (sin tokens requeridos) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/signaturePad.js"></script>
 
 <script>
 (function() {
@@ -558,8 +592,36 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const modal = new bootstrap.Modal(document.getElementById('finalizarModal'), { backdrop: 'static' });
+    const modalEl = document.getElementById('finalizarModal');
+    const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
     window.mostrarFinalizarModal = () => modal.show();
+
+    // ── Pad de firma del cliente ──
+    const firmaCanvas = document.getElementById('firmaCanvas');
+    const firmaInput = document.getElementById('firmaInput');
+    const firmaNombre = document.getElementById('firmaNombre');
+    const finalizarForm = document.getElementById('finalizarForm');
+    const pad = SignaturePad(firmaCanvas);
+    // El canvas necesita re-medirse cuando el modal ya es visible
+    modalEl.addEventListener('shown.bs.modal', () => pad.resize());
+    document.getElementById('firmaClear').addEventListener('click', () => pad.clear());
+
+    finalizarForm.addEventListener('submit', (e) => {
+      if (pad.isEmpty()) {
+        e.preventDefault();
+        alert('Falta la firma del cliente. Pedile que firme en el recuadro.');
+        return;
+      }
+      if (!firmaNombre.value.trim()) {
+        e.preventDefault();
+        alert('Ingresá el nombre de quien recibe la entrega.');
+        firmaNombre.focus();
+        return;
+      }
+      firmaInput.value = pad.toDataURL();
+      // Mostrar el loader global mientras se confirma
+      if (window.AppLoader) window.AppLoader.show('Confirmando entrega…');
+    });
 
     const remitoInput = document.querySelector('.remito-input');
     const preview = document.querySelector('.remito-preview');

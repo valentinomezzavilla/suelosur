@@ -36,6 +36,8 @@ const RemitosModel = {
       metodo_pago: op.metodo_pago,
       observaciones: op.observaciones || '',
       archivo_remito: op.archivo_remito || null,
+      firma_cliente: op.firma_cliente || null,
+      firma_aclaracion: op.firma_aclaracion || '',
       cliente: {
         nombre: `${op.cliente_nombre || ''} ${op.cliente_apellido || ''}`.trim() || 'Particular',
         telefono: op.cliente_telefono || op.tel_whatsapp || '',

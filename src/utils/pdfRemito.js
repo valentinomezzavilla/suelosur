@@ -4,8 +4,11 @@
 // Recibe un remito normalizado (RemitosModel.obtener) y lo escribe
 // en el response como application/pdf.
 // ─────────────────────────────────────────────────────────────────
+const path = require('path')
+const fs = require('fs')
 const PDFDocument = require('pdfkit')
 const { fmtFecha } = require('./fecha')
+const { DIR_REMITOS } = require('../middlewares/upload')
 const B = require('./pdfBrand')
 
 const AZUL = B.AZUL
@@ -103,12 +106,31 @@ function generarRemitoPDF(res, r) {
   }
 
   // ── Firmas ──────────────────────────────────────────────────
-  const yFirma = Math.max(y + 40, doc.page.height - 130)
+  const yFirma = Math.max(y + 50, doc.page.height - 130)
   const wFirma = (width - 40) / 2
+
+  // Firma digital del cliente (si firmó al recibir): se dibuja sobre la línea.
+  if (r.firma_cliente) {
+    const firmaPath = path.join(DIR_REMITOS, r.firma_cliente)
+    if (fs.existsSync(firmaPath)) {
+      try {
+        // Encajar la firma en un recuadro por encima de la línea
+        const fw = wFirma - 20
+        const fh = 44
+        doc.image(firmaPath, left + 10, yFirma - fh - 2, { fit: [fw, fh], align: 'center' })
+      } catch (_) { /* si la firma falla, queda la línea en blanco */ }
+    }
+  }
+
   doc.moveTo(left, yFirma).lineTo(left + wFirma, yFirma).strokeColor('#9ca3af').stroke()
   doc.moveTo(right - wFirma, yFirma).lineTo(right, yFirma).strokeColor('#9ca3af').stroke()
+
+  // Aclaración (nombre de quien recibió) debajo de la línea del cliente
+  const labelCliente = r.firma_aclaracion
+    ? `${r.firma_aclaracion} — Firma y aclaración cliente`
+    : 'Firma y aclaración cliente'
   doc.fillColor(GRIS).fontSize(8).font('Helvetica')
-     .text('Firma y aclaración cliente', left, yFirma + 6, { width: wFirma, align: 'center' })
+     .text(labelCliente, left, yFirma + 6, { width: wFirma, align: 'center' })
      .text('Firma Suelosur', right - wFirma, yFirma + 6, { width: wFirma, align: 'center' })
 
   doc.end()

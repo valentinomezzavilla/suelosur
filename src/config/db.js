@@ -182,9 +182,14 @@ async function initDB() {
       id_camion                 TEXT,
       asignacion_fecha          TEXT,
       asignacion_usuario        TEXT,
+      firma_cliente             TEXT,
+      firma_aclaracion          TEXT,
       created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
+  // Migración: firma digital del cliente al recibir la entrega
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_cliente TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_aclaracion TEXT`).catch(() => {})
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_material (
