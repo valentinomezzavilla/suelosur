@@ -4,14 +4,15 @@
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
 const { fmtFechaHora } = require('./fecha')
+const B = require('./pdfBrand')
 
-const AZUL = '#1c5bad'
-const GRIS = '#6b7280'
-const TINTA = '#1f2937'
-const ROJO = '#b91c1c'
-const VERDE = '#15803d'
+const AZUL = B.AZUL
+const GRIS = B.GRIS
+const TINTA = B.TINTA
+const ROJO = B.ROJO
+const VERDE = B.VERDE
 
-const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+const money = B.money
 
 function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48 })
@@ -23,15 +24,13 @@ function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel }) {
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
 
-  // Encabezado
-  doc.fillColor(AZUL).fontSize(20).font('Helvetica-Bold').text('SUELOSUR', left, 48)
-  doc.fillColor(TINTA).fontSize(15).font('Helvetica-Bold').text('Estado de cuenta', left, 48, { width, align: 'right' })
-  doc.fillColor(GRIS).fontSize(9).font('Helvetica').text(`Período: ${periodoLabel || '—'}`, left, 70, { width, align: 'right' })
-
-  doc.moveTo(left, 92).lineTo(right, 92).strokeColor('#e5e7eb').stroke()
+  // Encabezado de marca (con logo)
+  let y = B.drawHeader(doc, {
+    titulo: 'Estado de cuenta',
+    derecha: [{ label: 'Período', valor: periodoLabel || '—' }],
+  })
 
   // Cliente
-  let y = 104
   doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold').text('CLIENTE', left, y)
   const nombre = `${cliente.nombre} ${cliente.apellido || ''}`.trim()
   doc.fillColor(TINTA).fontSize(13).font('Helvetica-Bold').text(nombre, left, y + 12)
@@ -92,8 +91,7 @@ function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel }) {
      .fillColor(estado.saldoFinal < 0 ? ROJO : VERDE)
      .text(money(estado.saldoFinal), left, y, { width: width - 6, align: 'right' })
 
-  doc.fillColor(GRIS).fontSize(7).font('Helvetica')
-     .text(`Generado el ${fmtFechaHora(new Date().toISOString())} · Suelosur S.A.S.`, left, doc.page.height - 56, { width, align: 'center' })
+  B.drawFooter(doc)
 
   doc.end()
 }

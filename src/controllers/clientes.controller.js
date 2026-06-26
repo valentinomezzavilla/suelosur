@@ -309,48 +309,47 @@ const ClientesController = {
       const totalDeuda = movs.filter(m => m.tipo === 'deuda').reduce((a, m) => a + Number(m.monto || 0), 0)
       const totalPagos = movs.filter(m => m.tipo === 'pago').reduce((a, m) => a + Number(m.monto || 0), 0)
 
-      // Construir tablas para el PDF (combinamos secciones)
-      const columnas = [
-        { header: 'Fecha',       key: 'fecha',  width: 0.13 },
-        { header: 'Tipo',        key: 'tipo',   width: 0.18 },
-        { header: 'Descripción', key: 'desc',   width: 0.45 },
-        { header: 'Monto',       key: 'monto',  align: 'right', money: true, width: 0.18 },
-      ]
+      // Construir las filas de movimientos (transacciones y/o cuenta corriente)
       const filas = []
       if (incluir.includes('transacciones')) {
         transacciones.forEach(t => filas.push({
+          fechaISO: t.fecha || t.created_at,
           fecha: fmtFecha(t.fecha || t.created_at),
           tipo:  t.tipo || '—',
           desc:  t.descripcion || `Remito ${t.nro_remito || '—'}`,
-          monto: Number(t.monto || 0),
+          // Las transacciones (ventas/alquileres) representan cargos → débito
+          monto: -Math.abs(Number(t.monto || 0)),
         }))
       }
       if (incluir.includes('movimientos')) {
         movs.forEach(m => filas.push({
+          fechaISO: m.created_at,
           fecha: fmtFecha(m.created_at),
           tipo:  m.tipo === 'pago' ? 'Pago' : m.tipo === 'deuda' ? 'Deuda' : 'Ajuste',
           desc:  m.descripcion || '—',
           monto: Number(m.monto || 0),
         }))
       }
+      // Ordenar cronológicamente
+      filas.sort((a, b) => String(a.fechaISO || '').localeCompare(String(b.fechaISO || '')))
 
-      const periodoTxt = [desdeISO && `desde ${fmtFecha(desdeISO)}`, hastaISO && `hasta ${fmtFecha(hastaISO)}`]
-        .filter(Boolean).join(' ') || 'sin filtro de fechas'
+      const periodoLabel = [desdeISO && `desde ${fmtFecha(desdeISO)}`, hastaISO && `hasta ${fmtFecha(hastaISO)}`]
+        .filter(Boolean).join(' ') || 'Histórico completo'
 
-      const saldoActual = Number(cliente.saldo || 0)
-      const saldoTxt = saldoActual < 0 ? `Debe $${Math.abs(saldoActual).toLocaleString('es-AR')}`
-                    : saldoActual > 0 ? `A favor $${saldoActual.toLocaleString('es-AR')}`
-                    : 'Al día'
-
-      const subtitulo = `Cliente: #${cliente.numero || '—'} ${ClientesModel.nombreCompleto(cliente)} · ${periodoTxt} · Saldo: ${saldoTxt}`
-        + ` · Transacciones: $${totalTransacciones.toLocaleString('es-AR')}`
-        + ` · Pagos: $${totalPagos.toLocaleString('es-AR')}`
-        + ` · Deudas: $${Math.abs(totalDeuda).toLocaleString('es-AR')}`
-
-      return generarTablaPDF(res, {
-        titulo: 'Reporte de cliente',
-        subtitulo,
-        columnas, filas,
+      const { generarReporteClientePDF } = require('../utils/pdfReporteCliente')
+      return generarReporteClientePDF(res, {
+        cliente: {
+          ...cliente,
+          nombreCompleto: ClientesModel.nombreCompleto(cliente),
+        },
+        periodoLabel,
+        resumen: {
+          totalTransacciones,
+          totalDeuda,
+          totalPagos,
+          saldo: Number(cliente.saldo || 0),
+        },
+        filas,
         nombreArchivo: `reporte-cliente-${cliente.numero || cliente.id}`,
       })
     } catch (err) {

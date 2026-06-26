@@ -6,12 +6,13 @@
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
 const { fmtFecha } = require('./fecha')
+const B = require('./pdfBrand')
 
-const AZUL = '#1c5bad'
-const GRIS = '#6b7280'
-const TINTA = '#1f2937'
+const AZUL = B.AZUL
+const GRIS = B.GRIS
+const TINTA = B.TINTA
 
-const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+const money = B.money
 
 function generarRemitoPDF(res, r) {
   const doc = new PDFDocument({ size: 'A4', margin: 48 })
@@ -25,23 +26,16 @@ function generarRemitoPDF(res, r) {
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
 
-  // ── Encabezado ──────────────────────────────────────────────
-  doc.fillColor(AZUL).fontSize(22).font('Helvetica-Bold').text('SUELOSUR', left, 48)
-  doc.fillColor(GRIS).fontSize(8).font('Helvetica')
-     .text('Áridos · Contenedores · Movimiento de suelo', left, 74)
-     .text('Córdoba, Argentina', left, 86)
-
-  doc.fillColor(TINTA).fontSize(16).font('Helvetica-Bold').text('REMITO', left, 48, { width, align: 'right' })
+  // ── Encabezado de marca (con logo) ──────────────────────────
   const nroTxt = r.nro_remito ? '0001-' + String(r.nro_remito).padStart(8, '0') : 'OP-' + String(r.nro_op).padStart(4, '0')
-  doc.fontSize(13).text(nroTxt, left, 68, { width, align: 'right' })
-  doc.fillColor(GRIS).fontSize(8).font('Helvetica')
-     .text(`OP interna: ${String(r.nro_op).padStart(4, '0')}`, left, 86, { width, align: 'right' })
-     .text(`Fecha: ${fmtFecha(r.fecha_emision)}`, left, 98, { width, align: 'right' })
-
-  doc.moveTo(left, 118).lineTo(right, 118).strokeColor('#e5e7eb').lineWidth(1).stroke()
-
-  // ── Cliente / Atendido ──────────────────────────────────────
-  let y = 132
+  let y = B.drawHeader(doc, {
+    titulo: 'Remito',
+    derecha: [
+      { valor: nroTxt, bold: true, color: TINTA, size: 13 },
+      { label: 'OP interna', valor: String(r.nro_op).padStart(4, '0') },
+      { label: 'Fecha', valor: fmtFecha(r.fecha_emision) },
+    ],
+  })
   doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold').text('CLIENTE', left, y)
   doc.fillColor(TINTA).fontSize(12).font('Helvetica-Bold').text(r.cliente.nombre, left, y + 12)
   let yc = y + 28

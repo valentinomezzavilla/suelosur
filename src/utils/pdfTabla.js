@@ -5,13 +5,12 @@
 //   columnas: [{ header, key, width(0-1 proporción)?, align?, money? }]
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
-const { fmtFechaHora } = require('./fecha')
+const B = require('./pdfBrand')
 
-const AZUL = '#1c5bad'
-const GRIS = '#6b7280'
-const TINTA = '#1f2937'
+const GRIS = B.GRIS
+const TINTA = B.TINTA
 
-const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+const money = B.money
 
 function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [], filas = [], nombreArchivo } = {}) {
   const doc = new PDFDocument({ size: 'A4', margin: 40, layout: 'landscape' })
@@ -30,15 +29,15 @@ function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [
   const propPorCol = sinAncho ? restante / sinAncho : 0
   const anchos = columnas.map(c => (c.width || propPorCol) * width)
 
-  // Encabezado del documento
-  doc.fillColor(AZUL).fontSize(16).font('Helvetica-Bold').text('SUELOSUR', left, 36)
-  doc.fillColor(TINTA).fontSize(13).font('Helvetica-Bold').text(titulo, left, 36, { width, align: 'right' })
-  if (subtitulo) doc.fillColor(GRIS).fontSize(9).font('Helvetica').text(subtitulo, left, 54, { width, align: 'right' })
-
-  let y = 78
+  // Encabezado de marca (con logo)
+  let y = B.drawHeader(doc, {
+    titulo,
+    conRubro: false,
+    derecha: subtitulo ? [subtitulo] : [],
+  })
 
   const drawHeader = () => {
-    doc.rect(left, y, width, 20).fill('#f3f4f6')
+    doc.rect(left, y, width, 20).fill(B.FONDO)
     doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold')
     let x = left
     columnas.forEach((c, i) => {
@@ -65,9 +64,7 @@ function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [
     y += rowH
   })
 
-  doc.fillColor(GRIS).fontSize(7).font('Helvetica')
-     .text(`${filas.length} registro(s) · Generado el ${fmtFechaHora(new Date().toISOString())} · Suelosur S.A.S.`,
-           left, doc.page.height - 30, { width, align: 'center' })
+  B.drawFooter(doc, { extra: `${filas.length} registro(s)` })
 
   doc.end()
 }
