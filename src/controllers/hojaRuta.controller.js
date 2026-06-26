@@ -271,7 +271,36 @@ const HojaRutaController = {
       await query(`
         INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, exactitud, fecha_registro)
         VALUES (?, ?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
-      `, [require('crypto').randomUUID(), op.id, emp.id, lat, lng, accuracy || null])
+      `, [crypto.randomUUID(), op.id, emp.id, lat, lng, accuracy || null])
+
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  },
+
+  // Tracking global: el chofer logueado reporta su posición desde cualquier
+  // página. Si tiene un viaje en curso (despachado), se asocia esa OP.
+  async registrarPosicion(req, res) {
+    try {
+      const emp = await empleadoDe(req.session.user.id)
+      if (!emp) { return res.status(204).end() } // No es chofer vinculado: ignorar silenciosamente
+
+      const { lat, lng, accuracy, velocidad } = req.body
+      if (lat == null || lng == null) {
+        return res.status(400).json({ error: 'Coordenadas requeridas' })
+      }
+
+      // Buscar OP en curso del chofer para asociarla (si existe)
+      const opActiva = (await query(`
+        SELECT id FROM op_encabezado WHERE id_chofer = ? AND estado = 'despachado' ORDER BY created_at DESC LIMIT 1
+      `, [emp.id])).rows[0]
+
+      await query(`
+        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, velocidad, exactitud, fecha_registro)
+        VALUES (?, ?, ?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+      `, [crypto.randomUUID(), opActiva?.id || null, emp.id, lat, lng, velocidad || 0, accuracy || null])
 
       res.json({ ok: true })
     } catch (err) {
