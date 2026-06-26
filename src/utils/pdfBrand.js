@@ -19,7 +19,10 @@ const VERDE  = '#15803d'
 const LINEA  = '#e5e7eb'
 const FONDO  = '#f3f4f6'
 
-const LOGO_PATH = path.join(__dirname, '..', '..', 'public', 'img', 'suelosurjpg.jpg')
+// IMPORTANTE: pdfkit solo renderiza JPEG *baseline* y PNG. El logo original
+// (suelosurjpg.jpg) es un JPEG progresivo y NO se renderiza, por eso se usa
+// la versión PNG generada a partir de él.
+const LOGO_PATH = path.join(__dirname, '..', '..', 'public', 'img', 'logo.png')
 const HAY_LOGO = fs.existsSync(LOGO_PATH)
 
 const EMPRESA = {
@@ -84,13 +87,17 @@ function drawHeader(doc, { titulo = '', derecha = [], conRubro = true } = {}) {
 }
 
 // ── Pie de página de marca ─────────────────────────────────────
+// Se escribe DENTRO del área de contenido (no en el margen inferior): si la Y
+// cae por debajo del límite, pdfkit agrega una página en blanco automáticamente.
 function drawFooter(doc, { extra = '' } = {}) {
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
   const txt = `${extra ? extra + ' · ' : ''}Generado el ${fmtFechaHora(new Date().toISOString())} · ${EMPRESA.razon}`
+  // 10pt por encima del límite inferior del área de contenido → no dispara salto.
+  const y = doc.page.height - doc.page.margins.bottom - 10
   doc.fillColor(GRIS).fontSize(7).font('Helvetica')
-     .text(txt, left, doc.page.height - doc.page.margins.bottom + 6, { width, align: 'center' })
+     .text(txt, left, y, { width, align: 'center', lineBreak: false })
 }
 
 module.exports = {
