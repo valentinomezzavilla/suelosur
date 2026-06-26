@@ -370,7 +370,7 @@
   </div>
 </div>
 
-<!-- Leaflet CSS + JS -->
+<!-- Leaflet + OpenStreetMap (sin tokens requeridos) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
@@ -382,11 +382,10 @@
   const domicilio = '<%= op.domicilio || "" %>'.trim();
 
   let map;
-  let userMarker;
-  let destMarker;
   let currentLat, currentLng;
   let currentSpeed = 0;
   let watchId;
+  let currentHeading = 0;
 
   const statusEl = document.getElementById('statusGPS');
   const distanciaEl = document.getElementById('distancia');
@@ -394,25 +393,33 @@
   const velocidadEl = document.getElementById('velocidad');
 
   function initMap() {
-    map = L.map('map').setView([-31.4, -64.2], 13);
+    map = L.map('map', {
+      zoom: 16,
+      center: [-31.4, -64.2],
+      dragging: false,
+      touchZoom: false,
+      doubleClickZoom: false,
+      scrollWheelZoom: false,
+      zoomControl: false
+    });
+
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
       maxZoom: 19
     }).addTo(map);
 
-    // Pin del usuario (azul)
-    userMarker = L.circleMarker([0, 0], {
-      radius: 10,
-      fillColor: '#667eea',
-      color: '#fff',
-      weight: 3,
-      opacity: 1,
-      fillOpacity: 0.9
+    // Pin del usuario (triángulo apuntando hacia adelante)
+    userMarker = L.marker([0, 0], {
+      icon: L.divIcon({
+        html: '<div style="width: 30px; height: 30px; background: linear-gradient(to bottom, #667eea 0%, #667eea 60%, transparent 100%); clip-path: polygon(50% 0%, 100% 100%, 0% 100%); border: 2px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3);"></div>',
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
+      })
     }).addTo(map);
 
-    // Pin del destino (púrpura)
+    // Destino
     if (destLat && destLng) {
-      destMarker = L.marker([destLat, destLng], {
+      L.marker([destLat, destLng], {
         icon: L.icon({
           iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23764ba2"><path d="M12 2c-4.4 0-8 3.6-8 8 0 5.5 8 14 8 14s8-8.5 8-14c0-4.4-3.6-8-8-8zm0 10c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/></svg>',
           iconSize: [32, 32],
@@ -446,12 +453,21 @@
     const { latitude, longitude, accuracy } = position.coords;
     currentLat = latitude;
     currentLng = longitude;
-    currentSpeed = position.coords.speed || 0;
+    currentSpeed = (position.coords.speed || 0) * 3.6; // m/s a km/h
 
     userMarker.setLatLng([latitude, longitude]);
-    map.panTo([latitude, longitude]);
+    map.setView([latitude, longitude], 16, { animate: false });
 
-    velocidadEl.textContent = Math.round(currentSpeed * 3.6); // m/s a km/h
+    // Rotar el mapa según la dirección del viaje usando transform CSS
+    if (position.coords.heading !== null && position.coords.heading !== undefined) {
+      currentHeading = position.coords.heading;
+      const mapEl = document.getElementById('map');
+      mapEl.style.transform = `perspective(1000px) rotateZ(${currentHeading}deg)`;
+      mapEl.style.transformOrigin = 'center';
+      mapEl.style.transformStyle = 'preserve-3d';
+    }
+
+    velocidadEl.textContent = Math.round(currentSpeed);
 
     statusEl.innerHTML = '✓ GPS activo';
     statusEl.classList.remove('error');
@@ -504,6 +520,7 @@
       distanciaEl.textContent = `${distance} km`;
       duracionEl.textContent = `${duration} min`;
 
+      // Dibujar ruta en Leaflet
       const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
       if (window.routePolyline) {
         map.removeLayer(window.routePolyline);
@@ -513,9 +530,6 @@
         weight: 4,
         opacity: 0.8
       }).addTo(map);
-
-      const bounds = L.latLngBounds([[startLat, startLng], [endLat, endLng], ...coords]);
-      map.fitBounds(bounds, { padding: [100, 100] });
     } catch (err) {
       console.error('Error calculando ruta:', err);
     }
@@ -543,12 +557,10 @@
     }
   }
 
-  // Modal de finalización
   document.addEventListener('DOMContentLoaded', () => {
     const modal = new bootstrap.Modal(document.getElementById('finalizarModal'), { backdrop: 'static' });
     window.mostrarFinalizarModal = () => modal.show();
 
-    // Preview de remito
     const remitoInput = document.querySelector('.remito-input');
     const preview = document.querySelector('.remito-preview');
     const img = document.querySelector('.remito-preview__img');
@@ -587,8 +599,10 @@
     clearBtn.addEventListener('click', reset);
 
     initMap();
-    geocodeDestination();
-    startTracking();
+    setTimeout(() => {
+      geocodeDestination();
+      startTracking();
+    }, 1000);
   });
 
   window.addEventListener('beforeunload', () => {
