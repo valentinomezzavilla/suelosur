@@ -269,8 +269,8 @@ const HojaRutaController = {
 
       const { emp, op } = v
       await query(`
-        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, exactitud)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, exactitud, fecha_registro)
+        VALUES (?, ?, ?, ?, ?, ?, NOW() AT TIME ZONE 'America/Argentina/Buenos_Aires')
       `, [require('crypto').randomUUID(), op.id, emp.id, lat, lng, accuracy || null])
 
       res.json({ ok: true })

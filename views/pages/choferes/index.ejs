@@ -100,6 +100,8 @@ let choferMarker;
 
 // Formatear fecha de manera amigable
 function formatearUbicacion(fechaStr) {
+  // La fecha viene del servidor en formato UTC
+  // JavaScript convierte automáticamente a la zona horaria local
   const fecha = new Date(fechaStr);
   const ahora = new Date();
 
@@ -109,7 +111,12 @@ function formatearUbicacion(fechaStr) {
   const horas = Math.floor(diff / (1000 * 60 * 60));
   const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-  // Formatear hora (16:30)
+  // Asegurarse de que los valores son positivos
+  const minutosAbs = Math.abs(minutos);
+  const horasAbs = Math.abs(horas);
+  const diasAbs = Math.abs(dias);
+
+  // Formatear hora (16:30) - usar la zona horaria local del navegador
   const horas24 = String(fecha.getHours()).padStart(2, '0');
   const mins = String(fecha.getMinutes()).padStart(2, '0');
   const hora = `${horas24}:${mins}`;
@@ -135,14 +142,14 @@ function formatearUbicacion(fechaStr) {
 
   // Tiempo relativo
   let relativo;
-  if (minutos < 1) {
+  if (minutosAbs < 1) {
     relativo = 'justo ahora';
-  } else if (minutos < 60) {
-    relativo = `hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
-  } else if (horas < 24) {
-    relativo = `hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
-  } else if (dias < 7) {
-    relativo = `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
+  } else if (minutosAbs < 60) {
+    relativo = `hace ${minutosAbs} ${minutosAbs === 1 ? 'minuto' : 'minutos'}`;
+  } else if (horasAbs < 24) {
+    relativo = `hace ${horasAbs} ${horasAbs === 1 ? 'hora' : 'horas'}`;
+  } else if (diasAbs < 7) {
+    relativo = `hace ${diasAbs} ${diasAbs === 1 ? 'día' : 'días'}`;
   } else {
     relativo = 'hace mucho tiempo';
   }
