@@ -1,6 +1,7 @@
 'use strict'
 const path = require('path')
 const fs   = require('fs')
+const { query } = require('../config/db')
 const EmpleadosModel  = require('../models/empleados.model')
 const DocumentosModel = require('../models/documentos.model')
 const AsignacionesModel = require('../models/asignaciones.model')
@@ -285,6 +286,42 @@ const ChoferesController = {
       if (formato === 'excel') return generarExcel(res, { titulo, columnas, filas, nombreArchivo })
       return generarTablaPDF(res, { titulo, subtitulo: etiquetaPeriodo(periodo), columnas, filas, nombreArchivo })
     } catch (err) { console.error(err); req.flash('error', 'Error al generar el reporte.'); res.redirect('/choferes') }
+  },
+
+  async obtenerUbicacionActual(req, res) {
+    try {
+      const empleadoId = req.params.id
+
+      // Verificar que el empleado exista y sea chofer
+      const empleado = (await query(`
+        SELECT id FROM empleados WHERE id = ? AND es_chofer = 1
+      `, [empleadoId])).rows[0]
+
+      if (!empleado) {
+        return res.status(404).json({ error: 'Chofer no encontrado' })
+      }
+
+      // Obtener última ubicación registrada
+      const ubicacion = (await query(`
+        SELECT lat, lng, fecha_registro FROM rastreo_chofer
+        WHERE id_empleado = ?
+        ORDER BY fecha_registro DESC
+        LIMIT 1
+      `, [empleadoId])).rows[0]
+
+      if (!ubicacion) {
+        return res.json({ lat: null, lng: null, fecha: null })
+      }
+
+      res.json({
+        lat: ubicacion.lat,
+        lng: ubicacion.lng,
+        fecha: ubicacion.fecha_registro
+      })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
   },
 }
 

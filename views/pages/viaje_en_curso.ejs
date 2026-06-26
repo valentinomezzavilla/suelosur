@@ -1,0 +1,511 @@
+<%
+  // viaje_en_curso.ejs — Vista del chofer durante un viaje con mapa GPS
+%>
+
+<style>
+  .viaje-container {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 80px);
+    gap: 0;
+  }
+
+  .viaje-header {
+    background: #fff;
+    padding: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    z-index: 10;
+  }
+
+  .viaje-header h4 {
+    margin: 0 0 0.5rem 0;
+    font-weight: 600;
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .viaje-info {
+    font-size: 0.9rem;
+    color: #6b7280;
+  }
+
+  .viaje-destino {
+    margin-top: 0.5rem;
+    font-weight: 500;
+  }
+
+  #map {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .viaje-controls {
+    background: #fff;
+    padding: 1rem;
+    border-top: 1px solid #e5e7eb;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .viaje-estado {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    background: #f3f4f6;
+  }
+
+  .viaje-estado.rastreando {
+    background: #dcfce7;
+    color: #166534;
+  }
+
+  .viaje-estado.error {
+    background: #fee2e2;
+    color: #991b1b;
+  }
+
+  .distancia-info {
+    display: flex;
+    gap: 1.5rem;
+    font-size: 0.9rem;
+    margin-left: auto;
+  }
+
+  .distancia-info div {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border: 2px solid #e5e7eb;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .gps-warning {
+    display: none;
+    padding: 0.75rem 1rem;
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: 0.375rem;
+    margin-bottom: 1rem;
+    color: #92400e;
+    font-size: 0.9rem;
+  }
+
+  .gps-warning.show {
+    display: block;
+  }
+</style>
+
+<div class="viaje-container">
+  <div class="viaje-header">
+    <div class="gps-warning" id="gpsWarning">
+      📍 Solicitar permiso de GPS para rastrear tu ubicación...
+    </div>
+
+    <h4>
+      <%- icon('map', { size: 18 }) %>
+      Viaje en curso — OP-<%= String(op.nro_op).padStart(4,'0') %>
+    </h4>
+
+    <div class="viaje-info">
+      <span class="viaje-cliente"><%= op.cliente %></span>
+      <% if (op.tel) { %><span class="text-muted"> · <%= op.tel %></span><% } %>
+    </div>
+
+    <div class="viaje-destino">
+      📍 <%= op.domicilio || 'Domicilio a coordinar' %>
+    </div>
+
+    <% if (op.camion) { %>
+      <div class="viaje-info text-muted small">
+        🚚 <%= op.camion %>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Mapa Leaflet -->
+  <div id="map"></div>
+
+  <!-- Controles y estado -->
+  <div class="viaje-controles">
+    <div class="viaje-estado" id="statusGPS">
+      <span class="spinner"></span> Inicializando GPS...
+    </div>
+
+    <div class="distancia-info">
+      <div>
+        <span>📏 Distancia:</span>
+        <strong id="distancia">—</strong>
+      </div>
+      <div>
+        <span>⏱ Duración est.:</span>
+        <strong id="duracion">—</strong>
+      </div>
+    </div>
+
+    <div class="btn-group" style="margin-left: auto;">
+      <a href="/hoja-de-ruta" class="btn btn-sm btn-outline-secondary">← Volver</a>
+      <button type="button" class="btn btn-sm btn-success" onclick="window.mostrarFinalizarModal()">
+        <%- icon('check', {size:14}) %> Finalizar viaje
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para finalizar viaje -->
+<div class="modal fade" id="finalizarModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Confirmar entrega</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data">
+        <div class="modal-body">
+          <label class="form-label fw-semibold mb-1">📷 Remito firmado *</label>
+          <input type="file" name="remito_firmado" accept="image/*,application/pdf" capture="environment"
+                 class="form-control form-control-sm remito-input" required>
+          <small class="text-muted d-block mb-2">Sacá una foto del remito firmado o subí un archivo (PDF/JPG/PNG)</small>
+
+          <!-- Preview -->
+          <div class="remito-preview" style="display:none; margin-top:1rem">
+            <div class="remito-preview__info text-muted small mb-1">
+              <span class="remito-preview__name fw-semibold"></span>
+              <span class="remito-preview__size"></span>
+            </div>
+            <img class="remito-preview__img" alt="Vista previa"
+                 style="display:none; max-width:100%; max-height:240px; border-radius:8px; border:1px solid #e5e7eb; margin-bottom:1rem">
+            <div class="remito-preview__pdf" style="display:none; padding:0.75rem; background:#f3f4f6; border-radius:8px; text-align:center; margin-bottom:1rem">
+              📄 <span class="remito-preview__pdf-name"></span>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary remito-preview__clear">
+              Cambiar archivo
+            </button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-success"><%- icon('check',{size:15}) %> Confirmar entrega</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const modal = new bootstrap.Modal(document.getElementById('finalizarModal'), { backdrop: 'static' });
+
+  // Mostrar modal de finalizar con el botón
+  window.mostrarFinalizarModal = () => {
+    modal.show();
+  };
+
+  // Lógica de preview de remito
+  const remitoInput = document.querySelector('.remito-input');
+  const preview = document.querySelector('.remito-preview');
+  const img = document.querySelector('.remito-preview__img');
+  const pdf = document.querySelector('.remito-preview__pdf');
+  const pdfName = document.querySelector('.remito-preview__pdf-name');
+  const nameEl = document.querySelector('.remito-preview__name');
+  const sizeEl = document.querySelector('.remito-preview__size');
+  const clearBtn = document.querySelector('.remito-preview__clear');
+  let currentUrl = null;
+
+  function reset() {
+    if (currentUrl) { URL.revokeObjectURL(currentUrl); currentUrl = null; }
+    preview.style.display = 'none';
+    img.style.display = 'none'; img.src = '';
+    pdf.style.display = 'none'; pdfName.textContent = '';
+    remitoInput.value = '';
+  }
+
+  remitoInput.addEventListener('change', function() {
+    if (!remitoInput.files || !remitoInput.files[0]) { reset(); return; }
+    const f = remitoInput.files[0];
+    const kb = (f.size / 1024).toFixed(0);
+    const mb = (f.size / 1024 / 1024).toFixed(1);
+    const size = f.size > 1024 * 1024 ? (mb + ' MB') : (kb + ' KB');
+    nameEl.textContent = f.name;
+    sizeEl.textContent = ' · ' + size;
+    preview.style.display = 'block';
+
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = URL.createObjectURL(f);
+
+    if (f.type.startsWith('image/')) {
+      img.src = currentUrl; img.style.display = 'block';
+      pdf.style.display = 'none';
+    } else if (f.type === 'application/pdf') {
+      pdfName.textContent = f.name;
+      pdf.style.display = 'block';
+      img.style.display = 'none';
+    }
+  });
+  clearBtn.addEventListener('click', reset);
+});
+</script>
+
+<!-- Leaflet CSS + JS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- OSRM (routing) -->
+<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+<script>
+(function() {
+  const opId = '<%= op.id %>';
+  const destLat = <%= op.domicilio_lat || 'null' %>;
+  const destLng = <%= op.domicilio_lng || 'null' %>;
+  const domicilio = '<%= op.domicilio || "" %>'.trim();
+
+  let map;
+  let userMarker;
+  let destMarker;
+  let route;
+  let currentLat, currentLng;
+  let watchId;
+
+  const statusEl = document.getElementById('statusGPS');
+  const gpsWarning = document.getElementById('gpsWarning');
+  const distanciaEl = document.getElementById('distancia');
+  const duracionEl = document.getElementById('duracion');
+
+  // ─────────────────────────────────────────────────────────────
+  // Inicializar mapa
+  // ─────────────────────────────────────────────────────────────
+  function initMap() {
+    map = L.map('map').setView([-31.4, -64.2], 13); // Centro de Córdoba por defecto
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    // Pin del usuario (azul)
+    userMarker = L.circleMarker([0, 0], {
+      radius: 8,
+      fillColor: '#3b82f6',
+      color: '#fff',
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.8
+    }).addTo(map);
+
+    // Pin del destino (rojo)
+    if (destLat && destLng) {
+      destMarker = L.marker([destLat, destLng], {
+        icon: L.icon({
+          iconUrl: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iI2RjMjYyNiIgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJjMCA0LjQxIDMuMDUgOC4xOCA3IDkuMzd2LTEuNUg2djJoMnYyaDF2LTJ1aDE2LTIgMTB2LTJIMjEuNDh2MS41QzIwLjk1IDIwLjE4IDIzIDI4IDEyIDE2VjIuNDggMTIgMnoiLz48L3N2Zz4=',
+          iconSize: [32, 32],
+          iconAnchor: [16, 32],
+          popupAnchor: [0, -32]
+        })
+      }).addTo(map).bindPopup('📍 Destino');
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Solicitar GPS
+  // ─────────────────────────────────────────────────────────────
+  function startTracking() {
+    if (!navigator.geolocation) {
+      statusEl.innerHTML = '❌ GPS no disponible en este dispositivo';
+      statusEl.className = 'viaje-estado error';
+      return;
+    }
+
+    gpsWarning.classList.add('show');
+
+    // Obtener ubicación inicial
+    navigator.geolocation.getCurrentPosition(
+      (pos) => onGPSSuccess(pos),
+      (err) => onGPSError(err),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    );
+
+    // Rastrear continuamente
+    watchId = navigator.geolocation.watchPosition(
+      (pos) => onGPSSuccess(pos),
+      (err) => onGPSError(err),
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 5000
+      }
+    );
+  }
+
+  function onGPSSuccess(position) {
+    const { latitude, longitude, accuracy } = position.coords;
+    currentLat = latitude;
+    currentLng = longitude;
+
+    // Actualizar marcador del usuario
+    userMarker.setLatLng([latitude, longitude]);
+
+    // Centrar mapa en usuario
+    map.panTo([latitude, longitude]);
+
+    // Actualizar estado
+    statusEl.innerHTML = '✅ GPS activo';
+    statusEl.className = 'viaje-estado rastreando';
+    gpsWarning.classList.remove('show');
+
+    // Enviar ubicación al servidor
+    saveLocation(latitude, longitude, accuracy);
+
+    // Calcular ruta si tenemos destino
+    if (destLat && destLng) {
+      updateRoute(latitude, longitude, destLat, destLng);
+    }
+  }
+
+  function onGPSError(error) {
+    let msg = 'Error en GPS: ';
+    switch (error.code) {
+      case error.PERMISSION_DENIED:
+        msg += 'Permiso denegado. Por favor, permite el acceso al GPS.';
+        break;
+      case error.POSITION_UNAVAILABLE:
+        msg += 'Posición no disponible.';
+        break;
+      case error.TIMEOUT:
+        msg += 'Timeout esperando GPS.';
+        break;
+      default:
+        msg += 'Error desconocido.';
+    }
+    statusEl.innerHTML = '⚠️ ' + msg;
+    statusEl.className = 'viaje-estado error';
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Guardar ubicación en servidor
+  // ─────────────────────────────────────────────────────────────
+  async function saveLocation(lat, lng, accuracy) {
+    try {
+      await fetch(`/hoja-de-ruta/${opId}/ubicacion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lng, accuracy })
+      });
+    } catch (err) {
+      console.error('Error guardando ubicación:', err);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Calcular ruta con OSRM (OpenSource Routing Machine)
+  // ─────────────────────────────────────────────────────────────
+  async function updateRoute(startLat, startLng, endLat, endLng) {
+    if (!startLat || !startLng || !endLat || !endLng) return;
+
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${endLng},${endLat}?overview=full&steps=true&geometries=geojson`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Error en OSRM');
+
+      const data = await res.json();
+      if (!data.routes || !data.routes[0]) return;
+
+      const route = data.routes[0];
+      const distance = (route.distance / 1000).toFixed(1); // km
+      const duration = Math.round(route.duration / 60); // minutos
+
+      distanciaEl.textContent = `${distance} km`;
+      duracionEl.textContent = `${duration} min`;
+
+      // Dibujar la ruta en el mapa
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+      if (window.routePolyline) {
+        map.removeLayer(window.routePolyline);
+      }
+      window.routePolyline = L.polyline(coords, {
+        color: '#3b82f6',
+        weight: 3,
+        opacity: 0.7,
+        dashArray: '5, 5'
+      }).addTo(map);
+
+      // Ajustar vista
+      const bounds = L.latLngBounds([
+        [startLat, startLng],
+        [endLat, endLng],
+        ...coords
+      ]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } catch (err) {
+      console.error('Error calculando ruta:', err);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Geocodificar destino si no tiene coords
+  // ─────────────────────────────────────────────────────────────
+  async function geocodeDestination() {
+    if (destLat && destLng) return; // Ya tiene coordenadas
+    if (!domicilio) return; // Sin dirección
+
+    try {
+      const query = encodeURIComponent(domicilio + ', Córdoba, Argentina');
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`);
+      const data = await res.json();
+
+      if (data && data[0]) {
+        const { lat, lon } = data[0];
+        // Guardar coordenadas en el servidor
+        await fetch(`/hoja-de-ruta/${opId}/geocodificar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat: parseFloat(lat), lng: parseFloat(lon) })
+        });
+      }
+    } catch (err) {
+      console.error('Error geocodificando:', err);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // Inicialización
+  // ─────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', () => {
+    initMap();
+    geocodeDestination();
+    startTracking();
+  });
+
+  // Detener rastreo al cerrar la página
+  window.addEventListener('beforeunload', () => {
+    if (watchId) {
+      navigator.geolocation.clearWatch(watchId);
+    }
+  });
+})();
+</script>

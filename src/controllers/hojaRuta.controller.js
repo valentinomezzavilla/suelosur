@@ -1,4 +1,5 @@
 'use strict'
+const crypto = require('crypto')
 const path = require('path')
 const fs   = require('fs')
 const { query } = require('../config/db')
@@ -201,18 +202,131 @@ const HojaRutaController = {
       if (await tieneEnCurso(v.emp.id)) { req.flash('error', 'Ya tenés una tarea en curso. Finalizala antes de iniciar otra.'); return res.redirect(back) }
       const { op } = v
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'pendiente') {
-        await VentasModel.despachar(op.id); req.flash('success', 'Viaje iniciado. Buen camino.')
+        await VentasModel.despachar(op.id)
       } else if (op.tipo_op === 'C' && op.estado === 'pendiente') {
         const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
         if (!oc?.id_contenedor) { req.flash('error', 'El contenedor aún no está asignado. Avisá a la oficina.'); return res.redirect(back) }
-        await AlquileresModel.despachar(op.id); req.flash('success', 'Entrega iniciada.')
+        await AlquileresModel.despachar(op.id)
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
-        await AlquileresModel.registrarRetiro(op.id); req.flash('success', 'Retiro iniciado.')
+        await AlquileresModel.registrarRetiro(op.id)
       } else {
         req.flash('error', 'Esta tarea no se puede iniciar en su estado actual.')
+        return res.redirect(back)
       }
-    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al iniciar la tarea.') }
-    res.redirect(back)
+      // Redirigir a vista de viaje en curso con mapa
+      res.redirect(`/hoja-de-ruta/${op.id}/viaje-en-curso`)
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al iniciar la tarea.'); res.redirect(back) }
+  },
+
+  async verEnCurso(req, res) {
+    try {
+      const v = await HojaRutaController._validar(req)
+      if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect('/hoja-de-ruta') }
+      const { op, emp } = v
+
+      // Obtener datos completos de la operación
+      const opData = (await query(`
+        SELECT op.id, op.nro_op, op.estado, op.domicilio_calle, op.domicilio_altura,
+               op.domicilio_lat, op.domicilio_lng, op.observaciones,
+               c.nombre AS cliente, c.tel_whatsapp,
+               v.nombre AS camion, v.patente
+        FROM op_encabezado op
+        LEFT JOIN clientes c ON c.id = op.id_cliente
+        LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
+        WHERE op.id = ?
+      `, [op.id])).rows[0]
+
+      if (!opData) { req.flash('error', 'Operación no encontrada.'); return res.redirect('/hoja-de-ruta') }
+
+      res.render('pages/viaje_en_curso', {
+        titulo: 'Viaje en curso',
+        empleado: emp,
+        op: {
+          id: opData.id,
+          nro_op: opData.nro_op,
+          estado: opData.estado,
+          cliente: opData.cliente || 'Particular',
+          tel: opData.tel_whatsapp,
+          domicilio: [opData.domicilio_calle, opData.domicilio_altura].filter(Boolean).join(' ').trim(),
+          domicilio_lat: opData.domicilio_lat,
+          domicilio_lng: opData.domicilio_lng,
+          observaciones: opData.observaciones,
+          camion: [opData.camion, opData.patente].filter(Boolean).join(' · ')
+        }
+      })
+    } catch (err) { console.error(err); req.flash('error', 'Error al cargar la vista del viaje.'); res.redirect('/hoja-de-ruta') }
+  },
+
+  async guardarUbicacion(req, res) {
+    try {
+      const v = await HojaRutaController._validar(req)
+      if (!v) { return res.status(403).json({ error: 'No autorizado' }) }
+
+      const { lat, lng, accuracy } = req.body
+      if (lat == null || lng == null) {
+        return res.status(400).json({ error: 'Coordenadas requeridas' })
+      }
+
+      const { emp, op } = v
+      await query(`
+        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, exactitud)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [require('crypto').randomUUID(), op.id, emp.id, lat, lng, accuracy || null])
+
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  },
+
+  async geocodificarDestino(req, res) {
+    try {
+      const v = await HojaRutaController._validar(req)
+      if (!v) { return res.status(403).json({ error: 'No autorizado' }) }
+
+      const { lat, lng } = req.body
+      if (lat == null || lng == null) {
+        return res.status(400).json({ error: 'Coordenadas requeridas' })
+      }
+
+      const { op } = v
+      await query(`
+        UPDATE op_encabezado SET domicilio_lat = ?, domicilio_lng = ? WHERE id = ?
+      `, [lat, lng, op.id])
+
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
+  },
+
+  async obtenerUbicacionActual(req, res) {
+    try {
+      const emp = await empleadoDe(req.session.user.id)
+      if (!emp) { return res.status(403).json({ error: 'Usuario no vinculado a empleado' }) }
+
+      const ubicacion = (await query(`
+        SELECT lat, lng, fecha_registro FROM rastreo_chofer
+        WHERE id_empleado = ?
+        ORDER BY fecha_registro DESC
+        LIMIT 1
+      `, [emp.id])).rows[0]
+
+      if (!ubicacion) {
+        return res.json({ lat: null, lng: null, fecha: null })
+      }
+
+      res.json({
+        lat: ubicacion.lat,
+        lng: ubicacion.lng,
+        fecha: ubicacion.fecha_registro
+      })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: err.message })
+    }
   },
 
   async finalizar(req, res) {

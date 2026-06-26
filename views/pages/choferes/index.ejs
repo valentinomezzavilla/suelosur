@@ -62,6 +62,7 @@
           <td class="text-center">
             <a href="/choferes/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye', { size: 15 }) %></a>
             <a href="/choferes/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" title="Ver ubicación" onclick="verEnMapa('<%= c.id %>', '<%= c.nombre %> <%= c.apellido %>')"><%- icon('map', { size: 15 }) %></button>
           </td>
         </tr>
         <% }) %>
@@ -70,3 +71,83 @@
     <% } %>
   </div>
 </div>
+
+<!-- Modal para ver chofer en mapa -->
+<div class="modal fade" id="mapModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mapModalTitle">Ubicación del chofer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="height: 400px; padding: 0;">
+        <div id="choferMap" style="width: 100%; height: 100%;"></div>
+      </div>
+      <div class="modal-footer">
+        <div id="mapStatus" class="text-muted small" style="flex: 1; text-align: left;"></div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+let choferMapInstance;
+let choferMarker;
+
+async function verEnMapa(choferId, choferNombre) {
+  document.getElementById('mapModalTitle').textContent = `Ubicación: ${choferNombre}`;
+
+  const modal = new bootstrap.Modal(document.getElementById('mapModal'));
+  modal.show();
+
+  // Esperar a que el modal se muestre para inicializar el mapa
+  setTimeout(() => {
+    if (!choferMapInstance) {
+      choferMapInstance = L.map('choferMap').setView([-31.4, -64.2], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(choferMapInstance);
+
+      choferMarker = L.circleMarker([0, 0], {
+        radius: 10,
+        fillColor: '#3b82f6',
+        color: '#fff',
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.8
+      }).addTo(choferMapInstance);
+    }
+
+    // Obtener ubicación actual del chofer
+    obtenerYMostrarUbicacion(choferId);
+  }, 200);
+}
+
+async function obtenerYMostrarUbicacion(choferId) {
+  try {
+    const res = await fetch(`/choferes/${choferId}/ubicacion-actual`);
+    const data = await res.json();
+
+    const mapStatus = document.getElementById('mapStatus');
+
+    if (data.lat && data.lng) {
+      choferMarker.setLatLng([data.lat, data.lng]);
+      choferMapInstance.panTo([data.lat, data.lng]);
+      const fecha = new Date(data.fecha).toLocaleString('es-AR');
+      mapStatus.textContent = `📍 Última ubicación: ${fecha}`;
+    } else {
+      mapStatus.textContent = '📍 Sin rastreo disponible para este chofer';
+      mapStatus.style.color = '#dc2626';
+    }
+  } catch (err) {
+    console.error(err);
+    document.getElementById('mapStatus').textContent = '⚠️ Error al cargar ubicación';
+    document.getElementById('mapStatus').style.color = '#dc2626';
+  }
+}
+</script>

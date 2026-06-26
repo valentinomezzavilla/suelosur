@@ -77,6 +77,9 @@
           <div class="mt-2">
             <% if (t.fase === 'en_curso') { %>
               <% const requiereFirmado = (t.tipo === 'viaje' || t.tipo === 'contenedor_entrega') %>
+              <a href="/hoja-de-ruta/<%= t.id %>/viaje-en-curso" class="btn btn-sm btn-naranja mb-2 d-block">
+                <%- icon('map', {size:14}) %> Ver ruta
+              </a>
               <form action="/hoja-de-ruta/<%= t.id %>/finalizar" method="POST"
                     enctype="multipart/form-data"
                     onsubmit="return confirm('¿Confirmás: <%= t.accionFinalizar %>?')">

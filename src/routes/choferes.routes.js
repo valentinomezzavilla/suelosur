@@ -16,6 +16,7 @@ router.get('/reporte/:tipo',    auth, acceso, ctrl.reporte)
 
 router.get('/:id',              auth, acceso, ctrl.detalle)
 router.get('/:id/editar',       auth, acceso, ctrl.editar)
+router.get('/:id/ubicacion-actual', auth, acceso, ctrl.obtenerUbicacionActual)
 router.put('/:id',              auth, acceso, ctrl.actualizar)
 router.post('/:id/baja',        auth, acceso, ctrl.darBaja)
 router.post('/:id/reingreso',   auth, acceso, ctrl.reingresar)

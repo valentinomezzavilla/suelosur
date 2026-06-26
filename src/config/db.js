@@ -648,6 +648,22 @@ async function initDB() {
   `)
 
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS rastreo_chofer (
+      id                  TEXT PRIMARY KEY,
+      id_op               TEXT NOT NULL REFERENCES op_encabezado(id),
+      id_empleado         TEXT NOT NULL REFERENCES empleados(id),
+      lat                 REAL,
+      lng                 REAL,
+      velocidad           REAL DEFAULT 0,
+      exactitud           REAL,
+      fecha_registro      TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_op ON rastreo_chofer(id_op)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_empleado ON rastreo_chofer(id_empleado)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_fecha ON rastreo_chofer(fecha_registro DESC)`)
+
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS auditoria (
       id           TEXT PRIMARY KEY,
       entidad_tipo TEXT NOT NULL,
