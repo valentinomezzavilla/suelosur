@@ -98,41 +98,50 @@
 let choferMapInstance;
 let choferMarker;
 
+// Parsea una fecha del servidor de forma robusta.
+// El servidor guarda en UTC; los formatos posibles son:
+//   - "2026-06-26T19:41:00Z"   (ISO con Z → UTC explícito)
+//   - "2026-06-26 19:41:00"    (histórico, sin zona → asumir UTC)
+// El navegador luego convierte a la hora local automáticamente.
+function parseServerDate(fechaStr) {
+  if (!fechaStr) return null;
+  const s = String(fechaStr).trim();
+  // Si ya trae Z o un offset (+hh:mm / -hh:mm), interpretarlo directo
+  if (/[Zz]$|[+-]\d{2}:?\d{2}$/.test(s)) {
+    return new Date(s);
+  }
+  // Sin marcador de zona → tratar como UTC: normalizar a ISO y agregar Z
+  return new Date(s.replace(' ', 'T') + 'Z');
+}
+
 // Formatear fecha de manera amigable
 function formatearUbicacion(fechaStr) {
-  // La fecha viene del servidor en formato UTC
-  // JavaScript convierte automáticamente a la zona horaria local
-  const fecha = new Date(fechaStr);
+  const fecha = parseServerDate(fechaStr);
   const ahora = new Date();
 
-  // Diferenciar en milisegundos
-  const diff = ahora - fecha;
+  // Diferencia en milisegundos (siempre positiva: la fecha es pasada)
+  const diff = Math.max(0, ahora - fecha);
   const minutos = Math.floor(diff / (1000 * 60));
   const horas = Math.floor(diff / (1000 * 60 * 60));
   const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-  // Asegurarse de que los valores son positivos
-  const minutosAbs = Math.abs(minutos);
-  const horasAbs = Math.abs(horas);
-  const diasAbs = Math.abs(dias);
-
-  // Formatear hora (16:30) - usar la zona horaria local del navegador
+  // Formatear hora (16:30) en la zona horaria local del navegador
   const horas24 = String(fecha.getHours()).padStart(2, '0');
   const mins = String(fecha.getMinutes()).padStart(2, '0');
   const hora = `${horas24}:${mins}`;
 
-  // Determinar si es hoy, ayer, etc
+  // Determinar si es hoy, ayer, etc (comparando solo la fecha local)
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const ayer = new Date(hoy);
   ayer.setDate(ayer.getDate() - 1);
-  const fechaObj = new Date(fechaStr);
-  fechaObj.setHours(0, 0, 0, 0);
+  const fechaDia = new Date(fecha);
+  fechaDia.setHours(0, 0, 0, 0);
 
   let cuando;
-  if (fechaObj.getTime() === hoy.getTime()) {
+  if (fechaDia.getTime() === hoy.getTime()) {
     cuando = 'hoy';
-  } else if (fechaObj.getTime() === ayer.getTime()) {
+  } else if (fechaDia.getTime() === ayer.getTime()) {
     cuando = 'ayer';
   } else {
     // Formato: "26 de junio"
@@ -142,14 +151,14 @@ function formatearUbicacion(fechaStr) {
 
   // Tiempo relativo
   let relativo;
-  if (minutosAbs < 1) {
+  if (minutos < 1) {
     relativo = 'justo ahora';
-  } else if (minutosAbs < 60) {
-    relativo = `hace ${minutosAbs} ${minutosAbs === 1 ? 'minuto' : 'minutos'}`;
-  } else if (horasAbs < 24) {
-    relativo = `hace ${horasAbs} ${horasAbs === 1 ? 'hora' : 'horas'}`;
-  } else if (diasAbs < 7) {
-    relativo = `hace ${diasAbs} ${diasAbs === 1 ? 'día' : 'días'}`;
+  } else if (minutos < 60) {
+    relativo = `hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+  } else if (horas < 24) {
+    relativo = `hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+  } else if (dias < 7) {
+    relativo = `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
   } else {
     relativo = 'hace mucho tiempo';
   }
