@@ -98,6 +98,58 @@
 let choferMapInstance;
 let choferMarker;
 
+// Formatear fecha de manera amigable
+function formatearUbicacion(fechaStr) {
+  const fecha = new Date(fechaStr);
+  const ahora = new Date();
+
+  // Diferenciar en milisegundos
+  const diff = ahora - fecha;
+  const minutos = Math.floor(diff / (1000 * 60));
+  const horas = Math.floor(diff / (1000 * 60 * 60));
+  const dias = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+  // Formatear hora (16:30)
+  const horas24 = String(fecha.getHours()).padStart(2, '0');
+  const mins = String(fecha.getMinutes()).padStart(2, '0');
+  const hora = `${horas24}:${mins}`;
+
+  // Determinar si es hoy, ayer, etc
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const ayer = new Date(hoy);
+  ayer.setDate(ayer.getDate() - 1);
+  const fechaObj = new Date(fechaStr);
+  fechaObj.setHours(0, 0, 0, 0);
+
+  let cuando;
+  if (fechaObj.getTime() === hoy.getTime()) {
+    cuando = 'hoy';
+  } else if (fechaObj.getTime() === ayer.getTime()) {
+    cuando = 'ayer';
+  } else {
+    // Formato: "26 de junio"
+    const opciones = { day: 'numeric', month: 'long' };
+    cuando = new Intl.DateTimeFormat('es-AR', opciones).format(fecha);
+  }
+
+  // Tiempo relativo
+  let relativo;
+  if (minutos < 1) {
+    relativo = 'justo ahora';
+  } else if (minutos < 60) {
+    relativo = `hace ${minutos} ${minutos === 1 ? 'minuto' : 'minutos'}`;
+  } else if (horas < 24) {
+    relativo = `hace ${horas} ${horas === 1 ? 'hora' : 'horas'}`;
+  } else if (dias < 7) {
+    relativo = `hace ${dias} ${dias === 1 ? 'día' : 'días'}`;
+  } else {
+    relativo = 'hace mucho tiempo';
+  }
+
+  return `📍 Última vez ${cuando} a las ${hora} (${relativo})`;
+}
+
 async function verEnMapa(choferId, choferNombre) {
   document.getElementById('mapModalTitle').textContent = `Ubicación: ${choferNombre}`;
 
@@ -138,8 +190,8 @@ async function obtenerYMostrarUbicacion(choferId) {
     if (data.lat && data.lng) {
       choferMarker.setLatLng([data.lat, data.lng]);
       choferMapInstance.panTo([data.lat, data.lng]);
-      const fecha = new Date(data.fecha).toLocaleString('es-AR');
-      mapStatus.textContent = `📍 Última ubicación: ${fecha}`;
+      mapStatus.textContent = formatearUbicacion(data.fecha);
+      mapStatus.style.color = '#333';
     } else {
       mapStatus.textContent = '📍 Sin rastreo disponible para este chofer';
       mapStatus.style.color = '#dc2626';
