@@ -27,15 +27,48 @@
   <!-- Info cliente -->
   <div class="col-md-5">
     <div class="card shadow-sm h-100">
-      <div class="card-header card-header-light">Cliente</div>
+      <div class="card-header card-header-light d-flex justify-content-between align-items-center">
+        <span>Cliente</span>
+        <% if (op.id_cliente) { %>
+          <a href="/clientes/<%= op.id_cliente %>" class="small text-decoration-none">Ver ficha →</a>
+        <% } %>
+      </div>
       <div class="card-body">
-        <p class="fw-bold mb-1"><%= op.cliente_nombre %></p>
-        <% if (op.domicilio_ppal) { %>
-          <p class="text-muted small mb-1">📍 <%= op.domicilio_ppal %></p>
+        <p class="fw-bold mb-1 fs-6">
+          <%= op.cliente_nombre %><%= op.cliente_apellido ? ' ' + op.cliente_apellido : '' %>
+          <% if (op.cliente_numero != null) { %><span class="text-muted fw-normal small">· N° <%= op.cliente_numero %></span><% } %>
+        </p>
+        <% if (op.cliente_tipo) { %>
+          <span class="badge badge-rol mb-2"><%= op.cliente_tipo %></span>
         <% } %>
-        <% if (op.tel_whatsapp) { %>
-          <p class="text-muted small mb-0">📱 <%= op.tel_whatsapp %></p>
-        <% } %>
+        <div class="small">
+          <% if (op.cliente_dni) { %>
+            <p class="text-muted mb-1"><span class="fw-semibold text-dark">DNI/CUIT:</span> <%= op.cliente_dni %></p>
+          <% } %>
+          <% if (op.domicilio_ppal) { %>
+            <p class="text-muted mb-1">📍 <%= op.domicilio_ppal %><% if (op.cliente_zona) { %> <span class="text-muted">(<%= op.cliente_zona %>)</span><% } %></p>
+          <% } %>
+          <% if (op.tel_whatsapp) { %>
+            <p class="text-muted mb-1">📱 <%= op.tel_whatsapp %> <span class="text-muted">(WhatsApp)</span></p>
+          <% } %>
+          <% if (op.cliente_telefono) { %>
+            <p class="text-muted mb-1">📞 <%= op.cliente_telefono %></p>
+          <% } %>
+          <% if (op.cliente_email) { %>
+            <p class="text-muted mb-1">✉️ <%= op.cliente_email %></p>
+          <% } %>
+          <% if (op.cliente_cc) {
+               const saldo = Number(op.cliente_saldo || 0)
+               const saldoTxt = saldo < 0 ? 'Debe $' + Math.abs(saldo).toLocaleString('es-AR')
+                              : saldo > 0 ? 'A favor $' + saldo.toLocaleString('es-AR') : 'Al día'
+               const saldoCls = saldo < 0 ? 'text-danger' : (saldo > 0 ? 'text-success' : 'text-muted')
+          %>
+            <p class="mb-0 pt-1 border-top mt-2">
+              <span class="badge badge-activo">Cuenta corriente</span>
+              <span class="<%= saldoCls %> fw-semibold ms-1"><%= saldoTxt %></span>
+            </p>
+          <% } %>
+        </div>
       </div>
     </div>
   </div>
@@ -175,7 +208,7 @@
 
   <% if (op.estado !== 'anulado') { %>
   <div class="col-12">
-    <%- include('../../partials/remito_firmado', { opId: op.id, estado: op.estado, archivo: op.archivo_remito }) %>
+    <%- include('../../partials/remito_firmado', { opId: op.id, estado: op.estado, archivo: op.archivo_remito, firma: op.firma_cliente, firmaAclaracion: op.firma_aclaracion }) %>
   </div>
   <% } %>
 

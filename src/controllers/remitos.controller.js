@@ -74,6 +74,20 @@ const RemitosController = {
     }
   },
 
+  // Servir la imagen de la firma digital del cliente (PNG)
+  async verFirmaCliente(req, res) {
+    try {
+      if (!(await choferTieneAcceso(req, req.params.id))) return res.status(403).end()
+      const r = await RemitosModel.obtener(req.params.id)
+      if (!r || !r.firma_cliente) return res.status(404).end()
+      const file = path.join(DIR_REMITOS, r.firma_cliente)
+      if (!fs.existsSync(file)) return res.status(404).end()
+      res.sendFile(file)
+    } catch (err) {
+      console.error(err); res.status(500).end()
+    }
+  },
+
   // Eliminar el remito firmado adjunto
   async eliminarFirmado(req, res) {
     const r = await RemitosModel.obtener(req.params.id)

@@ -87,7 +87,10 @@ const VentasModel = {
   async obtener(id) {
     const op = (await query(`
       SELECT op.*, COALESCE(c.nombre, 'Particular') AS cliente_nombre,
-             c.tel_whatsapp, c.domicilio_ppal,
+             c.apellido AS cliente_apellido, c.tel_whatsapp, c.telefono AS cliente_telefono,
+             c.domicilio_ppal, c.dni AS cliente_dni, c.email AS cliente_email,
+             c.zona AS cliente_zona, c.tipo_cliente AS cliente_tipo,
+             c.cuenta_corriente AS cliente_cc, c.saldo AS cliente_saldo, c.numero AS cliente_numero,
              u.nombre AS administrativo_nombre
       FROM op_encabezado op
       LEFT JOIN clientes c ON c.id = op.id_cliente

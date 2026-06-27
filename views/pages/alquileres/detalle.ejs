@@ -191,6 +191,6 @@
 
 <% if (!estaAnulado) { %>
 <div class="mt-3">
-  <%- include('../../partials/remito_firmado', { opId: alquiler.id, estado: alquiler.estado, archivo: alquiler.archivo_remito }) %>
+  <%- include('../../partials/remito_firmado', { opId: alquiler.id, estado: alquiler.estado, archivo: alquiler.archivo_remito, firma: alquiler.firma_cliente, firmaAclaracion: alquiler.firma_aclaracion }) %>
 </div>
 <% } %>

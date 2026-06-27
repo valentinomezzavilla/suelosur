@@ -406,6 +406,8 @@
 <!-- Leaflet + OpenStreetMap (sin tokens requeridos) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- leaflet-rotate: permite rotar el mapa según la dirección de marcha -->
+<script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
 <script src="/js/signaturePad.js"></script>
 
 <script>
@@ -416,6 +418,7 @@
   const domicilio = '<%= op.domicilio || "" %>'.trim();
 
   let map;
+  let userMarker;
   let currentLat, currentLng;
   let currentSpeed = 0;
   let watchId;
@@ -428,13 +431,16 @@
 
   function initMap() {
     map = L.map('map', {
-      zoom: 16,
+      zoom: 17,
       center: [-31.4, -64.2],
       dragging: false,
       touchZoom: false,
       doubleClickZoom: false,
       scrollWheelZoom: false,
-      zoomControl: false
+      zoomControl: false,
+      rotate: true,        // habilita rotación (leaflet-rotate)
+      bearing: 0,
+      rotateControl: false
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -490,15 +496,16 @@
     currentSpeed = (position.coords.speed || 0) * 3.6; // m/s a km/h
 
     userMarker.setLatLng([latitude, longitude]);
-    map.setView([latitude, longitude], 16, { animate: false });
+    map.setView([latitude, longitude], map.getZoom(), { animate: false });
 
-    // Rotar el mapa según la dirección del viaje usando transform CSS
-    if (position.coords.heading !== null && position.coords.heading !== undefined) {
+    // Rotar el mapa según la dirección de marcha: la dirección de avance
+    // queda siempre hacia arriba (como un navegador GPS). El heading solo
+    // está disponible si el dispositivo se está moviendo.
+    if (position.coords.heading !== null && position.coords.heading !== undefined && !isNaN(position.coords.heading)) {
       currentHeading = position.coords.heading;
-      const mapEl = document.getElementById('map');
-      mapEl.style.transform = `perspective(1000px) rotateZ(${currentHeading}deg)`;
-      mapEl.style.transformOrigin = 'center';
-      mapEl.style.transformStyle = 'preserve-3d';
+      if (typeof map.setBearing === 'function') {
+        map.setBearing(-currentHeading); // negativo: el rumbo apunta hacia arriba
+      }
     }
 
     velocidadEl.textContent = Math.round(currentSpeed);
