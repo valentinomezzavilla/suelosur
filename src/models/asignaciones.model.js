@@ -4,7 +4,6 @@
 //  - Un recurso sólo puede estar asignado activo a UN chofer a la vez.
 //  - Un chofer puede tener a la vez 1 camión y/o 1 máquina (al reasignar se cierra la anterior).
 //  - No se puede asignar un recurso en mantenimiento / fuera de servicio / inactivo.
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const NO_DISPONIBLE_CAMION = ['en_mantenimiento', 'fuera_servicio', 'inactivo']
@@ -77,25 +76,24 @@ const AsignacionesModel = {
       if (NO_DISPONIBLE_MAQ.includes(m.estado_operativo)) throw new Error('La máquina no está disponible (mantenimiento / fuera de servicio).')
     }
 
-    // No puede estar asignado activo a otro chofer
+    // No puede estar asignado activo a otro chofer (comparación numérica robusta)
     const ocupado = await this.choferDeRecurso(recurso_tipo, recurso_id)
-    if (ocupado && ocupado.id_empleado !== id_empleado) {
+    if (ocupado && Number(ocupado.id_empleado) !== Number(id_empleado)) {
       throw new Error(`Ya está asignado a ${ocupado.nombre} ${ocupado.apellido || ''}.`.trim())
     }
     // Si ya lo tiene este chofer, no duplicar
-    if (ocupado && ocupado.id_empleado === id_empleado) {
+    if (ocupado && Number(ocupado.id_empleado) === Number(id_empleado)) {
       throw new Error('Este recurso ya está asignado a este chofer.')
     }
 
-    const id = crypto.randomUUID()
-    await transaction(async (q) => {
+    return await transaction(async (q) => {
       // Reasignación: cerrar la asignación activa previa del mismo tipo para este chofer
       await q(`UPDATE asignaciones_recurso SET activo = 0, fecha_hasta = CURRENT_DATE
                   WHERE id_empleado = ? AND recurso_tipo = ? AND activo = 1`, [id_empleado, recurso_tipo])
-      await q(`INSERT INTO asignaciones_recurso (id, id_empleado, recurso_tipo, recurso_id, observaciones) VALUES (?, ?, ?, ?, ?)`,
-        [id, id_empleado, recurso_tipo, recurso_id, observaciones || ''])
+      const { rows } = await q(`INSERT INTO asignaciones_recurso (id_empleado, recurso_tipo, recurso_id, observaciones) VALUES (?, ?, ?, ?) RETURNING id`,
+        [id_empleado, recurso_tipo, recurso_id, observaciones || ''])
+      return rows[0].id
     })
-    return id
   },
 
   async finalizar(id) {

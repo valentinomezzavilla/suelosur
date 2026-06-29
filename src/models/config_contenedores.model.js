@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const ConfigContenedoresModel = {
@@ -32,7 +31,7 @@ const ConfigContenedoresModel = {
       for (const [clave, valor] of Object.entries(datos)) {
         const result = await q(`UPDATE config_contenedores SET valor = ? WHERE clave = ?`, [String(valor), clave])
         if (result.rowCount === 0) {
-          await q(`INSERT INTO config_contenedores (id, clave, valor) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), clave, String(valor)])
+          await q(`INSERT INTO config_contenedores (clave, valor) VALUES (?, ?) ON CONFLICT DO NOTHING`, [clave, String(valor)])
         }
       }
     })

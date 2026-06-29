@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const ConfigMaquinariaModel = {
@@ -50,7 +49,7 @@ const ConfigMaquinariaModel = {
       for (const [clave, valor] of Object.entries(datos)) {
         const result = await q(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria IS NULL AND clave = ?`, [String(valor), clave])
         if (result.rowCount === 0) {
-          await q(`INSERT INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, NULL, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), clave, String(valor)])
+          await q(`INSERT INTO config_maquinaria (id_maquinaria, clave, valor) VALUES (NULL, ?, ?) ON CONFLICT DO NOTHING`, [clave, String(valor)])
         }
       }
     })
@@ -65,7 +64,7 @@ const ConfigMaquinariaModel = {
         }
         const result = await q(`UPDATE config_maquinaria SET valor = ? WHERE id_maquinaria = ? AND clave = ?`, [String(valor), idMaquinaria, clave])
         if (result.rowCount === 0) {
-          await q(`INSERT INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING`, [crypto.randomUUID(), idMaquinaria, clave, String(valor)])
+          await q(`INSERT INTO config_maquinaria (id_maquinaria, clave, valor) VALUES (?, ?, ?) ON CONFLICT DO NOTHING`, [idMaquinaria, clave, String(valor)])
         }
       }
     })

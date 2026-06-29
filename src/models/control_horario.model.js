@@ -1,6 +1,5 @@
 'use strict'
 // Control horario / jornadas + horas extra.
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 // Calcula horas entre HH:MM y HH:MM (maneja cruce de medianoche)
@@ -29,17 +28,17 @@ const ControlHorarioModel = {
   },
 
   async crear({ id_empleado, fecha, hora_ingreso, hora_egreso, horas_extra, motivo_extra, observaciones }) {
-    const id = crypto.randomUUID()
     const trabajadas = horasEntre(hora_ingreso, hora_egreso)
     const extra = parseFloat(horas_extra) || 0
     const normales = Math.max(0, trabajadas - extra)
-    await query(`
-      INSERT INTO control_horario (id, id_empleado, fecha, hora_ingreso, hora_egreso, horas_normales, horas_extra, motivo_extra, observaciones)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, id_empleado, fecha || new Date().toISOString().slice(0, 10),
+    const { rows } = await query(`
+      INSERT INTO control_horario (id_empleado, fecha, hora_ingreso, hora_egreso, horas_normales, horas_extra, motivo_extra, observaciones)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [id_empleado, fecha || new Date().toISOString().slice(0, 10),
         hora_ingreso || null, hora_egreso || null, normales, extra,
         motivo_extra || '', observaciones || ''])
-    return id
+    return rows[0].id
   },
 
   async aprobar(id, usuarioId) {
