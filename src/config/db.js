@@ -4,7 +4,6 @@
 // pg (async) · PostgreSQL / Supabase
 // ═══════════════════════════════════════════════════════════════════
 
-const crypto = require('crypto')
 const { Pool, types } = require('pg')
 const bcrypt  = require('bcryptjs')
 
@@ -65,7 +64,7 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
-      id            TEXT PRIMARY KEY,
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       usuario       TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       nombre        TEXT NOT NULL,
@@ -77,7 +76,7 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS clientes (
-      id               TEXT PRIMARY KEY,
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       nombre           TEXT NOT NULL,
       apellido         TEXT NOT NULL DEFAULT '',
       dni              TEXT,
@@ -98,8 +97,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS movimientos_cuenta (
-      id          TEXT PRIMARY KEY,
-      cliente_id  TEXT NOT NULL REFERENCES clientes(id),
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      cliente_id  BIGINT NOT NULL REFERENCES clientes(id),
       tipo        TEXT NOT NULL CHECK (tipo IN ('deuda','pago','ajuste')),
       descripcion TEXT NOT NULL DEFAULT '',
       monto       REAL NOT NULL,
@@ -109,7 +108,7 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS productos (
-      id                TEXT PRIMARY KEY,
+      id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       nombre            TEXT NOT NULL,
       unidad_medida     TEXT NOT NULL DEFAULT 'm³',
       precio_referencia REAL DEFAULT 0,
@@ -120,8 +119,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS stock (
-      id                      TEXT PRIMARY KEY,
-      id_producto             TEXT NOT NULL UNIQUE REFERENCES productos(id),
+      id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_producto             BIGINT NOT NULL UNIQUE REFERENCES productos(id),
       cantidad_actual         REAL DEFAULT 0,
       cant_pendiente_entregar REAL DEFAULT 0,
       stock_minimo            REAL DEFAULT 0
@@ -130,7 +129,7 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS flota_vehiculos (
-      id               TEXT PRIMARY KEY,
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       tipo_vehiculo    TEXT NOT NULL CHECK (tipo_vehiculo IN ('camion','bobcat','utilitario','otro')),
       patente          TEXT NOT NULL,
       nombre           TEXT NOT NULL,
@@ -158,9 +157,9 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_encabezado (
-      id                        TEXT PRIMARY KEY,
-      id_cliente                TEXT NOT NULL REFERENCES clientes(id),
-      id_administrativo         TEXT NOT NULL REFERENCES users(id),
+      id                        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_cliente                BIGINT NOT NULL REFERENCES clientes(id),
+      id_administrativo         BIGINT NOT NULL REFERENCES users(id),
       fecha_emision             TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       tipo_op                   TEXT NOT NULL DEFAULT 'M' CHECK (tipo_op IN ('M','C','MA')),
       nro_op                    INTEGER NOT NULL,
@@ -178,26 +177,20 @@ async function initDB() {
       domicilio_lng             REAL,
       estado_programacion       TEXT DEFAULT NULL,
       archivo_remito            TEXT,
-      id_chofer                 TEXT,
-      id_camion                 TEXT,
+      id_chofer                 BIGINT,
+      id_camion                 BIGINT,
       asignacion_fecha          TEXT,
-      asignacion_usuario        TEXT,
+      asignacion_usuario        BIGINT,
       firma_cliente             TEXT,
       firma_aclaracion          TEXT,
       created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
-  // Migración: firma digital del cliente al recibir la entrega
-  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_cliente TEXT`).catch(() => {})
-  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_aclaracion TEXT`).catch(() => {})
-  // Migración: PDF del remito firmado archivado en Storage
-  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS archivo_remito_pdf TEXT`).catch(() => {})
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_material (
-      id              TEXT PRIMARY KEY,
-      id_orden_pedido TEXT NOT NULL REFERENCES op_encabezado(id),
-      id_producto     TEXT NOT NULL REFERENCES productos(id),
+      id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_orden_pedido BIGINT NOT NULL REFERENCES op_encabezado(id),
+      id_producto     BIGINT NOT NULL REFERENCES productos(id),
       cantidad_pedida REAL NOT NULL,
       precio_unitario REAL NOT NULL
     )
@@ -206,7 +199,7 @@ async function initDB() {
   // Catálogos referenciados por op_detalle_*: deben crearse ANTES
   await pool.query(`
     CREATE TABLE IF NOT EXISTS contenedores (
-      id                   TEXT PRIMARY KEY,
+      id                   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       numero_contenedor    INTEGER NOT NULL UNIQUE,
       estado_general       TEXT NOT NULL DEFAULT 'operativo'
                              CHECK (estado_general IN ('operativo','en_reparacion','baja')),
@@ -219,7 +212,7 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS maquinaria (
-      id              TEXT PRIMARY KEY,
+      id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       nombre          TEXT NOT NULL,
       tipo            TEXT NOT NULL DEFAULT 'bobcat'
                         CHECK (tipo IN ('bobcat','minicargadora','retroexcavadora','otro')),
@@ -246,9 +239,9 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_contenedor (
-      id                   TEXT PRIMARY KEY,
-      id_orden_pedido      TEXT NOT NULL REFERENCES op_encabezado(id),
-      id_contenedor        TEXT REFERENCES contenedores(id),
+      id                   BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_orden_pedido      BIGINT NOT NULL REFERENCES op_encabezado(id),
+      id_contenedor        BIGINT REFERENCES contenedores(id),
       domicilio_entrega    TEXT NOT NULL DEFAULT '',
       zona_entrega         TEXT NOT NULL DEFAULT '',
       plazo_alquiler       INTEGER NOT NULL DEFAULT 5,
@@ -257,23 +250,23 @@ async function initDB() {
       domicilio_numero     TEXT,
       domicilio_lat        REAL,
       domicilio_lng        REAL,
-      alquiler_siguiente_id TEXT,
+      alquiler_siguiente_id BIGINT,
       metodo_pago          TEXT
     )
   `)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_maquinaria (
-      id                TEXT PRIMARY KEY,
-      id_orden_pedido   TEXT NOT NULL REFERENCES op_encabezado(id),
-      id_maquinaria     TEXT REFERENCES maquinaria(id),
+      id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_orden_pedido   BIGINT NOT NULL REFERENCES op_encabezado(id),
+      id_maquinaria     BIGINT REFERENCES maquinaria(id),
       domicilio_entrega TEXT NOT NULL DEFAULT '',
       zona_entrega      TEXT NOT NULL DEFAULT '',
       plazo_alquiler    INTEGER NOT NULL DEFAULT 1,
       precio_por_hora   REAL DEFAULT 0,
       horas_pactadas    REAL DEFAULT 0,
       precio_total      REAL DEFAULT 0,
-      id_chofer         TEXT REFERENCES users(id),
+      id_chofer         BIGINT REFERENCES users(id),
       domicilio_calle   TEXT,
       domicilio_numero  TEXT,
       metodo_pago       TEXT
@@ -285,11 +278,11 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS movimiento_contenedor (
-      id               TEXT PRIMARY KEY,
-      id_contenedor    TEXT NOT NULL REFERENCES contenedores(id),
-      id_op_contenedor TEXT REFERENCES op_detalle_contenedor(id),
-      id_chofer        TEXT REFERENCES users(id),
-      id_camion        TEXT REFERENCES flota_vehiculos(id),
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_contenedor    BIGINT NOT NULL REFERENCES contenedores(id),
+      id_op_contenedor BIGINT REFERENCES op_detalle_contenedor(id),
+      id_chofer        BIGINT REFERENCES users(id),
+      id_camion        BIGINT REFERENCES flota_vehiculos(id),
       fecha_movimiento TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
       estado_paso      TEXT NOT NULL
                          CHECK (estado_paso IN (
@@ -305,11 +298,11 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS movimiento_maquinaria (
-      id               TEXT PRIMARY KEY,
-      id_maquinaria    TEXT NOT NULL REFERENCES maquinaria(id),
-      id_op_maquinaria TEXT REFERENCES op_detalle_maquinaria(id),
-      id_operario      TEXT REFERENCES users(id),
-      id_camion        TEXT REFERENCES flota_vehiculos(id),
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_maquinaria    BIGINT NOT NULL REFERENCES maquinaria(id),
+      id_op_maquinaria BIGINT REFERENCES op_detalle_maquinaria(id),
+      id_operario      BIGINT REFERENCES users(id),
+      id_camion        BIGINT REFERENCES flota_vehiculos(id),
       fecha_movimiento TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
       estado_paso      TEXT NOT NULL
                          CHECK (estado_paso IN (
@@ -323,8 +316,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS mantenimiento_maquinaria (
-      id            TEXT PRIMARY KEY,
-      id_maquinaria TEXT NOT NULL REFERENCES maquinaria(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_maquinaria BIGINT NOT NULL REFERENCES maquinaria(id),
       tipo_service  TEXT NOT NULL DEFAULT 'preventivo'
                       CHECK (tipo_service IN ('preventivo','correctivo','revision')),
       fecha         TEXT NOT NULL,
@@ -342,15 +335,15 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS transacciones (
-      id               TEXT PRIMARY KEY,
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       tipo             TEXT NOT NULL
                          CHECK (tipo IN (
                            'Venta Cantera','Venta Viaje',
                            'Alquiler','Maquinaria','Ajuste'
                          )),
-      id_op_encabezado TEXT REFERENCES op_encabezado(id),
+      id_op_encabezado BIGINT REFERENCES op_encabezado(id),
       nro_remito       INTEGER,
-      cliente_id       TEXT REFERENCES clientes(id),
+      cliente_id       BIGINT REFERENCES clientes(id),
       cliente          TEXT NOT NULL DEFAULT '',
       monto            REAL NOT NULL DEFAULT 0,
       descripcion      TEXT DEFAULT '',
@@ -369,11 +362,11 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS circuitos (
-      id            TEXT PRIMARY KEY,
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       fecha         TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
-      id_chofer     TEXT REFERENCES users(id),
-      id_camion     TEXT REFERENCES flota_vehiculos(id),
-      id_empleado   TEXT,
+      id_chofer     BIGINT REFERENCES users(id),
+      id_camion     BIGINT REFERENCES flota_vehiculos(id),
+      id_empleado   BIGINT,
       estado        TEXT NOT NULL DEFAULT 'borrador'
                       CHECK (estado IN ('borrador','confirmado','en_curso','finalizado')),
       observaciones TEXT DEFAULT '',
@@ -383,9 +376,9 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS circuito_paradas (
-      id               TEXT PRIMARY KEY,
-      id_circuito      TEXT NOT NULL REFERENCES circuitos(id),
-      id_op_encabezado TEXT REFERENCES op_encabezado(id),
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_circuito      BIGINT NOT NULL REFERENCES circuitos(id),
+      id_op_encabezado BIGINT REFERENCES op_encabezado(id),
       orden            INTEGER NOT NULL DEFAULT 1,
       tipo_parada      TEXT NOT NULL
                          CHECK (tipo_parada IN (
@@ -408,7 +401,7 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS proveedores (
-      id         TEXT PRIMARY KEY,
+      id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       nombre     TEXT NOT NULL,
       cuit       TEXT,
       domicilio  TEXT,
@@ -421,8 +414,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS compras_encabezado (
-      id            TEXT PRIMARY KEY,
-      id_proveedor  TEXT NOT NULL REFERENCES proveedores(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_proveedor  BIGINT NOT NULL REFERENCES proveedores(id),
       fecha         TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       estado        TEXT NOT NULL DEFAULT 'emitida'
                       CHECK (estado IN ('emitida','recibida','cancelada')),
@@ -433,9 +426,9 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS compras_detalle (
-      id              TEXT PRIMARY KEY,
-      id_compra       TEXT NOT NULL REFERENCES compras_encabezado(id),
-      id_producto     TEXT NOT NULL REFERENCES productos(id),
+      id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_compra       BIGINT NOT NULL REFERENCES compras_encabezado(id),
+      id_producto     BIGINT NOT NULL REFERENCES productos(id),
       cantidad        REAL NOT NULL,
       precio_unitario REAL NOT NULL
     )
@@ -443,8 +436,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cc_proveedores (
-      id               TEXT PRIMARY KEY,
-      id_proveedor     TEXT NOT NULL REFERENCES proveedores(id),
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_proveedor     BIGINT NOT NULL REFERENCES proveedores(id),
       tipo_movimiento  TEXT NOT NULL CHECK (tipo_movimiento IN ('debito','credito')),
       nro_comprobante  TEXT,
       monto_debito     REAL DEFAULT 0,
@@ -461,8 +454,8 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS mantenimiento_vehiculo (
-      id            TEXT PRIMARY KEY,
-      id_vehiculo   TEXT NOT NULL REFERENCES flota_vehiculos(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo   BIGINT NOT NULL REFERENCES flota_vehiculos(id),
       tipo_service  TEXT NOT NULL DEFAULT 'preventivo'
                       CHECK (tipo_service IN ('preventivo','correctivo','revision')),
       fecha         TEXT NOT NULL,
@@ -481,9 +474,9 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS combustible (
-      id           TEXT PRIMARY KEY,
-      id_vehiculo  TEXT NOT NULL REFERENCES flota_vehiculos(id),
-      id_chofer    TEXT REFERENCES users(id),
+      id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo  BIGINT NOT NULL REFERENCES flota_vehiculos(id),
+      id_chofer    BIGINT REFERENCES users(id),
       litros       REAL NOT NULL,
       costo_total  REAL NOT NULL,
       km_al_cargar INTEGER DEFAULT 0,
@@ -498,7 +491,7 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS empleados (
-      id                        TEXT PRIMARY KEY,
+      id                        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       legajo                    INTEGER UNIQUE,
       nombre                    TEXT NOT NULL,
       apellido                  TEXT NOT NULL DEFAULT '',
@@ -522,7 +515,7 @@ async function initDB() {
       licencia_categoria        TEXT,
       licencia_vencimiento      TEXT,
       certificaciones           TEXT,
-      id_usuario                TEXT REFERENCES users(id),
+      id_usuario                BIGINT REFERENCES users(id),
       activo                    INTEGER DEFAULT 1,
       cuil                      TEXT,
       contacto_emergencia       TEXT,
@@ -530,7 +523,7 @@ async function initDB() {
       convenio                  TEXT,
       categoria_laboral         TEXT,
       sueldo_basico             REAL DEFAULT 0,
-      supervisor_id             TEXT,
+      supervisor_id             BIGINT,
       es_chofer                 INTEGER DEFAULT 0,
       licencia_numero           TEXT,
       licencia_fecha_emision    TEXT,
@@ -547,9 +540,9 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS documentos (
-      id                TEXT PRIMARY KEY,
+      id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       entidad_tipo      TEXT NOT NULL CHECK (entidad_tipo IN ('empleado','vehiculo')),
-      entidad_id        TEXT NOT NULL,
+      entidad_id        BIGINT NOT NULL,
       tipo              TEXT NOT NULL,
       descripcion       TEXT DEFAULT '',
       archivo           TEXT,
@@ -561,23 +554,9 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_documentos_entidad ON documentos(entidad_tipo, entidad_id)`)
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS asignaciones_chofer (
-      id            TEXT PRIMARY KEY,
-      id_empleado   TEXT NOT NULL REFERENCES empleados(id),
-      id_vehiculo   TEXT NOT NULL REFERENCES flota_vehiculos(id),
-      tipo          TEXT NOT NULL DEFAULT 'principal' CHECK (tipo IN ('principal','alternativo')),
-      fecha_desde   TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
-      fecha_hasta   TEXT,
-      activo        INTEGER DEFAULT 1,
-      observaciones TEXT DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
-    )
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS control_horario (
-      id             TEXT PRIMARY KEY,
-      id_empleado    TEXT NOT NULL REFERENCES empleados(id),
+      id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_empleado    BIGINT NOT NULL REFERENCES empleados(id),
       fecha          TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       hora_ingreso   TEXT,
       hora_egreso    TEXT,
@@ -585,7 +564,7 @@ async function initDB() {
       horas_extra    REAL DEFAULT 0,
       motivo_extra   TEXT DEFAULT '',
       aprobado       INTEGER DEFAULT 0,
-      aprobado_por   TEXT,
+      aprobado_por   BIGINT,
       observaciones  TEXT DEFAULT '',
       created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
@@ -593,8 +572,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS pagos_empleado (
-      id          TEXT PRIMARY KEY,
-      id_empleado TEXT NOT NULL REFERENCES empleados(id),
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_empleado BIGINT NOT NULL REFERENCES empleados(id),
       tipo        TEXT NOT NULL CHECK (tipo IN ('sueldo','anticipo','viatico','horas_extra','bonificacion','descuento','liquidacion')),
       periodo     TEXT,
       monto       REAL NOT NULL DEFAULT 0,
@@ -606,19 +585,19 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS estado_vehiculo_hist (
-      id            TEXT PRIMARY KEY,
-      id_vehiculo   TEXT NOT NULL REFERENCES flota_vehiculos(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo   BIGINT NOT NULL REFERENCES flota_vehiculos(id),
       estado        TEXT NOT NULL,
       fecha         TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
-      id_usuario    TEXT,
+      id_usuario    BIGINT,
       observaciones TEXT DEFAULT ''
     )
   `)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS config_mantenimiento (
-      id          TEXT PRIMARY KEY,
-      id_vehiculo TEXT REFERENCES flota_vehiculos(id),
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo BIGINT REFERENCES flota_vehiculos(id),
       tipo        TEXT NOT NULL,
       cada_km     INTEGER,
       cada_meses  INTEGER,
@@ -629,8 +608,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS gastos_vehiculo (
-      id          TEXT PRIMARY KEY,
-      id_vehiculo TEXT NOT NULL REFERENCES flota_vehiculos(id),
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo BIGINT NOT NULL REFERENCES flota_vehiculos(id),
       categoria   TEXT NOT NULL CHECK (categoria IN ('seguro','impuesto','peaje','estacionamiento','multa','otro')),
       descripcion TEXT DEFAULT '',
       monto       REAL NOT NULL DEFAULT 0,
@@ -643,22 +622,10 @@ async function initDB() {
   `)
 
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS gps_posiciones (
-      id          TEXT PRIMARY KEY,
-      id_vehiculo TEXT NOT NULL REFERENCES flota_vehiculos(id),
-      lat         REAL,
-      lng         REAL,
-      velocidad   REAL,
-      estado      TEXT,
-      fecha       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
-    )
-  `)
-
-  await pool.query(`
     CREATE TABLE IF NOT EXISTS rastreo_chofer (
-      id                  TEXT PRIMARY KEY,
-      id_op               TEXT REFERENCES op_encabezado(id),
-      id_empleado         TEXT NOT NULL REFERENCES empleados(id),
+      id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_op               BIGINT REFERENCES op_encabezado(id),
+      id_empleado         BIGINT NOT NULL REFERENCES empleados(id),
       lat                 REAL,
       lng                 REAL,
       velocidad           REAL DEFAULT 0,
@@ -666,19 +633,17 @@ async function initDB() {
       fecha_registro      TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
-  // Migración: permitir id_op NULL (tracking global del chofer sin viaje activo)
-  await pool.query(`ALTER TABLE rastreo_chofer ALTER COLUMN id_op DROP NOT NULL`).catch(() => {})
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_op ON rastreo_chofer(id_op)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_empleado ON rastreo_chofer(id_empleado)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_rastreo_fecha ON rastreo_chofer(fecha_registro DESC)`)
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS auditoria (
-      id           TEXT PRIMARY KEY,
+      id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       entidad_tipo TEXT NOT NULL,
-      entidad_id   TEXT NOT NULL,
+      entidad_id   BIGINT NOT NULL,
       accion       TEXT NOT NULL,
-      id_usuario   TEXT,
+      id_usuario   BIGINT,
       detalle      TEXT DEFAULT '',
       created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
@@ -687,7 +652,7 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS config_notificaciones (
-      id         TEXT PRIMARY KEY,
+      id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       clave      TEXT NOT NULL UNIQUE,
       valor      TEXT NOT NULL DEFAULT '',
       created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
@@ -696,10 +661,10 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS asignaciones_recurso (
-      id            TEXT PRIMARY KEY,
-      id_empleado   TEXT NOT NULL REFERENCES empleados(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_empleado   BIGINT NOT NULL REFERENCES empleados(id),
       recurso_tipo  TEXT NOT NULL CHECK (recurso_tipo IN ('camion','maquina')),
-      recurso_id    TEXT NOT NULL,
+      recurso_id    BIGINT NOT NULL,
       fecha_desde   TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       fecha_hasta   TEXT,
       activo        INTEGER DEFAULT 1,
@@ -712,12 +677,12 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS stock_ingresos (
-      id             TEXT PRIMARY KEY,
-      id_producto    TEXT NOT NULL REFERENCES productos(id),
-      id_proveedor   TEXT REFERENCES proveedores(id),
+      id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_producto    BIGINT NOT NULL REFERENCES productos(id),
+      id_proveedor   BIGINT REFERENCES proveedores(id),
       cantidad       REAL NOT NULL,
       costo_unitario REAL DEFAULT 0,
-      id_usuario     TEXT,
+      id_usuario     BIGINT,
       observaciones  TEXT DEFAULT '',
       fecha          TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
@@ -729,7 +694,7 @@ async function initDB() {
   // ─────────────────────────────────────────────────────────────────
   await pool.query(`
     CREATE TABLE IF NOT EXISTS config_contenedores (
-      id          TEXT PRIMARY KEY,
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       clave       TEXT NOT NULL UNIQUE,
       valor       TEXT NOT NULL DEFAULT '',
       descripcion TEXT DEFAULT '',
@@ -739,8 +704,8 @@ async function initDB() {
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS config_maquinaria (
-      id            TEXT PRIMARY KEY,
-      id_maquinaria TEXT REFERENCES maquinaria(id),
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_maquinaria BIGINT REFERENCES maquinaria(id),
       clave         TEXT NOT NULL,
       valor         TEXT NOT NULL DEFAULT '',
       created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
@@ -756,8 +721,8 @@ async function initDB() {
     ['alertas_licencias', '1'], ['alertas_documentos', '1'], ['alertas_mantenimiento', '1'],
   ]) {
     await pool.query(
-      `INSERT INTO config_notificaciones (id, clave, valor) VALUES ($1, $2, $3) ON CONFLICT (clave) DO NOTHING`,
-      [crypto.randomUUID(), k, v]
+      `INSERT INTO config_notificaciones (clave, valor) VALUES ($1, $2) ON CONFLICT (clave) DO NOTHING`,
+      [k, v]
     )
   }
 
@@ -770,8 +735,8 @@ async function initDB() {
     ['costo_extra_dia', '30000', 'Costo extra por día adicional'],
   ]) {
     await pool.query(
-      `INSERT INTO config_contenedores (id, clave, valor, descripcion) VALUES ($1, $2, $3, $4) ON CONFLICT (clave) DO NOTHING`,
-      [crypto.randomUUID(), clave, valor, desc]
+      `INSERT INTO config_contenedores (clave, valor, descripcion) VALUES ($1, $2, $3) ON CONFLICT (clave) DO NOTHING`,
+      [clave, valor, desc]
     )
   }
 
@@ -780,9 +745,13 @@ async function initDB() {
     ['precio_por_dia_default', '80000'],
     ['modo_precio_default', 'hora'],
   ]) {
+    // id_maquinaria NULL = config global. ON CONFLICT no sirve con NULL
+    // (NULL ≠ NULL), por eso se usa un guard explícito para no duplicar.
     await pool.query(
-      `INSERT INTO config_maquinaria (id, id_maquinaria, clave, valor) VALUES ($1, NULL, $2, $3) ON CONFLICT (id_maquinaria, clave) DO NOTHING`,
-      [crypto.randomUUID(), clave, valor]
+      `INSERT INTO config_maquinaria (id_maquinaria, clave, valor)
+       SELECT NULL, $1, $2
+       WHERE NOT EXISTS (SELECT 1 FROM config_maquinaria WHERE id_maquinaria IS NULL AND clave = $1)`,
+      [clave, valor]
     )
   }
 
@@ -840,8 +809,8 @@ async function initDB() {
   ]
   for (const u of seedUsuarios) {
     await pool.query(
-      `INSERT INTO users (id, usuario, password_hash, nombre, rol) VALUES ($1,$2,$3,$4,$5) ON CONFLICT (usuario) DO NOTHING`,
-      [crypto.randomUUID(), u.usuario, bcrypt.hashSync('suelosur123', 10), u.nombre, u.rol]
+      `INSERT INTO users (usuario, password_hash, nombre, rol) VALUES ($1,$2,$3,$4) ON CONFLICT (usuario) DO NOTHING`,
+      [u.usuario, bcrypt.hashSync('suelosur123', 10), u.nombre, u.rol]
     )
   }
 
@@ -854,8 +823,8 @@ async function initDB() {
       ['Canto Rodado', 'm³', 10500], ['Tosca', 'm³', 5500],
     ]) {
       await pool.query(
-        `INSERT INTO productos (id, nombre, unidad_medida, precio_referencia) VALUES ($1,$2,$3,$4)`,
-        [crypto.randomUUID(), nombre, um, precio]
+        `INSERT INTO productos (nombre, unidad_medida, precio_referencia) VALUES ($1,$2,$3)`,
+        [nombre, um, precio]
       )
     }
   }
@@ -868,85 +837,14 @@ async function initDB() {
   `)
   for (const p of sinStock) {
     await pool.query(
-      `INSERT INTO stock (id, id_producto, cantidad_actual, cant_pendiente_entregar, stock_minimo) VALUES ($1,$2,0,0,0)`,
-      [crypto.randomUUID(), p.id]
+      `INSERT INTO stock (id_producto, cantidad_actual, cant_pendiente_entregar, stock_minimo) VALUES ($1,0,0,0)`,
+      [p.id]
     )
   }
 
-  // Clientes
-  const { rows: [{ n: cantCli }] } = await pool.query(`SELECT COUNT(*) AS n FROM clientes`)
-  if (parseInt(cantCli) === 0) {
-    for (const [nombre, apellido, dom, zona, tel, tipo] of [
-      ['Construcciones Norte', 'SRL', 'Av. Vélez Sársfield 3200', 'Norte',  '3514001234', 'Empresa'   ],
-      ['García',               'Roberto', 'Colón 1420',           'Centro', '3513009876', 'Particular'],
-      ['Obra Bv. Chacabuco',   '',   'Bv. Chacabuco 890',         'Sur',    '3512005678', 'Obra'      ],
-    ]) {
-      await pool.query(
-        `INSERT INTO clientes (id, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, tipo_cliente) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-        [crypto.randomUUID(), nombre, apellido, dom, zona, tel, tipo]
-      )
-    }
-  }
-
-  // Proveedores
-  const { rows: [{ n: cantProv }] } = await pool.query(`SELECT COUNT(*) AS n FROM proveedores`)
-  if (parseInt(cantProv) === 0) {
-    for (const [nombre, cuit, dom, tel, email] of [
-      ['Cantera del Centro S.A.', '30-11223344-5', 'Ruta 9 Km 12',        '3514112233', 'ventas@canteracentro.com'],
-      ['Áridos del Sur SRL',      '30-55667788-9', 'Camino a Alta Gracia', '3515667788', 'info@aridosdelsur.com'],
-      ['Transporte Norte',        '20-99887766-5', 'Av. Japón 1500',       '3513445566', 'contacto@transportenorte.com'],
-    ]) {
-      await pool.query(
-        `INSERT INTO proveedores (id, nombre, cuit, domicilio, telefono, email) VALUES ($1,$2,$3,$4,$5,$6)`,
-        [crypto.randomUUID(), nombre, cuit, dom, tel, email]
-      )
-    }
-  }
-
-  // Flota
-  const { rows: [{ n: cantFlota }] } = await pool.query(`SELECT COUNT(*) AS n FROM flota_vehiculos`)
-  if (parseInt(cantFlota) === 0) {
-    for (const [tipo, patente, nombre] of [
-      ['camion', 'ABC123', 'Camión 1'], ['camion', 'DEF456', 'Camión 2'],
-      ['camion', 'GHI789', 'Camión 3'], ['camion', 'JKL012', 'Camión 4'],
-      ['camion', 'MNO345', 'Camión 5'], ['bobcat', 'PQR678', 'Bobcat'],
-    ]) {
-      await pool.query(
-        `INSERT INTO flota_vehiculos (id, tipo_vehiculo, patente, nombre) VALUES ($1,$2,$3,$4)`,
-        [crypto.randomUUID(), tipo, patente, nombre]
-      )
-    }
-  }
-
-  // Contenedores
-  const { rows: [{ n: cantCont }] } = await pool.query(`SELECT COUNT(*) AS n FROM contenedores`)
-  if (parseInt(cantCont) === 0) {
-    for (let n = 1; n <= 10; n++) {
-      const id = crypto.randomUUID()
-      await pool.query(
-        `INSERT INTO contenedores (id, numero_contenedor, estado_general) VALUES ($1,$2,'operativo')`,
-        [id, n]
-      )
-      await pool.query(
-        `INSERT INTO movimiento_contenedor (id, id_contenedor, estado_paso, observaciones) VALUES ($1,$2,'en_planta','Alta inicial')`,
-        [crypto.randomUUID(), id]
-      )
-    }
-  }
-
-  // Maquinaria
-  const { rows: [{ n: cantMaq }] } = await pool.query(`SELECT COUNT(*) AS n FROM maquinaria`)
-  if (parseInt(cantMaq) === 0) {
-    const id = crypto.randomUUID()
-    await pool.query(
-      `INSERT INTO maquinaria (id, nombre, tipo, patente, estado_general) VALUES ($1,'Bobcat S650','bobcat','PQR678','operativo')`,
-      [id]
-    )
-    await pool.query(
-      `INSERT INTO movimiento_maquinaria (id, id_maquinaria, estado_paso, observaciones) VALUES ($1,$2,'en_planta','Alta inicial')`,
-      [crypto.randomUUID(), id]
-    )
-  }
+  // Nota: el catálogo operativo (clientes, proveedores, flota, contenedores,
+  // maquinaria) se carga desde la app. No se siembran datos de ejemplo para
+  // que el arranque sea limpio.
 
   // ─────────────────────────────────────────────────────────────────
   // Backfill: todo usuario con rol chofer debe tener un empleado vinculado.
@@ -962,12 +860,11 @@ async function initDB() {
     const partes = String(u.nombre || u.usuario).trim().split(/\s+/)
     const nombre = partes[0] || u.usuario
     const apellido = partes.slice(1).join(' ') || ''
-    const empId = crypto.randomUUID()
     const proxLegajo = (await pool.query(`SELECT COALESCE(MAX(legajo), 0) + 1 AS n FROM empleados`)).rows[0].n
     await pool.query(`
-      INSERT INTO empleados (id, legajo, nombre, apellido, es_chofer, cargo, sector, id_usuario, estado_laboral, activo)
-      VALUES ($1, $2, $3, $4, 1, 'Chofer', 'Operaciones', $5, 'activo', 1)
-    `, [empId, proxLegajo, nombre, apellido, u.id])
+      INSERT INTO empleados (legajo, nombre, apellido, es_chofer, cargo, sector, id_usuario, estado_laboral, activo)
+      VALUES ($1, $2, $3, 1, 'Chofer', 'Operaciones', $4, 'activo', 1)
+    `, [proxLegajo, nombre, apellido, u.id])
     console.log(`  ↳ Empleado-chofer creado para usuario "${u.usuario}"`)
   }
 
