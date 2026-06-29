@@ -61,7 +61,14 @@
           <td class="fw-semibold"><%= a.titulo %></td>
           <td><%= a.entidad_nombre %></td>
           <td><small class="text-muted"><%= a.fecha ? formatFecha(a.fecha) + (a.dias!=null ? ' ('+a.dias+'d)' : '') : (a.km_restante!=null ? a.km_restante+' km' : '—') %></small></td>
-          <td class="text-end"><a href="<%= a.link %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+          <td class="text-end">
+            <% if (a.resolver) { %>
+              <form action="<%= a.resolver %>" method="POST" class="d-inline" onsubmit="return confirm('¿Registrar el pago y mover el vencimiento al mes siguiente?')">
+                <button class="btn btn-sm btn-success"><%- icon('check',{size:14}) %> Resolver</button>
+              </form>
+            <% } %>
+            <a href="<%= a.link %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+          </td>
         </tr>
         <% }) %>
       </tbody>
