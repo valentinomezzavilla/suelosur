@@ -2,6 +2,7 @@
 // Recursos (camión + chofer) asociados a una operación (op_encabezado).
 const { query } = require('../config/db')
 const { registrarAuditoria } = require('../utils/auditoria')
+const { validarAsignacionOperacion } = require('../utils/compatibilidad')
 
 const OperacionesModel = {
 
@@ -20,6 +21,14 @@ const OperacionesModel = {
   },
 
   async asignar(opId, { id_chofer, id_camion, usuario }) {
+    // Validar compatibilidad chofer/unidad ↔ tipo de operación
+    if (id_chofer) {
+      const op = (await query(`SELECT tipo_op, modalidad FROM op_encabezado WHERE id = ?`, [opId])).rows[0]
+      const chofer = (await query(`SELECT nombre, apellido, tipo_operacion FROM empleados WHERE id = ?`, [id_chofer])).rows[0]
+      const unidad = id_camion ? (await query(`SELECT actividad FROM flota_vehiculos WHERE id = ?`, [id_camion])).rows[0] : null
+      const v = validarAsignacionOperacion({ chofer, op, unidad })
+      if (!v.ok) throw new Error(v.motivo)
+    }
     await query(`
       UPDATE op_encabezado
       SET id_chofer = ?, id_camion = ?, asignacion_fecha = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), asignacion_usuario = ?

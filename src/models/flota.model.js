@@ -5,7 +5,7 @@ const { query, transaction } = require('../config/db')
 const CAMPOS = [
   'tipo_vehiculo', 'patente', 'nombre', 'numero_interno', 'marca', 'modelo', 'anio',
   'nro_chasis', 'nro_motor', 'tipo_unidad', 'capacidad_carga', 'kilometraje', 'estado_operativo',
-  'dedicacion', 'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
+  'dedicacion', 'actividad', 'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
 ]
 const NUMERICOS = new Set(['anio', 'capacidad_carga', 'kilometraje', 'numero_interno'])
 

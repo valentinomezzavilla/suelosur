@@ -5,6 +5,7 @@
 //  - Un chofer puede tener a la vez 1 camión y/o 1 máquina (al reasignar se cierra la anterior).
 //  - No se puede asignar un recurso en mantenimiento / fuera de servicio / inactivo.
 const { query, transaction } = require('../config/db')
+const { validarAsignacionRecurso } = require('../utils/compatibilidad')
 
 const NO_DISPONIBLE_CAMION = ['en_mantenimiento', 'fuera_servicio', 'inactivo']
 const NO_DISPONIBLE_MAQ    = ['en_mantenimiento', 'fuera_servicio']
@@ -63,17 +64,23 @@ const AsignacionesModel = {
     if (!['camion', 'maquina'].includes(recurso_tipo)) throw new Error('Tipo de recurso inválido.')
     if (!recurso_id) throw new Error('Seleccioná un recurso.')
 
-    // Validar existencia + estado del recurso
+    // Validar existencia + estado del recurso + compatibilidad de actividad
+    const chofer = (await query(`SELECT nombre, apellido, tipo_operacion FROM empleados WHERE id = ?`, [id_empleado])).rows[0]
+    const choferNom = chofer ? `${chofer.nombre || ''} ${chofer.apellido || ''}`.trim() : ''
     if (recurso_tipo === 'camion') {
-      const v = (await query(`SELECT activo, estado_operativo FROM flota_vehiculos WHERE id = ?`, [recurso_id])).rows[0]
+      const v = (await query(`SELECT activo, estado_operativo, actividad FROM flota_vehiculos WHERE id = ?`, [recurso_id])).rows[0]
       if (!v) throw new Error('Camión no encontrado.')
       if (!v.activo) throw new Error('El camión está dado de baja.')
       if (NO_DISPONIBLE_CAMION.includes(v.estado_operativo)) throw new Error('El camión no está disponible (mantenimiento / fuera de servicio).')
+      const comp = validarAsignacionRecurso(chofer?.tipo_operacion, v.actividad, choferNom)
+      if (!comp.ok) throw new Error(comp.motivo)
     } else {
-      const m = (await query(`SELECT activo, estado_operativo FROM maquinaria WHERE id = ?`, [recurso_id])).rows[0]
+      const m = (await query(`SELECT activo, estado_operativo, actividad FROM maquinaria WHERE id = ?`, [recurso_id])).rows[0]
       if (!m) throw new Error('Máquina no encontrada.')
       if (!m.activo) throw new Error('La máquina está dada de baja.')
       if (NO_DISPONIBLE_MAQ.includes(m.estado_operativo)) throw new Error('La máquina no está disponible (mantenimiento / fuera de servicio).')
+      const comp = validarAsignacionRecurso(chofer?.tipo_operacion, m.actividad, choferNom)
+      if (!comp.ok) throw new Error(comp.motivo)
     }
 
     // No puede estar asignado activo a otro chofer (comparación numérica robusta)

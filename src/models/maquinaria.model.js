@@ -77,20 +77,20 @@ const MaquinariaModel = {
 
   async crear(datos) {
     const { nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
-            km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service } = datos
+            km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service, actividad } = datos
     if (await this.patenteEnUso(patente)) throw new Error(`Ya existe una máquina con la patente ${patente}.`)
     if (numero_interno && await this.numeroInternoEnUso(numero_interno)) throw new Error(`Ya existe una máquina con el número interno ${numero_interno}.`)
     return await transaction(async (q) => {
       const { rows } = await q(`
         INSERT INTO maquinaria (nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
-          km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service, actividad)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [nombre, tipo || 'bobcat', patente || null, marca || null, modelo || null,
           anio ? parseInt(anio) : null, estado_general || 'operativo', estado_operativo || 'disponible',
           km_actuales ? parseInt(km_actuales) : 0, horas_uso ? parseFloat(horas_uso) : 0,
           numero_interno ? parseInt(numero_interno) : null, observaciones || '',
-          ultimo_service || null, proximo_service || null])
+          ultimo_service || null, proximo_service || null, actividad || null])
       const id = rows[0].id
       await q(`INSERT INTO movimiento_maquinaria (id_maquinaria, estado_paso, observaciones) VALUES (?, 'en_planta', 'Alta inicial')`,
         [id])
@@ -104,14 +104,14 @@ const MaquinariaModel = {
     await query(`
       UPDATE maquinaria SET nombre = ?, tipo = ?, patente = ?, marca = ?, modelo = ?, anio = ?,
         estado_general = ?, estado_operativo = ?, km_actuales = ?, horas_uso = ?, numero_interno = ?,
-        observaciones = ?, ultimo_service = ?, proximo_service = ?
+        observaciones = ?, ultimo_service = ?, proximo_service = ?, actividad = ?
       WHERE id = ?
     `, [datos.nombre, datos.tipo || 'bobcat', datos.patente || null, datos.marca || null, datos.modelo || null,
         datos.anio ? parseInt(datos.anio) : null, datos.estado_general || 'operativo',
         datos.estado_operativo || 'disponible', datos.km_actuales ? parseInt(datos.km_actuales) : 0,
         datos.horas_uso ? parseFloat(datos.horas_uso) : 0,
         datos.numero_interno ? parseInt(datos.numero_interno) : null,
-        datos.observaciones || '', datos.ultimo_service || null, datos.proximo_service || null, id])
+        datos.observaciones || '', datos.ultimo_service || null, datos.proximo_service || null, datos.actividad || null, id])
   },
 
   // Vista de disponibilidad: máquinas clasificadas por situación

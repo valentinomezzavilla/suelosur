@@ -35,11 +35,21 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label">Dedicación</label>
+          <label class="form-label">Actividad del camión</label>
+          <select name="actividad" class="form-select">
+            <option value="">— Sin definir —</option>
+            <% const _actsCam = { camion_viajes:'Camión - Viajes (Ventas)', camion_contenedores:'Camión - Alquiler de Contenedores' };
+               Object.entries(_actsCam).forEach(([v,l]) => { %>
+              <option value="<%= v %>" <%= vehiculo?.actividad===v?'selected':'' %>><%= l %></option>
+            <% }) %>
+          </select>
+          <p class="form-text mb-0">Controla qué choferes/operaciones puede tomar.</p>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Dedicación <span class="text-muted">(legado)</span></label>
           <select name="dedicacion" class="form-select">
             <% dedicaciones.forEach(d => { %><option value="<%= d %>" <%= (vehiculo?.dedicacion||'ambos')===d?'selected':'' %>><%= dedicLbl[d] %></option><% }) %>
           </select>
-          <p class="form-text mb-0">¿A qué se destina este camión?</p>
         </div>
         <div class="col-md-4"><label class="form-label">Último mantenimiento</label><input type="date" name="fecha_ultimo_mant" class="form-control" value="<%= vehiculo?.fecha_ultimo_mant || '' %>"></div>
         <div class="col-md-4"><label class="form-label">Próximo mantenimiento</label><input type="date" name="fecha_proximo_mant" class="form-control" value="<%= vehiculo?.fecha_proximo_mant || '' %>"></div>
