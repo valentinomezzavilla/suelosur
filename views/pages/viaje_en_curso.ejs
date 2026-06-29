@@ -559,6 +559,12 @@
     if (routeCoords.length) {
       const near = nearestRouteIndex(userLat, userLng);
       remaining = remainingDistance(near.idx, userLat, userLng);
+      // Consumir el tramo recorrido: la línea arranca en la posición actual
+      // y solo muestra lo que falta hacia el destino (estilo Waze).
+      if (routeLine) {
+        const ahead = routeCoords.slice(Math.min(near.idx + 1, routeCoords.length));
+        routeLine.setLatLngs([[userLat, userLng]].concat(ahead));
+      }
     } else {
       remaining = haversine(userLat, userLng, destLat, destLng);
     }
