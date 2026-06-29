@@ -131,11 +131,11 @@ const ChoferesController = {
   async subirDocumento(req, res) {
     const back = `/choferes/${req.params.id}?tab=documentos`
     try {
-      const { tipo, descripcion, fecha_emision, fecha_vencimiento } = req.body
+      const { tipo, descripcion, fecha_emision, fecha_vencimiento, dias_alerta } = req.body
       if (!tipo) { req.flash('error', 'Indicá el tipo de documento.'); return res.redirect(back) }
       await DocumentosModel.crear({
         entidad_tipo: ENTIDAD, entidad_id: req.params.id, tipo, descripcion,
-        archivo: req.file ? req.file.filename : null, fecha_emision, fecha_vencimiento,
+        archivo: req.file ? req.file.filename : null, fecha_emision, fecha_vencimiento, dias_alerta,
       })
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { documento: tipo } })
       req.flash('success', 'Documento agregado.')
@@ -286,6 +286,28 @@ const ChoferesController = {
       if (formato === 'excel') return generarExcel(res, { titulo, columnas, filas, nombreArchivo })
       return generarTablaPDF(res, { titulo, subtitulo: etiquetaPeriodo(periodo), columnas, filas, nombreArchivo })
     } catch (err) { console.error(err); req.flash('error', 'Error al generar el reporte.'); res.redirect('/choferes') }
+  },
+
+  // Resolver alerta de vencimiento de pago: registra el pago y adelanta el
+  // vencimiento un mes (los pagos suelen ser mensuales).
+  async resolverPagoVencimiento(req, res) {
+    const back = req.get('Referer') || '/alertas'
+    try {
+      const emp = await EmpleadosModel.obtener(req.params.id)
+      if (!emp) { req.flash('error', 'Empleado no encontrado.'); return res.redirect(back) }
+      await PagosModel.crear({
+        id_empleado: emp.id, tipo: 'sueldo',
+        monto: emp.sueldo_basico || emp.salario || 0,
+        fecha: new Date().toISOString().slice(0, 10),
+        descripcion: 'Pago registrado al resolver alerta de vencimiento',
+      })
+      const base = emp.fecha_vencimiento_pago ? new Date(emp.fecha_vencimiento_pago + 'T00:00:00') : new Date()
+      base.setMonth(base.getMonth() + 1)
+      const proximo = base.toISOString().slice(0, 10)
+      await query(`UPDATE empleados SET fecha_vencimiento_pago = ? WHERE id = ?`, [proximo, emp.id])
+      req.flash('success', `Pago registrado. Próximo vencimiento: ${proximo}.`)
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al resolver el pago.') }
+    res.redirect(back)
   },
 
   async obtenerUbicacionActual(req, res) {

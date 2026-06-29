@@ -63,6 +63,16 @@
           <label class="form-label">Km actuales</label>
           <input type="number" name="km_actuales" class="form-control" value="<%= maquina?.km_actuales || 0 %>" min="0">
         </div>
+        <div class="col-md-4">
+          <label class="form-label">Actividad de la máquina</label>
+          <select name="actividad" class="form-select">
+            <option value="">— Sin definir —</option>
+            <% const _actsMaq = { maquina_deposito:'Máquina - Depósito', maquina_alquiler:'Máquina - Alquiler' };
+               Object.entries(_actsMaq).forEach(([v,l]) => { %>
+              <option value="<%= v %>" <%= maquina?.actividad===v?'selected':'' %>><%= l %></option>
+            <% }) %>
+          </select>
+        </div>
         <div class="col-md-6">
           <label class="form-label">Último mantenimiento</label>
           <input type="date" name="ultimo_service" class="form-control" value="<%= maquina?.ultimo_service || '' %>">

@@ -31,6 +31,18 @@ function severidad(dias) {
   return null // fuera de ventana de alerta
 }
 
+// Severidad dentro de una ventana de anticipación configurable (días).
+// Gradúa critico/alto/medio según proximidad; null fuera de ventana.
+function severidadVentana(dias, ventana) {
+  if (dias == null) return null
+  if (dias < 0) return 'vencido'
+  const w = Number(ventana) > 0 ? Number(ventana) : 30
+  if (dias > w) return null
+  if (dias <= Math.ceil(w / 3)) return 'critico'
+  if (dias <= Math.ceil((2 * w) / 3)) return 'alto'
+  return 'medio'
+}
+
 const SEV_ORDER = { vencido: 0, critico: 1, alto: 2, medio: 3 }
 
 const AlertasModel = {
@@ -40,18 +52,34 @@ const AlertasModel = {
     const out = []
     const push = (a) => { if (a.severidad) out.push(a) }
 
-    // ── Licencias de choferes/empleados ───────────────────────────
+    // ── Licencias de choferes/empleados (anticipación configurable) ──
     ;(await query(`
-      SELECT id, nombre, apellido, licencia_vencimiento, es_chofer
+      SELECT id, nombre, apellido, licencia_vencimiento, licencia_dias_alerta, es_chofer
       FROM empleados WHERE activo = 1 AND licencia_vencimiento IS NOT NULL AND licencia_vencimiento != ''
     `)).rows.forEach(e => {
       const dias = diasHasta(e.licencia_vencimiento)
       push({
         modulo: 'choferes', tipo: 'licencia',
-        severidad: severidad(dias), dias,
+        severidad: severidadVentana(dias, e.licencia_dias_alerta || 30), dias,
         titulo: 'Licencia de conducir',
         entidad_id: e.id, entidad_nombre: `${e.nombre} ${e.apellido || ''}`.trim(),
         fecha: e.licencia_vencimiento, link: `/choferes/${e.id}`,
+      })
+    })
+
+    // ── Vencimiento de pago de empleados (alerta 7 días antes) ──────
+    ;(await query(`
+      SELECT id, nombre, apellido, fecha_vencimiento_pago
+      FROM empleados WHERE activo = 1 AND fecha_vencimiento_pago IS NOT NULL AND fecha_vencimiento_pago != ''
+    `)).rows.forEach(e => {
+      const dias = diasHasta(e.fecha_vencimiento_pago)
+      push({
+        modulo: 'choferes', tipo: 'pago',
+        severidad: severidadVentana(dias, 7), dias,
+        titulo: 'Vencimiento de pago',
+        entidad_id: e.id, entidad_nombre: `${e.nombre} ${e.apellido || ''}`.trim(),
+        fecha: e.fecha_vencimiento_pago, link: `/choferes/${e.id}`,
+        resolver: `/choferes/${e.id}/pago-vencimiento/resolver`,
       })
     })
 
@@ -67,7 +95,7 @@ const AlertasModel = {
       push({
         modulo: d.entidad_tipo === 'empleado' ? 'choferes' : 'flota',
         tipo: 'documento',
-        severidad: severidad(dias), dias,
+        severidad: severidadVentana(dias, d.dias_alerta || 30), dias,
         titulo: d.tipo || 'Documento',
         entidad_id: d.entidad_id, entidad_nombre: d.nom || '—',
         fecha: d.fecha_vencimiento,

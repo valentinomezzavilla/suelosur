@@ -124,6 +124,7 @@
           <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
           <div class="col-md-2"><label class="form-label">Emisión</label><input type="date" name="fecha_emision" class="form-control form-control-sm"></div>
           <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="fecha_vencimiento" class="form-control form-control-sm"></div>
+          <div class="col-md-2"><label class="form-label">Avisar (días antes)</label><input type="number" min="1" name="dias_alerta" value="30" class="form-control form-control-sm"></div>
           <div class="col-md-2"><label class="form-label">Archivo</label><input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm"></div>
         </div>
         <button class="btn btn-sm btn-naranja mt-2">Guardar</button>
@@ -287,15 +288,56 @@
   </div></div>
 
 <% } else if (tab === 'gps') { %>
-  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">GPS y seguimiento</div>
-    <div class="card-body text-center py-5">
-      <div style="font-size:2.5rem">🛰️</div>
-      <p class="fw-semibold mb-1">Integración GPS preparada</p>
-      <p class="text-muted small mb-0">El sistema está listo para integrar un proveedor de GPS:<br>
-        ubicación actual, historial de recorridos, tiempo detenido/en movimiento y km recorridos.<br>
-        Se activa al conectar el servicio de rastreo (tabla <code>gps_posiciones</code> ya disponible).</p>
+  <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span>Ubicación actual (vía chofer asignado)</span>
+    <button type="button" class="btn btn-sm btn-naranja" onclick="cargarUbicacionFlota()"><%- icon('map',{size:14}) %> Ver en mapa</button>
+  </div>
+    <div class="card-body">
+      <p class="text-muted small mb-2">La ubicación del camión se obtiene automáticamente del GPS del chofer asignado. No se carga manualmente.</p>
+      <div id="flotaMap" style="width:100%; height:340px; border-radius:8px; display:none;"></div>
+      <div id="flotaMapMsg" class="text-muted">Tocá "Ver en mapa" para ubicar el camión.</div>
+      <div id="flotaMapStatus" class="small text-muted mt-2"></div>
     </div>
   </div>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  let _fmap, _fmarker;
+  async function cargarUbicacionFlota() {
+    const mapDiv = document.getElementById('flotaMap'), msg = document.getElementById('flotaMapMsg'), st = document.getElementById('flotaMapStatus');
+    try {
+      const d = await (await fetch('/flota/<%= vehiculo.id %>/ubicacion-actual')).json();
+      if (d.estado === 'ok') {
+        mapDiv.style.display = 'block'; msg.style.display = 'none';
+        if (!_fmap) { _fmap = L.map('flotaMap').setView([d.lat,d.lng],14); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_fmap); _fmarker = L.circleMarker([d.lat,d.lng],{radius:10,fillColor:'#1a73e8',color:'#fff',weight:2,fillOpacity:0.85}).addTo(_fmap); }
+        else { _fmarker.setLatLng([d.lat,d.lng]); }
+        setTimeout(()=>{ _fmap.invalidateSize(); _fmap.setView([d.lat,d.lng],14); }, 100);
+        st.textContent = '📍 Chofer: ' + (d.chofer||'—');
+      } else if (d.estado === 'sin_chofer') {
+        msg.textContent = '🚫 Sin chofer asignado. Asigná un chofer para ver la ubicación.'; mapDiv.style.display='none';
+      } else {
+        msg.textContent = '📍 Sin ubicación disponible (el chofer ' + (d.chofer||'') + ' aún no reportó GPS).'; mapDiv.style.display='none';
+      }
+    } catch(e){ msg.textContent = '⚠️ Error al cargar la ubicación.'; }
+  }
+  </script>
+
+  <div class="card shadow-sm"><div class="card-header bg-white fw-semibold">Historial de kilometraje</div>
+    <div class="card-body p-0">
+    <% if(!historialKm || !historialKm.length){ %><div class="p-4 text-center text-muted">Sin incrementos automáticos registrados.</div>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr><th>Fecha</th><th class="text-end">Km anterior</th><th class="text-end">Distancia viaje</th><th class="text-end">Km nuevo</th><th>Motivo</th></tr></thead>
+      <tbody><% historialKm.forEach(h => { %>
+        <tr><td><small class="text-muted"><%= formatFechaHora(h.fecha) %></small></td>
+          <td class="text-end"><%= (h.km_anterior||0).toLocaleString('es-AR') %></td>
+          <td class="text-end"><small class="text-muted"><%= (h.distancia||0).toFixed(1) %> km</small></td>
+          <td class="text-end fw-semibold"><%= (h.km_nuevo||0).toLocaleString('es-AR') %></td>
+          <td><small class="text-muted"><%= h.motivo || '' %></small></td>
+        </tr><% }) %></tbody>
+    </table>
+    <% } %>
+  </div></div>
 
 <% } else if (tab === 'historial') { %>
   <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Historial de estados</div>

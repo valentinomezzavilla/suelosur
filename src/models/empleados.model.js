@@ -8,11 +8,11 @@ const CAMPOS = [
   'cargo', 'sector', 'fecha_ingreso', 'estado_laboral', 'tipo_contratacion',
   'convenio', 'categoria_laboral', 'supervisor_id',
   'salario', 'sueldo_basico', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras',
-  'vehiculo_asignado', 'es_chofer',
-  'licencia_numero', 'licencia_categoria', 'licencia_fecha_emision', 'licencia_vencimiento', 'licencia_organismo',
+  'vehiculo_asignado', 'es_chofer', 'tipo_operacion', 'fecha_vencimiento_pago',
+  'licencia_numero', 'licencia_categoria', 'licencia_fecha_emision', 'licencia_vencimiento', 'licencia_organismo', 'licencia_dias_alerta',
   'certificaciones', 'id_usuario',
 ]
-const NUMERICOS = new Set(['salario', 'sueldo_basico', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras'])
+const NUMERICOS = new Set(['salario', 'sueldo_basico', 'bonificaciones', 'descuentos', 'viaticos', 'horas_extras', 'licencia_dias_alerta'])
 const BOOLEANOS = new Set(['es_chofer'])
 
 function normalizar(datos) {

@@ -26,6 +26,13 @@ const serveDoc = (res, archivo) => {
 
 const FlotaController = {
 
+  // Ubicación del camión (derivada del chofer asignado) — JSON para el mapa
+  async ubicacionActual(req, res) {
+    try {
+      res.json(await FlotaModel.ubicacionActual(req.params.id))
+    } catch (err) { console.error(err); res.status(500).json({ error: err.message }) }
+  },
+
   async index(req, res) {
     try {
       const { q, estado, tipo, marca, chofer } = req.query
@@ -87,6 +94,7 @@ const FlotaController = {
         resumenGastos: await GastosModel.resumen(vehiculo.id, { desde: periodo.desde, hasta: periodo.hasta }),
         choferes: await EmpleadosModel.listarChoferes({ soloActivos: true }),
         historialEstados: await FlotaModel.historialEstados(vehiculo.id),
+        historialKm: await FlotaModel.historialKm(vehiculo.id),
         asignacionesRecurso: await AsignacionesModel.historialRecurso('camion', vehiculo.id),
         auditoria: await historial(ENTIDAD, vehiculo.id),
         alertas: (await AlertasModel.listar({ modulo: 'flota' })).filter(a => Number(a.entidad_id) === Number(vehiculo.id)),
@@ -133,7 +141,7 @@ const FlotaController = {
       if (!req.body.tipo) { req.flash('error', 'Indicá el tipo.'); return res.redirect(back) }
       await DocumentosModel.crear({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, tipo: req.body.tipo,
         descripcion: req.body.descripcion, archivo: req.file ? req.file.filename : null,
-        fecha_emision: req.body.fecha_emision, fecha_vencimiento: req.body.fecha_vencimiento })
+        fecha_emision: req.body.fecha_emision, fecha_vencimiento: req.body.fecha_vencimiento, dias_alerta: req.body.dias_alerta })
       req.flash('success', 'Documento agregado.')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error.') }
     res.redirect(back)

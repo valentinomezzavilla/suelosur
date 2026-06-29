@@ -5,7 +5,7 @@ const { query, transaction } = require('../config/db')
 const CAMPOS = [
   'tipo_vehiculo', 'patente', 'nombre', 'numero_interno', 'marca', 'modelo', 'anio',
   'nro_chasis', 'nro_motor', 'tipo_unidad', 'capacidad_carga', 'kilometraje', 'estado_operativo',
-  'dedicacion', 'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
+  'dedicacion', 'actividad', 'fecha_ultimo_mant', 'fecha_proximo_mant', 'observaciones',
 ]
 const NUMERICOS = new Set(['anio', 'capacidad_carga', 'kilometraje', 'numero_interno'])
 
@@ -58,6 +58,45 @@ const FlotaModel = {
         (SELECT a.id_empleado FROM asignaciones_recurso a WHERE a.recurso_tipo='camion' AND a.recurso_id=v.id AND a.activo=1 LIMIT 1) AS chofer_id
       FROM flota_vehiculos v WHERE v.id = ?
     `, [id])).rows[0]
+  },
+
+  // Suma automática de kilometraje al finalizar un viaje (ida + vuelta).
+  // km_nuevo = km_actual + round(2 × distancia). Registra en el historial.
+  async sumarKilometraje(idVehiculo, distanciaKm, idOp = null) {
+    const dist = parseFloat(distanciaKm) || 0
+    if (!idVehiculo || dist <= 0) return null
+    const incremento = Math.round(dist * 2)
+    return await transaction(async (q) => {
+      const v = (await q(`SELECT kilometraje FROM flota_vehiculos WHERE id = ?`, [idVehiculo])).rows[0]
+      if (!v) return null
+      const kmAnterior = parseInt(v.kilometraje) || 0
+      const kmNuevo = kmAnterior + incremento
+      await q(`UPDATE flota_vehiculos SET kilometraje = ? WHERE id = ?`, [kmNuevo, idVehiculo])
+      await q(`INSERT INTO historial_kilometraje (id_vehiculo, id_op, km_anterior, km_nuevo, distancia, motivo)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+        [idVehiculo, idOp || null, kmAnterior, kmNuevo, dist, 'Viaje finalizado (ida + vuelta)'])
+      return { kmAnterior, kmNuevo, incremento }
+    })
+  },
+
+  async historialKm(idVehiculo) {
+    return (await query(`SELECT * FROM historial_kilometraje WHERE id_vehiculo = ? ORDER BY fecha DESC, id DESC LIMIT 50`, [idVehiculo])).rows
+  },
+
+  // Ubicación del camión = última posición GPS del chofer asignado.
+  // Nunca se carga manual. Devuelve estado: ok / sin_chofer / sin_ubicacion.
+  async ubicacionActual(camionId) {
+    const asig = (await query(
+      `SELECT id_empleado FROM asignaciones_recurso WHERE recurso_tipo='camion' AND recurso_id = ? AND activo = 1 LIMIT 1`,
+      [camionId])).rows[0]
+    if (!asig) return { estado: 'sin_chofer' }
+    const emp = (await query(`SELECT nombre, apellido FROM empleados WHERE id = ?`, [asig.id_empleado])).rows[0]
+    const chofer = emp ? `${emp.nombre} ${emp.apellido || ''}`.trim() : null
+    const pos = (await query(
+      `SELECT lat, lng, fecha_registro FROM rastreo_chofer WHERE id_empleado = ? ORDER BY fecha_registro DESC LIMIT 1`,
+      [asig.id_empleado])).rows[0]
+    if (!pos || pos.lat == null) return { estado: 'sin_ubicacion', chofer }
+    return { estado: 'ok', lat: pos.lat, lng: pos.lng, fecha: pos.fecha_registro, chofer }
   },
 
   // Validaciones de unicidad

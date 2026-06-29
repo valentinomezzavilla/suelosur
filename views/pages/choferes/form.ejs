@@ -52,6 +52,22 @@
             <% supervisores.forEach(s => { %><option value="<%= s.id %>" <%= chofer?.supervisor_id===s.id?'selected':'' %>><%= s.nombre %> <%= s.apellido %></option><% }) %>
           </select>
         </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo de operación habilitada</label>
+          <select name="tipo_operacion" class="form-select">
+            <option value="">— Sin especializar —</option>
+            <% const _acts = { camion_viajes:'Camión - Viajes (Ventas)', camion_contenedores:'Camión - Alquiler de Contenedores', maquina_deposito:'Máquina - Depósito', maquina_alquiler:'Máquina - Alquiler' };
+               Object.entries(_acts).forEach(([v,l]) => { %>
+              <option value="<%= v %>" <%= chofer?.tipo_operacion===v?'selected':'' %>><%= l %></option>
+            <% }) %>
+          </select>
+          <small class="text-muted">Define qué unidades/operaciones puede tomar.</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Vencimiento de pago</label>
+          <input type="date" name="fecha_vencimiento_pago" class="form-control" value="<%= chofer?.fecha_vencimiento_pago || '' %>">
+          <small class="text-muted">Genera alerta 7 días antes.</small>
+        </div>
         <div class="col-12"><label class="form-label">Observaciones</label><input name="certificaciones" class="form-control" value="<%= chofer?.certificaciones || '' %>" placeholder="Notas, certificaciones, cursos..."></div>
       </div>
     </div>
@@ -79,6 +95,7 @@
         <div class="col-md-2"><label class="form-label">Emisión</label><input type="date" name="licencia_fecha_emision" class="form-control" value="<%= chofer?.licencia_fecha_emision || '' %>"></div>
         <div class="col-md-2"><label class="form-label">Vencimiento</label><input type="date" name="licencia_vencimiento" class="form-control" value="<%= chofer?.licencia_vencimiento || '' %>"></div>
         <div class="col-md-2"><label class="form-label">Organismo</label><input name="licencia_organismo" class="form-control" value="<%= chofer?.licencia_organismo || '' %>" placeholder="Municipalidad..."></div>
+        <div class="col-md-3"><label class="form-label">Anticipación alerta (días)</label><input type="number" min="1" name="licencia_dias_alerta" class="form-control" value="<%= chofer?.licencia_dias_alerta || 30 %>"></div>
       </div>
     </div>
   </div>

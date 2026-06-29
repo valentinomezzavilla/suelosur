@@ -220,6 +220,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data" id="finalizarForm" data-no-loader>
+        <input type="hidden" name="distancia_km" id="distanciaKmInput">
         <div class="modal-body">
           <label class="form-label fw-semibold mb-1">✍️ Firma del cliente *</label>
           <small class="text-muted d-block mb-1">Pedile al cliente que firme con el dedo en el recuadro</small>
@@ -708,6 +709,9 @@
       if (pad.isEmpty()) { e.preventDefault(); alert('Falta la firma del cliente.'); return; }
       if (!firmaNombre.value.trim()) { e.preventDefault(); alert('Ingresá el nombre de quien recibe.'); firmaNombre.focus(); return; }
       firmaInput.value = pad.toDataURL();
+      // Distancia de la ruta (km) para el kilometraje automático del camión
+      var dkm = document.getElementById('distanciaKmInput');
+      if (dkm) dkm.value = routeTotalDist > 0 ? (routeTotalDist / 1000).toFixed(2) : '';
       if (window.AppLoader) window.AppLoader.show('Confirmando entrega…');
     });
 

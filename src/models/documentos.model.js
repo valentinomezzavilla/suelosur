@@ -16,13 +16,14 @@ const DocumentosModel = {
     return (await query(`SELECT * FROM documentos WHERE id = ?`, [id])).rows[0]
   },
 
-  async crear({ entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento }) {
+  async crear({ entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento, dias_alerta }) {
     const { rows } = await query(`
-      INSERT INTO documentos (entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO documentos (entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento, dias_alerta)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `, [entidad_tipo, entidad_id, tipo, descripcion || '', archivo || null,
-        fecha_emision || null, fecha_vencimiento || null])
+        fecha_emision || null, fecha_vencimiento || null,
+        (dias_alerta != null && dias_alerta !== '') ? parseInt(dias_alerta) : 30])
     return rows[0].id
   },
 

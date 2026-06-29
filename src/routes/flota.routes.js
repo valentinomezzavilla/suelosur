@@ -15,6 +15,7 @@ router.post('/',             auth, acceso, ctrl.crear)
 router.get('/reporte/:tipo', auth, acceso, ctrl.reporte)
 
 router.get('/:id',           auth, acceso, ctrl.detalle)
+router.get('/:id/ubicacion-actual', auth, acceso, ctrl.ubicacionActual)
 router.get('/:id/editar',    auth, acceso, ctrl.editar)
 router.put('/:id',           auth, acceso, ctrl.actualizar)
 router.post('/:id/estado',   auth, acceso, ctrl.cambiarEstado)
