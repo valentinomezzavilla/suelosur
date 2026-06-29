@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 // Campos editables del empleado (whitelist para create/update)
@@ -72,14 +71,13 @@ const EmpleadosModel = {
   },
 
   async crear(datos) {
-    const id = crypto.randomUUID()
     const legajo = await this.proximoLegajo()
     const d = normalizar(datos)
-    const cols = ['id', 'legajo', ...CAMPOS]
-    const vals = [id, legajo, ...CAMPOS.map(c => d[c])]
+    const cols = ['legajo', ...CAMPOS]
+    const vals = [legajo, ...CAMPOS.map(c => d[c])]
     const placeholders = cols.map(() => '?').join(', ')
-    await query(`INSERT INTO empleados (${cols.join(', ')}) VALUES (${placeholders})`, vals)
-    return id
+    const { rows } = await query(`INSERT INTO empleados (${cols.join(', ')}) VALUES (${placeholders}) RETURNING id`, vals)
+    return rows[0].id
   },
 
   async actualizar(id, datos) {

@@ -75,15 +75,15 @@ const ClientesModel = {
   },
 
   async crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente }) {
-    const id = crypto.randomUUID()
     const numero = await this.proximoNumero()
-    await query(`
-      INSERT INTO clientes (id, numero, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, numero, nombre, apellido || '', domicilio_ppal || null, zona || null,
+    const { rows } = await query(`
+      INSERT INTO clientes (numero, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [numero, nombre, apellido || '', domicilio_ppal || null, zona || null,
         tel_whatsapp || null, telefono || null, email || null, dni || null,
         tipo_cliente || null, cuenta_corriente ? 1 : 0])
-    return id
+    return rows[0].id
   },
 
   async actualizar(id, datos) {
@@ -134,11 +134,10 @@ const ClientesModel = {
   },
 
   async agregarMovimiento(id, { tipo, descripcion, monto }) {
-    const movId = crypto.randomUUID()
-    await query(`INSERT INTO movimientos_cuenta (id, cliente_id, tipo, descripcion, monto) VALUES (?, ?, ?, ?, ?)`,
-      [movId, id, tipo, descripcion, Number(monto)])
+    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto) VALUES (?, ?, ?, ?) RETURNING id`,
+      [id, tipo, descripcion, Number(monto)])
     await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
-    return movId
+    return rows[0].id
   },
 
   async movimientos(clienteId) {

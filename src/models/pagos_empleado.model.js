@@ -1,6 +1,5 @@
 'use strict'
 // Pagos a empleados: sueldos, anticipos, viáticos, HE, bonif., descuentos, liquidaciones.
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 // Tipos que restan (descuento) — el resto suma al neto pagado.
@@ -21,13 +20,13 @@ const PagosEmpleadoModel = {
   },
 
   async crear({ id_empleado, tipo, periodo, monto, fecha, descripcion }) {
-    const id = crypto.randomUUID()
-    await query(`
-      INSERT INTO pagos_empleado (id, id_empleado, tipo, periodo, monto, fecha, descripcion)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [id, id_empleado, tipo, periodo || null, parseFloat(monto) || 0,
+    const { rows } = await query(`
+      INSERT INTO pagos_empleado (id_empleado, tipo, periodo, monto, fecha, descripcion)
+      VALUES (?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [id_empleado, tipo, periodo || null, parseFloat(monto) || 0,
         fecha || new Date().toISOString().slice(0, 10), descripcion || ''])
-    return id
+    return rows[0].id
   },
 
   async eliminar(id) {

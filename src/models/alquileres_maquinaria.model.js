@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const SQL_ULTIMO_MOV_MAQ = `
@@ -79,20 +78,20 @@ const AlquileresMaquinariaModel = {
   async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, id_maquinaria, id_chofer, metodo_pago, observaciones }) {
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const id_op = crypto.randomUUID()
-    await transaction(async (q) => {
-      await q(`INSERT INTO op_encabezado (id, id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones) VALUES (?, ?, ?, 'MA', ?, ?, 'pendiente', ?, ?)`,
-        [id_op, id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
+    return await transaction(async (q) => {
+      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones) VALUES (?, ?, 'MA', ?, ?, 'pendiente', ?, ?) RETURNING id`,
+        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
+      const id_op = rows[0].id
       await q(`
-        INSERT INTO op_detalle_maquinaria (id, id_orden_pedido, id_maquinaria, id_chofer, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [crypto.randomUUID(), id_op, id_maquinaria || null, id_chofer || null,
+        INSERT INTO op_detalle_maquinaria (id_orden_pedido, id_maquinaria, id_chofer, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [id_op, id_maquinaria || null, id_chofer || null,
           domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
           zona_entrega || '', parseInt(plazo_alquiler) || 1,
           parseFloat(precio_por_hora) || 0, parseFloat(horas_pactadas) || 0,
           parseFloat(precio_total) || 0, metodo_pago || null])
+      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
     })
-    return { id: id_op, nro_op: nro, nro_remito: nro_rem }
   },
 
   async asignarMaquinaria(id_op, id_maquinaria) {
@@ -121,8 +120,8 @@ const AlquileresMaquinariaModel = {
     if (!opm?.id_maquinaria) throw new Error('No hay maquinaria asignada.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'despachado' WHERE id = ? AND estado = 'pendiente'`, [id_op])
-      await q(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, ?, 'despachada', 'Salida a trabajo')`,
-        [crypto.randomUUID(), opm.id_maquinaria, opm.id])
+      await q(`INSERT INTO movimiento_maquinaria (id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'despachada', 'Salida a trabajo')`,
+        [opm.id_maquinaria, opm.id])
     })
   },
 
@@ -131,23 +130,23 @@ const AlquileresMaquinariaModel = {
     if (!opm?.id_maquinaria) throw new Error('No hay maquinaria asignada.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id_op])
-      await q(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, ?, 'en_uso', 'En trabajo en domicilio')`,
-        [crypto.randomUUID(), opm.id_maquinaria, opm.id])
+      await q(`INSERT INTO movimiento_maquinaria (id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'en_uso', 'En trabajo en domicilio')`,
+        [opm.id_maquinaria, opm.id])
     })
   },
 
   async registrarRetiro(id_op) {
     const opm = (await query(`SELECT id, id_maquinaria FROM op_detalle_maquinaria WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!opm?.id_maquinaria) throw new Error('No hay maquinaria asignada.')
-    await query(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, ?, 'a_retirar', 'Trabajo finalizado, pendiente retiro')`,
-      [crypto.randomUUID(), opm.id_maquinaria, opm.id])
+    await query(`INSERT INTO movimiento_maquinaria (id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'a_retirar', 'Trabajo finalizado, pendiente retiro')`,
+      [opm.id_maquinaria, opm.id])
   },
 
   async devolverAPlanta(id_op) {
     const opm = (await query(`SELECT id, id_maquinaria FROM op_detalle_maquinaria WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!opm?.id_maquinaria) throw new Error('No hay maquinaria asignada.')
-    await query(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, ?, 'en_planta', 'Devuelta a planta')`,
-      [crypto.randomUUID(), opm.id_maquinaria, opm.id])
+    await query(`INSERT INTO movimiento_maquinaria (id_maquinaria, id_op_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'en_planta', 'Devuelta a planta')`,
+      [opm.id_maquinaria, opm.id])
   },
 
   async anular(id_op) {

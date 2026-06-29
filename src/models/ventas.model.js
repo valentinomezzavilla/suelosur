@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const VentasModel = {
@@ -112,39 +111,40 @@ const VentasModel = {
           detalles, fecha_entrega_planificada, modalidad, domicilio, metodo_pago }) {
     // Crear cliente automáticamente si viene como texto libre
     if (!id_cliente && cliente_nombre_libre) {
-      id_cliente = crypto.randomUUID()
-      await query(`INSERT INTO clientes (id, nombre, activo) VALUES (?, ?, 1)`,
-        [id_cliente, cliente_nombre_libre.trim()])
+      const cli = await query(`INSERT INTO clientes (nombre, activo) VALUES (?, 1) RETURNING id`,
+        [cliente_nombre_libre.trim()])
+      id_cliente = cli.rows[0].id
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const id = crypto.randomUUID()
     const dom = domicilio || {}
 
-    await transaction(async (q) => {
-      await q(`
+    return await transaction(async (q) => {
+      const { rows } = await q(`
         INSERT INTO op_encabezado (
-          id, id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado,
+          id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado,
           observaciones, fecha_entrega_planificada, modalidad, metodo_pago,
           domicilio_calle, domicilio_altura, domicilio_sin_numero
-        ) VALUES (?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?)
-      `, [id, id_cliente, id_administrativo, tipo_op, nro, nro_rem,
+        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [id_cliente, id_administrativo, tipo_op, nro, nro_rem,
           observaciones, fecha_entrega_planificada || null, modalidad || null,
           metodo_pago || null, dom.calle || null,
           dom.altura ? parseInt(dom.altura) : null,
           dom.sin_numero ? 1 : 0])
+      const id = rows[0].id
 
       for (const d of (detalles || [])) {
         await q(`
-          INSERT INTO op_detalle_material (id, id_orden_pedido, id_producto, cantidad_pedida, precio_unitario)
-          VALUES (?, ?, ?, ?, ?)
-        `, [crypto.randomUUID(), id, d.id_producto, d.cantidad_pedida, d.precio_unitario])
+          INSERT INTO op_detalle_material (id_orden_pedido, id_producto, cantidad_pedida, precio_unitario)
+          VALUES (?, ?, ?, ?)
+        `, [id, d.id_producto, d.cantidad_pedida, d.precio_unitario])
         await q(`UPDATE stock SET cant_pendiente_entregar = cant_pendiente_entregar + ? WHERE id_producto = ?`,
           [d.cantidad_pedida, d.id_producto])
       }
-    })
 
-    return { id, nro_op: nro, nro_remito: nro_rem }
+      return { id, nro_op: nro, nro_remito: nro_rem }
+    })
   },
 
   // Actualiza datos editables de un viaje (estado != entregado/anulado).

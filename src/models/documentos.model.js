@@ -1,6 +1,5 @@
 'use strict'
 // Gestión documental polimórfica (empleados y vehículos).
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 const DocumentosModel = {
@@ -18,13 +17,13 @@ const DocumentosModel = {
   },
 
   async crear({ entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento }) {
-    const id = crypto.randomUUID()
-    await query(`
-      INSERT INTO documentos (id, entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, entidad_tipo, entidad_id, tipo, descripcion || '', archivo || null,
+    const { rows } = await query(`
+      INSERT INTO documentos (entidad_tipo, entidad_id, tipo, descripcion, archivo, fecha_emision, fecha_vencimiento)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [entidad_tipo, entidad_id, tipo, descripcion || '', archivo || null,
         fecha_emision || null, fecha_vencimiento || null])
-    return id
+    return rows[0].id
   },
 
   // Devuelve el nombre de archivo borrado (para limpiar del disco), o null.

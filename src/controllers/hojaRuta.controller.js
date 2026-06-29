@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
@@ -191,7 +190,7 @@ const HojaRutaController = {
     const emp = await empleadoDe(req.session.user.id)
     if (!emp) return null
     const op = (await query(`SELECT id, tipo_op, modalidad, estado, id_chofer, id_cliente FROM op_encabezado WHERE id = ?`, [req.params.id])).rows[0]
-    if (!op || op.id_chofer !== emp.id) return null
+    if (!op || Number(op.id_chofer) !== Number(emp.id)) return null
     return { emp, op }
   },
 
@@ -307,9 +306,9 @@ const HojaRutaController = {
 
       const { emp, op } = v
       await query(`
-        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, exactitud, fecha_registro)
-        VALUES (?, ?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
-      `, [crypto.randomUUID(), op.id, emp.id, lat, lng, accuracy || null])
+        INSERT INTO rastreo_chofer (id_op, id_empleado, lat, lng, exactitud, fecha_registro)
+        VALUES (?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+      `, [op.id, emp.id, lat, lng, accuracy || null])
 
       res.json({ ok: true })
     } catch (err) {
@@ -336,9 +335,9 @@ const HojaRutaController = {
       `, [emp.id])).rows[0]
 
       await query(`
-        INSERT INTO rastreo_chofer (id, id_op, id_empleado, lat, lng, velocidad, exactitud, fecha_registro)
-        VALUES (?, ?, ?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
-      `, [crypto.randomUUID(), opActiva?.id || null, emp.id, lat, lng, velocidad || 0, accuracy || null])
+        INSERT INTO rastreo_chofer (id_op, id_empleado, lat, lng, velocidad, exactitud, fecha_registro)
+        VALUES (?, ?, ?, ?, ?, ?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'))
+      `, [opActiva?.id || null, emp.id, lat, lng, velocidad || 0, accuracy || null])
 
       res.json({ ok: true })
     } catch (err) {

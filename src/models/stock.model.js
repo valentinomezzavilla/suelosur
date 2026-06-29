@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const StockModel = {
@@ -33,9 +32,9 @@ const StockModel = {
     await transaction(async (q) => {
       await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`, [cantidad, id_producto])
       await q(`
-        INSERT INTO stock_ingresos (id, id_producto, id_proveedor, cantidad, costo_unitario, id_usuario, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [crypto.randomUUID(), id_producto, id_proveedor || null, cantidad,
+        INSERT INTO stock_ingresos (id_producto, id_proveedor, cantidad, costo_unitario, id_usuario, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [id_producto, id_proveedor || null, cantidad,
           parseFloat(costo_unitario) || 0, usuario || null, observaciones || ''])
     })
   },

@@ -1,6 +1,5 @@
 'use strict'
 // Circuitos logísticos — agrupan paradas (operaciones) para un chofer + camión en una fecha.
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const TIPO_PARADA = { M: 'entrega_material', C: 'entrega_contenedor', MA: 'entrega_maquinaria' }
@@ -43,10 +42,9 @@ const CircuitosModel = {
   },
 
   async crear({ fecha, id_empleado, id_camion, observaciones }) {
-    const id = crypto.randomUUID()
-    await query(`INSERT INTO circuitos (id, fecha, id_empleado, id_camion, estado, observaciones) VALUES (?, ?, ?, ?, 'borrador', ?)`,
-      [id, fecha || new Date().toISOString().slice(0, 10), id_empleado || null, id_camion || null, observaciones || ''])
-    return id
+    const { rows } = await query(`INSERT INTO circuitos (fecha, id_empleado, id_camion, estado, observaciones) VALUES (?, ?, ?, 'borrador', ?) RETURNING id`,
+      [fecha || new Date().toISOString().slice(0, 10), id_empleado || null, id_camion || null, observaciones || ''])
+    return rows[0].id
   },
 
   async cambiarEstado(id, estado) {
@@ -98,9 +96,9 @@ const CircuitosModel = {
       domicilio = d ? d.domicilio_entrega : ''
     }
     const { n } = (await query(`SELECT COALESCE(MAX(orden),0)+1 AS n FROM circuito_paradas WHERE id_circuito = ?`, [id_circuito])).rows[0]
-    await query(`INSERT INTO circuito_paradas (id, id_circuito, id_op_encabezado, orden, tipo_parada, domicilio, estado)
-                VALUES (?, ?, ?, ?, ?, ?, 'pendiente')`,
-      [crypto.randomUUID(), id_circuito, id_op_encabezado, n, TIPO_PARADA[op.tipo_op] || 'entrega_material', domicilio || ''])
+    await query(`INSERT INTO circuito_paradas (id_circuito, id_op_encabezado, orden, tipo_parada, domicilio, estado)
+                VALUES (?, ?, ?, ?, ?, 'pendiente')`,
+      [id_circuito, id_op_encabezado, n, TIPO_PARADA[op.tipo_op] || 'entrega_material', domicilio || ''])
   },
 
   async quitarParada(id) {
