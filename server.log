@@ -1,0 +1,25 @@
+
+> suelosur@1.0.0 dev
+> concurrently "nodemon server.js" "sass --watch src/scss/main.scss:public/css/main.css"
+
+[0] [33m[nodemon] 3.1.14[39m
+[0] [33m[nodemon] to restart at any time, enter `rs`[39m
+[0] [33m[nodemon] watching path(s): *.*[39m
+[0] [33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[0] [32m[nodemon] starting `node server.js`[39m
+[1] Sass is watching for changes. Press Ctrl-C to stop.
+[1] 
+[0] ✅ Base de datos PostgreSQL inicializada
+[0] ✅ Suelosur corriendo en puerto 3000
+[0] [32m[nodemon] restarting due to changes...[39m
+[0] [32m[nodemon] starting `node server.js`[39m
+[0] ✅ Base de datos PostgreSQL inicializada
+[0] ✅ Suelosur corriendo en puerto 3000
+[0] [32m[nodemon] restarting due to changes...[39m
+[0] [32m[nodemon] starting `node server.js`[39m
+[0] ✅ Base de datos PostgreSQL inicializada
+[0] ✅ Suelosur corriendo en puerto 3000
+[0] [32m[nodemon] restarting due to changes...[39m
+[0] [32m[nodemon] starting `node server.js`[39m
+[0] ✅ Base de datos PostgreSQL inicializada
+[0] ✅ Suelosur corriendo en puerto 3000

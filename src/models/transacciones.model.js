@@ -1,6 +1,5 @@
 'use strict'
-const crypto = require('crypto')
-const { query, transaction } = require('../config/db')
+const { query } = require('../config/db')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -19,14 +18,14 @@ const TransaccionesModel = {
   codigo: codigoTransaccion,
 
   async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago }) {
-    const id = crypto.randomUUID()
     const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
-    await query(`
-      INSERT INTO transacciones (id, tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
+    const { rows } = await query(`
+      INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
         cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo'])
-    return id
+    return rows[0].id
   },
 
   async listar() {

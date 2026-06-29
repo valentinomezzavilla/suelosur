@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 const ProductosModel = {
@@ -22,11 +21,11 @@ const ProductosModel = {
   },
 
   async crear({ nombre, unidad_medida, precio_referencia }) {
-    const id = crypto.randomUUID()
-    await query(`INSERT INTO productos (id, nombre, unidad_medida, precio_referencia) VALUES (?, ?, ?, ?)`,
-      [id, nombre, unidad_medida || 'm³', parseFloat(precio_referencia) || 0])
+    const { rows } = await query(`INSERT INTO productos (nombre, unidad_medida, precio_referencia) VALUES (?, ?, ?) RETURNING id`,
+      [nombre, unidad_medida || 'm³', parseFloat(precio_referencia) || 0])
+    const id = rows[0].id
     // Inicializar stock automáticamente
-    await query(`INSERT INTO stock (id, id_producto) VALUES (?, ?)`, [crypto.randomUUID(), id])
+    await query(`INSERT INTO stock (id_producto) VALUES (?)`, [id])
     return id
   },
 

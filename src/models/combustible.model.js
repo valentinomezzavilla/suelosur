@@ -1,6 +1,5 @@
 'use strict'
 // Combustible — cargas + consumo/rendimiento por vehículo.
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const CombustibleModel = {
@@ -19,18 +18,18 @@ const CombustibleModel = {
   },
 
   async crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha }) {
-    const id = crypto.randomUUID()
-    await transaction(async (q) => {
-      await q(`
-        INSERT INTO combustible (id, id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      `, [id, id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
+    return await transaction(async (q) => {
+      const { rows } = await q(`
+        INSERT INTO combustible (id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, fecha)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
           parseInt(km_al_cargar) || 0, estacion || null, fecha || new Date().toISOString().slice(0, 10)])
       // Actualizar km del vehículo si la carga reporta un km mayor
       const km = parseInt(km_al_cargar) || 0
       if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])
+      return rows[0].id
     })
-    return id
   },
 
   async eliminar(id) {

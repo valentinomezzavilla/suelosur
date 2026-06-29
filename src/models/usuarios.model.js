@@ -1,7 +1,6 @@
 'use strict'
-const crypto = require('crypto')
 const bcrypt = require('bcryptjs')
-const { query, transaction } = require('../config/db')
+const { query } = require('../config/db')
 
 const UsuariosModel = {
 
@@ -14,11 +13,10 @@ const UsuariosModel = {
   },
 
   async crear({ usuario, nombre, rol, password }) {
-    const id = crypto.randomUUID()
     const hash = bcrypt.hashSync(password, 10)
-    await query(`INSERT INTO users (id, usuario, password_hash, nombre, rol) VALUES (?, ?, ?, ?, ?)`,
-      [id, usuario, hash, nombre, rol])
-    return id
+    const { rows } = await query(`INSERT INTO users (usuario, password_hash, nombre, rol) VALUES (?, ?, ?, ?) RETURNING id`,
+      [usuario, hash, nombre, rol])
+    return rows[0].id
   },
 
   async actualizar(id, { usuario, nombre, rol, password }) {

@@ -1,7 +1,6 @@
 'use strict'
 // Proveedores — CRUD + búsqueda inteligente (razón social / CUIT).
-const crypto = require('crypto')
-const { query, transaction } = require('../config/db')
+const { query } = require('../config/db')
 
 const ProveedoresModel = {
   // Solo activos (para selectores). Para el listado admin usar listarTodos.
@@ -22,10 +21,9 @@ const ProveedoresModel = {
   },
 
   async crear({ nombre, cuit, domicilio, telefono, email }) {
-    const id = crypto.randomUUID()
-    await query(`INSERT INTO proveedores (id, nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, nombre, cuit || null, domicilio || null, telefono || null, email || null])
-    return id
+    const { rows } = await query(`INSERT INTO proveedores (nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      [nombre, cuit || null, domicilio || null, telefono || null, email || null])
+    return rows[0].id
   },
 
   async actualizar(id, { nombre, cuit, domicilio, telefono, email }) {

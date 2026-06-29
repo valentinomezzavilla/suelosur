@@ -1,6 +1,5 @@
 'use strict'
 // Gastos del vehículo: seguros, impuestos, peajes, estacionamientos, multas, otros.
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 const GastosVehiculoModel = {
@@ -15,13 +14,13 @@ const GastosVehiculoModel = {
   },
 
   async crear({ id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo }) {
-    const id = crypto.randomUUID()
-    await query(`
-      INSERT INTO gastos_vehiculo (id, id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, id_vehiculo, categoria, descripcion || '', parseFloat(monto) || 0,
+    const { rows } = await query(`
+      INSERT INTO gastos_vehiculo (id_vehiculo, categoria, descripcion, monto, fecha, vencimiento, estado, archivo)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      RETURNING id
+    `, [id_vehiculo, categoria, descripcion || '', parseFloat(monto) || 0,
         fecha || new Date().toISOString().slice(0, 10), vencimiento || null, estado || 'pagado', archivo || null])
-    return id
+    return rows[0].id
   },
 
   async obtener(id) { return (await query(`SELECT * FROM gastos_vehiculo WHERE id = ?`, [id])).rows[0] },
