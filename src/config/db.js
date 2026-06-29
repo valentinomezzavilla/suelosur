@@ -183,6 +183,7 @@ async function initDB() {
       asignacion_usuario        BIGINT,
       firma_cliente             TEXT,
       firma_aclaracion          TEXT,
+      archivo_remito_pdf        TEXT,
       created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
