@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const SQL_ULTIMO_MOV = `
@@ -110,17 +109,17 @@ const AlquileresModel = {
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const id_op = crypto.randomUUID()
-    await transaction(async (q) => {
-      await q(`INSERT INTO op_encabezado (id, id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones) VALUES (?, ?, ?, 'C', ?, ?, 'pendiente', ?, ?)`,
-        [id_op, id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
-      await q(`INSERT INTO op_detalle_contenedor (id, id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [crypto.randomUUID(), id_op, id_contenedor || null,
+    return await transaction(async (q) => {
+      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?) RETURNING id`,
+        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
+      const id_op = rows[0].id
+      await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id_op, id_contenedor || null,
          domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
          zona_entrega || '', parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0,
          metodo_pago || null])
+      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
     })
-    return { id: id_op, nro_op: nro, nro_remito: nro_rem }
   },
 
   async asignarContenedor(id_op, id_contenedor) {
@@ -148,8 +147,8 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'despachado' WHERE id = ? AND estado = 'pendiente'`, [id_op])
-      await q(`INSERT INTO movimiento_contenedor (id, id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, 'en_transito', 'Salida a entregar')`,
-        [crypto.randomUUID(), oc.id_contenedor, oc.id])
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Salida a entregar')`,
+        [oc.id_contenedor, oc.id])
     })
   },
 
@@ -158,23 +157,23 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id_op])
-      await q(`INSERT INTO movimiento_contenedor (id, id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, 'entregado', 'Entregado en domicilio')`,
-        [crypto.randomUUID(), oc.id_contenedor, oc.id])
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'entregado', 'Entregado en domicilio')`,
+        [oc.id_contenedor, oc.id])
     })
   },
 
   async registrarRetiro(id_op) {
     const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
-    await query(`INSERT INTO movimiento_contenedor (id, id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, 'en_transito', 'Retirado de domicilio')`,
-      [crypto.randomUUID(), oc.id_contenedor, oc.id])
+    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Retirado de domicilio')`,
+      [oc.id_contenedor, oc.id])
   },
 
   async devolverAPlanta(id_op) {
     const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
-    await query(`INSERT INTO movimiento_contenedor (id, id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, 'vaciado', 'Devuelto a planta')`,
-      [crypto.randomUUID(), oc.id_contenedor, oc.id])
+    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'vaciado', 'Devuelto a planta')`,
+      [oc.id_contenedor, oc.id])
   },
 
   async anular(id_op) {
@@ -246,19 +245,18 @@ const AlquileresModel = {
 
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const id_op = crypto.randomUUID()
-    const id_detalle = crypto.randomUUID()
+    return await transaction(async (q) => {
+      const { rows } = await q(`
+        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, estado_programacion, metodo_pago, observaciones)
+        VALUES (?, ?, 'C', ?, ?, 'pendiente', 'programado', ?, ?)
+        RETURNING id
+      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
+      const id_op = rows[0].id
 
-    await transaction(async (q) => {
       await q(`
-        INSERT INTO op_encabezado (id, id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, estado_programacion, metodo_pago, observaciones)
-        VALUES (?, ?, ?, 'C', ?, ?, 'pendiente', 'programado', ?, ?)
-      `, [id_op, id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || ''])
-
-      await q(`
-        INSERT INTO op_detalle_contenedor (id, id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [id_detalle, id_op, id_contenedor, domicilio_entrega || '',
+        INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [id_op, id_contenedor, domicilio_entrega || '',
           domicilio_calle || null, domicilio_numero || null,
           zona_entrega || '', parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0,
           metodo_pago || null])
@@ -267,9 +265,9 @@ const AlquileresModel = {
         UPDATE op_detalle_contenedor SET alquiler_siguiente_id = ?
         WHERE id_orden_pedido = ? AND id_contenedor = ?
       `, [id_op, alquiler_actual_id, id_contenedor])
-    })
 
-    return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+    })
   },
 
   async activarProgramado(id_op) {
