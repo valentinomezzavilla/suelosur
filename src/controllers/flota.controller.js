@@ -133,7 +133,7 @@ const FlotaController = {
       if (!req.body.tipo) { req.flash('error', 'Indicá el tipo.'); return res.redirect(back) }
       await DocumentosModel.crear({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, tipo: req.body.tipo,
         descripcion: req.body.descripcion, archivo: req.file ? req.file.filename : null,
-        fecha_emision: req.body.fecha_emision, fecha_vencimiento: req.body.fecha_vencimiento })
+        fecha_emision: req.body.fecha_emision, fecha_vencimiento: req.body.fecha_vencimiento, dias_alerta: req.body.dias_alerta })
       req.flash('success', 'Documento agregado.')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error.') }
     res.redirect(back)

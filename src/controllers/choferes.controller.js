@@ -131,11 +131,11 @@ const ChoferesController = {
   async subirDocumento(req, res) {
     const back = `/choferes/${req.params.id}?tab=documentos`
     try {
-      const { tipo, descripcion, fecha_emision, fecha_vencimiento } = req.body
+      const { tipo, descripcion, fecha_emision, fecha_vencimiento, dias_alerta } = req.body
       if (!tipo) { req.flash('error', 'Indicá el tipo de documento.'); return res.redirect(back) }
       await DocumentosModel.crear({
         entidad_tipo: ENTIDAD, entidad_id: req.params.id, tipo, descripcion,
-        archivo: req.file ? req.file.filename : null, fecha_emision, fecha_vencimiento,
+        archivo: req.file ? req.file.filename : null, fecha_emision, fecha_vencimiento, dias_alerta,
       })
       registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { documento: tipo } })
       req.flash('success', 'Documento agregado.')
