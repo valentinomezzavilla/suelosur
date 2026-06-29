@@ -1,6 +1,5 @@
 'use strict'
 // Mantenimiento de vehículos (preventivo/correctivo) + reglas por km/fecha.
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const MantenimientoModel = {
@@ -14,20 +13,20 @@ const MantenimientoModel = {
   },
 
   async crear({ id_vehiculo, categoria, tipo_service, fecha, costo, km, proxima_fecha, proximo_km, taller, descripcion, observaciones, archivo }) {
-    const id = crypto.randomUUID()
-    await transaction(async (q) => {
-      await q(`
+    return await transaction(async (q) => {
+      const { rows } = await q(`
         INSERT INTO mantenimiento_vehiculo
-          (id, id_vehiculo, categoria, tipo_service, fecha, costo, km, proxima_fecha, proximo_km, taller, descripcion, observaciones, archivo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [id, id_vehiculo, categoria || 'preventivo', tipo_service || 'preventivo',
+          (id_vehiculo, categoria, tipo_service, fecha, costo, km, proxima_fecha, proximo_km, taller, descripcion, observaciones, archivo)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [id_vehiculo, categoria || 'preventivo', tipo_service || 'preventivo',
           fecha || new Date().toISOString().slice(0, 10), parseFloat(costo) || 0,
           parseInt(km) || 0, proxima_fecha || null, proximo_km ? parseInt(proximo_km) : null,
           taller || '', descripcion || '', observaciones || '', archivo || null])
       const k = parseInt(km) || 0
       if (k) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [k, id_vehiculo])
+      return rows[0].id
     })
-    return id
   },
 
   async obtener(id) { return (await query(`SELECT * FROM mantenimiento_vehiculo WHERE id = ?`, [id])).rows[0] },
@@ -57,10 +56,9 @@ const MantenimientoModel = {
   },
 
   async crearRegla({ id_vehiculo, tipo, cada_km, cada_meses, descripcion }) {
-    const id = crypto.randomUUID()
-    await query(`INSERT INTO config_mantenimiento (id, id_vehiculo, tipo, cada_km, cada_meses, descripcion) VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, id_vehiculo || null, tipo, cada_km ? parseInt(cada_km) : null, cada_meses ? parseInt(cada_meses) : null, descripcion || ''])
-    return id
+    const { rows } = await query(`INSERT INTO config_mantenimiento (id_vehiculo, tipo, cada_km, cada_meses, descripcion) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      [id_vehiculo || null, tipo, cada_km ? parseInt(cada_km) : null, cada_meses ? parseInt(cada_meses) : null, descripcion || ''])
+    return rows[0].id
   },
 
   async eliminarRegla(id) { await query(`DELETE FROM config_mantenimiento WHERE id = ?`, [id]) },

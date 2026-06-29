@@ -1,6 +1,5 @@
 'use strict'
 // Flota de camiones — CRUD + estados operativos con historial.
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const CAMPOS = [
@@ -75,10 +74,10 @@ const FlotaModel = {
     const d = normalizar(datos)
     if (await this.patenteEnUso(d.patente)) throw new Error(`Ya existe un camión con la patente ${d.patente}.`)
     if (await this.numeroInternoEnUso(d.numero_interno)) throw new Error(`Ya existe un camión con el número interno ${d.numero_interno}.`)
-    const id = crypto.randomUUID()
-    const cols = ['id', ...CAMPOS]
-    await query(`INSERT INTO flota_vehiculos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
-      [id, ...CAMPOS.map(c => d[c])])
+    const cols = [...CAMPOS]
+    const { rows } = await query(`INSERT INTO flota_vehiculos (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')}) RETURNING id`,
+      [...CAMPOS.map(c => d[c])])
+    const id = rows[0].id
     await this.registrarEstado(id, d.estado_operativo, null, 'Alta inicial')
     return id
   },
@@ -96,16 +95,16 @@ const FlotaModel = {
   },
 
   async registrarEstado(id, estado, usuarioId, obs) {
-    await query(`INSERT INTO estado_vehiculo_hist (id, id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), id, estado, usuarioId || null, obs || ''])
+    await query(`INSERT INTO estado_vehiculo_hist (id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?)`,
+      [id, estado, usuarioId || null, obs || ''])
   },
 
   async cambiarEstado(id, estado, usuarioId, obs) {
     if (!ESTADOS.includes(estado)) throw new Error('Estado inválido.')
     await transaction(async (q) => {
       await q(`UPDATE flota_vehiculos SET estado_operativo = ? WHERE id = ?`, [estado, id])
-      await q(`INSERT INTO estado_vehiculo_hist (id, id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?, ?)`,
-        [crypto.randomUUID(), id, estado, usuarioId || null, obs || ''])
+      await q(`INSERT INTO estado_vehiculo_hist (id_vehiculo, estado, id_usuario, observaciones) VALUES (?, ?, ?, ?)`,
+        [id, estado, usuarioId || null, obs || ''])
     })
   },
 
