@@ -409,12 +409,13 @@ const HojaRutaController = {
         req.flash('error', 'Falta la firma del cliente para confirmar la entrega.')
         return res.redirect(back)
       }
-      // Guardar la firma del cliente (PNG en base64 → archivo) y la aclaración
+      // Guardar la firma del cliente EN LA BASE DE DATOS (no en disco).
+      // Render tiene filesystem efímero: un archivo se borraría al reiniciar.
       if (req.body.firma_cliente) {
-        const filename = HojaRutaController._guardarFirma(req.body.firma_cliente, op.id)
-        if (filename) {
+        const firma = HojaRutaController._normalizarFirma(req.body.firma_cliente)
+        if (firma) {
           await query(`UPDATE op_encabezado SET firma_cliente = ?, firma_aclaracion = ? WHERE id = ?`,
-            [filename, (req.body.firma_aclaracion || '').trim() || null, op.id])
+            [firma, (req.body.firma_aclaracion || '').trim() || null, op.id])
         }
       }
       // Guardar archivo del remito firmado si el chofer adjuntó uno (opcional)
@@ -461,19 +462,16 @@ const HojaRutaController = {
     res.redirect(back)
   },
 
-  // Decodifica una firma PNG en base64 (dataURL) y la guarda como archivo.
-  // Devuelve el nombre del archivo, o null si el dato no es válido.
-  _guardarFirma(dataUrl, opId) {
-    try {
-      const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl).trim())
-      if (!m) return null
-      const buf = Buffer.from(m[1], 'base64')
-      if (!buf.length || buf.length > 2 * 1024 * 1024) return null // sanity (máx 2MB)
-      const base = String(opId).replace(/[^a-z0-9-]/gi, '')
-      const filename = `firma-${base}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}.png`
-      fs.writeFileSync(path.join(DIR_REMITOS, filename), buf)
-      return filename
-    } catch (err) { console.error('Error guardando firma:', err); return null }
+  // Valida la firma (dataURL PNG en base64) y la devuelve tal cual para
+  // guardarla en la base de datos. Persistir en BD (y no en disco) hace que
+  // la firma sobreviva a los reinicios del servidor.
+  _normalizarFirma(dataUrl) {
+    const s = String(dataUrl || '').trim()
+    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(s)
+    if (!m) return null
+    const bytes = Buffer.from(m[1], 'base64')
+    if (!bytes.length || bytes.length > 2 * 1024 * 1024) return null // máx 2MB
+    return s
   },
 
   // Servir el archivo del remito firmado (imagen/pdf)

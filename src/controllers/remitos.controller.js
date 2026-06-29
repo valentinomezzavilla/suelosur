@@ -80,7 +80,16 @@ const RemitosController = {
       if (!(await choferTieneAcceso(req, req.params.id))) return res.status(403).end()
       const r = await RemitosModel.obtener(req.params.id)
       if (!r || !r.firma_cliente) return res.status(404).end()
-      const file = path.join(DIR_REMITOS, r.firma_cliente)
+      const s = String(r.firma_cliente)
+      if (s.startsWith('data:image')) {
+        // Firma guardada en BD como dataURL base64 (formato actual)
+        const m = /base64,(.+)$/.exec(s)
+        if (!m) return res.status(404).end()
+        res.set('Content-Type', 'image/png')
+        return res.send(Buffer.from(m[1], 'base64'))
+      }
+      // Compatibilidad con firmas viejas en disco
+      const file = path.join(DIR_REMITOS, s)
       if (!fs.existsSync(file)) return res.status(404).end()
       res.sendFile(file)
     } catch (err) {

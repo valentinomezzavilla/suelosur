@@ -111,13 +111,22 @@ function generarRemitoPDF(res, r) {
 
   // Firma digital del cliente (si firmó al recibir): se dibuja sobre la línea.
   if (r.firma_cliente) {
-    const firmaPath = path.join(DIR_REMITOS, r.firma_cliente)
-    if (fs.existsSync(firmaPath)) {
+    let firmaImg = null
+    const s = String(r.firma_cliente)
+    if (s.startsWith('data:image')) {
+      // Firma guardada en BD como dataURL base64 (formato actual)
+      const m = /base64,(.+)$/.exec(s)
+      if (m) { try { firmaImg = Buffer.from(m[1], 'base64') } catch (_) {} }
+    } else {
+      // Compatibilidad con firmas viejas guardadas como archivo en disco
+      const firmaPath = path.join(DIR_REMITOS, s)
+      if (fs.existsSync(firmaPath)) firmaImg = firmaPath
+    }
+    if (firmaImg) {
       try {
-        // Encajar la firma en un recuadro por encima de la línea
         const fw = wFirma - 20
         const fh = 44
-        doc.image(firmaPath, left + 10, yFirma - fh - 2, { fit: [fw, fh], align: 'center' })
+        doc.image(firmaImg, left + 10, yFirma - fh - 2, { fit: [fw, fh], align: 'center' })
       } catch (_) { /* si la firma falla, queda la línea en blanco */ }
     }
   }

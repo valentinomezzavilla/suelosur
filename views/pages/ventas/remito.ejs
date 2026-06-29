@@ -168,8 +168,11 @@
   <!-- Firmas -->
   <div class="d-flex justify-content-between mt-5 pt-4">
     <div class="firma-box">
-      <% if (op.firma_cliente) { %>
-        <img src="/remitos/<%= op.id %>/firma-cliente" alt="Firma del cliente"
+      <% if (op.firma_cliente) {
+           const firmaSrc = String(op.firma_cliente).indexOf('data:') === 0
+             ? op.firma_cliente
+             : '/remitos/' + op.id + '/firma-cliente' %>
+        <img src="<%= firmaSrc %>" alt="Firma del cliente"
              style="max-height:60px; max-width:90%; display:block; margin:0 auto -6px">
       <% } %>
       <%= op.firma_aclaracion ? op.firma_aclaracion + ' — ' : '' %>Firma y aclaración cliente
