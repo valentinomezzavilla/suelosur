@@ -63,11 +63,13 @@ const FlotaModel = {
   // Validaciones de unicidad
   async patenteEnUso(patente, excludeId = null) {
     if (!patente) return false
-    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE patente = ? AND id != ?`, [patente, excludeId || ''])).rows[0]
+    if (excludeId) return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE patente = ? AND id != ?`, [patente, excludeId])).rows[0]
+    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE patente = ?`, [patente])).rows[0]
   },
   async numeroInternoEnUso(numero, excludeId = null) {
     if (!numero) return false
-    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE numero_interno = ? AND id != ?`, [numero, excludeId || ''])).rows[0]
+    if (excludeId) return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE numero_interno = ? AND id != ?`, [numero, excludeId])).rows[0]
+    return !!(await query(`SELECT 1 FROM flota_vehiculos WHERE numero_interno = ?`, [numero])).rows[0]
   },
 
   async crear(datos) {
