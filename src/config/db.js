@@ -715,6 +715,33 @@ async function initDB() {
   `)
 
   // ─────────────────────────────────────────────────────────────────
+  // MEJORAS FUNCIONALES — columnas nuevas + historial de kilometraje
+  // ─────────────────────────────────────────────────────────────────
+  // Empleados: vencimiento de pago, especialización y anticipación de licencia
+  await pool.query(`ALTER TABLE empleados ADD COLUMN IF NOT EXISTS fecha_vencimiento_pago TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE empleados ADD COLUMN IF NOT EXISTS tipo_operacion TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE empleados ADD COLUMN IF NOT EXISTS licencia_dias_alerta INTEGER DEFAULT 30`).catch(() => {})
+  // Flota y maquinaria: actividad para la que está destinada la unidad
+  await pool.query(`ALTER TABLE flota_vehiculos ADD COLUMN IF NOT EXISTS actividad TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE maquinaria ADD COLUMN IF NOT EXISTS actividad TEXT`).catch(() => {})
+  // Documentos: anticipación de la alerta configurable por documento
+  await pool.query(`ALTER TABLE documentos ADD COLUMN IF NOT EXISTS dias_alerta INTEGER DEFAULT 30`).catch(() => {})
+  // Historial de kilometraje (auditoría de incrementos automáticos)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS historial_kilometraje (
+      id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_vehiculo   BIGINT NOT NULL REFERENCES flota_vehiculos(id),
+      id_op         BIGINT REFERENCES op_encabezado(id),
+      km_anterior   INTEGER NOT NULL DEFAULT 0,
+      km_nuevo      INTEGER NOT NULL DEFAULT 0,
+      distancia     REAL DEFAULT 0,
+      motivo        TEXT DEFAULT '',
+      fecha         TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_histkm_vehiculo ON historial_kilometraje(id_vehiculo)`)
+
+  // ─────────────────────────────────────────────────────────────────
   // SEEDS DE CONFIGURACIÓN
   // ─────────────────────────────────────────────────────────────────
   for (const [k, v] of [
