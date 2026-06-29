@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 // Sub-query reutilizable — último movimiento por máquina
@@ -79,21 +78,22 @@ const MaquinariaModel = {
             km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service } = datos
     if (await this.patenteEnUso(patente)) throw new Error(`Ya existe una máquina con la patente ${patente}.`)
     if (numero_interno && await this.numeroInternoEnUso(numero_interno)) throw new Error(`Ya existe una máquina con el número interno ${numero_interno}.`)
-    const id = crypto.randomUUID()
-    await transaction(async (q) => {
-      await q(`
-        INSERT INTO maquinaria (id, nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
+    return await transaction(async (q) => {
+      const { rows } = await q(`
+        INSERT INTO maquinaria (nombre, tipo, patente, marca, modelo, anio, estado_general, estado_operativo,
           km_actuales, horas_uso, numero_interno, observaciones, ultimo_service, proximo_service)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [id, nombre, tipo || 'bobcat', patente || null, marca || null, modelo || null,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [nombre, tipo || 'bobcat', patente || null, marca || null, modelo || null,
           anio ? parseInt(anio) : null, estado_general || 'operativo', estado_operativo || 'disponible',
           km_actuales ? parseInt(km_actuales) : 0, horas_uso ? parseFloat(horas_uso) : 0,
           numero_interno ? parseInt(numero_interno) : null, observaciones || '',
           ultimo_service || null, proximo_service || null])
-      await q(`INSERT INTO movimiento_maquinaria (id, id_maquinaria, estado_paso, observaciones) VALUES (?, ?, 'en_planta', 'Alta inicial')`,
-        [crypto.randomUUID(), id])
+      const id = rows[0].id
+      await q(`INSERT INTO movimiento_maquinaria (id_maquinaria, estado_paso, observaciones) VALUES (?, 'en_planta', 'Alta inicial')`,
+        [id])
+      return id
     })
-    return id
   },
 
   async actualizar(id, datos) {
@@ -135,9 +135,9 @@ const MaquinariaModel = {
   async registrarMovimiento({ id_maquinaria, id_op_maquinaria, id_operario, id_camion, estado_paso, horas_trabajadas, km_registrados, observaciones, fecha_movimiento }) {
     await query(`
       INSERT INTO movimiento_maquinaria
-        (id, id_maquinaria, id_op_maquinaria, id_operario, id_camion, fecha_movimiento, estado_paso, horas_trabajadas, km_registrados, observaciones)
-      VALUES (?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?, ?, ?)
-    `, [crypto.randomUUID(), id_maquinaria, id_op_maquinaria || null,
+        (id_maquinaria, id_op_maquinaria, id_operario, id_camion, fecha_movimiento, estado_paso, horas_trabajadas, km_registrados, observaciones)
+      VALUES (?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?, ?, ?)
+    `, [id_maquinaria, id_op_maquinaria || null,
         id_operario || null, id_camion || null, fecha_movimiento || null,
         estado_paso, parseFloat(horas_trabajadas) || 0,
         parseInt(km_registrados) || 0, observaciones || ''])
@@ -145,9 +145,9 @@ const MaquinariaModel = {
 
   async registrarMantenimiento({ id_maquinaria, tipo_service, fecha, costo, km_al_service, proximo_fecha, taller, descripcion }) {
     await query(`
-      INSERT INTO mantenimiento_maquinaria (id, id_maquinaria, tipo_service, fecha, costo, km_al_service, proximo_fecha, taller, descripcion)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [crypto.randomUUID(), id_maquinaria, tipo_service || 'preventivo',
+      INSERT INTO mantenimiento_maquinaria (id_maquinaria, tipo_service, fecha, costo, km_al_service, proximo_fecha, taller, descripcion)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id_maquinaria, tipo_service || 'preventivo',
         fecha, parseFloat(costo) || 0, parseInt(km_al_service) || 0,
         proximo_fecha || null, taller || '', descripcion || ''])
     if (proximo_fecha) {

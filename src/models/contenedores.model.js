@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
 const SQL_ULTIMO_MOV = `
@@ -61,16 +60,15 @@ const ContenedoresModel = {
   // El número es autoincrementable: se calcula dentro de la transacción
   // para evitar duplicados ante creaciones simultáneas.
   async crear({ estado_general, fecha_ultima_pintada, observaciones } = {}) {
-    const id = crypto.randomUUID()
-    let numero
-    await transaction(async (q) => {
-      numero = parseInt((await q(`SELECT COALESCE(MAX(numero_contenedor), 0) + 1 AS n FROM contenedores`)).rows[0].n) || 1
-      await q(`INSERT INTO contenedores (id, numero_contenedor, estado_general, fecha_ultima_pintada, observaciones) VALUES (?, ?, ?, ?, ?)`,
-        [id, numero, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || ''])
-      await q(`INSERT INTO movimiento_contenedor (id, id_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_planta', 'Alta inicial')`,
-        [crypto.randomUUID(), id])
+    return await transaction(async (q) => {
+      const numero = parseInt((await q(`SELECT COALESCE(MAX(numero_contenedor), 0) + 1 AS n FROM contenedores`)).rows[0].n) || 1
+      const { rows } = await q(`INSERT INTO contenedores (numero_contenedor, estado_general, fecha_ultima_pintada, observaciones) VALUES (?, ?, ?, ?) RETURNING id`,
+        [numero, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || ''])
+      const id = rows[0].id
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, estado_paso, observaciones) VALUES (?, 'en_planta', 'Alta inicial')`,
+        [id])
+      return { id, numero }
     })
-    return { id, numero }
   },
 
   // El número de contenedor es inmutable (autoincrementable): no se actualiza.
@@ -85,9 +83,9 @@ const ContenedoresModel = {
 
   async registrarMovimiento({ id_contenedor, id_op_contenedor, id_chofer, id_camion, estado_paso, observaciones, fecha_movimiento }) {
     await query(`
-      INSERT INTO movimiento_contenedor (id, id_contenedor, id_op_contenedor, id_chofer, id_camion, fecha_movimiento, estado_paso, observaciones)
-      VALUES (?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?)
-    `, [crypto.randomUUID(), id_contenedor, id_op_contenedor || null,
+      INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, id_chofer, id_camion, fecha_movimiento, estado_paso, observaciones)
+      VALUES (?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?)
+    `, [id_contenedor, id_op_contenedor || null,
         id_chofer || null, id_camion || null, fecha_movimiento || null,
         estado_paso, observaciones || ''])
   },
