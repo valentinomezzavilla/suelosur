@@ -360,7 +360,7 @@ const VentasController = {
           `SELECT id FROM empleados WHERE id_usuario = ? AND activo = 1`,
           [req.session.user.id]
         )).rows[0]
-        if (!emp || op.id_chofer !== emp.id) {
+        if (!emp || Number(op.id_chofer) !== Number(emp.id)) {
           req.flash('error', 'No tenés permiso para ver este remito.')
           return res.redirect('/hoja-de-ruta')
         }

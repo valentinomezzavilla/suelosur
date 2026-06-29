@@ -12,7 +12,7 @@ async function choferTieneAcceso(req, opId) {
   const emp = (await query(`SELECT id FROM empleados WHERE id_usuario = ? AND activo = 1`, [req.session.user.id])).rows[0]
   if (!emp) return false
   const op = (await query(`SELECT id_chofer FROM op_encabezado WHERE id = ?`, [opId])).rows[0]
-  return op && op.id_chofer === emp.id
+  return op && Number(op.id_chofer) === Number(emp.id)
 }
 
 const RemitosController = {

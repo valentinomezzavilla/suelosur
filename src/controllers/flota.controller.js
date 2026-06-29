@@ -89,7 +89,7 @@ const FlotaController = {
         historialEstados: await FlotaModel.historialEstados(vehiculo.id),
         asignacionesRecurso: await AsignacionesModel.historialRecurso('camion', vehiculo.id),
         auditoria: await historial(ENTIDAD, vehiculo.id),
-        alertas: (await AlertasModel.listar({ modulo: 'flota' })).filter(a => a.entidad_id === vehiculo.id),
+        alertas: (await AlertasModel.listar({ modulo: 'flota' })).filter(a => Number(a.entidad_id) === Number(vehiculo.id)),
         periodoLabel: etiquetaPeriodo(periodo),
         filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
       })

@@ -1,14 +1,13 @@
 'use strict'
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 async function registrarAuditoria({ entidad_tipo, entidad_id, accion, usuario, detalle } = {}) {
   try {
     const det = detalle == null ? '' : (typeof detalle === 'string' ? detalle : JSON.stringify(detalle))
     await query(`
-      INSERT INTO auditoria (id, entidad_tipo, entidad_id, accion, id_usuario, detalle)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `, [crypto.randomUUID(), entidad_tipo, String(entidad_id), accion, usuario || null, det])
+      INSERT INTO auditoria (entidad_tipo, entidad_id, accion, id_usuario, detalle)
+      VALUES (?, ?, ?, ?, ?)
+    `, [entidad_tipo, entidad_id, accion, usuario || null, det])
   } catch (err) {
     console.error('auditoria:', err.message)
   }

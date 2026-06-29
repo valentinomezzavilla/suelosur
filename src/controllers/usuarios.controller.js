@@ -119,7 +119,7 @@ const UsuariosController = {
   },
   async toggleActivo(req, res) {
     try {
-      if (req.params.id === req.session.user.id) { req.flash('error', 'No podés desactivar tu propia cuenta.'); return res.redirect('/usuarios') }
+      if (Number(req.params.id) === Number(req.session.user.id)) { req.flash('error', 'No podés desactivar tu propia cuenta.'); return res.redirect('/usuarios') }
       await UsuariosModel.toggleActivo(req.params.id)
       req.flash('success', 'Estado del usuario actualizado.')
     } catch (err) {

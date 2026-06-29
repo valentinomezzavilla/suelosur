@@ -1,5 +1,4 @@
 'use strict'
-const crypto = require('crypto')
 const { query } = require('../config/db')
 
 async function getConfig() {
@@ -11,9 +10,9 @@ async function getConfig() {
 
 async function setConfig(clave, valor) {
   await query(`
-    INSERT INTO config_notificaciones (id, clave, valor) VALUES (?, ?, ?)
+    INSERT INTO config_notificaciones (clave, valor) VALUES (?, ?)
     ON CONFLICT (clave) DO UPDATE SET valor = EXCLUDED.valor
-  `, [crypto.randomUUID(), clave, String(valor)])
+  `, [clave, String(valor)])
 }
 
 async function emailActivo() {
