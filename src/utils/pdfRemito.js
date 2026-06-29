@@ -17,14 +17,8 @@ const TINTA = B.TINTA
 
 const money = B.money
 
-function generarRemitoPDF(res, r) {
-  const doc = new PDFDocument({ size: 'A4', margin: 48 })
-  const filename = `remito-${r.nro_remito ? '0001-' + String(r.nro_remito).padStart(8, '0') : 'OP-' + String(r.nro_op).padStart(4, '0')}.pdf`
-
-  res.setHeader('Content-Type', 'application/pdf')
-  res.setHeader('Content-Disposition', `inline; filename="${filename}"`)
-  doc.pipe(res)
-
+// Dibuja el contenido del remito sobre un documento pdfkit ya creado.
+function construirRemito(doc, r) {
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
@@ -141,8 +135,33 @@ function generarRemitoPDF(res, r) {
   doc.fillColor(GRIS).fontSize(8).font('Helvetica')
      .text(labelCliente, left, yFirma + 6, { width: wFirma, align: 'center' })
      .text('Firma Suelosur', right - wFirma, yFirma + 6, { width: wFirma, align: 'center' })
+}
 
+function nombreRemito(r) {
+  return r.nro_remito ? '0001-' + String(r.nro_remito).padStart(8, '0') : 'OP-' + String(r.nro_op).padStart(4, '0')
+}
+
+// Envía el remito al response (ver/descargar en el navegador)
+function generarRemitoPDF(res, r) {
+  const doc = new PDFDocument({ size: 'A4', margin: 48 })
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', `inline; filename="remito-${nombreRemito(r)}.pdf"`)
+  doc.pipe(res)
+  construirRemito(doc, r)
   doc.end()
 }
 
-module.exports = { generarRemitoPDF }
+// Genera el remito como Buffer (para archivarlo en Storage)
+function generarRemitoPDFBuffer(r) {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ size: 'A4', margin: 48 })
+    const chunks = []
+    doc.on('data', (c) => chunks.push(c))
+    doc.on('end', () => resolve(Buffer.concat(chunks)))
+    doc.on('error', reject)
+    construirRemito(doc, r)
+    doc.end()
+  })
+}
+
+module.exports = { generarRemitoPDF, generarRemitoPDFBuffer }

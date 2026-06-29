@@ -190,6 +190,8 @@ async function initDB() {
   // Migración: firma digital del cliente al recibir la entrega
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_cliente TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_aclaracion TEXT`).catch(() => {})
+  // Migración: PDF del remito firmado archivado en Storage
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS archivo_remito_pdf TEXT`).catch(() => {})
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS op_detalle_material (
@@ -968,6 +970,59 @@ async function initDB() {
     `, [empId, proxLegajo, nombre, apellido, u.id])
     console.log(`  ↳ Empleado-chofer creado para usuario "${u.usuario}"`)
   }
+
+  // ─────────────────────────────────────────────────────────────────
+  // VISTAS LEGIBLES — para consultar en Supabase con nombres en vez de UUIDs.
+  // No tocan los datos: son "tablas traducidas" de solo lectura.
+  // ─────────────────────────────────────────────────────────────────
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_stock AS
+    SELECT p.nombre AS producto, p.unidad_medida AS unidad,
+           s.cantidad_actual, s.cant_pendiente_entregar, s.stock_minimo,
+           p.precio_referencia, s.id
+    FROM stock s JOIN productos p ON p.id = s.id_producto
+  `)
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_operaciones AS
+    SELECT op.nro_op, op.fecha_emision, op.tipo_op, op.estado, op.modalidad, op.metodo_pago,
+           COALESCE(c.nombre, 'Particular') AS cliente, c.numero AS nro_cliente,
+           NULLIF(TRIM(COALESCE(e.nombre, '') || ' ' || COALESCE(e.apellido, '')), '') AS chofer,
+           fv.nombre AS camion, u.nombre AS administrativo, op.id
+    FROM op_encabezado op
+    LEFT JOIN clientes c        ON c.id  = op.id_cliente
+    LEFT JOIN empleados e       ON e.id  = op.id_chofer
+    LEFT JOIN flota_vehiculos fv ON fv.id = op.id_camion
+    LEFT JOIN users u           ON u.id  = op.id_administrativo
+  `)
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_detalle_material AS
+    SELECT op.nro_op, p.nombre AS producto, d.cantidad_pedida, p.unidad_medida AS unidad,
+           d.precio_unitario, (d.cantidad_pedida * d.precio_unitario) AS subtotal, d.id
+    FROM op_detalle_material d
+    JOIN op_encabezado op ON op.id = d.id_orden_pedido
+    JOIN productos p      ON p.id  = d.id_producto
+  `)
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_movimientos_contenedor AS
+    SELECT m.fecha_movimiento, cont.numero_contenedor, m.estado_paso,
+           u.nombre AS chofer, fv.nombre AS camion, m.observaciones, m.id
+    FROM movimiento_contenedor m
+    JOIN contenedores cont       ON cont.id = m.id_contenedor
+    LEFT JOIN users u            ON u.id    = m.id_chofer
+    LEFT JOIN flota_vehiculos fv ON fv.id   = m.id_camion
+  `)
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_movimientos_cuenta AS
+    SELECT m.created_at AS fecha, cl.numero AS nro_cliente, cl.nombre AS cliente,
+           m.tipo, m.descripcion, m.monto, m.id
+    FROM movimientos_cuenta m JOIN clientes cl ON cl.id = m.cliente_id
+  `)
+  await pool.query(`
+    CREATE OR REPLACE VIEW v_transacciones AS
+    SELECT t.numero, t.tipo, t.fecha, COALESCE(cl.nombre, t.cliente) AS cliente,
+           t.monto, t.metodo_pago, t.nro_remito, t.descripcion, t.id
+    FROM transacciones t LEFT JOIN clientes cl ON cl.id = t.cliente_id
+  `)
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

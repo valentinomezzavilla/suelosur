@@ -5,6 +5,8 @@ const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
+const RemitosModel = require('../models/remitos.model')
+const { generarRemitoPDFBuffer } = require('../utils/pdfRemito')
 const { nombreArchivo } = require('../middlewares/upload')
 const storage = require('../config/storage')
 
@@ -458,6 +460,20 @@ const HojaRutaController = {
         req.flash('success', 'Contenedor retirado y devuelto a planta. ¡Tarea completada!')
       } else {
         req.flash('error', 'Esta tarea no se puede finalizar en su estado actual.')
+      }
+
+      // Archivar el remito firmado como PDF en Storage (comprobante inmutable
+      // del momento de la entrega). Es secundario: si falla, no rompe la entrega.
+      if (req.body.firma_cliente) {
+        try {
+          const remito = await RemitosModel.obtener(op.id)
+          if (remito) {
+            const buffer = await generarRemitoPDFBuffer(remito)
+            const filename = `remito-firmado-${op.id}.pdf`
+            await storage.guardar(buffer, filename, 'application/pdf')
+            await query(`UPDATE op_encabezado SET archivo_remito_pdf = ? WHERE id = ?`, [filename, op.id])
+          }
+        } catch (e) { console.error('No se pudo archivar el PDF del remito:', e.message) }
       }
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al finalizar la tarea.') }
     res.redirect(back)
