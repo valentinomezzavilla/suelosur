@@ -224,9 +224,9 @@ const HojaRutaController = {
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect('/hoja-de-ruta') }
       const { op, emp } = v
 
-      // Obtener datos completos de la operación
+      // Datos de la operación (encabezado + cliente + camión)
       const opData = (await query(`
-        SELECT op.id, op.nro_op, op.estado, op.domicilio_calle, op.domicilio_altura,
+        SELECT op.id, op.nro_op, op.estado, op.tipo_op, op.domicilio_calle, op.domicilio_altura,
                op.domicilio_lat, op.domicilio_lng, op.observaciones,
                c.nombre AS cliente, c.tel_whatsapp,
                v.nombre AS camion, v.patente
@@ -238,6 +238,25 @@ const HojaRutaController = {
 
       if (!opData) { req.flash('error', 'Operación no encontrada.'); return res.redirect('/hoja-de-ruta') }
 
+      // Resolver el domicilio del destino según el tipo de operación
+      let domicilio = [opData.domicilio_calle, opData.domicilio_altura].filter(Boolean).join(' ').trim()
+      if (opData.tipo_op === 'C') {
+        const oc = (await query(`SELECT domicilio_entrega, zona_entrega FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
+        if (oc?.domicilio_entrega) domicilio = oc.domicilio_entrega
+      }
+
+      // Geocodificar el destino en el backend si aún no tiene coordenadas.
+      // Así la vista SIEMPRE recibe el destino resuelto y la ruta se dibuja.
+      let lat = opData.domicilio_lat
+      let lng = opData.domicilio_lng
+      if ((lat == null || lng == null) && domicilio) {
+        const geo = await HojaRutaController._geocodificar(domicilio)
+        if (geo) {
+          lat = geo.lat; lng = geo.lng
+          await query(`UPDATE op_encabezado SET domicilio_lat = ?, domicilio_lng = ? WHERE id = ?`, [lat, lng, op.id])
+        }
+      }
+
       res.render('pages/viaje_en_curso', {
         titulo: 'Viaje en curso',
         empleado: emp,
@@ -247,14 +266,32 @@ const HojaRutaController = {
           estado: opData.estado,
           cliente: opData.cliente || 'Particular',
           tel: opData.tel_whatsapp,
-          domicilio: [opData.domicilio_calle, opData.domicilio_altura].filter(Boolean).join(' ').trim(),
-          domicilio_lat: opData.domicilio_lat,
-          domicilio_lng: opData.domicilio_lng,
+          domicilio: domicilio || '',
+          domicilio_lat: lat,
+          domicilio_lng: lng,
           observaciones: opData.observaciones,
           camion: [opData.camion, opData.patente].filter(Boolean).join(' · ')
         }
       })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar la vista del viaje.'); res.redirect('/hoja-de-ruta') }
+  },
+
+  // Geocodifica una dirección a {lat, lng} usando Nominatim (OpenStreetMap).
+  // Se ejecuta en el backend para respetar las políticas de uso (User-Agent)
+  // y cachear el resultado en la base de datos.
+  async _geocodificar(texto) {
+    if (!texto) return null
+    try {
+      const q = encodeURIComponent(texto + ', Córdoba, Argentina')
+      const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`
+      const resp = await fetch(url, { headers: { 'User-Agent': 'SuelosurGestion/1.0 (sistema interno de logistica)' } })
+      if (!resp.ok) return null
+      const data = await resp.json()
+      if (Array.isArray(data) && data[0]?.lat && data[0]?.lon) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) }
+      }
+    } catch (e) { console.error('Geocodificación falló:', e.message) }
+    return null
   },
 
   async guardarUbicacion(req, res) {
