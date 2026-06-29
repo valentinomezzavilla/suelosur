@@ -77,6 +77,7 @@
           <td class="text-center">
             <a href="/flota/<%= v.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye',{size:15}) %></a>
             <a href="/flota/<%= v.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit',{size:15}) %></a>
+            <button type="button" class="btn btn-sm btn-outline-secondary" title="Ver ubicación" onclick="verCamionEnMapa('<%= v.id %>', '<%= (v.nombre||'').replace(/'/g,"") %> <%= v.patente||'' %>')"><%- icon('map',{size:15}) %></button>
           </td>
         </tr>
         <% }) %>
@@ -85,3 +86,63 @@
     <% } %>
   </div>
 </div>
+
+<!-- Modal: ubicación del camión (derivada del chofer asignado) -->
+<div class="modal fade" id="camionMapModal" tabindex="-1">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="camionMapTitle">Ubicación del camión</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="height:400px; padding:0; position:relative;">
+        <div id="camionMap" style="width:100%; height:100%;"></div>
+        <div id="camionMapMsg" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:#f8f9fa; text-align:center; padding:1rem;"></div>
+      </div>
+      <div class="modal-footer">
+        <div id="camionMapStatus" class="text-muted small" style="flex:1; text-align:left;"></div>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let camionMap, camionMarker;
+async function verCamionEnMapa(id, nombre) {
+  document.getElementById('camionMapTitle').textContent = 'Ubicación: ' + nombre.trim();
+  const modal = new bootstrap.Modal(document.getElementById('camionMapModal'));
+  modal.show();
+  const mapEl = document.getElementById('camionMap');
+  const msgEl = document.getElementById('camionMapMsg');
+  const statusEl = document.getElementById('camionMapStatus');
+  statusEl.textContent = ''; msgEl.style.display = 'none'; msgEl.style.display = 'none';
+  setTimeout(async () => {
+    if (!camionMap) {
+      camionMap = L.map('camionMap').setView([-31.42, -64.18], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 19 }).addTo(camionMap);
+      camionMarker = L.circleMarker([0,0], { radius: 10, fillColor:'#1a73e8', color:'#fff', weight:2, fillOpacity:0.85 }).addTo(camionMap);
+    }
+    camionMap.invalidateSize();
+    try {
+      const r = await fetch('/flota/' + id + '/ubicacion-actual');
+      const d = await r.json();
+      const showMsg = (txt) => { mapEl.style.visibility='hidden'; msgEl.style.display='flex'; msgEl.innerHTML = txt; };
+      mapEl.style.visibility='visible';
+      if (d.estado === 'ok') {
+        camionMarker.setLatLng([d.lat, d.lng]); camionMap.panTo([d.lat, d.lng]);
+        const f = d.fecha ? new Date(String(d.fecha).replace(' ','T').replace(/Z?$/,'Z')).toLocaleString('es-AR') : '';
+        statusEl.textContent = '📍 Chofer: ' + (d.chofer||'—') + (f ? ' · ' + f : '');
+      } else if (d.estado === 'sin_chofer') {
+        showMsg('🚫 <strong>Sin chofer asignado</strong><br><small class="text-muted">Asigná un chofer al camión para ver su ubicación.</small>');
+        statusEl.textContent = 'Sin chofer asignado';
+      } else {
+        showMsg('📍 <strong>Sin ubicación disponible</strong><br><small class="text-muted">El chofer ' + (d.chofer||'') + ' todavía no reportó su GPS.</small>');
+        statusEl.textContent = 'Sin ubicación disponible';
+      }
+    } catch (e) { document.getElementById('camionMapStatus').textContent = '⚠️ Error al cargar la ubicación'; }
+  }, 250);
+}
+</script>

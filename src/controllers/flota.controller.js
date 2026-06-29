@@ -26,6 +26,13 @@ const serveDoc = (res, archivo) => {
 
 const FlotaController = {
 
+  // Ubicación del camión (derivada del chofer asignado) — JSON para el mapa
+  async ubicacionActual(req, res) {
+    try {
+      res.json(await FlotaModel.ubicacionActual(req.params.id))
+    } catch (err) { console.error(err); res.status(500).json({ error: err.message }) }
+  },
+
   async index(req, res) {
     try {
       const { q, estado, tipo, marca, chofer } = req.query
