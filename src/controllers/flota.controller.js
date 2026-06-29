@@ -94,6 +94,7 @@ const FlotaController = {
         resumenGastos: await GastosModel.resumen(vehiculo.id, { desde: periodo.desde, hasta: periodo.hasta }),
         choferes: await EmpleadosModel.listarChoferes({ soloActivos: true }),
         historialEstados: await FlotaModel.historialEstados(vehiculo.id),
+        historialKm: await FlotaModel.historialKm(vehiculo.id),
         asignacionesRecurso: await AsignacionesModel.historialRecurso('camion', vehiculo.id),
         auditoria: await historial(ENTIDAD, vehiculo.id),
         alertas: (await AlertasModel.listar({ modulo: 'flota' })).filter(a => Number(a.entidad_id) === Number(vehiculo.id)),

@@ -5,6 +5,7 @@ const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
 const RemitosModel = require('../models/remitos.model')
+const FlotaModel = require('../models/flota.model')
 const { generarRemitoPDFBuffer } = require('../utils/pdfRemito')
 const { nombreArchivo } = require('../middlewares/upload')
 const storage = require('../config/storage')
@@ -428,6 +429,11 @@ const HojaRutaController = {
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
         const full = await VentasModel.obtener(op.id)
         await VentasModel.entregar(op.id)
+        // Kilometraje automático del camión (ida + vuelta) según la ruta navegada
+        if (full.id_camion && req.body.distancia_km) {
+          await FlotaModel.sumarKilometraje(full.id_camion, req.body.distancia_km, op.id)
+            .catch(e => console.error('Kilometraje automático:', e.message))
+        }
         await TransaccionesModel.crear({
           tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
           cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,

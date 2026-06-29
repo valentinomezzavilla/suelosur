@@ -60,6 +60,29 @@ const FlotaModel = {
     `, [id])).rows[0]
   },
 
+  // Suma automática de kilometraje al finalizar un viaje (ida + vuelta).
+  // km_nuevo = km_actual + round(2 × distancia). Registra en el historial.
+  async sumarKilometraje(idVehiculo, distanciaKm, idOp = null) {
+    const dist = parseFloat(distanciaKm) || 0
+    if (!idVehiculo || dist <= 0) return null
+    const incremento = Math.round(dist * 2)
+    return await transaction(async (q) => {
+      const v = (await q(`SELECT kilometraje FROM flota_vehiculos WHERE id = ?`, [idVehiculo])).rows[0]
+      if (!v) return null
+      const kmAnterior = parseInt(v.kilometraje) || 0
+      const kmNuevo = kmAnterior + incremento
+      await q(`UPDATE flota_vehiculos SET kilometraje = ? WHERE id = ?`, [kmNuevo, idVehiculo])
+      await q(`INSERT INTO historial_kilometraje (id_vehiculo, id_op, km_anterior, km_nuevo, distancia, motivo)
+               VALUES (?, ?, ?, ?, ?, ?)`,
+        [idVehiculo, idOp || null, kmAnterior, kmNuevo, dist, 'Viaje finalizado (ida + vuelta)'])
+      return { kmAnterior, kmNuevo, incremento }
+    })
+  },
+
+  async historialKm(idVehiculo) {
+    return (await query(`SELECT * FROM historial_kilometraje WHERE id_vehiculo = ? ORDER BY fecha DESC, id DESC LIMIT 50`, [idVehiculo])).rows
+  },
+
   // Ubicación del camión = última posición GPS del chofer asignado.
   // Nunca se carga manual. Devuelve estado: ok / sin_chofer / sin_ubicacion.
   async ubicacionActual(camionId) {
