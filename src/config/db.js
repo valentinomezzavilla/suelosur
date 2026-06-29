@@ -1027,4 +1027,21 @@ async function initDB() {
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 
-module.exports = { pool, query, transaction, initDB }
+// Borra el rastreo GPS de los choferes con más de N días (default 7).
+// Conserva la última semana y evita que la tabla crezca indefinidamente.
+// LEFT(fecha_registro, 10) toma 'YYYY-MM-DD' (funciona con ambos formatos guardados).
+async function limpiarRastreoViejo(dias = 7) {
+  try {
+    const r = await pool.query(
+      `DELETE FROM rastreo_chofer WHERE LEFT(fecha_registro, 10)::date < CURRENT_DATE - $1::int`,
+      [dias]
+    )
+    if (r.rowCount > 0) console.log(`🧹 Rastreo GPS: ${r.rowCount} registro(s) de más de ${dias} días eliminados`)
+    return r.rowCount
+  } catch (e) {
+    console.error('Error al limpiar el rastreo GPS:', e.message)
+    return 0
+  }
+}
+
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo }
