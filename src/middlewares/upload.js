@@ -33,7 +33,16 @@ function makeUploader(dir, prefix) {
   return multer({ storage, limits: { fileSize: 10 * 1024 * 1024 }, fileFilter })
 }
 
-const uploadRemito    = makeUploader(DIR_REMITOS, 'remito')
+// Remitos: subida EN MEMORIA. El buffer luego se persiste vía src/config/storage
+// (Supabase Storage en producción, disco en desarrollo). Documentos siguen en disco.
+const uploadRemito    = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 }, fileFilter })
 const uploadDocumento = makeUploader(DIR_DOCUMENTOS, 'doc')
 
-module.exports = { uploadRemito, uploadDocumento, DIR_REMITOS, DIR_DOCUMENTOS }
+// Genera un nombre de archivo único y seguro conservando la extensión.
+function nombreArchivo(prefix, refId, originalname) {
+  const ext = path.extname(originalname || '').toLowerCase() || ''
+  const base = String(refId || prefix).replace(/[^a-z0-9-]/gi, '')
+  return `${prefix}-${base}-${Date.now()}-${crypto.randomBytes(3).toString('hex')}${ext}`
+}
+
+module.exports = { uploadRemito, uploadDocumento, DIR_REMITOS, DIR_DOCUMENTOS, nombreArchivo }

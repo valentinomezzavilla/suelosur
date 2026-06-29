@@ -1,13 +1,12 @@
 'use strict'
 const crypto = require('crypto')
-const path = require('path')
-const fs   = require('fs')
 const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
-const { DIR_REMITOS } = require('../middlewares/upload')
+const { nombreArchivo } = require('../middlewares/upload')
+const storage = require('../config/storage')
 
 // Empleado vinculado al usuario logueado
 async function empleadoDe(userId) {
@@ -418,9 +417,11 @@ const HojaRutaController = {
             [firma, (req.body.firma_aclaracion || '').trim() || null, op.id])
         }
       }
-      // Guardar archivo del remito firmado si el chofer adjuntó uno (opcional)
+      // Guardar la foto del remito si el chofer adjuntó una (opcional)
       if (req.file) {
-        await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [req.file.filename, op.id])
+        const filename = nombreArchivo('remito', op.id, req.file.originalname)
+        await storage.guardar(req.file.buffer, filename, req.file.mimetype)
+        await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [filename, op.id])
       }
 
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
@@ -474,14 +475,16 @@ const HojaRutaController = {
     return s
   },
 
-  // Servir el archivo del remito firmado (imagen/pdf)
+  // Servir la foto del remito (imagen/pdf) desde el almacenamiento
   async verRemitoFirmado(req, res) {
     try {
       const r = (await query(`SELECT archivo_remito FROM op_encabezado WHERE id = ?`, [req.params.id])).rows[0]
-      if (!r || !r.archivo_remito) { req.flash('error', 'No hay remito firmado adjunto.'); return res.redirect('back') }
-      const file = path.join(DIR_REMITOS, r.archivo_remito)
-      if (!fs.existsSync(file)) { req.flash('error', 'Archivo no encontrado.'); return res.redirect('back') }
-      res.sendFile(file)
+      if (!r || !r.archivo_remito) { req.flash('error', 'No hay foto del remito adjunta.'); return res.redirect('back') }
+      const buf = await storage.leer(r.archivo_remito)
+      if (!buf) { req.flash('error', 'Archivo no encontrado.'); return res.redirect('back') }
+      const ext = (r.archivo_remito.split('.').pop() || '').toLowerCase()
+      res.set('Content-Type', ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg')
+      res.send(buf)
     } catch (err) { console.error(err); res.redirect('back') }
   },
 }

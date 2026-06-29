@@ -11,3 +11,10 @@ services:
         generateValue: true
       - key: DATABASE_URL
         sync: false
+      # Supabase Storage para fotos de remitos (configurar valores en el dashboard de Render)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_BUCKET
+        value: remitos
