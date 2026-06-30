@@ -24,11 +24,11 @@
 
     <% if (editable) { %>
       <hr class="my-3">
-      <form action="/operaciones/<%= opId %>/recursos" method="POST">
+      <form action="/operaciones/<%= opId %>/recursos" method="POST" id="formRecursosOp-<%= opId %>">
         <div class="row g-2 align-items-end">
           <div class="col-md-5">
             <label class="form-label">Camión</label>
-            <select name="id_camion" class="form-select form-select-sm">
+            <select name="id_camion" class="form-select form-select-sm" id="selCamion-<%= opId %>">
               <option value="">— sin asignar —</option>
               <% camiones.forEach(v => { %>
                 <option value="<%= v.id %>" <%= r.id_camion===v.id?'selected':'' %>>
@@ -39,16 +39,28 @@
           </div>
           <div class="col-md-5">
             <label class="form-label">Chofer</label>
-            <select name="id_chofer" class="form-select form-select-sm">
+            <select name="id_chofer" class="form-select form-select-sm" id="selChofer-<%= opId %>">
               <option value="">— sin asignar —</option>
               <% choferes.forEach(c => { %>
-                <option value="<%= c.id %>" <%= r.id_chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %></option>
+                <option value="<%= c.id %>" data-camion="<%= c.camion_id || '' %>" <%= r.id_chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %></option>
               <% }) %>
             </select>
           </div>
           <div class="col-auto"><button class="btn btn-sm btn-naranja">Guardar</button></div>
         </div>
       </form>
+      <script>
+        (function () {
+          var selChofer = document.getElementById('selChofer-<%= opId %>')
+          var selCamion = document.getElementById('selCamion-<%= opId %>')
+          if (!selChofer || !selCamion) return
+          selChofer.addEventListener('change', function () {
+            var opt = selChofer.options[selChofer.selectedIndex]
+            var camionId = opt && opt.getAttribute('data-camion')
+            if (camionId) selCamion.value = camionId
+          })
+        })()
+      </script>
     <% } %>
   </div>
 </div>

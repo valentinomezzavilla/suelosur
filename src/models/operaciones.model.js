@@ -3,6 +3,7 @@
 const { query } = require('../config/db')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { validarAsignacionOperacion } = require('../utils/compatibilidad')
+const AsignacionesModel = require('./asignaciones.model')
 
 const OperacionesModel = {
 
@@ -21,6 +22,11 @@ const OperacionesModel = {
   },
 
   async asignar(opId, { id_chofer, id_camion, usuario }) {
+    // Si se asigna un chofer sin especificar camión, usar el camión que ya tiene asignado.
+    if (id_chofer && !id_camion) {
+      const asign = await AsignacionesModel.recursoActivo(id_chofer, 'camion')
+      if (asign) id_camion = asign.recurso_id
+    }
     // Validar compatibilidad chofer/unidad ↔ tipo de operación
     if (id_chofer) {
       const op = (await query(`SELECT tipo_op, modalidad FROM op_encabezado WHERE id = ?`, [opId])).rows[0]
@@ -40,11 +46,13 @@ const OperacionesModel = {
     })
   },
 
-  // Choferes activos (es_chofer) para asignar
+  // Choferes activos (es_chofer) para asignar, con el camión que tienen asignado (si tienen)
   async choferesDisponibles() {
     return (await query(`
-      SELECT id, nombre, apellido FROM empleados
-      WHERE activo = 1 AND es_chofer = 1 ORDER BY apellido, nombre
+      SELECT e.id, e.nombre, e.apellido, a.recurso_id AS camion_id
+      FROM empleados e
+      LEFT JOIN asignaciones_recurso a ON a.id_empleado = e.id AND a.recurso_tipo = 'camion' AND a.activo = 1
+      WHERE e.activo = 1 AND e.es_chofer = 1 ORDER BY e.apellido, e.nombre
     `)).rows
   },
 
