@@ -48,6 +48,16 @@
                             <input type="text" name="numero" id="numeroViaje" placeholder="123">
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="zonaViaje">Zona</label>
+                        <select name="zona" id="zonaViaje">
+                            <option value="">— Sin zona —</option>
+                            <% (typeof zonas !== 'undefined' ? zonas : []).forEach(z => { %>
+                                <option value="<%= z.nombre %>" data-tarifa="<%= z.tarifa_flete || 0 %>"><%= z.nombre %><% if (z.tarifa_flete > 0) { %> — flete $<%= Number(z.tarifa_flete).toLocaleString('es-AR') %><% } %></option>
+                            <% }) %>
+                        </select>
+                        <p class="form-hint">Al elegir la zona, el precio del flete se completa con su tarifa.</p>
+                    </div>
                     <button type="button" id="btnBuscarDireccionViaje" class="btn-secondary btn-buscar-mapa"><%- icon('mapPin', { size: 15 }) %> Buscar en mapa</button>
                     <p id="msgMapaViaje" class="form-hint">Ingresa calle y numero para buscar.</p>
                     <div id="mapaViaje" style="display:none;margin-top:0.75rem">

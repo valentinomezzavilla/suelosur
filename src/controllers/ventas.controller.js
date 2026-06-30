@@ -139,9 +139,10 @@ const VentasController = {
           AND COALESCE(v.dedicacion, 'ambos') IN ('ambos','ventas')
         ORDER BY v.numero_interno, v.nombre
       `)).rows
+      const zonas = await require('../models/zonas.model').listarActivas()
       res.render('pages/ventas/viaje', {
         titulo: 'Venta con Viaje',
-        productos, viajesHoy, viajesTodos, choferes, camiones,
+        productos, viajesHoy, viajesTodos, choferes, camiones, zonas,
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/ventasViaje.js'],
       })
     } catch (err) {
@@ -181,7 +182,7 @@ const VentasController = {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
         productoId, cantidad, precioProducto, precioFlete, precioTotal,
         metodoPago, descripcion, finalizarAhora,
-        idChofer, idCamion,
+        idChofer, idCamion, zona,
       } = req.body
 
       const cantidadNum = Number(cantidad) || 1
@@ -199,6 +200,7 @@ const VentasController = {
         metodo_pago:         metodoPago || 'efectivo',
         observaciones:       descripcion || '',
         fecha_entrega_planificada: fecha || null,
+        zona:                zona || null,
         domicilio: { calle, altura: numero, sin_numero: !numero },
         detalles: [{
           id_producto:     productoId,

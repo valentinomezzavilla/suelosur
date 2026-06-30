@@ -1,0 +1,25 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('map', { size: 18 }) %> Zonas y tarifas de flete</h4>
+  <a href="/zonas/planificador" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 15 }) %> Planificador por zona</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-header bg-white fw-semibold">Tarifa de flete por zona</div>
+  <div class="card-body">
+    <p class="text-muted small mb-3">Estos valores autocompletan el precio del flete al crear una venta con viaje, según la zona de entrega.</p>
+    <form action="/zonas/tarifas" method="POST">
+      <div class="row g-3">
+        <% zonas.forEach(z => { %>
+          <div class="col-md-6">
+            <label class="form-label">📍 <%= z.nombre %></label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" min="0" step="100" name="tarifa[<%= z.nombre %>]" class="form-control" value="<%= z.tarifa_flete || 0 %>">
+            </div>
+          </div>
+        <% }) %>
+      </div>
+      <button class="btn btn-naranja mt-3">Guardar tarifas</button>
+    </form>
+  </div>
+</div>
