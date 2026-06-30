@@ -726,6 +726,23 @@ async function initDB() {
   await pool.query(`ALTER TABLE maquinaria ADD COLUMN IF NOT EXISTS actividad TEXT`).catch(() => {})
   // Documentos: anticipación de la alerta configurable por documento
   await pool.query(`ALTER TABLE documentos ADD COLUMN IF NOT EXISTS dias_alerta INTEGER DEFAULT 30`).catch(() => {})
+  // Zona del viaje (venta con flete) para tarifa y planificación logística
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS zona TEXT`).catch(() => {})
+  // Catálogo de zonas (con tarifa de flete configurable)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS zonas (
+      id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      nombre       TEXT NOT NULL UNIQUE,
+      tarifa_flete REAL DEFAULT 0,
+      orden        INTEGER DEFAULT 0,
+      activo       INTEGER DEFAULT 1,
+      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  // Seed de zonas estándar (si la tabla está vacía)
+  for (const [nombre, orden] of [['Norte', 1], ['Sur', 2], ['Este', 3], ['Oeste', 4], ['Centro', 5]]) {
+    await pool.query(`INSERT INTO zonas (nombre, orden) VALUES ($1, $2) ON CONFLICT (nombre) DO NOTHING`, [nombre, orden])
+  }
   // Historial de kilometraje (auditoría de incrementos automáticos)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS historial_kilometraje (

@@ -78,6 +78,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     inputFlete?.addEventListener('input', calcularPrecios);
 
+    // Zona → autocompleta el precio del flete con la tarifa de la zona
+    const selectZona = document.getElementById('zonaViaje');
+    selectZona?.addEventListener('change', () => {
+        const opt = selectZona.options[selectZona.selectedIndex];
+        const tarifa = Number(opt?.dataset.tarifa || 0);
+        if (tarifa > 0 && inputFlete) { inputFlete.value = tarifa; calcularPrecios(); }
+    });
+
     // toggle para editar el total manualmente
     checkEditar.addEventListener('change', () => {
         totalInput.style.display = checkEditar.checked ? 'block' : 'none';

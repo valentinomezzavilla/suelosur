@@ -1,0 +1,48 @@
+<%
+  const tipoBadge = { 'Viaje':'badge-en-transito', 'Contenedor (entrega)':'badge-activo', 'Contenedor (retiro)':'badge-alerta', 'Maquinaria':'badge-pendiente' }
+%>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('layers', { size: 18 }) %> Planificador por zona</h4>
+    <small class="text-muted"><%= total %> operación<%= total === 1 ? '' : 'es' %> pendiente<%= total === 1 ? '' : 's' %> de traslado</small>
+  </div>
+  <div class="d-flex gap-2">
+    <button onclick="window.print()" class="btn btn-sm btn-outline-secondary">🖨️ Imprimir</button>
+    <a href="/zonas" class="btn btn-sm btn-outline-secondary">Tarifas</a>
+  </div>
+</div>
+
+<% if (!total) { %>
+  <div class="card shadow-sm"><div class="card-body text-center py-5 text-muted">
+    <div style="font-size:2.5rem">✅</div>
+    <p class="mt-3 mb-0">No hay operaciones pendientes de traslado. Todo al día.</p>
+  </div></div>
+<% } else { %>
+  <p class="text-muted small mb-3">Agrupá los traslados por zona para hacer cada zona en un mismo recorrido y ahorrar viajes.</p>
+  <% zonasOrdenadas.forEach(zona => { const items = porZona[zona] %>
+    <div class="card shadow-sm mb-3">
+      <div class="card-header card-header-orange d-flex justify-content-between align-items-center">
+        <span>📍 Zona <%= zona %></span>
+        <small><%= items.length %> parada<%= items.length === 1 ? '' : 's' %></small>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-hover align-middle mb-0">
+          <thead><tr><th class="col-w-50">#</th><th>Tipo</th><th>OP</th><th>Cliente</th><th>Domicilio</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            <% items.forEach((o, i) => { %>
+            <tr>
+              <td class="text-muted"><%= i + 1 %></td>
+              <td><span class="badge rounded-pill px-3 <%= tipoBadge[o.tipo] || 'badge-pendiente' %>"><%= o.tipo %></span></td>
+              <td class="fw-semibold">OP-<%= String(o.nro_op).padStart(4,'0') %></td>
+              <td><%= o.cliente %><% if (o.tel_whatsapp) { %><small class="text-muted d-block"><%= o.tel_whatsapp %></small><% } %></td>
+              <td><small><%= o.domicilio || 'A coordinar' %></small></td>
+              <td><small class="text-muted"><%= o.estado %></small></td>
+              <td class="text-end"><a href="<%= o.link %>" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  <% }) %>
+<% } %>

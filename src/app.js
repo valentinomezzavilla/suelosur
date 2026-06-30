@@ -84,6 +84,7 @@ app.use('/alertas',       require('./routes/alertas.routes'))
 app.use('/operaciones',   require('./routes/operaciones.routes'))
 app.use('/hoja-de-ruta',  require('./routes/hojaRuta.routes'))
 app.use('/circuitos',     require('./routes/circuitos.routes'))
+app.use('/zonas',         require('./routes/zonas.routes'))
 
 // ── Placeholders (módulos futuros) ───────────────────────────────
 const placeholder = (titulo, icono, sprint) => (req, res) =>
