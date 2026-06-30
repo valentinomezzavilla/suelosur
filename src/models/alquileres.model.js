@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const FlotaModel = require('./flota.model')
 
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
@@ -150,6 +151,7 @@ const AlquileresModel = {
       await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Salida a entregar')`,
         [oc.id_contenedor, oc.id])
     })
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), true)
   },
 
   async entregar(id_op) {
@@ -160,6 +162,7 @@ const AlquileresModel = {
       await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'entregado', 'Entregado en domicilio')`,
         [oc.id_contenedor, oc.id])
     })
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
   },
 
   async registrarRetiro(id_op) {
@@ -167,6 +170,7 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Retirado de domicilio')`,
       [oc.id_contenedor, oc.id])
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), true)
   },
 
   async devolverAPlanta(id_op) {
@@ -174,6 +178,7 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'vaciado', 'Devuelto a planta')`,
       [oc.id_contenedor, oc.id])
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
   },
 
   async anular(id_op) {

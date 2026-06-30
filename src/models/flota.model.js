@@ -60,6 +60,24 @@ const FlotaModel = {
     `, [id])).rows[0]
   },
 
+  // Estado operativo automático según uso. NO toca estados manuales
+  // (en_mantenimiento / fuera_servicio / inactivo): solo alterna
+  // disponible ↔ en_viaje. Si no hay camión, no hace nada.
+  async setEnUso(camionId, enUso) {
+    if (!camionId) return
+    if (enUso) {
+      await query(`UPDATE flota_vehiculos SET estado_operativo = 'en_viaje' WHERE id = ? AND estado_operativo IN ('disponible','activo')`, [camionId])
+    } else {
+      await query(`UPDATE flota_vehiculos SET estado_operativo = 'disponible' WHERE id = ? AND estado_operativo = 'en_viaje'`, [camionId])
+    }
+  },
+
+  // id_camion de una operación (para actualizar su estado por uso)
+  async camionDeOperacion(opId) {
+    const r = (await query(`SELECT id_camion FROM op_encabezado WHERE id = ?`, [opId])).rows[0]
+    return r ? r.id_camion : null
+  },
+
   // Suma automática de kilometraje al finalizar un viaje (ida + vuelta).
   // km_nuevo = km_actual + round(2 × distancia). Registra en el historial.
   async sumarKilometraje(idVehiculo, distanciaKm, idOp = null) {

@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const FlotaModel = require('./flota.model')
 
 const VentasModel = {
 
@@ -216,6 +217,8 @@ const VentasModel = {
 
   async despachar(id) {
     await query(`UPDATE op_encabezado SET estado = 'despachado' WHERE id = ? AND estado = 'pendiente'`, [id])
+    // Camión "en viaje" automáticamente (no toca estados manuales)
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), true)
   },
 
   async entregar(id) {
@@ -232,11 +235,15 @@ const VentasModel = {
         `, [d.cantidad_pedida, d.cantidad_pedida, d.id_producto])
       }
     })
+    // Viaje terminado: el camión vuelve a "disponible" automáticamente
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), false)
   },
 
   async anular(id) {
     const op = (await query(`SELECT estado FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op || op.estado === 'anulado' || op.estado === 'entregado') return
+    // Si se anula, liberar el camión
+    await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), false)
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'anulado' WHERE id = ?`, [id])
       const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [id])).rows
