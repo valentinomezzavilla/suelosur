@@ -118,11 +118,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch(`/ventas/api/chofer-de-camion/${encodeURIComponent(idCamion)}`);
             const data = await resp.json();
             if (data && data.id && selectChofer) {
-                // Solo auto-completar si la opción existe
-                const opt = Array.from(selectChofer.options).find(o => o.value === data.id);
+                // Solo auto-completar si la opción existe (ids vienen como número desde la API)
+                const opt = Array.from(selectChofer.options).find(o => String(o.value) === String(data.id));
                 if (opt) {
                     autoFillInProgress = true;
-                    selectChofer.value = data.id;
+                    selectChofer.value = String(data.id);
                     autoFillInProgress = false;
                     mostrarMsgAsig(`✓ Chofer ${data.nombre} (asignado a este camión)`);
                 }
@@ -138,10 +138,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const resp = await fetch(`/ventas/api/camion-de-chofer/${encodeURIComponent(idChofer)}`);
             const data = await resp.json();
             if (data && data.id && selectCamion) {
-                const opt = Array.from(selectCamion.options).find(o => o.value === data.id);
+                const opt = Array.from(selectCamion.options).find(o => String(o.value) === String(data.id));
                 if (opt) {
                     autoFillInProgress = true;
-                    selectCamion.value = data.id;
+                    selectCamion.value = String(data.id);
                     autoFillInProgress = false;
                     const label = [data.numero_interno ? '#' + data.numero_interno : null, data.patente, data.nombre].filter(Boolean).join(' · ');
                     mostrarMsgAsig(`✓ Camión ${label} (asignado a este chofer)`);
