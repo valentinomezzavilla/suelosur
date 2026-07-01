@@ -136,7 +136,7 @@ const VentasController = {
         FROM flota_vehiculos v
         WHERE v.activo = 1
           AND COALESCE(v.estado_operativo, 'disponible') NOT IN ('en_mantenimiento','fuera_servicio','inactivo')
-          AND COALESCE(v.dedicacion, 'ambos') IN ('ambos','ventas')
+          AND (v.actividad IS NULL OR v.actividad = '' OR v.actividad = 'ventas')
         ORDER BY v.numero_interno, v.nombre
       `)).rows
       const zonas = await require('../models/zonas.model').listarActivas()

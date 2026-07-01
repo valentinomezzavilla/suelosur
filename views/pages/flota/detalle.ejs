@@ -66,8 +66,8 @@
           <%- fila('Marca', vehiculo.marca) %>
           <%- fila('Modelo', vehiculo.modelo) %>
           <%- fila('Tipo de unidad', vehiculo.tipo_unidad) %>
-          <% const dedicLbl = { ambos:'Ventas y contenedores', ventas:'Ventas (material/viajes)', contenedores:'Alquiler de contenedores' } %>
-          <%- fila('Dedicación', dedicLbl[vehiculo.dedicacion] || 'Ventas y contenedores') %>
+          <% const actLbl = { ventas:'Ventas (viajes)', contenedores:'Contenedores', maquinas:'Máquinas' } %>
+          <%- fila('Actividad', actLbl[vehiculo.actividad] || 'Sin definir') %>
         </div>
       </div>
     </div>
