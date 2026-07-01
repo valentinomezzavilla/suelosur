@@ -200,6 +200,7 @@ const VentasController = {
         metodo_pago:         metodoPago || 'efectivo',
         observaciones:       descripcion || '',
         fecha_entrega_planificada: fecha || null,
+        hora_planificada:    hora || null,
         zona:                zona || null,
         domicilio: { calle, altura: numero, sin_numero: !numero },
         detalles: [{
@@ -212,12 +213,16 @@ const VentasController = {
       // Asignar chofer y camión si se seleccionaron
       if (idChofer || idCamion) {
         try {
-          await OperacionesModel.asignar(id_op, {
+          const { advertencias } = await OperacionesModel.asignar(id_op, {
             id_chofer: idChofer || null,
             id_camion: idCamion || null,
             usuario: req.session.user.id,
           })
-        } catch (e) { console.error('asignar chofer/camion:', e) }
+          ;(advertencias || []).forEach(a => req.flash('warning', a))
+        } catch (e) {
+          console.error('asignar chofer/camion:', e)
+          req.flash('warning', e.message || 'No se pudo asignar el chofer/camión.')
+        }
       }
 
       if (esFinalizarAhora) {
@@ -259,7 +264,7 @@ const VentasController = {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
         recursos: await OperacionesModel.obtenerRecursos(op.id),
         choferesDisp: await OperacionesModel.choferesDisponibles(),
-        camionesDisp: await OperacionesModel.camionesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles('ventas'),
         recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',
       })
     } catch (err) {

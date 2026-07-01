@@ -75,7 +75,7 @@ const AlquileresMaquinariaController = {
         alquiler, disponibles,
         recursos: await OperacionesModel.obtenerRecursos(alquiler.id),
         choferesDisp: await OperacionesModel.choferesDisponibles(),
-        camionesDisp: await OperacionesModel.camionesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles('maquinas'),
         recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {

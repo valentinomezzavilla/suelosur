@@ -56,7 +56,7 @@
           <label class="form-label">Tipo de operación habilitada</label>
           <select name="tipo_operacion" class="form-select">
             <option value="">— Sin especializar —</option>
-            <% const _acts = { camion_viajes:'Camión - Viajes (Ventas)', camion_contenedores:'Camión - Alquiler de Contenedores', maquina_deposito:'Máquina - Depósito', maquina_alquiler:'Máquina - Alquiler' };
+            <% const _acts = { ventas:'Ventas (viajes)', contenedores:'Contenedores', maquinas:'Máquinas' };
                Object.entries(_acts).forEach(([v,l]) => { %>
               <option value="<%= v %>" <%= chofer?.tipo_operacion===v?'selected':'' %>><%= l %></option>
             <% }) %>
