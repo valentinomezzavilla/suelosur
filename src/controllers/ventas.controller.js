@@ -260,10 +260,15 @@ const VentasController = {
     try {
       const op = await VentasModel.obtener(req.params.id)
       if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
+      const recursos = await OperacionesModel.obtenerRecursos(op.id)
+      const choferesDisp = await OperacionesModel.choferesDisponibles()
+      if (recursos?.id_chofer && !choferesDisp.some(c => c.id === recursos.id_chofer)) {
+        const extra = await OperacionesModel.obtenerChofer(recursos.id_chofer)
+        if (extra) choferesDisp.push(extra)
+      }
       res.render('pages/ventas/detalle', {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
-        recursos: await OperacionesModel.obtenerRecursos(op.id),
-        choferesDisp: await OperacionesModel.choferesDisponibles(),
+        recursos, choferesDisp,
         camionesDisp: await OperacionesModel.camionesDisponibles('ventas'),
         recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',
       })

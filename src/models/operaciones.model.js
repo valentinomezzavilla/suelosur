@@ -90,6 +90,15 @@ const OperacionesModel = {
     `)).rows
   },
 
+  async obtenerChofer(id) {
+    return (await query(`
+      SELECT e.id, e.nombre, e.apellido, a.recurso_id AS camion_id
+      FROM empleados e
+      LEFT JOIN asignaciones_recurso a ON a.id_empleado = e.id AND a.recurso_tipo = 'camion' AND a.activo = 1
+      WHERE e.id = ?
+    `, [id])).rows[0] || null
+  },
+
   // Camiones operativos para asignar, filtrados por la actividad requerida (ventas/contenedores/maquinas).
   // Un camión con actividad distinta a la requerida NO aparece; los "Sin definir" aparecen siempre.
   async camionesDisponibles(actividad = null) {

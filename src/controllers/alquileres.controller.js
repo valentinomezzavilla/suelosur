@@ -84,11 +84,15 @@ const AlquileresController = {
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
       const { disponibles } = await AlquileresModel.contenedoresDisponibles()
+      const recursos = await OperacionesModel.obtenerRecursos(alquiler.id)
+      const choferesDisp = await OperacionesModel.choferesDisponibles()
+      if (recursos?.id_chofer && !choferesDisp.some(c => c.id === recursos.id_chofer)) {
+        const extra = await OperacionesModel.obtenerChofer(recursos.id_chofer)
+        if (extra) choferesDisp.push(extra)
+      }
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
-        alquiler, disponibles,
-        recursos: await OperacionesModel.obtenerRecursos(alquiler.id),
-        choferesDisp: await OperacionesModel.choferesDisponibles(),
+        alquiler, disponibles, recursos, choferesDisp,
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
       })

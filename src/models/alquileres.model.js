@@ -161,6 +161,8 @@ const AlquileresModel = {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id_op])
       await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'entregado', 'Entregado en domicilio')`,
         [oc.id_contenedor, oc.id])
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', 'Alquiler en curso')`,
+        [oc.id_contenedor, oc.id])
     })
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
   },

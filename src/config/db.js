@@ -15,7 +15,7 @@ types.setTypeParser(20,   (v) => v == null ? null : parseInt(v, 10)) // BIGINT /
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: { rejectUnauthorized: false },
   max: 10,                       // máximo de conexiones simultáneas
   idleTimeoutMillis: 30000,      // cerrar conexiones idle a los 30s
   connectionTimeoutMillis: 10000,// timeout para conectar (10s)
