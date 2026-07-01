@@ -36,7 +36,7 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id } = req.body
+      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
@@ -59,12 +59,14 @@ const AlquileresController = {
           zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, alquiler_actual_id,
+          fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
         })
       } else {
         result = await AlquileresModel.crear({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, observaciones,
+          fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
         })
       }
 
@@ -87,7 +89,7 @@ const AlquileresController = {
         alquiler, disponibles,
         recursos: await OperacionesModel.obtenerRecursos(alquiler.id),
         choferesDisp: await OperacionesModel.choferesDisponibles(),
-        camionesDisp: await OperacionesModel.camionesDisponibles(),
+        camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
       })
     } catch (err) {

@@ -31,8 +31,8 @@
             <select name="id_camion" class="form-select form-select-sm" id="selCamion-<%= opId %>">
               <option value="">— sin asignar —</option>
               <% camiones.forEach(v => { %>
-                <option value="<%= v.id %>" <%= r.id_camion===v.id?'selected':'' %>>
-                  <%= [v.patente, v.nombre, [v.marca,v.modelo].filter(Boolean).join(' ')].filter(Boolean).join(' · ') %> — <%= v.estado_operativo %><%= v.dedicacion && v.dedicacion!=='ambos' ? ' · ' + (dedicLbl[v.dedicacion]||v.dedicacion) : '' %>
+                <option value="<%= v.id %>" data-chofer="<%= v.chofer_id || '' %>" <%= r.id_camion===v.id?'selected':'' %>>
+                  <%= [v.patente, v.nombre, [v.marca,v.modelo].filter(Boolean).join(' ')].filter(Boolean).join(' · ') %> — <%= v.ocupado ? '🔴 Ocupado' : '🟢 Disponible' %>
                 </option>
               <% }) %>
             </select>
@@ -42,22 +42,31 @@
             <select name="id_chofer" class="form-select form-select-sm" id="selChofer-<%= opId %>">
               <option value="">— sin asignar —</option>
               <% choferes.forEach(c => { %>
-                <option value="<%= c.id %>" data-camion="<%= c.camion_id || '' %>" <%= r.id_chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %></option>
+                <option value="<%= c.id %>" data-camion="<%= c.camion_id || '' %>" <%= r.id_chofer===c.id?'selected':'' %>><%= c.nombre %> <%= c.apellido %> — <%= c.ocupado ? '🔴 Ocupado' : '🟢 Disponible' %></option>
               <% }) %>
             </select>
           </div>
           <div class="col-auto"><button class="btn btn-sm btn-naranja">Guardar</button></div>
         </div>
+        <p class="form-text mb-0 mt-1">Al elegir un chofer o un camión, se autocompleta el otro si ya están asignados entre sí.</p>
       </form>
       <script>
         (function () {
           var selChofer = document.getElementById('selChofer-<%= opId %>')
           var selCamion = document.getElementById('selCamion-<%= opId %>')
           if (!selChofer || !selCamion) return
+          var syncing = false
           selChofer.addEventListener('change', function () {
+            if (syncing) return
             var opt = selChofer.options[selChofer.selectedIndex]
             var camionId = opt && opt.getAttribute('data-camion')
-            if (camionId) selCamion.value = camionId
+            if (camionId) { syncing = true; selCamion.value = String(camionId); syncing = false }
+          })
+          selCamion.addEventListener('change', function () {
+            if (syncing) return
+            var opt = selCamion.options[selCamion.selectedIndex]
+            var choferId = opt && opt.getAttribute('data-chofer')
+            if (choferId) { syncing = true; selChofer.value = String(choferId); syncing = false }
           })
         })()
       </script>

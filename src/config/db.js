@@ -728,6 +728,20 @@ async function initDB() {
   await pool.query(`ALTER TABLE documentos ADD COLUMN IF NOT EXISTS dias_alerta INTEGER DEFAULT 30`).catch(() => {})
   // Zona del viaje (venta con flete) para tarifa y planificación logística
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS zona TEXT`).catch(() => {})
+  // Hora planificada de la operación (para detectar solapamientos de camión/chofer)
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS hora_planificada TEXT`).catch(() => {})
+  // Unificación de actividades a 3 categorías: ventas / contenedores / maquinas
+  const _mapAct = `CASE actividad
+      WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'
+      WHEN 'maquina_deposito' THEN 'maquinas' WHEN 'maquina_alquiler' THEN 'maquinas'
+      ELSE actividad END`
+  await pool.query(`UPDATE flota_vehiculos SET actividad = ${_mapAct} WHERE actividad IN ('camion_viajes','camion_contenedores','maquina_deposito','maquina_alquiler')`).catch(() => {})
+  await pool.query(`UPDATE maquinaria SET actividad = ${_mapAct} WHERE actividad IN ('camion_viajes','camion_contenedores','maquina_deposito','maquina_alquiler')`).catch(() => {})
+  await pool.query(`UPDATE empleados SET tipo_operacion = CASE tipo_operacion
+      WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'
+      WHEN 'maquina_deposito' THEN 'maquinas' WHEN 'maquina_alquiler' THEN 'maquinas'
+      ELSE tipo_operacion END
+    WHERE tipo_operacion IN ('camion_viajes','camion_contenedores','maquina_deposito','maquina_alquiler')`).catch(() => {})
   // Catálogo de zonas (con tarifa de flete configurable)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS zonas (

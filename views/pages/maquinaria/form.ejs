@@ -67,9 +67,10 @@
           <label class="form-label">Actividad de la máquina</label>
           <select name="actividad" class="form-select">
             <option value="">— Sin definir —</option>
-            <% const _actsMaq = { maquina_deposito:'Máquina - Depósito', maquina_alquiler:'Máquina - Alquiler' };
+            <% const _actsMaq = { ventas:'Ventas (viajes)', contenedores:'Contenedores', maquinas:'Máquinas' };
+               const _actSel = maquina?.actividad || 'maquinas';
                Object.entries(_actsMaq).forEach(([v,l]) => { %>
-              <option value="<%= v %>" <%= maquina?.actividad===v?'selected':'' %>><%= l %></option>
+              <option value="<%= v %>" <%= _actSel===v?'selected':'' %>><%= l %></option>
             <% }) %>
           </select>
         </div>

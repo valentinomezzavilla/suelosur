@@ -38,7 +38,7 @@
           <label class="form-label">Actividad del camión</label>
           <select name="actividad" class="form-select">
             <option value="">— Sin definir —</option>
-            <% const _actsCam = { camion_viajes:'Camión - Viajes (Ventas)', camion_contenedores:'Camión - Alquiler de Contenedores' };
+            <% const _actsCam = { ventas:'Ventas (viajes)', contenedores:'Contenedores', maquinas:'Máquinas' };
                Object.entries(_actsCam).forEach(([v,l]) => { %>
               <option value="<%= v %>" <%= vehiculo?.actividad===v?'selected':'' %>><%= l %></option>
             <% }) %>

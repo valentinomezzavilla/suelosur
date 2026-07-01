@@ -109,7 +109,7 @@ const VentasModel = {
   },
 
   async crear({ id_cliente, cliente_nombre_libre, id_administrativo, tipo_op = 'M', observaciones = '',
-          detalles, fecha_entrega_planificada, modalidad, domicilio, metodo_pago, zona }) {
+          detalles, fecha_entrega_planificada, hora_planificada, modalidad, domicilio, metodo_pago, zona }) {
     // Crear cliente automáticamente si viene como texto libre
     if (!id_cliente && cliente_nombre_libre) {
       const cli = await query(`INSERT INTO clientes (nombre, activo) VALUES (?, 1) RETURNING id`,
@@ -124,12 +124,12 @@ const VentasModel = {
       const { rows } = await q(`
         INSERT INTO op_encabezado (
           id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado,
-          observaciones, fecha_entrega_planificada, modalidad, metodo_pago,
+          observaciones, fecha_entrega_planificada, hora_planificada, modalidad, metodo_pago,
           domicilio_calle, domicilio_altura, domicilio_sin_numero, zona
-        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [id_cliente, id_administrativo, tipo_op, nro, nro_rem,
-          observaciones, fecha_entrega_planificada || null, modalidad || null,
+          observaciones, fecha_entrega_planificada || null, hora_planificada || null, modalidad || null,
           metodo_pago || null, dom.calle || null,
           dom.altura ? parseInt(dom.altura) : null,
           dom.sin_numero ? 1 : 0, zona || null])
