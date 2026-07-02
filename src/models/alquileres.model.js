@@ -26,8 +26,8 @@ const AlquileresModel = {
              cont.numero_contenedor,
              um.estado_paso AS contenedor_estado, um.fecha_movimiento AS fecha_ultimo_mov,
              ma.fecha_alquiler AS fecha_entrega_real,
-             (LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) AS fecha_fin_estimada,
-             ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             (COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) AS fecha_fin_estimada,
+             ((COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
@@ -106,9 +106,12 @@ const AlquileresModel = {
       op.diasEnDomicilio = movEntrega
         ? Math.floor((Date.now() - new Date(movEntrega.fecha_movimiento).getTime()) / 86400000)
         : null
-      // Fecha exacta de fin de alquiler = fecha de entrega + plazo (días)
-      if (movEntrega) {
-        const ini = new Date(String(movEntrega.fecha_movimiento).slice(0, 10) + 'T00:00:00')
+      // Fin de alquiler = fecha de inicio (la que se edita) + plazo (días).
+      // Base: fecha_entrega_planificada (inicio editable); si falta, la entrega real.
+      const baseInicio = (op.fecha_entrega_planificada && String(op.fecha_entrega_planificada).slice(0, 10))
+        || (movEntrega && String(movEntrega.fecha_movimiento).slice(0, 10))
+      if (baseInicio) {
+        const ini = new Date(baseInicio + 'T00:00:00')
         ini.setDate(ini.getDate() + (op.detalle.plazo_alquiler || 0))
         op.fechaFinAlquiler = ini.toISOString().slice(0, 10)
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
