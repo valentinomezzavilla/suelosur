@@ -1,6 +1,11 @@
 (function() {
     if (!document.getElementById('modal-transaccion')) return;
 
+    const PAGO_LABEL = {
+        efectivo: 'Efectivo', transferencia: 'Transferencia',
+        cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente',
+    };
+
     document.querySelectorAll('.btn-ver-transaccion').forEach(btn => {
         btn.addEventListener('click', () => {
             document.getElementById('modal-t-id').textContent = '#' + btn.dataset.id;
@@ -9,7 +14,8 @@
             document.getElementById('modal-t-descripcion').textContent = btn.dataset.descripcion;
             document.getElementById('modal-t-fecha').textContent = btn.dataset.fecha;
             document.getElementById('modal-t-monto').textContent = '$' + Number(btn.dataset.monto).toLocaleString('es-AR');
-            document.getElementById('modal-t-metodo-pago').textContent = btn.dataset.metodoPago;
+            const mp = btn.dataset.metodoPago;
+            document.getElementById('modal-t-metodo-pago').textContent = PAGO_LABEL[mp] || (mp ? mp : '—');
             document.getElementById('modal-transaccion').style.display = 'flex';
             document.body.style.overflow = 'hidden';
         });
