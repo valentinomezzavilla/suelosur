@@ -9,6 +9,7 @@ const AlquileresController = {
 
   async index(req, res) {
     try {
+      await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const grupos = await AlquileresModel.listarPorEstado()
       res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos })
     } catch (err) {
@@ -86,6 +87,7 @@ const AlquileresController = {
 
   async detalle(req, res) {
     try {
+      await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
       const { disponibles } = await AlquileresModel.contenedoresDisponibles()

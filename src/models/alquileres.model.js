@@ -9,15 +9,34 @@ const SQL_ULTIMO_MOV = `
   ) m WHERE m.rn = 1
 `
 
+// Movimiento 'en_alquiler' más antiguo por contenedor (= inicio real del período)
+const SQL_MOV_ALQUILER = `
+  SELECT DISTINCT ON (id_contenedor) id_contenedor, fecha_movimiento AS fecha_alquiler
+  FROM movimiento_contenedor WHERE estado_paso = 'en_alquiler'
+  ORDER BY id_contenedor, fecha_movimiento ASC
+`
+
 const AlquileresModel = {
+
+  // Auto-vence alquileres: los que llegaron a su fecha fin y siguen 'en_alquiler'
+  // pasan automáticamente a 'pendiente_retiro'. Idempotente (una vez marcado, ya no
+  // vuelve a matchear). Se llama al abrir el listado/detalle.
+  async autoVencerAlquileres() {
+    await query(`
+      INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones)
+      SELECT lm.id_contenedor, lm.id_op_contenedor, 'pendiente_retiro', 'Vencimiento automático del alquiler'
+      FROM (${SQL_ULTIMO_MOV}) lm
+      JOIN op_detalle_contenedor oc ON oc.id = lm.id_op_contenedor
+      JOIN op_encabezado op ON op.id = oc.id_orden_pedido
+      JOIN (${SQL_MOV_ALQUILER}) ma ON ma.id_contenedor = lm.id_contenedor
+      WHERE op.tipo_op = 'C' AND op.estado = 'entregado'
+        AND lm.estado_paso = 'en_alquiler'
+        AND (COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) <= CURRENT_DATE
+    `)
+  },
 
   async listarPorEstado() {
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
-    const SQL_MOV_ALQUILER = `
-      SELECT DISTINCT ON (id_contenedor) id_contenedor, fecha_movimiento AS fecha_alquiler
-      FROM movimiento_contenedor WHERE estado_paso = 'en_alquiler'
-      ORDER BY id_contenedor, fecha_movimiento ASC
-    `
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              cli.nombre AS cliente_nombre, cli.tel_whatsapp,
