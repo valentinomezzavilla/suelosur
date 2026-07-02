@@ -145,15 +145,25 @@ const AlquileresModel = {
     return op
   },
 
+  // ¿El contenedor está ocupado? (último movimiento no 'disponible' O hay una op activa sin cerrar)
+  async contenedorOcupado(id_contenedor) {
+    if (!id_contenedor) return false
+    const r = (await query(`
+      SELECT 1 FROM (
+        SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
+        FROM movimiento_contenedor ORDER BY id_contenedor, fecha_movimiento DESC, id DESC
+      ) lm WHERE lm.id_contenedor = ? AND lm.estado_paso NOT IN ('disponible','vuelta_a_planta')
+      UNION
+      SELECT 1 FROM op_detalle_contenedor oc
+      JOIN op_encabezado op ON op.id = oc.id_orden_pedido
+      WHERE oc.id_contenedor = ? AND op.tipo_op = 'C' AND op.estado IN ('pendiente','despachado')
+    `, [id_contenedor, id_contenedor])).rows[0]
+    return !!r
+  },
+
   async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion }) {
-    if (id_contenedor) {
-      const noDisponible = (await query(`
-        SELECT 1 FROM (
-          SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
-          FROM movimiento_contenedor ORDER BY id_contenedor, fecha_movimiento DESC, id DESC
-        ) lm WHERE lm.id_contenedor = ? AND lm.estado_paso != 'disponible'
-      `, [id_contenedor])).rows[0]
-      if (noDisponible) throw new Error('El contenedor seleccionado ya no está disponible.')
+    if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
+      throw new Error('Ese contenedor ya está alquilado o reservado en otra operación. Para programar el próximo alquiler, usá "próximos a finalizar".')
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
