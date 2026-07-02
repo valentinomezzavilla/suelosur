@@ -296,7 +296,7 @@ const AlquileresModel = {
              op.id AS alquiler_actual_id, op.nro_op,
              cli.nombre AS cliente_actual,
              oc.plazo_alquiler,
-             (LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) AS fecha_liberacion,
+             to_char(LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler, 'YYYY-MM-DD') AS fecha_liberacion,
              ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
       FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id

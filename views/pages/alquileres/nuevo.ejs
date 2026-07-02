@@ -41,7 +41,7 @@
           data-alquiler-actual="<%= c.alquiler_actual_id %>">
           <div class="alquiler-card__numero">#<%= c.numero_contenedor %>
           </div>
-          <span class="badge badge--pendiente">Libera: <%= c.fecha_liberacion %></span>
+          <span class="badge badge--pendiente">Libera: <%= formatFecha(c.fecha_liberacion) %></span>
           <small class="text-muted">
             <%= c.cliente_actual %>
           </small>
