@@ -40,12 +40,26 @@ const AlquileresModel = {
     const todosEnCurso = (await query(`${baseSelect}
       AND op.estado = 'entregado' AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
       ORDER BY fecha_fin_estimada ASC`)).rows
-    // "Por finalizar" son los que vencen hoy/mañana (o ya están en pendiente_retiro);
-    // el resto queda en "actuales". Un alquiler aparece en UNA sola tabla.
+    // "Por finalizar" son los que vencen hoy/mañana (o ya están en pendiente_retiro).
     const esPorFinalizar = a => a.contenedor_estado === 'pendiente_retiro'
       || (a.dias_restantes != null && a.dias_restantes <= 1)
-    const porFinalizar = todosEnCurso.filter(esPorFinalizar)
-    const actuales     = todosEnCurso.filter(a => !esPorFinalizar(a))
+    // Un mismo contenedor físico solo puede estar en un alquiler a la vez: si hay
+    // varias ops activas para el mismo contenedor, dejamos una sola (la más urgente),
+    // priorizando "por finalizar". Así no se duplica ni aparece en dos tablas.
+    const masUrgente = (a, b) => {
+      const pa = esPorFinalizar(a), pb = esPorFinalizar(b)
+      if (pa !== pb) return pa // por finalizar gana
+      return (a.dias_restantes ?? 9999) < (b.dias_restantes ?? 9999)
+    }
+    const porContenedor = new Map()
+    for (const a of todosEnCurso) {
+      const key = a.id_contenedor != null ? `c${a.id_contenedor}` : `op${a.id}`
+      const prev = porContenedor.get(key)
+      if (!prev || masUrgente(a, prev)) porContenedor.set(key, a)
+    }
+    const unicos = [...porContenedor.values()]
+    const porFinalizar = unicos.filter(esPorFinalizar)
+    const actuales     = unicos.filter(a => !esPorFinalizar(a))
     const programados  = (await query(`${baseSelect}
       AND op.estado IN ('pendiente','despachado')
       ORDER BY op.fecha_entrega_planificada ASC NULLS LAST, op.created_at ASC`)).rows
