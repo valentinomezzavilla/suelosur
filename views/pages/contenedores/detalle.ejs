@@ -1,19 +1,19 @@
 <%
   const labelEstado = {
-    en_planta:   'En planta',
-    vaciado:     'Vaciado',
-    entregado:   'Entregado',
-    en_alquiler: 'En alquiler',
-    a_retirar:   'A retirar',
-    en_transito: 'En tránsito',
+    disponible:        'Disponible',
+    pendiente_despacho:'Pendiente despacho',
+    despachado:        'En camino',
+    en_alquiler:       'En alquiler',
+    pendiente_retiro:  'Pendiente retiro',
+    vuelta_a_planta:   'Vuelta a planta',
   }
   const badgeEstado = {
-    en_planta:   'badge-activo',
-    vaciado:     'badge-pendiente',
-    entregado:   'badge-en-transito',
-    en_alquiler: 'badge-en-transito',
-    a_retirar:   'badge-alerta',
-    en_transito: 'badge-pendiente',
+    disponible:        'badge-activo',
+    pendiente_despacho:'badge-pendiente',
+    despachado:        'badge-en-transito',
+    en_alquiler:       'badge-en-transito',
+    pendiente_retiro:  'badge-alerta',
+    vuelta_a_planta:   'badge-pendiente',
   }
   const ultimo = contenedor.movimientos[0]
 %>

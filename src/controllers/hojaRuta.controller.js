@@ -21,9 +21,9 @@ async function estadoCont(id_contenedor) {
   return (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1`, [id_contenedor])).rows[0]?.estado_paso || null
 }
 
-// Fecha de la entrega (primer movimiento 'entregado') de un contenedor en una OP
+// Fecha de inicio del alquiler (primer movimiento 'en_alquiler') de un contenedor en una OP
 async function fechaEntrega(id_contenedor, id_oc) {
-  const m = (await query(`SELECT fecha_movimiento FROM movimiento_contenedor WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'entregado' ORDER BY fecha_movimiento ASC LIMIT 1`, [id_contenedor, id_oc])).rows[0]
+  const m = (await query(`SELECT fecha_movimiento FROM movimiento_contenedor WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'en_alquiler' ORDER BY fecha_movimiento ASC LIMIT 1`, [id_contenedor, id_oc])).rows[0]
   return m ? String(m.fecha_movimiento).slice(0, 10) : null
 }
 
@@ -34,14 +34,14 @@ function diasRestantes(finISO) {
   return Math.round((fin - hoy) / 86400000)
 }
 
-// ¿El chofer tiene una tarea en curso? (entrega despachada o retiro en tránsito)
+// ¿El chofer tiene una tarea en curso? (entrega despachada o retiro en vuelta_a_planta)
 async function tieneEnCurso(empId) {
   const desp = (await query(`SELECT 1 FROM op_encabezado WHERE id_chofer = ? AND estado = 'despachado' LIMIT 1`, [empId])).rows[0]
   if (desp) return true
   const ret = (await query(`
     SELECT 1 FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
     WHERE op.id_chofer = ? AND op.tipo_op = 'C' AND op.estado = 'entregado'
-      AND (SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = oc.id_contenedor ORDER BY fecha_movimiento DESC, id DESC LIMIT 1) = 'en_transito'
+      AND (SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = oc.id_contenedor ORDER BY fecha_movimiento DESC, id DESC LIMIT 1) = 'vuelta_a_planta'
     LIMIT 1`, [empId])).rows[0]
   return !!ret
 }
@@ -118,16 +118,16 @@ async function construirTareas(empId) {
         fase: 'en_curso', detalleFase: 'En camino', accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
     } else if (o.estado === 'entregado') {
       const ec = await estadoCont(o.id_contenedor)
-      if (ec === 'en_transito') {
+      if (ec === 'vuelta_a_planta') {
         tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
           fase: 'en_curso', detalleFase: 'Volviendo a planta', accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
-      } else if (['entregado', 'en_alquiler'].includes(ec)) {
+      } else if (['en_alquiler', 'pendiente_retiro'].includes(ec)) {
         const fe = await fechaEntrega(o.id_contenedor, o.id_oc)
         const fin = (() => { if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
         const dr = diasRestantes(fin)
-        if (dr != null && dr <= 0) {
+        if (ec === 'pendiente_retiro' || (dr != null && dr <= 0)) {
           tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
-            fase: 'por_iniciar', detalleFase: 'Plazo vencido', fin, diasRestantes: dr, accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
+            fase: 'por_iniciar', detalleFase: ec === 'pendiente_retiro' ? 'Pendiente retiro' : 'Plazo vencido', fin, diasRestantes: dr, accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
         } else {
           tareas.push({ ...base, tipo: 'contenedor_alquiler', icono: '⏳', titulo: 'Contenedor en alquiler',
             fase: 'en_servicio', detalleFase: 'En domicilio', fin, diasRestantes: dr })
@@ -209,7 +209,7 @@ const HojaRutaController = {
         if (!oc?.id_contenedor) { req.flash('error', 'El contenedor aún no está asignado. Avisá a la oficina.'); return res.redirect(back) }
         await AlquileresModel.despachar(op.id)
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
-        await AlquileresModel.registrarRetiro(op.id)
+        await AlquileresModel.iniciarRetiro(op.id)
       } else {
         req.flash('error', 'Esta tarea no se puede iniciar en su estado actual.')
         return res.redirect(back)
@@ -458,7 +458,7 @@ const HojaRutaController = {
         req.flash('success', 'Contenedor entregado. Comenzó el período de alquiler.')
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
         const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
-        if (await estadoCont(oc?.id_contenedor) !== 'en_transito') {
+        if (await estadoCont(oc?.id_contenedor) !== 'vuelta_a_planta') {
           req.flash('error', 'Primero tenés que iniciar el retiro.'); return res.redirect(back)
         }
         await AlquileresModel.devolverAPlanta(op.id)

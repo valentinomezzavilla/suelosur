@@ -6,16 +6,16 @@
     anulado:    'badge-alerta',
   }
   const labelCont = {
-    en_planta:   'En planta',
-    vaciado:     'Vaciado',
-    entregado:   'En domicilio',
-    en_alquiler: 'En alquiler',
-    a_retirar:   'A retirar',
-    en_transito: 'En tránsito',
+    disponible:        'Disponible',
+    pendiente_despacho:'Pendiente despacho',
+    despachado:        'En camino',
+    en_alquiler:       'En alquiler',
+    pendiente_retiro:  'Pendiente retiro',
+    vuelta_a_planta:   'Volviendo a planta',
   }
   const iconCont = {
-    en_planta: '🏠', vaciado: '🧹', entregado: '📦',
-    en_alquiler: '⏳', a_retirar: '⚠️', en_transito: '🚛',
+    disponible: '🏠', pendiente_despacho: '📋', despachado: '🚛',
+    en_alquiler: '⏳', pendiente_retiro: '⚠️', vuelta_a_planta: '🔄',
   }
   const estadoCont = alquiler.estadoContenedor?.estado_paso
   const estaAnulado = alquiler.estado === 'anulado'
@@ -112,22 +112,22 @@
           <!-- Acciones según estado -->
           <% if (!estaAnulado) { %>
             <div class="d-flex flex-wrap gap-2 mt-3">
-              <% if (alquiler.estado === 'pendiente') { %>
+              <% if (alquiler.estado === 'pendiente' && estadoCont === 'pendiente_despacho') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/despachar" method="POST">
                   <button class="btn btn-sm btn-naranja">🚛 Registrar salida</button>
                 </form>
               <% } %>
-              <% if (alquiler.estado === 'despachado') { %>
+              <% if (alquiler.estado === 'despachado' && estadoCont === 'despachado') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/entregar" method="POST">
                   <button class="btn btn-sm btn-naranja">📦 Confirmar entrega</button>
                 </form>
               <% } %>
-              <% if (alquiler.estado === 'entregado' && (estadoCont === 'entregado' || estadoCont === 'en_alquiler')) { %>
+              <% if (alquiler.estado === 'entregado' && estadoCont === 'en_alquiler') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/retirar" method="POST">
-                  <button class="btn btn-sm btn-outline-secondary">⚠️ Registrar retiro</button>
+                  <button class="btn btn-sm btn-outline-secondary">⚠️ Marcar pendiente retiro</button>
                 </form>
               <% } %>
-              <% if (alquiler.estado === 'entregado' && estadoCont === 'en_transito') { %>
+              <% if (alquiler.estado === 'entregado' && estadoCont === 'vuelta_a_planta') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST">
                   <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta</button>
                 </form>
@@ -186,7 +186,7 @@
 <% } %>
 
 <div class="mt-3">
-  <%- include('../../partials/recursos_operacion', { opId: alquiler.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable }) %>
+  <%- include('../../partials/recursos_operacion', { opId: alquiler.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable, solapamiento }) %>
 </div>
 
 <% if (!estaAnulado) { %>

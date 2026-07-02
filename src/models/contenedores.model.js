@@ -65,7 +65,7 @@ const ContenedoresModel = {
       const { rows } = await q(`INSERT INTO contenedores (numero_contenedor, estado_general, fecha_ultima_pintada, observaciones) VALUES (?, ?, ?, ?) RETURNING id`,
         [numero, estado_general || 'operativo', fecha_ultima_pintada || null, observaciones || ''])
       const id = rows[0].id
-      await q(`INSERT INTO movimiento_contenedor (id_contenedor, estado_paso, observaciones) VALUES (?, 'en_planta', 'Alta inicial')`,
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, estado_paso, observaciones) VALUES (?, 'disponible', 'Alta inicial')`,
         [id])
       return { id, numero }
     })
@@ -94,7 +94,7 @@ const ContenedoresModel = {
     return (await query(`
       SELECT c.id, c.numero_contenedor FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
-      WHERE c.activo = 1 AND c.estado_general = 'operativo' AND um.estado_paso IN ('en_planta','vaciado')
+      WHERE c.activo = 1 AND c.estado_general = 'operativo' AND um.estado_paso = 'disponible'
       ORDER BY c.numero_contenedor
     `)).rows
   },
@@ -109,18 +109,23 @@ const ContenedoresModel = {
 
   async circuitoDiario() {
     return (await query(`
-      SELECT c.id, c.numero_contenedor, um.estado_paso, um.fecha_movimiento,
+      SELECT c.id, c.numero_contenedor, um.estado_paso, ma.fecha_alquiler AS fecha_movimiento,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega, oc.plazo_alquiler,
              cli.nombre AS cliente_nombre, cli.tel_whatsapp, op.nro_op,
-             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_domicilio,
-             ((CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) - oc.plazo_alquiler) AS dias_excedidos
+             (CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) AS dias_en_domicilio,
+             ((CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) - oc.plazo_alquiler) AS dias_excedidos
       FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       JOIN op_detalle_contenedor oc ON oc.id = um.id_op_contenedor
       JOIN op_encabezado op ON op.id = oc.id_orden_pedido
       JOIN clientes cli ON cli.id = op.id_cliente
-      WHERE c.activo = 1 AND um.estado_paso IN ('entregado','en_alquiler','a_retirar')
-        AND (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) >= oc.plazo_alquiler
+      JOIN (
+        SELECT DISTINCT ON (id_contenedor) id_contenedor, fecha_movimiento AS fecha_alquiler
+        FROM movimiento_contenedor WHERE estado_paso = 'en_alquiler'
+        ORDER BY id_contenedor, fecha_movimiento ASC
+      ) ma ON ma.id_contenedor = c.id
+      WHERE c.activo = 1 AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
+        AND (CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) >= oc.plazo_alquiler
       ORDER BY oc.zona_entrega, dias_excedidos DESC
     `)).rows
   },

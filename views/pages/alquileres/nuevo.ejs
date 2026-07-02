@@ -132,6 +132,50 @@
       <!-- Método de pago -->
       <%- include('../../partials/metodo_pago') %>
 
+      <!-- Chofer / Camión -->
+      <div class="form-section">
+        <h3 class="form-section__title">Chofer y camión (opcional)</h3>
+        <p class="form-hint">Podés asignarlos ahora o más tarde desde el detalle del alquiler.</p>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="selNuevoChofer">Chofer</label>
+            <select name="id_chofer" id="selNuevoChofer" class="form-select">
+              <option value="">— Sin asignar —</option>
+              <% choferesDisp.forEach(c => { %>
+                <option value="<%= c.id %>" data-camion="<%= c.camion_id || '' %>"><%= c.nombre %> <%= c.apellido %><%= c.ocupado ? ' 🔴' : '' %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="selNuevoCamion">Camión</label>
+            <select name="id_camion" id="selNuevoCamion" class="form-select">
+              <option value="">— Sin asignar —</option>
+              <% camionesDisp.forEach(v => { %>
+                <option value="<%= v.id %>" data-chofer="<%= v.chofer_id || '' %>"><%= [v.patente, v.nombre].filter(Boolean).join(' · ') %><%= v.ocupado ? ' 🔴' : '' %></option>
+              <% }) %>
+            </select>
+          </div>
+        </div>
+        <script>
+          (function () {
+            var selC = document.getElementById('selNuevoChofer')
+            var selV = document.getElementById('selNuevoCamion')
+            if (!selC || !selV) return
+            var sync = false
+            selC.addEventListener('change', function () {
+              if (sync) return
+              var cam = selC.options[selC.selectedIndex]?.getAttribute('data-camion')
+              if (cam) { sync = true; selV.value = String(cam); sync = false }
+            })
+            selV.addEventListener('change', function () {
+              if (sync) return
+              var cho = selV.options[selV.selectedIndex]?.getAttribute('data-chofer')
+              if (cho) { sync = true; selC.value = String(cho); sync = false }
+            })
+          })()
+        </script>
+      </div>
+
         <!-- Observaciones -->
         <div class="form-section">
           <h3 class="form-section__title">Observaciones</h3>

@@ -266,9 +266,11 @@ const VentasController = {
         const extra = await OperacionesModel.obtenerChofer(recursos.id_chofer)
         if (extra) choferesDisp.push(extra)
       }
+      const solapamiento = req.session.solapamiento?.opId === String(op.id) ? req.session.solapamiento : null
+      if (solapamiento) delete req.session.solapamiento
       res.render('pages/ventas/detalle', {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
-        recursos, choferesDisp,
+        recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('ventas'),
         recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',
       })

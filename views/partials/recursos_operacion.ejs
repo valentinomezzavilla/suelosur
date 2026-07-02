@@ -1,5 +1,5 @@
 <%
-  // Params: opId, recursos, choferes, camiones, editable
+  // Params: opId, recursos, choferes, camiones, editable, solapamiento (optional)
   const r = recursos || {}
 %>
 <div class="card shadow-sm">
@@ -21,6 +21,20 @@
       <p class="text-muted small mb-0">Asignado el <%= formatFechaHora(r.asignacion_fecha) %><%= r.asignado_por ? ' por ' + r.asignado_por : '' %></p>
     <% } %>
 
+    <% if (typeof solapamiento !== 'undefined' && solapamiento && solapamiento.opId === String(opId)) { %>
+      <hr class="my-3">
+      <div class="alert alert-warning p-3 rounded-3" style="border-left:4px solid #f59e0b">
+        <p class="fw-semibold mb-2">⚠️ Solapamiento de horario detectado</p>
+        <% solapamiento.advertencias.forEach(a => { %><p class="small mb-1"><%= a %></p><% }) %>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="this.closest('.alert').remove()">Entiendo, continuar así</button>
+          <form action="/operaciones/<%= opId %>/retrasar30" method="POST" class="d-inline">
+            <button class="btn btn-sm btn-warning">⏱ Atrasar 30 minutos</button>
+          </form>
+          <button type="button" class="btn btn-sm btn-outline-secondary" onclick="this.closest('.alert').remove(); document.getElementById('selChofer-<%= opId %>')?.focus()">Elegir otro chofer / camión</button>
+        </div>
+      </div>
+    <% } %>
     <% if (editable) { %>
       <hr class="my-3">
       <form action="/operaciones/<%= opId %>/recursos" method="POST" id="formRecursosOp-<%= opId %>">

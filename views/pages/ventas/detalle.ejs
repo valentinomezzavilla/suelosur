@@ -203,7 +203,7 @@
   <% } %>
 
   <div class="col-12">
-    <%- include('../../partials/recursos_operacion', { opId: op.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable }) %>
+    <%- include('../../partials/recursos_operacion', { opId: op.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable, solapamiento }) %>
   </div>
 
   <% if (op.estado !== 'anulado') { %>

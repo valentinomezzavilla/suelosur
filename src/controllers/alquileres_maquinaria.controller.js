@@ -76,9 +76,11 @@ const AlquileresMaquinariaController = {
         const extra = await OperacionesModel.obtenerChofer(recursos.id_chofer)
         if (extra) choferesDisp.push(extra)
       }
+      const solapamiento = req.session.solapamiento?.opId === String(alquiler.id) ? req.session.solapamiento : null
+      if (solapamiento) delete req.session.solapamiento
       res.render('pages/alquileres/maquinaria_detalle', {
         titulo: `Alquiler Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`,
-        alquiler, disponibles, recursos, choferesDisp,
+        alquiler, disponibles, recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('maquinas'),
         recursosEditable: alquiler.estado !== 'anulado',
       })

@@ -118,7 +118,7 @@
 <% } %>
 
 <div class="mt-3">
-  <%- include('../../partials/recursos_operacion', { opId: alquiler.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable }) %>
+  <%- include('../../partials/recursos_operacion', { opId: alquiler.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable, solapamiento }) %>
 </div>
 
 <% if (!estaAnulado) { %>

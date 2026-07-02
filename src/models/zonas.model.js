@@ -60,7 +60,7 @@ const ZonasModel = {
     // Retiros de contenedor con plazo vencido (reusa la lógica del circuito del día)
     const ContenedoresModel = require('./contenedores.model')
     const retiros = (await ContenedoresModel.circuitoDiario()).map(r => ({
-      id: r.id, nro_op: r.nro_op, estado: 'a_retirar',
+      id: r.id, nro_op: r.nro_op, estado: 'pendiente_retiro',
       zona: r.zona_entrega || 'Sin zona', cliente: r.cliente_nombre, tel_whatsapp: r.tel_whatsapp,
       domicilio: r.domicilio_entrega, tipo: 'Contenedor (retiro)', link: '/contenedores/circuito',
     }))

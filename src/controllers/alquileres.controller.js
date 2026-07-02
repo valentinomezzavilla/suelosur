@@ -20,11 +20,15 @@ const AlquileresController = {
 
   async nuevo(req, res) {
     try {
-      const { disponibles, porLiberar } = await AlquileresModel.contenedoresDisponibles()
-      const configPrecios = await ConfigContenedoresModel.obtenerPrecios()
+      const [{ disponibles, porLiberar }, configPrecios, choferesDisp, camionesDisp] = await Promise.all([
+        AlquileresModel.contenedoresDisponibles(),
+        ConfigContenedoresModel.obtenerPrecios(),
+        OperacionesModel.choferesDisponibles(),
+        OperacionesModel.camionesDisponibles('contenedores'),
+      ])
       res.render('pages/alquileres/nuevo', {
         titulo: 'Nuevo Alquiler de Contenedor',
-        disponibles, porLiberar, configPrecios,
+        disponibles, porLiberar, configPrecios, choferesDisp, camionesDisp,
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/alquilerService.js'],
       })
     } catch (err) {
@@ -36,7 +40,7 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id } = req.body
+      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
@@ -67,6 +71,7 @@ const AlquileresController = {
           domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, observaciones,
           fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
+          id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
       }
 
@@ -90,9 +95,11 @@ const AlquileresController = {
         const extra = await OperacionesModel.obtenerChofer(recursos.id_chofer)
         if (extra) choferesDisp.push(extra)
       }
+      const solapamiento = req.session.solapamiento?.opId === String(alquiler.id) ? req.session.solapamiento : null
+      if (solapamiento) delete req.session.solapamiento
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
-        alquiler, disponibles, recursos, choferesDisp,
+        alquiler, disponibles, recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
       })
@@ -140,7 +147,7 @@ const AlquileresController = {
   async despachar(req, res) {
     try {
       await AlquileresModel.despachar(req.params.id)
-      req.flash('success', 'Contenedor despachado — movimiento "en tránsito" registrado.')
+      req.flash('success', 'Contenedor despachado.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al despachar.')

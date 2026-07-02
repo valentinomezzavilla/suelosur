@@ -12,25 +12,33 @@ const SQL_ULTIMO_MOV = `
 const AlquileresModel = {
 
   async listarPorEstado() {
+    // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
+    const SQL_MOV_ALQUILER = `
+      SELECT DISTINCT ON (id_contenedor) id_contenedor, fecha_movimiento AS fecha_alquiler
+      FROM movimiento_contenedor WHERE estado_paso = 'en_alquiler'
+      ORDER BY id_contenedor, fecha_movimiento ASC
+    `
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              cli.nombre AS cliente_nombre, cli.tel_whatsapp,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega,
              oc.plazo_alquiler, oc.precio_alquiler, oc.id_contenedor,
              cont.numero_contenedor,
-             um.estado_paso AS contenedor_estado, um.fecha_movimiento AS fecha_entrega_real,
-             (LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) AS fecha_fin_estimada,
-             ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             um.estado_paso AS contenedor_estado, um.fecha_movimiento AS fecha_ultimo_mov,
+             ma.fecha_alquiler AS fecha_entrega_real,
+             (LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) AS fecha_fin_estimada,
+             ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
       LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor
+      LEFT JOIN (${SQL_MOV_ALQUILER}) ma ON ma.id_contenedor = oc.id_contenedor
       WHERE op.tipo_op = 'C'
     `
     const actuales = (await query(`${baseSelect}
-      AND op.estado = 'entregado' AND um.estado_paso IN ('entregado','en_alquiler','a_retirar')
+      AND op.estado = 'entregado' AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
       ORDER BY fecha_fin_estimada ASC`)).rows
     const porFinalizar = actuales.filter(a => a.dias_restantes != null && a.dias_restantes <= 1)
     const programados  = (await query(`${baseSelect}
@@ -73,7 +81,7 @@ const AlquileresModel = {
 
       const movEntrega = (await query(`
         SELECT fecha_movimiento FROM movimiento_contenedor
-        WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'entregado'
+        WHERE id_contenedor = ? AND id_op_contenedor = ? AND estado_paso = 'en_alquiler'
         ORDER BY fecha_movimiento ASC LIMIT 1
       `, [op.detalle.id_contenedor, op.detalle.id])).rows[0]
       op.diasEnDomicilio = movEntrega
@@ -96,35 +104,41 @@ const AlquileresModel = {
     return op
   },
 
-  async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada }) {
+  async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion }) {
     if (id_contenedor) {
-      const reservado = (await query(`
-        SELECT 1 FROM op_detalle_contenedor oc
-        JOIN op_encabezado op ON op.id = oc.id_orden_pedido
-        LEFT JOIN (${SQL_ULTIMO_MOV}) lm ON lm.id_contenedor = oc.id_contenedor
-        WHERE oc.id_contenedor = ? AND op.estado != 'anulado'
-          AND (op.estado IN ('pendiente','despachado')
-               OR (op.estado = 'entregado' AND lm.estado_paso IN ('en_transito','entregado','en_alquiler','a_retirar')))
+      const noDisponible = (await query(`
+        SELECT 1 FROM (
+          SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
+          FROM movimiento_contenedor ORDER BY id_contenedor, fecha_movimiento DESC, id DESC
+        ) lm WHERE lm.id_contenedor = ? AND lm.estado_paso != 'disponible'
       `, [id_contenedor])).rows[0]
-      if (reservado) throw new Error('El contenedor seleccionado ya no está disponible.')
+      if (noDisponible) throw new Error('El contenedor seleccionado ya no está disponible.')
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
-      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?) RETURNING id`,
-        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null])
+      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?) RETURNING id`,
+        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null, id_chofer || null, id_camion || null])
       const id_op = rows[0].id
-      await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      const { rows: detRows } = await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         [id_op, id_contenedor || null,
          domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
          zona_entrega || '', parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0,
          metodo_pago || null])
+      if (id_contenedor) {
+        await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_despacho', 'Contenedor reservado para despacho')`,
+          [id_contenedor, detRows[0].id])
+      }
       return { id: id_op, nro_op: nro, nro_remito: nro_rem }
     })
   },
 
   async asignarContenedor(id_op, id_contenedor) {
-    await query(`UPDATE op_detalle_contenedor SET id_contenedor = ? WHERE id_orden_pedido = ?`, [id_contenedor, id_op])
+    const oc = (await query(`UPDATE op_detalle_contenedor SET id_contenedor = ? WHERE id_orden_pedido = ? RETURNING id`, [id_contenedor, id_op])).rows[0]
+    if (oc) {
+      await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_despacho', 'Contenedor asignado — pendiente de despacho')`,
+        [id_contenedor, oc.id])
+    }
   },
 
   // Edición de los datos comerciales / de entrega del alquiler
@@ -148,7 +162,7 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'despachado' WHERE id = ? AND estado = 'pendiente'`, [id_op])
-      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Salida a entregar')`,
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'despachado', 'Salida a entregar')`,
         [oc.id_contenedor, oc.id])
     })
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), true)
@@ -159,18 +173,25 @@ const AlquileresModel = {
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id_op])
-      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'entregado', 'Entregado en domicilio')`,
-        [oc.id_contenedor, oc.id])
-      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', 'Alquiler en curso')`,
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', 'Contenedor en domicilio — alquiler iniciado')`,
         [oc.id_contenedor, oc.id])
     })
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
   },
 
+  // Admin marca que el contenedor está listo para retirar (espera al chofer)
   async registrarRetiro(id_op) {
     const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
-    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_transito', 'Retirado de domicilio')`,
+    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_retiro', 'Pendiente retiro por el chofer')`,
+      [oc.id_contenedor, oc.id])
+  },
+
+  // Chofer inicia el retiro: sale a buscar el contenedor
+  async iniciarRetiro(id_op) {
+    const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
+    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'vuelta_a_planta', 'Retiro iniciado — volviendo a planta')`,
       [oc.id_contenedor, oc.id])
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), true)
   },
@@ -178,13 +199,21 @@ const AlquileresModel = {
   async devolverAPlanta(id_op) {
     const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
-    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'vaciado', 'Devuelto a planta')`,
+    await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'disponible', 'Devuelto a planta — disponible')`,
       [oc.id_contenedor, oc.id])
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
   },
 
   async anular(id_op) {
+    const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     await query(`UPDATE op_encabezado SET estado = 'anulado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id_op])
+    if (oc?.id_contenedor) {
+      const ec = (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1`, [oc.id_contenedor])).rows[0]?.estado_paso
+      if (ec && ['pendiente_despacho','despachado'].includes(ec)) {
+        await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'disponible', 'Alquiler anulado — contenedor disponible')`,
+          [oc.id_contenedor, oc.id])
+      }
+    }
   },
 
   async clientes() {
@@ -192,30 +221,12 @@ const AlquileresModel = {
   },
 
   async contenedoresDisponibles() {
-    // Contenedores reservados por una orden vigente que todavía no liberó la unidad:
-    //  - 'pendiente'  → alquiler creado, aún no despachado (no genera movimiento, pero el contenedor ya está comprometido)
-    //  - 'despachado' → en camino al cliente
-    //  - 'entregado' que NO volvió a planta (sigue en domicilio / a retirar)
-    // Un alquiler 'entregado' ya devuelto (último movimiento en_planta/vaciado) NO reserva.
-    const SQL_RESERVADOS = `
-      SELECT oc.id_contenedor
-      FROM op_detalle_contenedor oc
-      JOIN op_encabezado op ON op.id = oc.id_orden_pedido
-      LEFT JOIN (${SQL_ULTIMO_MOV}) lm ON lm.id_contenedor = oc.id_contenedor
-      WHERE oc.id_contenedor IS NOT NULL
-        AND op.estado != 'anulado'
-        AND (
-          op.estado IN ('pendiente','despachado')
-          OR (op.estado = 'entregado' AND lm.estado_paso IN ('en_transito','entregado','en_alquiler','a_retirar'))
-        )
-    `
-
+    // Un contenedor está disponible solo cuando su último movimiento es 'disponible'.
     const disponibles = (await query(`
       SELECT c.id, c.numero_contenedor FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       WHERE c.activo = 1 AND c.estado_general = 'operativo'
-        AND um.estado_paso IN ('en_planta','vaciado')
-        AND c.id NOT IN (${SQL_RESERVADOS})
+        AND um.estado_paso = 'disponible'
       ORDER BY c.numero_contenedor
     `)).rows
 
@@ -224,17 +235,22 @@ const AlquileresModel = {
              op.id AS alquiler_actual_id, op.nro_op,
              cli.nombre AS cliente_actual,
              oc.plazo_alquiler,
-             (LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) AS fecha_liberacion,
-             ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
+             (LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) AS fecha_liberacion,
+             ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
       FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       JOIN op_detalle_contenedor oc ON oc.id_contenedor = c.id AND oc.id = um.id_op_contenedor
       JOIN op_encabezado op ON op.id = oc.id_orden_pedido
       JOIN clientes cli ON cli.id = op.id_cliente
+      JOIN (
+        SELECT DISTINCT ON (id_contenedor) id_contenedor, fecha_movimiento AS fecha_alquiler
+        FROM movimiento_contenedor WHERE estado_paso = 'en_alquiler'
+        ORDER BY id_contenedor, fecha_movimiento ASC
+      ) ma ON ma.id_contenedor = c.id
       WHERE c.activo = 1
         AND c.estado_general = 'operativo'
-        AND um.estado_paso IN ('entregado','en_alquiler','a_retirar')
-        AND ((LEFT(um.fecha_movimiento, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) BETWEEN 0 AND 2
+        AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
+        AND ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) BETWEEN 0 AND 2
         AND oc.alquiler_siguiente_id IS NULL
       ORDER BY horas_restantes ASC
     `)).rows
@@ -281,6 +297,11 @@ const AlquileresModel = {
     const op = (await query(`SELECT estado_programacion FROM op_encabezado WHERE id = ?`, [id_op])).rows[0]
     if (!op || op.estado_programacion !== 'programado') return
     await query(`UPDATE op_encabezado SET estado_programacion = 'activo' WHERE id = ?`, [id_op])
+    const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (oc?.id_contenedor) {
+      await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_despacho', 'Alquiler programado activado — pendiente despacho')`,
+        [oc.id_contenedor, oc.id])
+    }
   },
 }
 

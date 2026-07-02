@@ -1,22 +1,22 @@
 <%
-  const conteo = { en_planta:0, entregado:0, en_alquiler:0, a_retirar:0, en_transito:0, vaciado:0 }
+  const conteo = { disponible:0, pendiente_despacho:0, despachado:0, en_alquiler:0, pendiente_retiro:0, vuelta_a_planta:0 }
   resumen.forEach(r => { if (conteo[r.estado_paso] !== undefined) conteo[r.estado_paso] = r.total })
 
   const badgeEstado = {
-    en_planta:   'badge-activo',
-    vaciado:     'badge-pendiente',
-    entregado:   'badge-en-transito',
-    en_alquiler: 'badge-en-transito',
-    a_retirar:   'badge-alerta',
-    en_transito: 'badge-pendiente',
+    disponible:        'badge-activo',
+    pendiente_despacho:'badge-pendiente',
+    despachado:        'badge-en-transito',
+    en_alquiler:       'badge-en-transito',
+    pendiente_retiro:  'badge-alerta',
+    vuelta_a_planta:   'badge-pendiente',
   }
   const labelEstado = {
-    en_planta:   'En planta',
-    vaciado:     'Vaciado',
-    entregado:   'Entregado',
-    en_alquiler: 'En alquiler',
-    a_retirar:   'A retirar',
-    en_transito: 'En tránsito',
+    disponible:        'Disponible',
+    pendiente_despacho:'Pend. despacho',
+    despachado:        'En camino',
+    en_alquiler:       'En alquiler',
+    pendiente_retiro:  'Pend. retiro',
+    vuelta_a_planta:   'Vuelta a planta',
   }
   function semaforoDias(dias, plazo) {
     if (!plazo || plazo <= 0) return ''
@@ -40,12 +40,12 @@
 <!-- Resumen de estados -->
 <div class="row g-2 mb-4">
   <% [
-    { key:'en_planta',   label:'En planta',    icono:'home' },
-    { key:'vaciado',     label:'Vaciados',     icono:'checkCircle' },
-    { key:'entregado',   label:'Entregados',   icono:'box' },
-    { key:'en_alquiler', label:'En alquiler',  icono:'clock' },
-    { key:'a_retirar',   label:'A retirar',    icono:'alert' },
-    { key:'en_transito', label:'En tránsito',  icono:'truck' },
+    { key:'disponible',        label:'Disponibles',       icono:'home' },
+    { key:'pendiente_despacho',label:'Pend. despacho',    icono:'checkCircle' },
+    { key:'despachado',        label:'En camino',         icono:'truck' },
+    { key:'en_alquiler',       label:'En alquiler',       icono:'clock' },
+    { key:'pendiente_retiro',  label:'Pend. retiro',      icono:'alert' },
+    { key:'vuelta_a_planta',   label:'Vuelta a planta',   icono:'box' },
   ].forEach(s => { %>
   <div class="col-6 col-md-2">
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
@@ -128,7 +128,7 @@
           <td><small class="text-muted"><%= c.domicilio_entrega || '—' %></small></td>
           <td><small class="text-muted"><%= c.zona_entrega || '—' %></small></td>
           <td class="text-center">
-            <% if (c.estado_paso === 'entregado' || c.estado_paso === 'en_alquiler' || c.estado_paso === 'a_retirar') { %>
+            <% if (c.estado_paso === 'en_alquiler' || c.estado_paso === 'pendiente_retiro') { %>
               <span class="<%= semaforoDias(c.dias_en_estado, c.plazo_alquiler) %>">
                 <%= c.dias_en_estado %><% if (c.plazo_alquiler) { %> / <%= c.plazo_alquiler %><% } %>
               </span>

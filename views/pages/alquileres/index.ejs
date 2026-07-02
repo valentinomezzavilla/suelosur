@@ -5,7 +5,7 @@
     if (a.estado === 'pendiente')  return { label: 'Pendiente',   badge: 'badge-pendiente' }
     if (a.estado === 'despachado') return { label: 'Despachado',  badge: 'badge-en-transito' }
     if (a.estado === 'entregado') {
-      if (['en_planta','vaciado'].includes(a.contenedor_estado)) return { label: 'Retirado', badge: 'badge-activo' }
+      if (a.contenedor_estado === 'disponible') return { label: 'Retirado', badge: 'badge-activo' }
       return { label: 'En curso', badge: 'badge-en-transito' }
     }
     return { label: a.estado, badge: 'badge-pendiente' }
