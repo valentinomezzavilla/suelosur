@@ -118,21 +118,19 @@ async function construirTareas(empId) {
         fase: 'en_curso', detalleFase: 'En camino', accionIniciar: 'Iniciar entrega', accionFinalizar: 'Confirmar entrega' })
     } else if (o.estado === 'entregado') {
       const ec = await estadoCont(o.id_contenedor)
+      // El chofer NO ve los contenedores en alquiler activo (en_domicilio): no hay
+      // nada que hacer hasta que la oficina marque "pendiente retiro".
+      const fe = await fechaEntrega(o.id_contenedor, o.id_oc)
+      const fin = (() => { if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
+      const dr = diasRestantes(fin)
       if (ec === 'vuelta_a_planta') {
         tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
-          fase: 'en_curso', detalleFase: 'Volviendo a planta', accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
-      } else if (['en_alquiler', 'pendiente_retiro'].includes(ec)) {
-        const fe = await fechaEntrega(o.id_contenedor, o.id_oc)
-        const fin = (() => { if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
-        const dr = diasRestantes(fin)
-        if (ec === 'pendiente_retiro' || (dr != null && dr <= 0)) {
-          tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
-            fase: 'por_iniciar', detalleFase: ec === 'pendiente_retiro' ? 'Pendiente retiro' : 'Plazo vencido', fin, diasRestantes: dr, accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
-        } else {
-          tareas.push({ ...base, tipo: 'contenedor_alquiler', icono: '⏳', titulo: 'Contenedor en alquiler',
-            fase: 'en_servicio', detalleFase: 'En domicilio', fin, diasRestantes: dr })
-        }
+          fase: 'en_curso', detalleFase: 'Volviendo a planta', fin, diasRestantes: dr, accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
+      } else if (ec === 'pendiente_retiro') {
+        tareas.push({ ...base, tipo: 'contenedor_retiro', icono: '⚠️', titulo: 'Retiro de contenedor',
+          fase: 'por_iniciar', detalleFase: 'Pendiente retiro', fin, diasRestantes: dr, accionIniciar: 'Iniciar retiro', accionFinalizar: 'Devolver a planta' })
       }
+      // ec === 'en_alquiler' → sin tarea para el chofer
     }
   }
 
@@ -209,6 +207,11 @@ const HojaRutaController = {
         if (!oc?.id_contenedor) { req.flash('error', 'El contenedor aún no está asignado. Avisá a la oficina.'); return res.redirect(back) }
         await AlquileresModel.despachar(op.id)
       } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
+        const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
+        if (await estadoCont(oc?.id_contenedor) !== 'pendiente_retiro') {
+          req.flash('error', 'Este contenedor todavía no está marcado como pendiente de retiro.')
+          return res.redirect(back)
+        }
         await AlquileresModel.iniciarRetiro(op.id)
       } else {
         req.flash('error', 'Esta tarea no se puede iniciar en su estado actual.')
@@ -241,9 +244,16 @@ const HojaRutaController = {
 
       // Resolver el domicilio del destino según el tipo de operación
       let domicilio = [opData.domicilio_calle, opData.domicilio_altura].filter(Boolean).join(' ').trim()
+      // Fase: entrega (llevar el contenedor) o retiro (traerlo de vuelta).
+      let fase = 'entrega'
+      let proximo = null
       if (opData.tipo_op === 'C') {
         const oc = (await query(`SELECT domicilio_entrega, zona_entrega FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
         if (oc?.domicilio_entrega) domicilio = oc.domicilio_entrega
+        if (opData.estado === 'entregado') {
+          fase = 'retiro'
+          proximo = await AlquileresModel.proximoAlquiler(op.id)
+        }
       }
 
       // Geocodificar el destino en el backend si aún no tiene coordenadas.
@@ -265,6 +275,9 @@ const HojaRutaController = {
           id: opData.id,
           nro_op: opData.nro_op,
           estado: opData.estado,
+          tipo_op: opData.tipo_op,
+          fase,
+          proximo, // { id, nro_op, cliente_nombre, domicilio_entrega } | null
           cliente: opData.cliente || 'Particular',
           tel: opData.tel_whatsapp,
           domicilio: domicilio || '',
@@ -403,27 +416,39 @@ const HojaRutaController = {
       if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
       const { op } = v
 
-      // Para finalizar una entrega, el cliente debe firmar digitalmente.
+      // Fase de la tarea: entrega (llevar) o retiro de contenedor (traer).
       const esEntrega = (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado')
                      || (op.tipo_op === 'C' && op.estado === 'despachado')
-      if (esEntrega && !req.body.firma_cliente) {
-        req.flash('error', 'Falta la firma del cliente para confirmar la entrega.')
+      const esRetiroContenedor = op.tipo_op === 'C' && op.estado === 'entregado'
+
+      // Tanto la entrega como el retiro necesitan la firma del cliente (cada uno
+      // genera su propio remito: remito de entrega y remito de retiro).
+      if ((esEntrega || esRetiroContenedor) && !req.body.firma_cliente) {
+        req.flash('error', `Falta la firma del cliente para confirmar ${esRetiroContenedor ? 'el retiro' : 'la entrega'}.`)
         return res.redirect(back)
       }
-      // Guardar la firma del cliente EN LA BASE DE DATOS (no en disco).
-      // Render tiene filesystem efímero: un archivo se borraría al reiniciar.
+      // Guardar la firma EN LA BASE DE DATOS (no en disco). Render tiene filesystem
+      // efímero: un archivo se borraría al reiniciar. Cada fase guarda su firma aparte.
       if (req.body.firma_cliente) {
         const firma = HojaRutaController._normalizarFirma(req.body.firma_cliente)
         if (firma) {
-          await query(`UPDATE op_encabezado SET firma_cliente = ?, firma_aclaracion = ? WHERE id = ?`,
-            [firma, (req.body.firma_aclaracion || '').trim() || null, op.id])
+          const acl = (req.body.firma_aclaracion || '').trim() || null
+          if (esRetiroContenedor) {
+            await query(`UPDATE op_encabezado SET firma_retiro = ?, firma_retiro_aclaracion = ? WHERE id = ?`, [firma, acl, op.id])
+          } else {
+            await query(`UPDATE op_encabezado SET firma_cliente = ?, firma_aclaracion = ? WHERE id = ?`, [firma, acl, op.id])
+          }
         }
       }
-      // Guardar la foto del remito si el chofer adjuntó una (opcional)
+      // Guardar la foto del remito si el chofer adjuntó una (opcional), separada por fase.
       if (req.file) {
-        const filename = nombreArchivo('remito', op.id, req.file.originalname)
+        const filename = nombreArchivo(esRetiroContenedor ? 'remito-retiro' : 'remito', op.id, req.file.originalname)
         await storage.guardar(req.file.buffer, filename, req.file.mimetype)
-        await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [filename, op.id])
+        if (esRetiroContenedor) {
+          await query(`UPDATE op_encabezado SET archivo_remito_retiro = ? WHERE id = ?`, [filename, op.id])
+        } else {
+          await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [filename, op.id])
+        }
       }
 
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
@@ -456,20 +481,31 @@ const HojaRutaController = {
           await ClientesModel.agregarMovimiento(al.id_cliente, { tipo: 'deuda', descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, monto: -monto })
         }
         req.flash('success', 'Contenedor entregado. Comenzó el período de alquiler.')
-      } else if (op.tipo_op === 'C' && op.estado === 'entregado') {
-        const oc = (await query(`SELECT id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
+      } else if (esRetiroContenedor) {
+        const oc = (await query(`SELECT id_contenedor, alquiler_siguiente_id FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
         if (await estadoCont(oc?.id_contenedor) !== 'vuelta_a_planta') {
           req.flash('error', 'Primero tenés que iniciar el retiro.'); return res.redirect(back)
         }
+        const quiereProximo = req.body.destino_retiro === 'proximo' && oc?.alquiler_siguiente_id
+        if (quiereProximo) {
+          const idB = await AlquileresModel.iniciarProximoAlquiler(op.id)
+          req.flash('success', 'Contenedor retirado. En camino al próximo alquiler.')
+          return res.redirect(`/hoja-de-ruta/${idB}/viaje-en-curso`)
+        }
+        const al = await AlquileresModel.obtener(op.id)
         await AlquileresModel.devolverAPlanta(op.id)
+        if (al?.detalle?.alquiler_siguiente_id) {
+          await AlquileresModel.activarProgramado(al.detalle.alquiler_siguiente_id)
+        }
         req.flash('success', 'Contenedor retirado y devuelto a planta. ¡Tarea completada!')
       } else {
         req.flash('error', 'Esta tarea no se puede finalizar en su estado actual.')
       }
 
-      // Archivar el remito firmado como PDF en Storage (comprobante inmutable
-      // del momento de la entrega). Es secundario: si falla, no rompe la entrega.
-      if (req.body.firma_cliente) {
+      // Archivar el remito de ENTREGA firmado como PDF en Storage (comprobante
+      // inmutable). Es secundario: si falla, no rompe la operación. El remito de
+      // retiro se regenera on-demand, no se archiva (evita pisar el de entrega).
+      if (req.body.firma_cliente && !esRetiroContenedor) {
         try {
           const remito = await RemitosModel.obtener(op.id)
           if (remito) {

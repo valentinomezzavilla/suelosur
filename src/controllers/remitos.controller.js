@@ -24,8 +24,9 @@ const RemitosController = {
         req.flash('error', 'No tenés permiso para ver este remito.')
         return res.redirect('/hoja-de-ruta')
       }
-      const r = await RemitosModel.obtener(req.params.id)
+      let r = await RemitosModel.obtener(req.params.id)
       if (!r) { req.flash('error', 'Operación no encontrada.'); return res.redirect('back') }
+      if (req.query.tipo === 'retiro') r = RemitosModel.vistaRetiro(r)
       generarRemitoPDF(res, r)
     } catch (err) {
       console.error(err)
@@ -38,12 +39,14 @@ const RemitosController = {
   async subirFirmado(req, res) {
     const r = await RemitosModel.obtener(req.params.id)
     const back = r ? RemitosModel.urlOperacion(r) : '/ventas'
+    const tipo = req.query.tipo === 'retiro' ? 'retiro' : 'entrega'
     try {
       if (!req.file) { req.flash('error', 'No se recibió ningún archivo.'); return res.redirect(back) }
-      if (r && r.archivo_remito) await storage.borrar(r.archivo_remito) // borrar el anterior
-      const filename = nombreArchivo('remito', req.params.id, req.file.originalname)
+      const anterior = r ? (tipo === 'retiro' ? r.archivo_remito_retiro : r.archivo_remito) : null
+      if (anterior) await storage.borrar(anterior) // borrar el anterior
+      const filename = nombreArchivo(tipo === 'retiro' ? 'remito-retiro' : 'remito', req.params.id, req.file.originalname)
       await storage.guardar(req.file.buffer, filename, req.file.mimetype)
-      await RemitosModel.guardarArchivo(req.params.id, filename)
+      await RemitosModel.guardarArchivo(req.params.id, filename, tipo)
       req.flash('success', 'Foto del remito adjuntada correctamente.')
     } catch (err) {
       console.error(err)
@@ -60,10 +63,11 @@ const RemitosController = {
         return res.redirect('/hoja-de-ruta')
       }
       const r = await RemitosModel.obtener(req.params.id)
-      if (!r || !r.archivo_remito) { req.flash('error', 'No hay foto del remito adjunta.'); return res.redirect('back') }
-      const buf = await storage.leer(r.archivo_remito)
+      const archivo = req.query.tipo === 'retiro' ? r?.archivo_remito_retiro : r?.archivo_remito
+      if (!r || !archivo) { req.flash('error', 'No hay foto del remito adjunta.'); return res.redirect('back') }
+      const buf = await storage.leer(archivo)
       if (!buf) { req.flash('error', 'El archivo no se encuentra.'); return res.redirect('back') }
-      const ext = (r.archivo_remito.split('.').pop() || '').toLowerCase()
+      const ext = (archivo.split('.').pop() || '').toLowerCase()
       const mime = ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
       res.set('Content-Type', mime)
       res.send(buf)
@@ -102,10 +106,12 @@ const RemitosController = {
   async eliminarFirmado(req, res) {
     const r = await RemitosModel.obtener(req.params.id)
     const back = r ? RemitosModel.urlOperacion(r) : '/ventas'
+    const tipo = req.query.tipo === 'retiro' ? 'retiro' : 'entrega'
     try {
-      if (r && r.archivo_remito) {
-        await storage.borrar(r.archivo_remito)
-        await RemitosModel.guardarArchivo(req.params.id, null)
+      const archivo = tipo === 'retiro' ? r?.archivo_remito_retiro : r?.archivo_remito
+      if (r && archivo) {
+        await storage.borrar(archivo)
+        await RemitosModel.guardarArchivo(req.params.id, null, tipo)
         req.flash('success', 'Foto del remito eliminada.')
       }
     } catch (err) {

@@ -37,10 +37,15 @@ const AlquileresModel = {
       LEFT JOIN (${SQL_MOV_ALQUILER}) ma ON ma.id_contenedor = oc.id_contenedor
       WHERE op.tipo_op = 'C'
     `
-    const actuales = (await query(`${baseSelect}
+    const todosEnCurso = (await query(`${baseSelect}
       AND op.estado = 'entregado' AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
       ORDER BY fecha_fin_estimada ASC`)).rows
-    const porFinalizar = actuales.filter(a => a.dias_restantes != null && a.dias_restantes <= 1)
+    // "Por finalizar" son los que vencen hoy/mañana (o ya están en pendiente_retiro);
+    // el resto queda en "actuales". Un alquiler aparece en UNA sola tabla.
+    const esPorFinalizar = a => a.contenedor_estado === 'pendiente_retiro'
+      || (a.dias_restantes != null && a.dias_restantes <= 1)
+    const porFinalizar = todosEnCurso.filter(esPorFinalizar)
+    const actuales     = todosEnCurso.filter(a => !esPorFinalizar(a))
     const programados  = (await query(`${baseSelect}
       AND op.estado IN ('pendiente','despachado')
       ORDER BY op.fecha_entrega_planificada ASC NULLS LAST, op.created_at ASC`)).rows
@@ -202,6 +207,48 @@ const AlquileresModel = {
     await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'disponible', 'Devuelto a planta — disponible')`,
       [oc.id_contenedor, oc.id])
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), false)
+  },
+
+  // ¿La operación (retiro) tiene un alquiler programado siguiente para el mismo contenedor?
+  async proximoAlquiler(id_op) {
+    const oc = (await query(`SELECT alquiler_siguiente_id FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (!oc?.alquiler_siguiente_id) return null
+    return (await query(`
+      SELECT op.id, op.nro_op, cli.nombre AS cliente_nombre, oc.domicilio_entrega
+      FROM op_encabezado op
+      JOIN clientes cli ON cli.id = op.id_cliente
+      LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      WHERE op.id = ? AND op.estado != 'anulado'
+    `, [oc.alquiler_siguiente_id])).rows[0] || null
+  },
+
+  // El chofer retira el contenedor y, en vez de volver a planta, lo lleva
+  // directo al próximo alquiler programado (se despacha con el mismo camión/chofer).
+  async iniciarProximoAlquiler(id_op) {
+    const ocA = (await query(`SELECT id, id_contenedor, alquiler_siguiente_id FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (!ocA?.id_contenedor) throw new Error('No hay contenedor asignado.')
+    if (!ocA.alquiler_siguiente_id) throw new Error('No hay un alquiler programado siguiente.')
+    const idB = ocA.alquiler_siguiente_id
+    const opA = (await query(`SELECT id_chofer, id_camion FROM op_encabezado WHERE id = ?`, [id_op])).rows[0]
+    return await transaction(async (q) => {
+      // El contenedor lo lleva el chofer que hizo el retiro: se le asigna la op siguiente.
+      await q(`
+        UPDATE op_encabezado
+        SET estado = 'despachado', estado_programacion = 'activo',
+            id_chofer = COALESCE(?, id_chofer), id_camion = COALESCE(?, id_camion)
+        WHERE id = ? AND estado IN ('pendiente','despachado')
+      `, [opA?.id_chofer || null, opA?.id_camion || null, idB])
+      const ocB = (await q(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [idB])).rows[0]
+      if (!ocB) throw new Error('El alquiler siguiente no tiene detalle de contenedor.')
+      if (!ocB.id_contenedor) {
+        await q(`UPDATE op_detalle_contenedor SET id_contenedor = ? WHERE id = ?`, [ocA.id_contenedor, ocB.id])
+        ocB.id_contenedor = ocA.id_contenedor
+      }
+      // El contenedor pasa directo a "despachado" (en camino) para el próximo alquiler.
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'despachado', 'Retirado del cliente anterior — en camino al próximo alquiler')`,
+        [ocB.id_contenedor, ocB.id])
+      return idB
+    })
   },
 
   async anular(id_op) {

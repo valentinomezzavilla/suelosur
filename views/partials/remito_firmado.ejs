@@ -1,25 +1,32 @@
 <%
   // Params: opId, estado, archivo (foto del remito en papel, opcional),
-  //         firma (firma_cliente), firmaAclaracion, finalizado (bool)
+  //         firma (firma_cliente), firmaAclaracion, finalizado (bool),
+  //         tipo ('entrega' | 'retiro'), titulo
+  const _tipo = (typeof tipo !== 'undefined' && tipo === 'retiro') ? 'retiro' : 'entrega'
+  const _titulo = (typeof titulo !== 'undefined' && titulo) ? titulo : 'Remito'
   const _fin = (typeof finalizado !== 'undefined') ? finalizado : (estado === 'entregado')
   const _firma = typeof firma !== 'undefined' ? firma : null
   const _aclaracion = typeof firmaAclaracion !== 'undefined' ? firmaAclaracion : ''
+  const _q = _tipo === 'retiro' ? '?tipo=retiro' : ''
+  const _pendiente = _tipo === 'retiro'
+    ? 'El remito de retiro va a estar disponible una vez que el contenedor sea <strong>retirado</strong>.'
+    : 'El remito firmado va a estar disponible una vez que la operación esté <strong>entregada / finalizada</strong>.'
 %>
 <div class="card shadow-sm">
   <div class="card-header card-header-light d-flex justify-content-between align-items-center">
-    <span>Remito</span>
+    <span><%= _titulo %></span>
     <div class="d-flex gap-2">
-      <a href="/remitos/<%= opId %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary">
+      <a href="/remitos/<%= opId %>/pdf<%= _q %>" target="_blank" class="btn btn-sm btn-outline-secondary">
         <%- icon('eye', { size: 15 }) %> Ver remito
       </a>
-      <a href="/remitos/<%= opId %>/pdf" download class="btn btn-sm btn-outline-secondary">
+      <a href="/remitos/<%= opId %>/pdf<%= _q %>" download class="btn btn-sm btn-outline-secondary">
         <%- icon('download', { size: 15 }) %> Descargar
       </a>
     </div>
   </div>
   <div class="card-body">
     <% if (!_fin) { %>
-      <p class="text-muted small mb-0">El remito firmado va a estar disponible una vez que la operación esté <strong>entregada / finalizada</strong>.</p>
+      <p class="text-muted small mb-0"><%- _pendiente %></p>
     <% } else { %>
 
       <!-- Firma digital del cliente -->
@@ -40,17 +47,17 @@
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
               <span class="badge rounded-pill px-3 badge-activo"><%- icon('checkCircle', { size: 14 }) %> Foto adjunta</span>
-              <a href="/remitos/<%= opId %>/firmado" target="_blank" class="btn btn-sm btn-outline-secondary">
+              <a href="/remitos/<%= opId %>/firmado<%= _q %>" target="_blank" class="btn btn-sm btn-outline-secondary">
                 <%- icon('eye', { size: 15 }) %> Ver foto
               </a>
             </div>
-            <form action="/remitos/<%= opId %>/firmado/eliminar" method="POST"
+            <form action="/remitos/<%= opId %>/firmado/eliminar<%= _q %>" method="POST"
                   onsubmit="return confirm('¿Eliminar la foto del remito adjunta?')">
               <button class="btn btn-sm btn-outline-danger"><%- icon('trash', { size: 15 }) %> Quitar</button>
             </form>
           </div>
         <% } else { %>
-          <form action="/remitos/<%= opId %>/firmado" method="POST" enctype="multipart/form-data">
+          <form action="/remitos/<%= opId %>/firmado<%= _q %>" method="POST" enctype="multipart/form-data">
             <div class="d-flex gap-2 align-items-center flex-wrap">
               <input type="file" name="archivo" accept="image/*,application/pdf" class="form-control form-control-sm" style="max-width:340px" required>
               <button type="submit" class="btn btn-sm btn-naranja">Subir foto</button>

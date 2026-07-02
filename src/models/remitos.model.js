@@ -38,6 +38,9 @@ const RemitosModel = {
       archivo_remito: op.archivo_remito || null,
       firma_cliente: op.firma_cliente || null,
       firma_aclaracion: op.firma_aclaracion || '',
+      archivo_remito_retiro: op.archivo_remito_retiro || null,
+      firma_retiro: op.firma_retiro || null,
+      firma_retiro_aclaracion: op.firma_retiro_aclaracion || '',
       cliente: {
         nombre: `${op.cliente_nombre || ''} ${op.cliente_apellido || ''}`.trim() || 'Particular',
         telefono: op.cliente_telefono || op.tel_whatsapp || '',
@@ -109,8 +112,22 @@ const RemitosModel = {
     return r
   },
 
-  async guardarArchivo(opId, filename) {
-    await query(`UPDATE op_encabezado SET archivo_remito = ? WHERE id = ?`, [filename, opId])
+  async guardarArchivo(opId, filename, tipo = 'entrega') {
+    const col = tipo === 'retiro' ? 'archivo_remito_retiro' : 'archivo_remito'
+    await query(`UPDATE op_encabezado SET ${col} = ? WHERE id = ?`, [filename, opId])
+  },
+
+  // Convierte un remito normalizado a su "vista de retiro": usa la firma/foto del
+  // retiro y ajusta la etiqueta. Devuelve un nuevo objeto (no muta el original).
+  vistaRetiro(r) {
+    return {
+      ...r,
+      esRetiro: true,
+      tipoLabel: 'Remito de retiro — contenedor',
+      firma_cliente: r.firma_retiro,
+      firma_aclaracion: r.firma_retiro_aclaracion,
+      archivo_remito: r.archivo_remito_retiro,
+    }
   },
 
   // Ruta de "volver" coherente con el tipo de operación.

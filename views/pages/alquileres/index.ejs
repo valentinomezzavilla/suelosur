@@ -18,6 +18,30 @@
     return 'dias-ok'
   }
 
+  // Tarjetas para "Por finalizar" — más visibles que una fila de tabla.
+  function cardsFinalizar(lista) {
+    if (!lista.length) return `<div class="empty-state empty-state--compact"><div class="empty-state__icon">✅</div><p class="empty-state__msg">No hay alquileres finalizando próximamente.</p></div>`
+    return `<div class="finalizar-grid">` + lista.map(a => {
+      const est = estadoAlquiler(a)
+      const dr = a.dias_restantes
+      const drTxt = dr == null ? '—' : dr < 0 ? `Vencido hace ${Math.abs(dr)}d` : dr === 0 ? 'Vence hoy' : dr === 1 ? 'Vence mañana' : `Faltan ${dr}d`
+      return `
+      <div class="finalizar-card ${semaforoDias(dr)}">
+        <div class="finalizar-card__top">
+          <span class="finalizar-card__cont">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : 'Sin contenedor'}</span>
+          <span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span>
+        </div>
+        <div class="finalizar-card__cliente">${a.cliente_nombre}</div>
+        <div class="finalizar-card__dom">${a.domicilio_entrega || '—'}</div>
+        <div class="finalizar-card__fecha">
+          <span class="finalizar-card__fecha-val">${a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—'}</span>
+          <span class="finalizar-card__dr ${semaforoDias(dr)}">${drTxt}</span>
+        </div>
+        <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-naranja w-100 mt-2">Ver / gestionar retiro</a>
+      </div>`
+    }).join('') + `</div>`
+  }
+
   function tabla(lista, opts = {}) {
     if (!lista.length) return `<div class="empty-state empty-state--compact"><div class="empty-state__icon">📭</div><p class="empty-state__msg">${opts.empty || 'Aún no hay datos para mostrar.'}</p></div>`
     return `
@@ -62,6 +86,31 @@
   }
 %>
 
+<style>
+  .finalizar-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 0.85rem; padding: 0.25rem 0;
+  }
+  .finalizar-card {
+    border: 1px solid #eadfc4; border-left: 4px solid #f0b429;
+    border-radius: 12px; padding: 0.85rem 0.95rem; background: #fffdf7;
+    display: flex; flex-direction: column;
+  }
+  .finalizar-card.dias-rojo   { border-left-color: #dc2626; background: #fef4f4; }
+  .finalizar-card.dias-alerta { border-left-color: #f0b429; }
+  .finalizar-card.dias-ok     { border-left-color: #16a34a; }
+  .finalizar-card__top { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .finalizar-card__cont { font-weight: 700; color: #b45309; font-size: 0.95rem; }
+  .finalizar-card__cliente { font-weight: 600; color: #1f2937; }
+  .finalizar-card__dom { font-size: 0.82rem; color: #6b7280; margin-bottom: 0.5rem; }
+  .finalizar-card__fecha { display: flex; justify-content: space-between; align-items: baseline; }
+  .finalizar-card__fecha-val { font-weight: 700; color: #1f2937; }
+  .finalizar-card__dr { font-size: 0.8rem; font-weight: 600; }
+  .finalizar-card__dr.dias-rojo { color: #dc2626; }
+  .finalizar-card__dr.dias-alerta { color: #b45309; }
+  .finalizar-card__dr.dias-ok { color: #16a34a; }
+</style>
+
 <div class="page-header mb-4">
   <h4 class="page-title">Alquileres de contenedores</h4>
   <div class="d-flex gap-2">
@@ -76,8 +125,8 @@
     <span class="card-modern-title">Por finalizar — finalizan hoy o mañana</span>
     <span class="badge badge-pendiente rounded-pill px-3"><%= grupos.porFinalizar.length %></span>
   </div>
-  <div class="card-modern-body p-0">
-    <%- tabla(grupos.porFinalizar, { empty: 'No hay alquileres finalizando próximamente.' }) %>
+  <div class="card-modern-body">
+    <%- cardsFinalizar(grupos.porFinalizar) %>
   </div>
 </div>
 

@@ -205,7 +205,7 @@
 
       <div class="nav-actions">
         <a href="/hoja-de-ruta" class="btn btn-volver">← Volver</a>
-        <button type="button" class="btn btn-finalizar" id="btnFinalizar">✓ Finalizar entrega</button>
+        <button type="button" class="btn btn-finalizar" id="btnFinalizar">✓ <%= op.fase === 'retiro' ? 'Finalizar retiro' : 'Finalizar entrega' %></button>
       </div>
     </div>
   </div>
@@ -216,21 +216,23 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Confirmar entrega</h5>
+        <h5 class="modal-title"><%= op.fase === 'retiro' ? 'Confirmar retiro' : 'Confirmar entrega' %></h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <form action="/hoja-de-ruta/<%= op.id %>/finalizar" method="POST" enctype="multipart/form-data" id="finalizarForm" data-no-loader>
         <input type="hidden" name="distancia_km" id="distanciaKmInput">
         <div class="modal-body">
           <label class="form-label fw-semibold mb-1">✍️ Firma del cliente *</label>
-          <small class="text-muted d-block mb-1">Pedile al cliente que firme con el dedo en el recuadro</small>
+          <small class="text-muted d-block mb-1">
+            <%= op.fase === 'retiro' ? 'Pedile al cliente que firme la conformidad del retiro' : 'Pedile al cliente que firme con el dedo en el recuadro' %>
+          </small>
           <div class="firma-wrap">
             <canvas id="firmaCanvas" class="firma-canvas"></canvas>
             <button type="button" class="btn btn-sm btn-outline-secondary firma-clear" id="firmaClear">Limpiar</button>
           </div>
           <input type="hidden" name="firma_cliente" id="firmaInput">
 
-          <label class="form-label fw-semibold mb-1 mt-3">Aclaración (nombre de quien recibe) *</label>
+          <label class="form-label fw-semibold mb-1 mt-3">Aclaración (nombre de quien firma) *</label>
           <input type="text" name="firma_aclaracion" class="form-control form-control-sm" id="firmaNombre"
                  placeholder="Nombre y apellido" required autocomplete="off">
 
@@ -251,10 +253,24 @@
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary remito-preview__clear">Cambiar</button>
           </div>
+
+          <% if (op.fase === 'retiro' && op.proximo) { %>
+            <div class="alert alert-info mt-3 mb-0 p-2 small">
+              🔁 Este contenedor tiene un <strong>próximo alquiler</strong>: OP-<%= String(op.proximo.nro_op).padStart(4,'0') %> — <%= op.proximo.cliente_nombre %><% if (op.proximo.domicilio_entrega) { %> (<%= op.proximo.domicilio_entrega %>)<% } %>.
+              Podés llevarlo directo sin pasar por planta.
+            </div>
+          <% } %>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-success">Confirmar entrega</button>
+          <% if (op.fase === 'retiro') { %>
+            <button type="submit" name="destino_retiro" value="planta" class="btn btn-success">🏠 Devolver a planta</button>
+            <% if (op.proximo) { %>
+              <button type="submit" name="destino_retiro" value="proximo" class="btn btn-primary">🔁 Próximo alquiler</button>
+            <% } %>
+          <% } else { %>
+            <button type="submit" class="btn btn-success">Confirmar entrega</button>
+          <% } %>
         </div>
       </form>
     </div>
@@ -712,7 +728,7 @@
       // Distancia de la ruta (km) para el kilometraje automático del camión
       var dkm = document.getElementById('distanciaKmInput');
       if (dkm) dkm.value = routeTotalDist > 0 ? (routeTotalDist / 1000).toFixed(2) : '';
-      if (window.AppLoader) window.AppLoader.show('Confirmando entrega…');
+      if (window.AppLoader) window.AppLoader.show('Confirmando…');
     });
 
     // Preview de la foto del remito

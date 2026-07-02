@@ -184,6 +184,9 @@ async function initDB() {
       firma_cliente             TEXT,
       firma_aclaracion          TEXT,
       archivo_remito_pdf        TEXT,
+      firma_retiro              TEXT,
+      firma_retiro_aclaracion   TEXT,
+      archivo_remito_retiro     TEXT,
       created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
@@ -1029,6 +1032,12 @@ async function initDB() {
   // Ahora estrechar el CHECK a solo los nuevos estados
   await pool.query(`ALTER TABLE movimiento_contenedor DROP CONSTRAINT IF EXISTS movimiento_contenedor_estado_paso_check`).catch(() => {})
   await pool.query(`ALTER TABLE movimiento_contenedor ADD CONSTRAINT movimiento_contenedor_estado_paso_check CHECK (estado_paso IN ('disponible','pendiente_despacho','despachado','en_alquiler','pendiente_retiro','vuelta_a_planta'))`).catch(() => {})
+
+  // MIGRACIÓN: remito de retiro (los alquileres de contenedor tienen 2 remitos:
+  // el de entrega y el de retiro, cada uno con su firma y su foto).
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_retiro TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_retiro_aclaracion TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS archivo_remito_retiro TEXT`).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
