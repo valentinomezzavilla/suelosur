@@ -133,7 +133,10 @@
                                                 data-id="<%= codigoTx(t) %>" data-tipo="<%= t.tipo %>"
                                                 data-cliente="<%= t.cliente %>" data-descripcion="<%= t.descripcion %>"
                                                 data-fecha="<%= formatFecha(t.fecha) %>" data-monto="<%= t.monto %>"
-                                                data-metodo-pago="<%= t.metodo_pago || '' %>">
+                                                data-metodo-pago="<%= t.metodo_pago || '' %>"
+                                                data-op-id="<%= t.id_op_encabezado || '' %>"
+                                                data-nro-remito="<%= t.nro_remito || '' %>"
+                                                data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
                                                 Ver
                                             </button>
                                         </td>
@@ -167,39 +170,79 @@
 
         <!-- Modal detalle transaccion -->
         <div id="modal-transaccion" class="modal-overlay" style="display:none">
-            <div class="modal-box">
-                <div class="modal-header">
-                    <h2 class="modal-title">Detalle de transacción <span id="modal-t-id"></span></h2>
+            <div class="modal-box tx-modal">
+                <div class="modal-header tx-modal__header">
+                    <h2 class="modal-title">Detalle de transacción <span id="modal-t-id" class="tx-modal__id"></span></h2>
                     <button type="button" class="modal-close" id="cerrarModalTransaccion">✕</button>
                 </div>
-                <div class="alquiler-resumen__rows" style="margin-top:1rem">
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Tipo</span>
-                        <span id="modal-t-tipo"></span>
+
+                <div class="tx-modal__body">
+                    <div class="tx-row">
+                        <span class="tx-row__label">Tipo</span>
+                        <span class="tx-row__value"><span id="modal-t-tipo" class="tx-badge"></span></span>
                     </div>
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Cliente</span>
-                        <span id="modal-t-cliente"></span>
+                    <div class="tx-row">
+                        <span class="tx-row__label">Cliente</span>
+                        <span class="tx-row__value" id="modal-t-cliente"></span>
                     </div>
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Descripción</span>
-                        <span id="modal-t-descripcion"></span>
+                    <div class="tx-row">
+                        <span class="tx-row__label">Descripción</span>
+                        <span class="tx-row__value" id="modal-t-descripcion"></span>
                     </div>
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Fecha</span>
-                        <span id="modal-t-fecha"></span>
+                    <div class="tx-row">
+                        <span class="tx-row__label">Fecha</span>
+                        <span class="tx-row__value" id="modal-t-fecha"></span>
                     </div>
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Monto</span>
-                        <span id="modal-t-monto" style="font-weight:700"></span>
+                    <div class="tx-row">
+                        <span class="tx-row__label">Método de pago</span>
+                        <span class="tx-row__value" id="modal-t-metodo-pago"></span>
                     </div>
-                    <div class="alquiler-resumen__row">
-                        <span class="alquiler-resumen__label">Método de pago</span>
-                        <span id="modal-t-metodo-pago" style="font-weight:700"></span>
+                    <div class="tx-row tx-row--monto">
+                        <span class="tx-row__label">Monto</span>
+                        <span class="tx-row__value tx-monto" id="modal-t-monto"></span>
+                    </div>
+
+                    <div class="tx-files" id="modal-t-files">
+                        <span class="tx-files__title">📎 Archivos</span>
+                        <div class="tx-files__links" id="modal-t-files-links"></div>
                     </div>
                 </div>
-                <div class="modal-actions" style="margin-top:1.5rem">
+
+                <div class="tx-modal__actions">
                     <button type="button" class="btn-secondary" id="cerrarModalTransaccionBtn">Cerrar</button>
                 </div>
             </div>
         </div>
+
+        <style>
+          .tx-modal { max-width: 560px; width: 100%; }
+          .tx-modal__header { border-bottom: 1px solid #eef0f3; padding-bottom: 0.9rem; }
+          .tx-modal__id { color: #1a56db; font-weight: 700; }
+          .tx-modal__body { padding: 0.5rem 0 0.25rem; }
+          .tx-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+            padding: 0.85rem 0.25rem; border-bottom: 1px solid #f1f3f5;
+          }
+          .tx-row__label { color: #6b7280; font-size: 0.9rem; flex-shrink: 0; }
+          .tx-row__value { color: #111827; font-weight: 600; text-align: right; }
+          .tx-row--monto { border-bottom: none; margin-top: 0.15rem; }
+          .tx-monto { font-size: 1.6rem; font-weight: 800; color: #16a34a; }
+          .tx-badge {
+            display: inline-block; padding: 0.2rem 0.7rem; border-radius: 999px;
+            background: #eef2ff; color: #4338ca; font-size: 0.8rem; font-weight: 700;
+          }
+          .tx-files { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #dfe3e8; }
+          .tx-files__title { display: block; color: #6b7280; font-size: 0.9rem; margin-bottom: 0.6rem; }
+          .tx-files__links { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+          .tx-file-link {
+            display: inline-flex; align-items: center; gap: 0.4rem;
+            padding: 0.55rem 0.9rem; border-radius: 10px; text-decoration: none;
+            font-size: 0.88rem; font-weight: 600; border: 1px solid #e5e7eb;
+            background: #f9fafb; color: #1f2937; transition: background .15s, border-color .15s;
+          }
+          .tx-file-link:hover { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+          .tx-file-link--firmado { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+          .tx-file-link--firmado:hover { background: #d1fae5; border-color: #6ee7b7; }
+          .tx-files__empty { color: #9ca3af; font-size: 0.85rem; font-style: italic; }
+          .tx-modal__actions { margin-top: 1.5rem; display: flex; justify-content: flex-end; }
+        </style>

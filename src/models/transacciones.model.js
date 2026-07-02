@@ -52,7 +52,13 @@ const TransaccionesModel = {
 
     const total = (await query(`SELECT COUNT(*) AS n FROM transacciones ${where}`, params)).rows[0]?.n || 0
     const sumaTotal = (await query(`SELECT COALESCE(SUM(monto), 0) AS s FROM transacciones ${where}`, params)).rows[0]?.s || 0
-    const rows = (await query(`SELECT * FROM transacciones ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?`, [...params, limit, offset])).rows
+    const rows = (await query(`
+      SELECT sub.*,
+             (oe.archivo_remito IS NOT NULL AND oe.archivo_remito <> '') AS tiene_remito_firmado
+      FROM (SELECT * FROM transacciones ${where}) sub
+      LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
+      ORDER BY sub.${orderCol} ${orderDir} LIMIT ? OFFSET ?
+    `, [...params, limit, offset])).rows
 
     return { rows, total, sumaTotal, page, limit, totalPaginas: Math.ceil(total / limit) }
   },
