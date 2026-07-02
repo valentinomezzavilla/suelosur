@@ -3,6 +3,14 @@
   const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente']]
   const calle = d.domicilio_calle || d.domicilio_entrega || ''
   const numero = d.domicilio_numero || ''
+  // Fecha inicio = entrega planificada; fecha fin = inicio + plazo (días)
+  const fechaInicioVal = alquiler.fecha_entrega_planificada || ''
+  let fechaFinVal = ''
+  if (fechaInicioVal) {
+    const _fin = new Date(fechaInicioVal)
+    _fin.setDate(_fin.getDate() + (parseInt(d.plazo_alquiler) || 0))
+    fechaFinVal = _fin.toISOString().slice(0, 10)
+  }
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -18,9 +26,9 @@
         <div class="col-md-6"><label class="form-label">Calle</label><input name="calle" class="form-control" value="<%= calle %>"></div>
         <div class="col-md-3"><label class="form-label">Número</label><input name="numero" class="form-control" value="<%= numero %>"></div>
         <div class="col-md-3"><label class="form-label">Zona</label><input name="zona_entrega" class="form-control" value="<%= d.zona_entrega || '' %>"></div>
-        <div class="col-md-3"><label class="form-label">Plazo (días)</label><input type="number" min="1" name="plazo_alquiler" class="form-control" value="<%= d.plazo_alquiler || 5 %>"></div>
+        <div class="col-md-3"><label class="form-label">Fecha inicio</label><input type="date" name="fechaInicio" class="form-control" value="<%= fechaInicioVal %>"></div>
+        <div class="col-md-3"><label class="form-label">Fecha fin</label><input type="date" name="fechaFin" class="form-control" value="<%= fechaFinVal %>"></div>
         <div class="col-md-3"><label class="form-label">Precio</label><input type="number" step="0.01" min="0" name="precio_alquiler" class="form-control" value="<%= d.precio_alquiler || 0 %>"></div>
-        <div class="col-md-3"><label class="form-label">Fecha de entrega</label><input type="date" name="fecha_entrega_planificada" class="form-control" value="<%= alquiler.fecha_entrega_planificada || '' %>"></div>
         <div class="col-md-3"><label class="form-label">Método de pago</label>
           <select name="metodo_pago" class="form-select">
             <option value="">— Sin especificar —</option>

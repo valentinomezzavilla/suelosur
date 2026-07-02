@@ -123,7 +123,16 @@ const AlquileresController = {
 
   async actualizar(req, res) {
     try {
-      await AlquileresModel.actualizar(req.params.id, req.body)
+      const { fechaInicio, fechaFin } = req.body
+      let plazo_alquiler = req.body.plazo_alquiler
+      if (fechaInicio && fechaFin) {
+        plazo_alquiler = Math.max(1, Math.round((new Date(fechaFin) - new Date(fechaInicio)) / 86400000))
+      }
+      await AlquileresModel.actualizar(req.params.id, {
+        ...req.body,
+        plazo_alquiler,
+        fecha_entrega_planificada: fechaInicio || req.body.fecha_entrega_planificada || null,
+      })
       req.flash('success', 'Alquiler actualizado.')
       res.redirect(`/alquileres/contenedores/${req.params.id}`)
     } catch (err) {
