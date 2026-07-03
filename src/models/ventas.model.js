@@ -159,17 +159,20 @@ const VentasModel = {
     const calle  = datos.calle || null
     const numero = datos.numero ? parseInt(datos.numero) : null
     const fecha  = datos.fecha || null
+    const hora   = datos.hora || null
+    const zona   = datos.zona || null
     const metodoPago = datos.metodoPago || null
     const observaciones = datos.descripcion || ''
 
     await transaction(async (q) => {
       await q(`
         UPDATE op_encabezado
-        SET fecha_entrega_planificada = ?, domicilio_calle = ?, domicilio_altura = ?,
+        SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
+            domicilio_calle = ?, domicilio_altura = ?,
             domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
             observaciones = ?
         WHERE id = ?
-      `, [fecha, calle, numero, numero ? 0 : 1, metodoPago, observaciones, id])
+      `, [fecha, hora, zona, calle, numero, numero ? 0 : 1, metodoPago, observaciones, id])
 
       // Actualizar único detalle (cantidad/precio) si corresponde
       const detalle = (await q(`SELECT id, id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`, [id])).rows[0]
@@ -202,7 +205,8 @@ const VentasModel = {
       clienteNombre: op.cliente_nombre,
       telefono: op.tel_whatsapp || '',
       fecha: op.fecha_entrega_planificada || '',
-      hora: '',
+      hora: op.hora_planificada || '',
+      zona: op.zona || '',
       calle: op.domicilio_calle || '',
       numero: op.domicilio_altura || '',
       productoNombre: detalle.producto_nombre || '',

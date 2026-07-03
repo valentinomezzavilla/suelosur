@@ -32,7 +32,7 @@ const ZonasModel = {
   // Reúne viajes (ventas con flete), entregas/retiros de contenedor y maquinaria.
   async operacionesPendientes() {
     const viajes = (await query(`
-      SELECT op.id, op.nro_op, op.estado, COALESCE(NULLIF(op.zona,''),'Sin zona') AS zona,
+      SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(op.zona,''),'Sin zona') AS zona,
              COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
              TRIM(COALESCE(op.domicilio_calle,'') || ' ' || COALESCE(op.domicilio_altura::text,'')) AS domicilio,
              'Viaje' AS tipo, '/ventas/' || op.id AS link
@@ -40,7 +40,7 @@ const ZonasModel = {
       WHERE op.tipo_op='M' AND op.modalidad='flete' AND op.estado IN ('pendiente','despachado')
     `)).rows
     const contEntrega = (await query(`
-      SELECT op.id, op.nro_op, op.estado, COALESCE(NULLIF(oc.zona_entrega,''),'Sin zona') AS zona,
+      SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(oc.zona_entrega,''),'Sin zona') AS zona,
              COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
              oc.domicilio_entrega AS domicilio, 'Contenedor (entrega)' AS tipo,
              '/alquileres/contenedores/' || op.id AS link
@@ -49,7 +49,7 @@ const ZonasModel = {
       WHERE op.tipo_op='C' AND op.estado IN ('pendiente','despachado')
     `)).rows
     const maquinaria = (await query(`
-      SELECT op.id, op.nro_op, op.estado, COALESCE(NULLIF(om.zona_entrega,''),'Sin zona') AS zona,
+      SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(om.zona_entrega,''),'Sin zona') AS zona,
              COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
              om.domicilio_entrega AS domicilio, 'Maquinaria' AS tipo,
              '/alquileres/maquinaria/' || op.id AS link

@@ -295,6 +295,7 @@ const VentasController = {
         viaje,
         calle: viaje.calle,
         numero: viaje.numero,
+        zonas: await require('../models/zonas.model').listarActivas(),
       })
     } catch (err) {
       console.error(err)
@@ -403,6 +404,8 @@ const VentasController = {
         dni: c.dni,
         telefono: c.telefono || c.tel_whatsapp,
         email: c.email,
+        zona: c.zona || '',
+        domicilio: c.domicilio_ppal || '',
         cuentaCorriente: !!c.cuenta_corriente,
       })))
     } catch (err) {

@@ -32,9 +32,25 @@
       <div class="direccion-acciones">
         <div class="form-group">
           <label for="zona">Zona</label>
-          <input type="text" name="zona_entrega" id="zona" placeholder="Ej: Norte">
+          <select name="zona_entrega" id="zona">
+            <option value="">— Sin zona —</option>
+            <% (typeof zonas !== 'undefined' ? zonas : []).forEach(z => { %>
+              <option value="<%= z.nombre %>"><%= z.nombre %></option>
+            <% }) %>
+          </select>
         </div>
         <button type="button" id="btnBuscarDireccion" class="btn-secondary btn-buscar-mapa direccion-mapbtn"><%- icon('mapPin', { size: 15 }) %> Buscar en mapa</button>
+      </div>
+      <div class="form-row-2" style="margin-top:0.75rem">
+        <div class="form-group">
+          <label for="fechaEntrega">Fecha de entrega</label>
+          <input type="date" name="fechaEntrega" id="fechaEntrega">
+        </div>
+        <div class="form-group">
+          <label for="horaEntrega">Hora</label>
+          <input type="time" name="horaEntrega" id="horaEntrega">
+          <p class="form-hint">Se usa para avisar si el chofer/camión ya tiene otra operación en ese horario.</p>
+        </div>
       </div>
       <p id="msgMapa" class="form-hint" style="display:none">Ingresá calle y número para buscar.</p>
       <div id="mapaEntrega" style="display:none;margin-top:0.75rem">

@@ -29,7 +29,12 @@
     <div class="card shadow-sm h-100 card-accent-blue kpi-card"><div class="card-body">
       <p class="text-muted small mb-1">Flota disponible</p>
       <h3 class="fw-bold text-blue"><%= (flota.porEstado.disponible||0) %> / <%= flota.total %></h3>
-      <small class="text-muted"><%= (flota.porEstado.en_mantenimiento||0) %> en mantenimiento</small>
+      <small class="text-muted"><%
+        const _fparts = []
+        if (flota.porEstado.en_viaje) _fparts.push(flota.porEstado.en_viaje + ' en viaje')
+        if (flota.porEstado.en_mantenimiento) _fparts.push(flota.porEstado.en_mantenimiento + ' en mantenimiento')
+        if (flota.porEstado.fuera_servicio) _fparts.push(flota.porEstado.fuera_servicio + ' fuera de servicio')
+      %><%= _fparts.length ? _fparts.join(' · ') : 'Todos disponibles' %></small>
     </div></div>
   </div>
   <div class="col-md-3">

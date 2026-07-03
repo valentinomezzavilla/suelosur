@@ -27,6 +27,7 @@ const AlquileresMaquinariaController = {
       res.render('pages/alquileres/maquinaria_nuevo', {
         titulo: 'Nuevo Alquiler de Maquinaria',
         disponibles, choferes, configDefaults,
+        zonas: await require('../models/zonas.model').listarActivas(),
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/alquilerMaquinariaService.js'],
       })
     } catch (err) {
@@ -38,7 +39,7 @@ const AlquileresMaquinariaController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, plazo_alquiler, modo_precio, precio_por_hora, horas_pactadas, precio_total, id_maquinaria, id_chofer, metodoPago, observaciones } = req.body
+      const { clienteId, calle, numero, zona_entrega, plazo_alquiler, modo_precio, precio_por_hora, horas_pactadas, precio_total, id_maquinaria, id_chofer, metodoPago, observaciones, fechaEntrega, horaEntrega } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
@@ -55,6 +56,8 @@ const AlquileresMaquinariaController = {
         id_chofer: id_chofer || null,
         metodo_pago: metodoPago,
         observaciones,
+        fecha_entrega_planificada: fechaEntrega || null,
+        hora_planificada: horaEntrega || null,
       })
       req.flash('success', `Alquiler maquinaria OP-${String(nro_op).padStart(4,'0')} creado.`)
       res.redirect('/alquileres/maquinaria')

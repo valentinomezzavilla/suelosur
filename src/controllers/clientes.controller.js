@@ -245,7 +245,8 @@ const ClientesController = {
         id: c.id, numero: c.numero, nombre: c.nombre, apellido: c.apellido || '',
         nombreCompleto: ClientesModel.nombreCompleto(c),
         dni: c.dni, telefono: c.telefono || c.tel_whatsapp,
-        email: c.email, cuentaCorriente: !!c.cuenta_corriente,
+        email: c.email, zona: c.zona || '', domicilio: c.domicilio_ppal || '',
+        cuentaCorriente: !!c.cuenta_corriente,
       })))
     } catch (err) {
       console.error(err); res.status(500).json({ error: 'Error.' })

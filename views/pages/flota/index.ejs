@@ -63,14 +63,17 @@
       <%- include('../../partials/empty_state', { icono: '🚚', mensaje: 'No hay camiones registrados.', accionHref: '/flota/nuevo', accionLabel: 'Registrar primer camión' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th class="col-w-50">N°</th><th>Patente</th><th>Vehículo</th><th>Tipo</th><th>Chofer</th><th class="text-end">Km</th><th class="text-center">Estado</th><th class="text-center">Acciones</th></tr></thead>
+      <thead><tr><th class="col-w-50">N°</th><th>Patente</th><th>Vehículo</th><th>Tipo</th><th>Actividad</th><th>Chofer</th><th class="text-end">Km</th><th class="text-center">Estado</th><th class="text-center">Acciones</th></tr></thead>
       <tbody>
+        <% const actLbl = { ventas:'Ventas', contenedores:'Contenedores', maquinas:'Máquinas' }
+           const actBadge = { ventas:'badge-en-transito', contenedores:'badge-activo', maquinas:'badge-pendiente' } %>
         <% vehiculos.forEach(v => { %>
         <tr class="<%= !v.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold text-orange">#<%= v.numero_interno || '—' %></td>
           <td class="fw-semibold"><%= v.patente || '—' %></td>
           <td class="fw-semibold"><%= v.nombre || '—' %> <% if(v.marca||v.modelo){ %><small class="text-muted d-block"><%= [v.marca,v.modelo].filter(Boolean).join(' ') %></small><% } %></td>
           <td><small class="text-muted"><%= v.tipo_unidad || v.tipo_vehiculo || '—' %></small></td>
+          <td><% if (v.actividad) { %><span class="badge rounded-pill px-2 <%= actBadge[v.actividad]||'badge-pendiente' %>"><%= actLbl[v.actividad]||v.actividad %></span><% } else { %><small class="text-muted">Sin definir</small><% } %></td>
           <td><small class="<%= v.chofer_nombre ? '' : 'text-muted' %>"><%= v.chofer_nombre && v.chofer_nombre.trim() ? v.chofer_nombre : '— libre —' %></small></td>
           <td class="text-end"><small><%= (v.kilometraje||0).toLocaleString('es-AR') %></small></td>
           <td class="text-center"><span class="badge rounded-pill px-3 <%= estadoBadge[v.estado_operativo]||'badge-pendiente' %>"><%= estadoLbl[v.estado_operativo]||v.estado_operativo %></span></td>
