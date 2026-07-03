@@ -22,25 +22,40 @@
   }
   .nav-top > * { pointer-events: auto; }
   .nav-icon-btn {
-    width: 44px; height: 44px; flex-shrink: 0;
-    border-radius: 50%; background: #fff; border: none; cursor: pointer;
+    width: 46px; height: 46px; flex-shrink: 0;
+    border-radius: 50%; background: rgba(255,255,255,.97); border: none; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 2px 6px rgba(0,0,0,.25); font-size: 20px; color: #333;
+    box-shadow: 0 1px 3px rgba(0,0,0,.2), 0 4px 14px rgba(0,0,0,.12);
+    font-size: 20px; color: #3c4043;
   }
-  .nav-icon-btn:active { background: #f0f0f0; }
+  .nav-icon-btn:active { background: #f0f0f0; transform: scale(.96); }
   .nav-dest-chip {
-    flex: 1; min-width: 0; background: #fff; border-radius: 10px;
-    padding: 0.5rem 0.85rem; box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    flex: 1; min-width: 0; background: rgba(255,255,255,.97);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    border-radius: 14px; padding: 0.55rem 0.95rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,.18), 0 4px 14px rgba(0,0,0,.12);
     display: flex; flex-direction: column; justify-content: center;
   }
   .nav-dest-chip .d {
-    font-weight: 600; color: #202124; font-size: 0.9rem;
+    font-weight: 700; color: #202124; font-size: 0.92rem; letter-spacing: -0.01em;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .nav-dest-chip .c {
     color: #5f6368; font-size: 0.78rem;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+
+  /* ── Velocímetro flotante (estilo Waze) ── */
+  .nav-speed {
+    position: absolute; left: 14px; bottom: 16px; z-index: 600;
+    width: 64px; height: 64px; border-radius: 50%;
+    background: #fff; border: 3px solid #1a73e8;
+    box-shadow: 0 3px 10px rgba(0,0,0,.25);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: bottom .28s ease;
+  }
+  .nav-speed b { font-size: 1.3rem; line-height: 1.05; color: #202124; font-weight: 800; }
+  .nav-speed span { font-size: 0.58rem; color: #80868b; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 
   /* ── Botones flotantes (FAB) ── */
   .nav-fabs {
@@ -61,10 +76,21 @@
 
   /* ── Marcador del chofer (puck con flecha de dirección) ── */
   .nav-puck { position: relative; width: 34px; height: 34px; }
+  .nav-puck__halo {
+    position: absolute; inset: -16px; border-radius: 50%;
+    background: rgba(26,115,232,.28);
+    animation: puckPulse 2.4s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes puckPulse {
+    0%   { transform: scale(.4); opacity: .9; }
+    70%  { transform: scale(1);  opacity: 0; }
+    100% { transform: scale(1);  opacity: 0; }
+  }
   .nav-puck__dot {
     position: absolute; inset: 6px; border-radius: 50%;
     background: #1a73e8; border: 3px solid #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    box-shadow: 0 1px 4px rgba(0,0,0,.4), 0 0 0 1px rgba(26,115,232,.3);
   }
   .nav-puck__arrow {
     position: absolute; top: -4px; left: 50%;
@@ -92,14 +118,38 @@
   .nav-grip { padding: 8px 0 4px; display: flex; justify-content: center; cursor: pointer; flex-shrink: 0; }
   .nav-grip span { width: 40px; height: 5px; border-radius: 3px; background: #dadce0; }
 
+  .nav-progress { height: 4px; background: #e8eaed; border-radius: 2px; margin: 0 1rem 0.55rem; overflow: hidden; flex-shrink: 0; }
+  .nav-progress__bar { height: 100%; width: 0%; background: linear-gradient(90deg, #1a73e8, #0f9d58); border-radius: 2px; transition: width .6s ease; }
+
   .nav-stats {
     display: flex; align-items: center; gap: 0.5rem;
     padding: 0 1rem 0.6rem; flex-shrink: 0;
   }
   .nav-stat { flex: 1; text-align: center; }
-  .nav-stat b { display: block; font-size: 1.35rem; font-weight: 700; color: #202124; line-height: 1.1; }
-  .nav-stat span { font-size: 0.72rem; color: #80868b; font-weight: 500; }
-  .nav-stat--primary b { color: #1a73e8; }
+  .nav-stat b { display: block; font-size: 1.3rem; font-weight: 800; color: #202124; line-height: 1.1; letter-spacing: -0.01em; }
+  .nav-stat span { font-size: 0.7rem; color: #80868b; font-weight: 600; }
+  .nav-stat--primary b { color: #0f9d58; font-size: 1.45rem; }
+
+  /* ── Navegación externa + llamada ── */
+  .nav-ext { display: flex; gap: 0.55rem; margin-bottom: 0.85rem; }
+  .nav-ext a {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 0.35rem;
+    padding: 0.62rem 0.4rem; border-radius: 10px; text-decoration: none;
+    font-size: 0.83rem; font-weight: 700; color: #3c4043;
+    background: #fff; border: 1.5px solid #e0e3e7;
+  }
+  .nav-ext a:active { background: #f1f3f4; }
+  .nav-ext a.disabled { opacity: .4; pointer-events: none; }
+  .nav-ext a.ext-call { color: #0f9d58; border-color: #ceead6; background: #f6fef9; }
+
+  /* ── Estado "llegaste" ── */
+  .nav-panel.arrived .nav-dest-card { background: #e6f4ea; }
+  .nav-panel.arrived .nav-dest-card__icon { background: #0f9d58; }
+  .nav-panel.arrived .btn-finalizar { background: #0f9d58 !important; animation: btnPulse 1.8s infinite; }
+  @keyframes btnPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(15,157,88,.45); }
+    50%      { box-shadow: 0 0 0 12px rgba(15,157,88,0); }
+  }
   .nav-panel-hide {
     border: none; background: #f1f3f4; color: #5f6368; cursor: pointer;
     width: 36px; height: 36px; border-radius: 50%; font-size: 16px; flex-shrink: 0;
@@ -176,16 +226,21 @@
       <button class="nav-fab" id="fabRecenter" title="Centrar en mi ubicación" hidden>◎</button>
       <button class="nav-fab nav-fab--info" id="fabShowPanel" title="Mostrar info" hidden>ℹ️ Info</button>
     </div>
+
+    <!-- Velocímetro -->
+    <div class="nav-speed" id="navSpeed"><b id="velocidad">0</b><span>km/h</span></div>
   </div>
 
   <!-- Panel inferior -->
   <div class="nav-panel" id="navPanel">
     <div class="nav-grip" id="panelGrip"><span></span></div>
 
+    <div class="nav-progress"><div class="nav-progress__bar" id="progressBar"></div></div>
+
     <div class="nav-stats">
-      <div class="nav-stat nav-stat--primary"><b id="distancia">—</b><span>Restante</span></div>
-      <div class="nav-stat"><b id="duracion">—</b><span>Tiempo</span></div>
-      <div class="nav-stat"><b id="velocidad">0</b><span>km/h</span></div>
+      <div class="nav-stat nav-stat--primary"><b id="duracion">—</b><span>Tiempo restante</span></div>
+      <div class="nav-stat"><b id="distancia">—</b><span>Distancia</span></div>
+      <div class="nav-stat"><b id="llegada">—</b><span>Llegada</span></div>
       <button class="nav-panel-hide" id="panelHide" title="Esconder panel">✕</button>
     </div>
 
@@ -196,6 +251,12 @@
           <h4><%= op.domicilio || 'Destino a coordinar' %></h4>
           <p><%= op.cliente %><% if (op.tel) { %> · <%= op.tel %><% } %></p>
         </div>
+      </div>
+
+      <div class="nav-ext">
+        <a id="btnWaze" class="disabled" target="_blank" rel="noopener">🚙 Waze</a>
+        <a id="btnGmaps" class="disabled" target="_blank" rel="noopener">🗺️ Maps</a>
+        <% if (op.tel) { %><a class="ext-call" href="tel:<%= op.tel %>">📞 Llamar</a><% } %>
       </div>
 
       <div class="nav-status" id="statusGPS">
@@ -300,7 +361,7 @@
   const SAVE_INTERVAL   = 8000;   // ms entre envíos de posición al backend
 
   // ── Estado ──
-  let map, userMarker, destMarker, accuracyCircle, routeLine;
+  let map, userMarker, destMarker, accuracyCircle, routeLine, routeCasing;
   let userLat = null, userLng = null, heading = 0, speedKmh = 0;
   let followMode = true;
   let programmaticMove = false;
@@ -319,6 +380,8 @@
   const distanciaEl = document.getElementById('distancia');
   const duracionEl  = document.getElementById('duracion');
   const velocidadEl = document.getElementById('velocidad');
+  const llegadaEl   = document.getElementById('llegada');
+  const progressBar = document.getElementById('progressBar');
   const fabRecenter = document.getElementById('fabRecenter');
   const fabRoute    = document.getElementById('fabRoute');
   const fabShowPanel = document.getElementById('fabShowPanel');
@@ -387,8 +450,9 @@
       dragging: true, touchZoom: true, scrollWheelZoom: true, doubleClickZoom: true,
     }).setView([destLat != null ? destLat : -31.4203, destLng != null ? destLng : -64.1888], 16);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, crossOrigin: true,
+    // Cartografía CARTO Voyager: estilo limpio tipo app de navegación (gratis, sin key)
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20, crossOrigin: true, subdomains: 'abcd',
     }).addTo(map);
 
     // Marcador del chofer
@@ -396,7 +460,7 @@
       zIndexOffset: 1000,
       icon: L.divIcon({
         className: 'nav-puck-icon',
-        html: '<div class="nav-puck"><div class="nav-puck__arrow" id="puckArrow"></div><div class="nav-puck__dot"></div></div>',
+        html: '<div class="nav-puck"><div class="nav-puck__halo"></div><div class="nav-puck__arrow" id="puckArrow"></div><div class="nav-puck__dot"></div></div>',
         iconSize: [34, 34], iconAnchor: [17, 17],
       }),
     });
@@ -421,6 +485,12 @@
         iconSize: [36, 36], iconAnchor: [18, 36],
       }),
     }).addTo(map);
+
+    // Habilitar navegación externa (deep links gratuitos)
+    const w = document.getElementById('btnWaze');
+    const g = document.getElementById('btnGmaps');
+    if (w) { w.href = 'https://waze.com/ul?ll=' + destLat + ',' + destLng + '&navigate=yes'; w.classList.remove('disabled'); }
+    if (g) { g.href = 'https://www.google.com/maps/dir/?api=1&destination=' + destLat + ',' + destLng + '&travelmode=driving'; g.classList.remove('disabled'); }
   }
 
   function onUserInteract() {
@@ -549,8 +619,14 @@
       routeTotalDur = route.duration;
       lastNearestIdx = 0;
 
-      if (routeLine) routeLine.setLatLngs(routeCoords);
-      else routeLine = L.polyline(routeCoords, { color: '#1a73e8', weight: 6, opacity: 0.85, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+      if (routeLine) {
+        routeCasing.setLatLngs(routeCoords);
+        routeLine.setLatLngs(routeCoords);
+      } else {
+        // Doble trazo (borde oscuro + relleno vibrante), como las apps de navegación
+        routeCasing = L.polyline(routeCoords, { color: '#1557b0', weight: 11, opacity: 0.95, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+        routeLine = L.polyline(routeCoords, { color: '#4285f4', weight: 6.5, opacity: 1, lineJoin: 'round', lineCap: 'round' }).addTo(map);
+      }
 
       fabRoute.hidden = false;
       if (isFirst && !firstFitDone) {
@@ -580,7 +656,9 @@
       // y solo muestra lo que falta hacia el destino (estilo Waze).
       if (routeLine) {
         const ahead = routeCoords.slice(Math.min(near.idx + 1, routeCoords.length));
-        routeLine.setLatLngs([[userLat, userLng]].concat(ahead));
+        const seg = [[userLat, userLng]].concat(ahead);
+        routeLine.setLatLngs(seg);
+        if (routeCasing) routeCasing.setLatLngs(seg);
       }
     } else {
       remaining = haversine(userLat, userLng, destLat, destLng);
@@ -596,6 +674,16 @@
       etaSec = remaining / (speedKmh / 3.6);
     }
     duracionEl.textContent = fmtMin(etaSec);
+
+    // Hora estimada de llegada + barra de progreso del recorrido
+    if (etaSec != null && llegadaEl) {
+      const t = new Date(Date.now() + etaSec * 1000);
+      llegadaEl.textContent = String(t.getHours()).padStart(2, '0') + ':' + String(t.getMinutes()).padStart(2, '0');
+    }
+    if (progressBar && routeTotalDist > 0) {
+      const pct = Math.max(0, Math.min(100, (1 - remaining / routeTotalDist) * 100));
+      progressBar.style.width = pct.toFixed(1) + '%';
+    }
   }
 
   function detectArrival() {
@@ -603,6 +691,9 @@
     if (haversine(userLat, userLng, destLat, destLng) <= ARRIVAL_M) {
       arrived = true;
       setStatus('active', '🎉 Llegaste al destino. Confirmá la entrega.');
+      navPanel.classList.add('arrived');
+      applyPanelState('expanded', false);
+      if (progressBar) progressBar.style.width = '100%';
       if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
     }
   }
@@ -702,8 +793,13 @@
     fabRoute.addEventListener('click', showFullRoute);
     document.getElementById('btnBack').addEventListener('click', function () { window.location.href = '/hoja-de-ruta'; });
 
-    // Posicionar los FABs por encima del panel
-    const ro = function () { navFabs.style.bottom = (navPanel.offsetHeight + 16) + 'px'; };
+    // Posicionar los FABs y el velocímetro por encima del panel
+    const navSpeed = document.getElementById('navSpeed');
+    const ro = function () {
+      const b = (navPanel.offsetHeight + 16) + 'px';
+      navFabs.style.bottom = b;
+      if (navSpeed) navSpeed.style.bottom = b;
+    };
     ro(); window.addEventListener('resize', ro);
     new MutationObserver(ro).observe(navPanel, { attributes: true, attributeFilter: ['class'] });
     navPanel.addEventListener('transitionend', ro);
