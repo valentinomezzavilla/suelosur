@@ -87,7 +87,12 @@
         <div class="direccion-acciones">
           <div class="form-group">
             <label for="zona">Zona</label>
-            <input type="text" name="zona_entrega" id="zona" placeholder="Ej: Norte">
+            <select name="zona_entrega" id="zona">
+              <option value="">— Sin zona —</option>
+              <% (typeof zonas !== 'undefined' ? zonas : []).forEach(z => { %>
+                <option value="<%= z.nombre %>"><%= z.nombre %></option>
+              <% }) %>
+            </select>
           </div>
           <button type="button" id="btnBuscarDireccion" class="btn-secondary btn-buscar-mapa direccion-mapbtn"><%- icon('mapPin', { size: 15 }) %> Buscar en mapa</button>
         </div>

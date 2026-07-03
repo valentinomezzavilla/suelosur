@@ -21,15 +21,16 @@ const AlquileresController = {
 
   async nuevo(req, res) {
     try {
-      const [{ disponibles, porLiberar }, configPrecios, choferesDisp, camionesDisp] = await Promise.all([
+      const [{ disponibles, porLiberar }, configPrecios, choferesDisp, camionesDisp, zonas] = await Promise.all([
         AlquileresModel.contenedoresDisponibles(),
         ConfigContenedoresModel.obtenerPrecios(),
         OperacionesModel.choferesDisponibles(),
         OperacionesModel.camionesDisponibles('contenedores'),
+        require('../models/zonas.model').listarActivas(),
       ])
       res.render('pages/alquileres/nuevo', {
         titulo: 'Nuevo Alquiler de Contenedor',
-        disponibles, porLiberar, configPrecios, choferesDisp, camionesDisp,
+        disponibles, porLiberar, configPrecios, choferesDisp, camionesDisp, zonas,
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/alquilerService.js'],
       })
     } catch (err) {
@@ -117,7 +118,10 @@ const AlquileresController = {
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/contenedores') }
       if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/contenedores/${alquiler.id}`) }
-      res.render('pages/alquileres/editar', { titulo: `Editar OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
+      res.render('pages/alquileres/editar', {
+        titulo: `Editar OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler,
+        zonas: await require('../models/zonas.model').listarActivas(),
+      })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al cargar el alquiler.'); res.redirect('/alquileres/contenedores')
     }

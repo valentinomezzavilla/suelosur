@@ -18,7 +18,7 @@ const MaquinariaModel = {
     if (estado_general) { wheres.push('m.estado_general = ?'); params.push(estado_general) }
     if (estado_paso)    { wheres.push('um.estado_paso = ?');   params.push(estado_paso) }
     return (await query(`
-      SELECT m.id, m.nombre, m.tipo, m.patente, m.modelo, m.anio, m.estado_general,
+      SELECT m.id, m.nombre, m.tipo, m.patente, m.modelo, m.anio, m.estado_general, m.actividad,
              m.km_actuales, m.ultimo_service, m.proximo_service, m.observaciones, m.activo,
              um.estado_paso, um.fecha_movimiento,
              op.nro_op, cli.nombre AS cliente_nombre,

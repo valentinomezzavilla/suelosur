@@ -27,9 +27,11 @@ const ZonasController = {
       const zonas = await ZonasModel.listarActivas()
       const orden = {}
       zonas.forEach((z, i) => { orden[z.nombre] = z.orden || (i + 1) })
-      // Agrupar por zona
+      // Agrupar por zona (dentro de cada zona, primero las que tienen hora, en orden)
       const porZona = {}
       ops.forEach(o => { (porZona[o.zona] = porZona[o.zona] || []).push(o) })
+      Object.values(porZona).forEach(items => items.sort((a, b) =>
+        String(a.hora_planificada || '99:99').localeCompare(String(b.hora_planificada || '99:99'))))
       // Ordenar zonas según el catálogo (las "Sin zona" al final)
       const zonasOrdenadas = Object.keys(porZona).sort((a, b) => {
         const oa = orden[a] ?? 999, ob = orden[b] ?? 999

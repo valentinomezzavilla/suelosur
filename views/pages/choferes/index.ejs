@@ -42,18 +42,22 @@
           <th>Chofer</th>
           <th>DNI</th>
           <th>Licencia</th>
+          <th>Especialización</th>
           <th>Camión asignado</th>
           <th class="text-center">Estado</th>
           <th class="text-center">Acciones</th>
         </tr>
       </thead>
       <tbody>
+        <% const opLbl = { ventas:'Ventas', contenedores:'Contenedores', maquinas:'Máquinas' }
+           const opBadge = { ventas:'badge-en-transito', contenedores:'badge-activo', maquinas:'badge-pendiente' } %>
         <% choferes.forEach(c => { const lb = licBadge(c.licencia_vencimiento) %>
         <tr class="<%= !c.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold text-orange">#<%= c.legajo %></td>
           <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
           <td><small class="text-muted"><%= c.dni || '—' %></small></td>
           <td><span class="badge rounded-pill px-3 <%= lb[0] %>"><%= lb[1] %></span></td>
+          <td><% if (c.tipo_operacion) { %><span class="badge rounded-pill px-2 <%= opBadge[c.tipo_operacion]||'badge-pendiente' %>"><%= opLbl[c.tipo_operacion]||c.tipo_operacion %></span><% } else { %><small class="text-muted">Sin especializar</small><% } %></td>
           <td><small class="text-muted"><%= c.camion_principal || '— sin asignar —' %></small></td>
           <td class="text-center">
             <% if (c.activo) { %><span class="badge rounded-pill px-3 badge-activo">Activo</span>

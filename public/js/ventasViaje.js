@@ -20,11 +20,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const hoy = new Date().toISOString().split('T')[0];
     if (fechaInput) fechaInput.min = hoy;
 
-    // cuando selecciono un cliente, le cargo el telefono automaticamente
+    // cuando selecciono un cliente, le cargo el telefono y la zona automaticamente
     document.addEventListener('clienteSeleccionado', (e) => {
         const c = e.detail;
         const telInput = document.getElementById('telefonoViaje');
         if (telInput && c.telefono) telInput.value = c.telefono;
+        // Zona del cliente → preseleccionar (si el select la tiene) y autocompletar tarifa
+        const zonaSel = document.getElementById('zonaViaje');
+        if (zonaSel && c.zona && !zonaSel.value) {
+            const opt = Array.from(zonaSel.options).find(o => o.value.toLowerCase() === String(c.zona).toLowerCase());
+            if (opt) { zonaSel.value = opt.value; zonaSel.dispatchEvent(new Event('change')); }
+        }
     });
 
     // stock disponible del producto seleccionado

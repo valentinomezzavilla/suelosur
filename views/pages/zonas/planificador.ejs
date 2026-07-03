@@ -27,11 +27,12 @@
       </div>
       <div class="card-body p-0">
         <table class="table table-hover align-middle mb-0">
-          <thead><tr><th class="col-w-50">#</th><th>Tipo</th><th>OP</th><th>Cliente</th><th>Domicilio</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th class="col-w-50">#</th><th>Hora</th><th>Tipo</th><th>OP</th><th>Cliente</th><th>Domicilio</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             <% items.forEach((o, i) => { %>
             <tr>
               <td class="text-muted"><%= i + 1 %></td>
+              <td><% if (o.hora_planificada) { %><span class="fw-semibold">🕐 <%= o.hora_planificada %></span><% } else { %><small class="text-muted">—</small><% } %></td>
               <td><span class="badge rounded-pill px-3 <%= tipoBadge[o.tipo] || 'badge-pendiente' %>"><%= o.tipo %></span></td>
               <td class="fw-semibold">OP-<%= String(o.nro_op).padStart(4,'0') %></td>
               <td><%= o.cliente %><% if (o.tel_whatsapp) { %><small class="text-muted d-block"><%= o.tel_whatsapp %></small><% } %></td>
