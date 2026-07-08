@@ -1,0 +1,112 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Refinamientos mobile — tipografía y tamaños táctiles
+// Se carga al FINAL de main.scss para ganar por orden de fuente.
+// Objetivo: fuentes legibles, controles cómodos al tacto y sin
+// zoom automático de iOS al enfocar campos.
+// ═══════════════════════════════════════════════════════════════
+
+@include md-down {
+
+  // ── Texto base un punto más grande y legible en pantallas chicas ──
+  body { font-size: 1rem; }
+
+  // ── Anti-zoom iOS ────────────────────────────────────────────
+  // iOS Safari hace zoom al enfocar cualquier control con
+  // font-size < 16px. Igualamos todos los campos a 16px.
+  input:not([type="radio"]):not([type="checkbox"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea,
+  .form-control,
+  .form-select,
+  .form-group select,
+  .form-group textarea,
+  .filtro-group input,
+  .filtro-group select,
+  .input-sm {
+    font-size: 16px;
+  }
+
+  // ── Altura táctil cómoda (>= 44px) en controles ──────────────
+  .form-group input:not([type="radio"]):not([type="checkbox"]),
+  .form-group select,
+  .form-group textarea,
+  .filtro-group input,
+  .filtro-group select,
+  .tabla-toolbar__search .form-control,
+  .tabla-toolbar__filtro .form-select,
+  .tabla-toolbar__filtro .form-control {
+    min-height: 44px;
+  }
+  .form-group textarea { min-height: 96px; }
+
+  // ── Botones e íconos táctiles ────────────────────────────────
+  .btn-sm {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-icon-danger {
+    width: 40px;
+    height: 40px;
+    font-size: 1.25rem;
+  }
+  .periodo-chip  { padding: 0.55rem 1rem; }
+  .navbar-toggle { width: 42px; height: 42px; }
+
+  // ── Navbar ───────────────────────────────────────────────────
+  .app-navbar .nav-title { font-size: 1rem; }
+
+  // ── Tablas: contenedor con scroll + celdas más compactas ─────
+  // Muchas listas montan la tabla directamente en .card-body.p-0
+  // sin wrapper: en mobile desbordaban la página entera.
+  .card-body.p-0 {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .table thead th,
+  .table tbody td,
+  .table-modern thead th,
+  .table-modern tbody td,
+  .data-table thead th,
+  .data-table tbody td {
+    padding-left: 0.7rem;
+    padding-right: 0.7rem;
+  }
+
+  // ── Sidebar (drawer): etiquetas y enlaces más legibles/tocables ──
+  .nav-section-label { font-size: 0.66rem; }
+  .nav-group-label   { font-size: 0.62rem; }
+  .app-sidebar .nav-link {
+    font-size: 0.9rem;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+    &.is-indent { font-size: 0.86rem; }
+  }
+
+  // ── Stat cards: que entren dos por fila sin desbordar ────────
+  .stat-card {
+    gap: 0.7rem;
+    padding: 0.85rem 0.9rem;
+  }
+  .stat-card__icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+  .stat-card__value { font-size: 1.35rem; }
+  .stat-card__label { font-size: 0.66rem; }
+}
+
+// ── Teléfonos muy angostos ───────────────────────────────────────
+@include sm-down {
+  .stat-card__value { font-size: 1.25rem; }
+  .page-title       { font-size: 1.1rem; }
+  .total-display    { font-size: 1.65rem; }
+  .rs-total-value   { font-size: 1.3rem; }
+  // Números de dinero grandes que no deben cortar
+  .detalle-precio   { font-size: 1rem; }
+}

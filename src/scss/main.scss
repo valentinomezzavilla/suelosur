@@ -46,3 +46,6 @@
 
 // ── Utilidades (al final, para que ganen por especificidad) ────
 @use 'utilities/helpers';
+
+// ── Refinamientos mobile (último, para ganar por orden de fuente) ──
+@use 'base/mobile';
