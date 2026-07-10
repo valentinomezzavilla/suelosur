@@ -864,10 +864,7 @@ async function initDB() {
   // SEED DE DESARROLLO
   // ─────────────────────────────────────────────────────────────────
   const seedUsuarios = [
-    { usuario: 'valentino',      nombre: 'Valentino Mezzavilla', rol: 'dueno'          },
-    { usuario: 'admin_ventas',   nombre: 'Admin Ventas',         rol: 'admin_ventas'   },
-    { usuario: 'admin_contable', nombre: 'Admin Contable',       rol: 'admin_contable' },
-    { usuario: 'chofer1',        nombre: 'Chofer Demo',          rol: 'chofer'         },
+    { usuario: 'eduardomezzavilla', nombre: 'Eduardo Mezzavilla', rol: 'dueno' },
   ]
   for (const u of seedUsuarios) {
     await pool.query(
