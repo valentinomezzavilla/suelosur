@@ -52,6 +52,12 @@
                         <span class="info-label">Direccion</span>
                         <span class="info-value"><%= viaje.direccion || '—' %></span>
                     </div>
+                    <% if (viaje.obra) { %>
+                    <div class="info-row">
+                        <span class="info-label">Obra</span>
+                        <span class="info-value"><%= viaje.obra %></span>
+                    </div>
+                    <% } %>
                     <div class="info-row">
                         <span class="info-label">Zona</span>
                         <span class="info-value"><%= viaje.zona || '—' %></span>

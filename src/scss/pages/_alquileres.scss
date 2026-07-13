@@ -124,3 +124,67 @@
   font-size: $fs-sm;
   cursor: pointer;
 }
+
+// ── Pestañas: Disponibles / Próximos a finalizar ──────────────
+.cont-tabs {
+  display: inline-flex;
+  gap: 0.35rem;
+  background: $bg-app;
+  border: 1px solid $border;
+  border-radius: 999px;
+  padding: 0.25rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cont-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  background: transparent;
+  color: $muted;
+  font-weight: 600;
+  font-size: $fs-sm;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+
+  &:hover { color: $ink; }
+
+  &.is-active {
+    background: $accent;
+    color: #fff;
+    box-shadow: $shadow-xs;
+  }
+
+  &--warn.is-active { background: $orange; }
+
+  &__count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.4em;
+    padding: 0 0.35em;
+    height: 1.4em;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.12);
+    font-size: 0.78em;
+    font-weight: 700;
+  }
+
+  &.is-active &__count { background: rgba(255, 255, 255, 0.28); }
+}
+
+// Fila: pestañas + acción "Cargar alquiler finalizado"
+.cont-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+
+  .cont-tabs { margin-top: 0; }
+}

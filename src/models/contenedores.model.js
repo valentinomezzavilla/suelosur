@@ -10,11 +10,32 @@ const SQL_ULTIMO_MOV = `
 
 const ContenedoresModel = {
 
-  async listar({ estado_paso, estado_general } = {}) {
+  async listar({ estado_paso, estado_general, q } = {}) {
     const wheres = ['c.activo = 1']
     const params = []
     if (estado_general) { wheres.push('c.estado_general = ?'); params.push(estado_general) }
     if (estado_paso)    { wheres.push('um.estado_paso = ?');   params.push(estado_paso) }
+    // Búsqueda: si es puramente numérica, filtra por N° de contenedor u OP (exacto,
+    // así "5" trae el contenedor 5 y no todo lo que contenga un 5). Si tiene letras,
+    // busca texto libre en el resto de los datos.
+    if (q && String(q).trim()) {
+      const term = String(q).trim()
+      if (/^\d+$/.test(term)) {
+        wheres.push(`(CAST(c.numero_contenedor AS TEXT) = ? OR COALESCE(CAST(op.nro_op AS TEXT), '') = ?)`)
+        params.push(term, term)
+      } else {
+        const like = `%${term}%`
+        wheres.push(`(
+          COALESCE(c.observaciones, '')      ILIKE ?
+          OR COALESCE(c.estado_general, '')  ILIKE ?
+          OR COALESCE(um.estado_paso, '')    ILIKE ?
+          OR COALESCE(cli.nombre, '')        ILIKE ?
+          OR COALESCE(oc.domicilio_entrega, '') ILIKE ?
+          OR COALESCE(oc.zona_entrega, '')   ILIKE ?
+        )`)
+        for (let i = 0; i < 6; i++) params.push(like)
+      }
+    }
     return (await query(`
       SELECT c.id, c.numero_contenedor, c.estado_general, c.fecha_ultima_pintada,
              c.observaciones, c.activo, um.estado_paso, um.fecha_movimiento,

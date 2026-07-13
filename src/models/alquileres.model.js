@@ -161,15 +161,15 @@ const AlquileresModel = {
     return !!r
   },
 
-  async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion }) {
+  async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion, obra }) {
     if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
       throw new Error('Ese contenedor ya está alquilado o reservado en otra operación. Para programar el próximo alquiler, usá "próximos a finalizar".')
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
-      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?) RETURNING id`,
-        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null, id_chofer || null, id_camion || null])
+      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, id_chofer, id_camion, obra) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null, id_chofer || null, id_camion || null, obra || null])
       const id_op = rows[0].id
       const { rows: detRows } = await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         [id_op, id_contenedor || null,
@@ -343,7 +343,6 @@ const AlquileresModel = {
       WHERE c.activo = 1
         AND c.estado_general = 'operativo'
         AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
-        AND ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) BETWEEN 0 AND 2
         AND oc.alquiler_siguiente_id IS NULL
       ORDER BY horas_restantes ASC
     `)).rows
@@ -351,7 +350,7 @@ const AlquileresModel = {
     return { disponibles, porLiberar }
   },
 
-  async crearProgramado({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, alquiler_actual_id, fecha_entrega_planificada, hora_planificada }) {
+  async crearProgramado({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, alquiler_actual_id, fecha_entrega_planificada, hora_planificada, obra }) {
     const tieneProximoAlquiler = (await query(`
       SELECT 1 FROM op_detalle_contenedor oc
       JOIN op_encabezado op ON op.id = oc.id_orden_pedido
@@ -363,10 +362,10 @@ const AlquileresModel = {
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`
-        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, estado_programacion, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada)
-        VALUES (?, ?, 'C', ?, ?, 'pendiente', 'programado', ?, ?, ?, ?)
+        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, estado_programacion, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada, obra)
+        VALUES (?, ?, 'C', ?, ?, 'pendiente', 'programado', ?, ?, ?, ?, ?)
         RETURNING id
-      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null])
+      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, hora_planificada || null, obra || null])
       const id_op = rows[0].id
 
       await q(`
@@ -383,6 +382,30 @@ const AlquileresModel = {
       `, [id_op, alquiler_actual_id, id_contenedor])
 
       return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+    })
+  },
+
+  // Carga histórica: alquiler que YA terminó. Se crea directamente como
+  // 'entregado' con las fechas pasadas y SIN contenedor físico (no genera
+  // movimientos ni tareas de chofer). El ingreso lo registra el controller.
+  async crearFinalizado({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_inicio, fecha_fin, obra }) {
+    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
+    const cli = (await query(`SELECT nombre FROM clientes WHERE id = ?`, [id_cliente])).rows[0]
+    return await transaction(async (q) => {
+      const { rows } = await q(`
+        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_emision, fecha_entrega_planificada, obra)
+        VALUES (?, ?, 'C', ?, ?, 'entregado', ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '',
+          fecha_inicio || null, fecha_inicio || null, obra || null])
+      const id_op = rows[0].id
+      await q(`
+        INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
+        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
+      `, [id_op, domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
+          zona_entrega || '', parseInt(plazo_alquiler) || 0, parseFloat(precio_alquiler) || 0, metodo_pago || null])
+      return { id: id_op, nro_op: nro, nro_remito: nro_rem, cliente_nombre: cli?.nombre || '' }
     })
   },
 

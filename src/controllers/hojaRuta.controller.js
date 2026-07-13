@@ -60,7 +60,7 @@ async function construirTareas(empId) {
 
   // ── Viajes (venta con flete) ──────────────────────────────────
   const viajes = (await query(`
-    SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada, op.observaciones,
+    SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada, op.observaciones, op.obra,
            op.domicilio_calle, op.domicilio_altura,
            COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
            v.nombre AS camion, v.patente
@@ -76,7 +76,7 @@ async function construirTareas(empId) {
     tareas.push({
       id: o.id, tipo: 'viaje', icono: '🚚', titulo: 'Entrega de viaje',
       cliente: o.cliente, tel: o.tel_whatsapp,
-      domicilio: [o.domicilio_calle, o.domicilio_altura].filter(Boolean).join(' ').trim(),
+      domicilio: [[o.domicilio_calle, o.domicilio_altura].filter(Boolean).join(' ').trim(), o.obra ? `Obra: ${o.obra}` : ''].filter(Boolean).join(' · '),
       camion: [o.camion, o.patente].filter(Boolean).join(' · '),
       nro_op: o.nro_op, fecha: o.fecha_entrega_planificada, observaciones: o.observaciones,
       fase: enCurso ? 'en_curso' : 'por_iniciar',
@@ -191,6 +191,43 @@ const HojaRutaController = {
     const op = (await query(`SELECT id, tipo_op, modalidad, estado, id_chofer, id_cliente FROM op_encabezado WHERE id = ?`, [req.params.id])).rows[0]
     if (!op || Number(op.id_chofer) !== Number(emp.id)) return null
     return { emp, op }
+  },
+
+  // Pantalla de confirmación (GET) para el deep-link "Iniciar viaje" que le
+  // llega al chofer por WhatsApp. Muestra el resumen y un botón que hace el POST.
+  async confirmarIniciar(req, res) {
+    const back = '/hoja-de-ruta'
+    try {
+      const v = await HojaRutaController._validar(req)
+      if (!v) { req.flash('error', 'Tarea no válida o no asignada a vos.'); return res.redirect(back) }
+      const { op } = v
+      // Si ya está en curso, ir directo a la vista con mapa.
+      if (op.estado === 'despachado' || (op.tipo_op === 'C' && op.estado === 'entregado')) {
+        return res.redirect(`/hoja-de-ruta/${op.id}/viaje-en-curso`)
+      }
+      const info = (await query(`
+        SELECT op.nro_op, op.tipo_op, op.modalidad, op.observaciones, op.obra,
+               op.fecha_entrega_planificada, op.domicilio_calle, op.domicilio_altura,
+               COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+               v.nombre AS camion, v.patente
+        FROM op_encabezado op
+        LEFT JOIN clientes c        ON c.id = op.id_cliente
+        LEFT JOIN flota_vehiculos v ON v.id = op.id_camion
+        WHERE op.id = ?
+      `, [op.id])).rows[0]
+      // Domicilio: para contenedores está en el detalle
+      let domicilio = [info.domicilio_calle, info.domicilio_altura].filter(Boolean).join(' ').trim()
+      if (op.tipo_op === 'C') {
+        const oc = (await query(`SELECT domicilio_entrega FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
+        if (oc?.domicilio_entrega) domicilio = oc.domicilio_entrega
+      }
+      if (info.obra) domicilio = [domicilio, `Obra: ${info.obra}`].filter(Boolean).join(' · ')
+      res.render('pages/hoja_ruta_iniciar', {
+        titulo: `Iniciar viaje · OP-${String(info.nro_op).padStart(4, '0')}`,
+        op: { id: op.id, ...info, domicilio, tieneEnCurso: await tieneEnCurso(v.emp.id) },
+        empleado: v.emp,
+      })
+    } catch (err) { console.error(err); req.flash('error', 'Error al abrir la tarea.'); res.redirect(back) }
   },
 
   async iniciar(req, res) {

@@ -1,0 +1,37 @@
+<%
+  const tipoLabel = { M: 'Entrega de viaje', C: 'Entrega de contenedor', MA: 'Maquinaria' }
+  const camion = [op.camion, op.patente].filter(Boolean).join(' · ')
+%>
+
+<div class="d-flex align-items-center gap-2 mb-3">
+  <a href="/hoja-de-ruta" class="btn btn-sm btn-outline-secondary"><%- icon('map', { size: 14 }) %> Mi ruta</a>
+</div>
+
+<div class="card shadow-sm mx-auto" style="max-width:520px">
+  <div class="card-body">
+    <div class="text-center mb-3">
+      <div style="font-size:2.2rem">🚚</div>
+      <h4 class="fw-bold mb-0"><%= tipoLabel[op.tipo_op] || 'Viaje' %></h4>
+      <span class="text-muted">OP-<%= String(op.nro_op).padStart(4, '0') %></span>
+    </div>
+
+    <div class="border rounded-3 p-3 mb-3" style="background:#f8fafb">
+      <p class="fw-semibold mb-1"><%= op.cliente %><% if (op.tel_whatsapp) { %> <small class="text-muted">· <%= op.tel_whatsapp %></small><% } %></p>
+      <p class="mb-1">📍 <%= op.domicilio || 'Domicilio a coordinar' %></p>
+      <% if (op.fecha_entrega_planificada) { %><p class="text-muted small mb-1"><%- icon('clock', { size: 13 }) %> <%= formatFecha(op.fecha_entrega_planificada) %></p><% } %>
+      <% if (camion) { %><p class="text-muted small mb-1">🚛 <%= camion %></p><% } %>
+      <% if (op.observaciones && op.observaciones.trim()) { %><p class="small mb-0">📝 <%= op.observaciones %></p><% } %>
+    </div>
+
+    <% if (op.tieneEnCurso) { %>
+      <div class="alert alert-warning small mb-3">Ya tenés una tarea en curso. Finalizala antes de iniciar esta.</div>
+      <a href="/hoja-de-ruta" class="btn btn-outline-secondary w-100">Ir a mi ruta</a>
+    <% } else { %>
+      <form action="/hoja-de-ruta/<%= op.id %>/iniciar" method="POST"
+            onsubmit="return confirm('¿Iniciar el viaje ahora? Se marcará en curso y comenzará el seguimiento.')">
+        <button class="btn btn-naranja btn-lg w-100"><%- icon('truck', { size: 18 }) %> Iniciar viaje</button>
+      </form>
+      <p class="form-text text-center mt-2 mb-0">Al iniciar, la operación pasa a “en camino” y se abre la ruta con el mapa.</p>
+    <% } %>
+  </div>
+</div>

@@ -10,61 +10,34 @@
 </div>
 
 <div class="config-page">
-  <form action="/clientes/<%= cliente.id %>/reporte" method="POST" target="_blank" class="config-form">
+  <%# Reporte = libro de ventas de este cliente (mismas columnas que el reporte de ventas) %>
+  <form method="GET" class="config-form">
+    <input type="hidden" name="clienteId" value="<%= cliente.id %>">
 
     <div class="form-section">
       <h3 class="form-section__title">Período</h3>
-      <p class="form-hint">Dejá vacío para incluir todo el historial.</p>
+      <p class="form-hint">Dejá vacío para incluir todo el historial. El reporte lista las ventas del cliente por renglón: fecha, remito, cantidad, código, material, obra, precio unitario e importe.</p>
       <div class="form-row-2">
         <div class="form-group">
           <label for="fechaDesde">Desde</label>
-          <input type="date" name="fechaDesde" id="fechaDesde" value="<%= filtros.fechaDesde %>">
+          <input type="date" name="desde" id="fechaDesde" value="<%= filtros.fechaDesde || '' %>">
         </div>
         <div class="form-group">
           <label for="fechaHasta">Hasta</label>
-          <input type="date" name="fechaHasta" id="fechaHasta" value="<%= filtros.fechaHasta %>">
+          <input type="date" name="hasta" id="fechaHasta" value="<%= filtros.fechaHasta || '' %>">
         </div>
       </div>
-
       <div class="form-row-2" style="margin-top:0.5rem">
         <button type="button" class="btn-secondary btn-sm" onclick="setPreset('mes')">Mes actual</button>
         <button type="button" class="btn-secondary btn-sm" onclick="setPreset('anio')">Año actual</button>
       </div>
     </div>
 
-    <div class="form-section">
-      <h3 class="form-section__title">Qué incluir</h3>
-      <div class="form-group">
-        <label class="toggle-row">
-          <input type="checkbox" name="incluir" value="transacciones" checked>
-          <span><strong>Transacciones</strong> (ventas, alquileres, pagos del cliente)</span>
-        </label>
-        <label class="toggle-row">
-          <input type="checkbox" name="incluir" value="movimientos" checked>
-          <span><strong>Movimientos de cuenta corriente</strong> (deudas, pagos, ajustes)</span>
-        </label>
-      </div>
-    </div>
-
-    <div class="form-section">
-      <h3 class="form-section__title">Filtrar por tipo de transacción</h3>
-      <div class="form-group">
-        <select name="tipo" class="form-select">
-          <option value="todos">— Todos los tipos —</option>
-          <option value="Venta Cantera">Venta Cantera</option>
-          <option value="Venta Viaje">Venta Viaje</option>
-          <option value="Alquiler">Alquiler</option>
-          <option value="Maquinaria">Maquinaria</option>
-          <option value="Ajuste">Ajuste</option>
-        </select>
-      </div>
-    </div>
-
     <div class="config-actions">
-      <button type="submit" class="btn-primary">📄 Generar reporte PDF</button>
-      <a href="/clientes" class="btn-secondary">Cancelar</a>
+      <button type="submit" formaction="/ventas/libro/pdf" formtarget="_blank" class="btn-primary"><%- icon('fileText', { size: 15 }) %> Generar reporte PDF</button>
+      <button type="submit" formaction="/ventas/libro/excel" class="btn-secondary"><%- icon('download', { size: 15 }) %> Excel</button>
+      <a href="/clientes/<%= cliente.id %>" class="btn-secondary">Volver</a>
     </div>
-
   </form>
 </div>
 

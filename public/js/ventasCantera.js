@@ -174,6 +174,8 @@ document.addEventListener('DOMContentLoaded', () => {
         formItems.value       = JSON.stringify(carrito);
         formMetodoPago.value  = document.getElementById('metodoPago')?.value || 'efectivo';
         formPrecioTotal.value = checkPrecio.checked ? inputPrecio.value : calcularTotal();
+        const formObs = document.getElementById('formObservaciones');
+        if (formObs) formObs.value = document.getElementById('obsCantera')?.value?.trim() || '';
 
         document.getElementById('formCantera').submit();
     });

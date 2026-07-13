@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.preventDefault();
             return;
         }
-        const campos = ['#productoViaje', '#cantidadViaje', '#fechaViaje', '#calleViaje'];
+        const campos = ['#productoViaje', '#cantidadViaje', '#fechaViaje'];
 
         const clienteId = document.getElementById('inputClienteId')?.value;
         if (!clienteId) {
@@ -204,6 +204,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const tel = document.getElementById('telefonoViaje')?.value.trim();
         if (!tel) {
             alert('El telefono de contacto es obligatorio.');
+            e.preventDefault();
+            return;
+        }
+
+        // Destino: al menos uno entre dirección (calle) y obra
+        const calleV = document.getElementById('calleViaje')?.value.trim();
+        const obraV  = document.getElementById('obraViaje')?.value.trim();
+        if (!calleV && !obraV) {
+            alert('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.');
             e.preventDefault();
             return;
         }

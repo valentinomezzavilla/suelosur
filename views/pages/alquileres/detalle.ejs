@@ -50,6 +50,7 @@
         <% } %>
         <hr class="my-2">
         <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
+        <% if (alquiler.obra) { %><p class="mb-1"><strong>Obra:</strong> <%= alquiler.obra %></p><% } %>
         <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
         <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler %> días</p>
         <p class="mb-0"><strong>Precio:</strong>

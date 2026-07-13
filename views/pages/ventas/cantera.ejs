@@ -75,6 +75,11 @@
                     </label>
                 </div>
                 <%- include('../../partials/metodo_pago') %>
+
+                <div class="carrito-seccion">
+                    <label class="form-label" for="obsCantera">Observación</label>
+                    <textarea id="obsCantera" class="form-control" rows="2" placeholder="Nota opcional de la venta…"></textarea>
+                </div>
             </div>
 
             <!-- Acciones -->
@@ -95,4 +100,5 @@
         <input type="hidden" name="items" id="formItems">
         <input type="hidden" name="metodoPago" id="formMetodoPago">
         <input type="hidden" name="precioTotal" id="formPrecioTotal">
+        <input type="hidden" name="observaciones" id="formObservaciones">
     </form>

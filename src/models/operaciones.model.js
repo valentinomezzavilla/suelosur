@@ -13,6 +13,7 @@ const OperacionesModel = {
     return (await query(`
       SELECT op.id_chofer, op.id_camion, op.asignacion_fecha, op.asignacion_usuario, op.estado,
              (e.nombre || ' ' || COALESCE(e.apellido,'')) AS chofer_nombre,
+             e.telefono AS chofer_telefono,
              (COALESCE(v.nombre,'') || CASE WHEN v.patente IS NOT NULL THEN ' (' || v.patente || ')' ELSE '' END) AS camion_label,
              u.nombre AS asignado_por
       FROM op_encabezado op

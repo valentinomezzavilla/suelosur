@@ -42,10 +42,16 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion } = req.body
+      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+
+      // Destino: se exige dirección (calle) u obra, al menos uno.
+      if (!(calle || '').trim() && !(obra || '').trim()) {
+        req.flash('error', 'Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
 
@@ -53,6 +59,34 @@ const AlquileresController = {
       let plazo_alquiler = 5
       if (fechaInicio && fechaFin) {
         plazo_alquiler = Math.round((new Date(fechaFin) - new Date(fechaInicio)) / 86400000)
+      }
+
+      // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
+      if (req.body.finalizado === '1' || req.body.finalizado === 'on') {
+        const result = await AlquileresModel.crearFinalizado({
+          id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
+          domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
+          zona_entrega, plazo_alquiler, precio_alquiler,
+          metodo_pago: metodoPago, observaciones, obra,
+          fecha_inicio: fechaInicio || null, fecha_fin: fechaFin || null,
+        })
+        const monto = parseFloat(precio_alquiler) || 0
+        await TransaccionesModel.crear({
+          tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
+          cliente_id: clienteIdClean, cliente: result.cliente_nombre, monto,
+          descripcion: `Alquiler contenedor (histórico)${domicilio_entrega ? ' — ' + domicilio_entrega : ''}`,
+          metodo_pago: metodoPago || 'efectivo',
+          fecha: fechaFin || fechaInicio || null,
+        })
+        if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
+          await ClientesModel.agregarMovimiento(clienteIdClean, {
+            tipo: 'deuda',
+            descripcion: `Alquiler contenedor (histórico) OP-${String(result.nro_op).padStart(4, '0')}`,
+            monto: -monto,
+          })
+        }
+        req.flash('success', `Alquiler finalizado OP-${String(result.nro_op).padStart(4, '0')} cargado (histórico).`)
+        return res.redirect('/alquileres/contenedores')
       }
 
       const esProgramado = !!alquiler_actual_id
@@ -64,14 +98,14 @@ const AlquileresController = {
           domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
           zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
-          observaciones, alquiler_actual_id,
+          observaciones, obra, alquiler_actual_id,
           fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
         })
       } else {
         result = await AlquileresModel.crear({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
-          id_contenedor: id_contenedor || null, observaciones,
+          id_contenedor: id_contenedor || null, observaciones, obra,
           fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })

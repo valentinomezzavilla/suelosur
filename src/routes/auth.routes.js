@@ -19,8 +19,11 @@ router.post('/login', async (req, res) => {
     }
     req.session.user = { id: user.id, nombre: user.nombre, usuario: user.usuario, rol: user.rol }
     const destinos = { dueno: '/dashboard', admin_ventas: '/ventas', admin_contable: '/cobranzas', chofer: '/hoja-de-ruta' }
+    // Volver al deep-link pedido antes del login (si lo hay); si no, al inicio por rol.
+    const returnTo = req.session.returnTo
+    delete req.session.returnTo
     req.flash('success', `Bienvenido, ${user.nombre}`)
-    res.redirect(destinos[user.rol] || '/ventas')
+    res.redirect(returnTo || destinos[user.rol] || '/ventas')
   } catch (err) {
     console.error(err)
     req.flash('error', 'Error interno.')

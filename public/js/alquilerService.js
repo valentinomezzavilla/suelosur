@@ -199,26 +199,75 @@ document.querySelectorAll('.btn-seleccionar-cont').forEach(btn => {
     });
 });
 
-// ── Toggle disponibles / próximos a finalizar ─────────────────
-const checkPorFinalizar = document.getElementById('contenedorPorFinalizar');
+// ── Pestañas disponibles / próximos a finalizar ───────────────
 const listaDisponibles  = document.getElementById('listaDisponibles');
 const listaPorFinalizar = document.getElementById('listaPorFinalizar');
 
-if (checkPorFinalizar) {
-    checkPorFinalizar.addEventListener('change', () => {
-        const usar = checkPorFinalizar.checked;
-        if (listaDisponibles)  listaDisponibles.style.display  = usar ? 'none' : '';
-        if (listaPorFinalizar) listaPorFinalizar.style.display = usar ? '' : 'none';
+document.querySelectorAll('.cont-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.cont-tab').forEach(t => t.classList.remove('is-active'));
+        tab.classList.add('is-active');
+        const verPorFinalizar = tab.getAttribute('data-target') === 'porFinalizar';
+        if (listaDisponibles)  listaDisponibles.style.display  = verPorFinalizar ? 'none' : '';
+        if (listaPorFinalizar) listaPorFinalizar.style.display = verPorFinalizar ? '' : 'none';
         document.querySelectorAll('.alquiler-card').forEach(c => c.classList.remove('alquiler-card--selected'));
         contenedorSeleccionado = null;
     });
+});
+
+// ── Carga histórica: alquiler ya finalizado ───────────────────
+const checkFinalizado       = document.getElementById('checkFinalizado');
+const finalizadoHint        = document.getElementById('finalizadoHint');
+const seccionChoferCamion   = document.getElementById('seccionChoferCamion');
+const modalContLabel        = document.getElementById('modal-cont-label');
+const fechaInicioMinDefault = fechaInicio ? fechaInicio.min : '';
+
+function aplicarModoFinalizado(activo) {
+    if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
+    if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
+    if (fechaInicio)         fechaInicio.min = activo ? '' : fechaInicioMinDefault;   // permitir fechas pasadas
+    if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';
 }
+
+checkFinalizado?.addEventListener('change', () => aplicarModoFinalizado(checkFinalizado.checked));
+
+// Abrir el modal SIN contenedor, directo en modo histórico
+document.getElementById('btnCargarFinalizado')?.addEventListener('click', () => {
+    contenedorSeleccionado = null;
+    const inputId  = document.getElementById('inputContenedorId');
+    const inputAct = document.getElementById('inputAlquilerActualId');
+    if (inputId)  inputId.value  = '';
+    if (inputAct) inputAct.value = '';
+    document.querySelectorAll('.alquiler-card').forEach(c => c.classList.remove('alquiler-card--selected'));
+    if (checkFinalizado) checkFinalizado.checked = true;
+    aplicarModoFinalizado(true);
+    if (modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';
+    abrirModalAlquiler();
+    actualizarResumen();
+});
+
+// Al cerrar/cancelar el modal, salir del modo histórico
+['cerrarModalAlquiler', 'cancelarModalAlquiler'].forEach(id => {
+    document.getElementById(id)?.addEventListener('click', () => {
+        if (checkFinalizado) checkFinalizado.checked = false;
+        aplicarModoFinalizado(false);
+    });
+});
 
 // ── Prevenir submit con Enter (solo confirmar con el botón) ────
 const formAlquiler = document.getElementById('formNuevoAlquiler');
 if (formAlquiler) {
     formAlquiler.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.type !== 'submit') {
+            e.preventDefault();
+        }
+    });
+    // Destino: al menos uno entre dirección (calle) y obra
+    formAlquiler.addEventListener('submit', (e) => {
+        const calleV = document.getElementById('calle')?.value.trim();
+        const obraV  = document.getElementById('obraAlquiler')?.value.trim();
+        if (!calleV && !obraV) {
+            alert('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.');
             e.preventDefault();
         }
     });

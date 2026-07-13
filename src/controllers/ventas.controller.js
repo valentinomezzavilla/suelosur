@@ -61,7 +61,9 @@ const VentasController = {
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
       const total  = precioTotal ? Number(precioTotal) : carrito.reduce((a, p) => a + p.precio * p.cantidad, 0)
       const nombre = clienteNombre || 'Particular'
-      const desc   = carrito.map(p => `${p.nombre} x${p.cantidad}`).join(', ')
+      const obsUser = (req.body.observaciones || '').trim()
+      const detalleCarrito = carrito.map(p => `${p.nombre} x${p.cantidad}`).join(', ')
+      const desc   = obsUser ? `${detalleCarrito} — ${obsUser}` : detalleCarrito
 
       const detalles = carrito.map(p => ({
         id_producto:     p.id,
@@ -182,8 +184,14 @@ const VentasController = {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
         productoId, cantidad, precioProducto, precioFlete, precioTotal,
         metodoPago, descripcion, finalizarAhora,
-        idChofer, idCamion, zona,
+        idChofer, idCamion, zona, obra,
       } = req.body
+
+      // Destino: se exige dirección (calle) u obra, al menos uno.
+      if (!(calle || '').trim() && !(obra || '').trim()) {
+        req.flash('error', 'Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
+        return res.redirect(req.get('Referrer') || '/ventas')
+      }
 
       const cantidadNum = Number(cantidad) || 1
       const esFinalizarAhora = finalizarAhora === 'true'
@@ -202,6 +210,7 @@ const VentasController = {
         fecha_entrega_planificada: fecha || null,
         hora_planificada:    hora || null,
         zona:                zona || null,
+        obra:                obra || null,
         domicilio: { calle, altura: numero, sin_numero: !numero },
         detalles: [{
           id_producto:     productoId,
@@ -387,6 +396,55 @@ const VentasController = {
       req.flash('error', 'Error al generar el remito.')
       res.redirect('back')
     }
+  },
+
+  // ── Libro de ventas (reporte a nivel de renglón) ─────────────
+  async libroForm(req, res) {
+    res.render('pages/ventas/libro', { titulo: 'Libro de ventas', filtros: req.query })
+  },
+
+  async libroPDF(req, res) {
+    try {
+      const ReportesModel = require('../models/reportes.model')
+      const { generarLibroVentasPDF } = require('../utils/pdfLibroVentas')
+      const { fmtFecha } = require('../utils/fecha')
+      const { desde, hasta, clienteId } = req.query
+      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
+      let clienteLabel = null
+      if (clienteId) {
+        const cli = await require('../models/clientes.model').obtener(clienteId)
+        clienteLabel = cli ? `${cli.nombre || ''} ${cli.apellido || ''}`.trim() : null
+      }
+      const periodoLabel = [desde && `desde ${fmtFecha(desde)}`, hasta && `hasta ${fmtFecha(hasta)}`].filter(Boolean).join(' ') || 'Histórico completo'
+      return generarLibroVentasPDF(res, {
+        filas, total, periodoLabel, clienteLabel,
+        nombreArchivo: clienteId ? `libro-ventas-cliente-${clienteId}` : 'libro-ventas',
+      })
+    } catch (err) { console.error(err); req.flash('error', 'Error al generar el libro de ventas.'); res.redirect('/ventas/libro') }
+  },
+
+  async libroExcel(req, res) {
+    try {
+      const ReportesModel = require('../models/reportes.model')
+      const { generarExcel } = require('../utils/excel')
+      const { fmtFecha } = require('../utils/fecha')
+      const { desde, hasta, clienteId } = req.query
+      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
+      const columnas = [
+        { header: 'Fecha', key: 'fecha', width: 12 },
+        { header: 'Remito', key: 'nro_remito', width: 10 },
+        { header: 'Cant.', key: 'cantidad', width: 8 },
+        { header: 'Cód', key: 'cod', width: 8 },
+        { header: 'Material', key: 'material', width: 24 },
+        { header: 'Cliente', key: 'cliente', width: 28 },
+        { header: 'Obra', key: 'obra', width: 28 },
+        { header: 'Precio unit.', key: 'precio_unit', width: 14, money: true },
+        { header: 'Importe', key: 'importe', width: 14, money: true },
+      ]
+      const filasX = filas.map(f => ({ ...f, fecha: fmtFecha(f.fecha) }))
+      filasX.push({ material: 'TOTAL', importe: total })
+      return generarExcel(res, { titulo: 'Libro de ventas', columnas, filas: filasX, nombreArchivo: clienteId ? `libro-ventas-cliente-${clienteId}` : 'libro-ventas' })
+    } catch (err) { console.error(err); req.flash('error', 'Error al generar el Excel.'); res.redirect('/ventas/libro') }
   },
 
   // ── API JSON para búsqueda de clientes desde el front ────────

@@ -9,15 +9,22 @@
 
 <!-- ── Paso 1: seleccionar contenedor ─────────────────────────── -->
 <div class="form-section">
-  <div class="d-flex justify-content-between align-items-center" style="flex-wrap:wrap;gap:0.75rem">
-    <h3 class="form-section__title" style="margin:0">Seleccioná un contenedor</h3>
-    <% if (porLiberar && porLiberar.length> 0) { %>
-      <label class="toggle-row">
-        <input type="checkbox" id="contenedorPorFinalizar">
-        <span>Mostrar próximos a finalizar (<%= porLiberar.length %>)</span>
-      </label>
-      <% } %>
+  <h3 class="form-section__title">Seleccioná un contenedor</h3>
+
+  <div class="cont-tabs-row">
+    <div class="cont-tabs" role="tablist">
+      <button type="button" class="cont-tab is-active" data-target="disponibles" role="tab">
+        Disponibles <span class="cont-tab__count"><%= disponibles.length %></span>
+      </button>
+      <button type="button" class="cont-tab cont-tab--warn" data-target="porFinalizar" role="tab">
+        Próximos a finalizar <span class="cont-tab__count"><%= porLiberar.length %></span>
+      </button>
+    </div>
+    <button type="button" id="btnCargarFinalizado" class="btn-secondary btn-sm">＋ Cargar alquiler finalizado</button>
   </div>
+  <p class="form-hint" style="margin-top:0.6rem">
+    <strong>Próximos a finalizar</strong>: contenedores que están en alquiler (sin un próximo ya programado). Al elegir uno, programás el <strong>próximo alquiler</strong> encadenado, que arranca cuando se libera.
+  </p>
 
   <div id="listaDisponibles" class="alquiler-cards-grid" style="margin-top:1rem">
     <% if (disponibles.length===0) { %>
@@ -33,23 +40,24 @@
             <% }) %>
   </div>
 
-  <% if (porLiberar && porLiberar.length> 0) { %>
-    <div id="listaPorFinalizar" class="alquiler-cards-grid" style="display:none;margin-top:1rem">
-      <% porLiberar.forEach(c=> { %>
-        <div class="alquiler-card alquiler-card--por-liberar" data-id="<%= c.id %>"
-          data-numero="<%= c.numero_contenedor %>" data-fin="<%= c.fecha_liberacion %>"
-          data-alquiler-actual="<%= c.alquiler_actual_id %>">
-          <div class="alquiler-card__numero">#<%= c.numero_contenedor %>
-          </div>
-          <span class="badge badge--pendiente">Libera: <%= formatFecha(c.fecha_liberacion) %></span>
-          <small class="text-muted">
-            <%= c.cliente_actual %>
-          </small>
-          <button type="button" class="btn-seleccionar-cont btn-primary btn-sm">Seleccionar</button>
-        </div>
-        <% }) %>
-    </div>
+  <div id="listaPorFinalizar" class="alquiler-cards-grid" style="display:none;margin-top:1rem">
+    <% if (!porLiberar.length) { %>
+      <%- include('../../partials/empty_state', { icono: '📦', mensaje: 'No hay contenedores en alquiler para programar el próximo alquiler.' }) %>
     <% } %>
+    <% porLiberar.forEach(c=> { %>
+      <div class="alquiler-card alquiler-card--por-liberar" data-id="<%= c.id %>"
+        data-numero="<%= c.numero_contenedor %>" data-fin="<%= c.fecha_liberacion %>"
+        data-alquiler-actual="<%= c.alquiler_actual_id %>">
+        <div class="alquiler-card__numero">#<%= c.numero_contenedor %>
+        </div>
+        <span class="badge badge--pendiente">Libera: <%= formatFecha(c.fecha_liberacion) %></span>
+        <small class="text-muted">
+          <%= c.cliente_actual %>
+        </small>
+        <button type="button" class="btn-seleccionar-cont btn-primary btn-sm">Seleccionar</button>
+      </div>
+      <% }) %>
+  </div>
 </div>
 
 <!-- ── Paso 2: modal con el formulario de alquiler ────────────── -->
@@ -66,6 +74,13 @@
       <input type="hidden" name="lat" id="inputLat">
       <input type="hidden" name="lng" id="inputLng">
 
+      <!-- Carga histórica: alquiler ya finalizado -->
+      <label class="toggle-row" style="margin-bottom:0.4rem">
+        <input type="checkbox" id="checkFinalizado" name="finalizado" value="1">
+        <span>Alquiler ya finalizado (carga histórica)</span>
+      </label>
+      <p id="finalizadoHint" class="form-hint" style="display:none;margin:0 0 0.75rem">Se registra el ingreso con la fecha indicada y queda en el historial del cliente. No ocupa un contenedor físico ni genera tareas para el chofer.</p>
+
       <!-- Cliente -->
       <div class="form-section">
         <%- include('../../partials/buscar_cliente') %>
@@ -76,14 +91,19 @@
         <h3 class="form-section__title">Dirección de entrega</h3>
         <div class="form-row-2">
           <div class="form-group">
-            <label for="calle">Calle *</label>
-            <input type="text" name="calle" id="calle" placeholder="Ej: Av. Colón" required>
+            <label for="calle">Calle</label>
+            <input type="text" name="calle" id="calle" placeholder="Ej: Av. Colón">
           </div>
           <div class="form-group">
-            <label for="numero">Número *</label>
-            <input type="text" name="numero" id="numero" placeholder="Ej: 1234" required>
+            <label for="numero">Número</label>
+            <input type="text" name="numero" id="numero" placeholder="Ej: 1234">
           </div>
         </div>
+        <div class="form-group">
+          <label for="obraAlquiler">Obra</label>
+          <input type="text" name="obra" id="obraAlquiler" placeholder="Nombre o referencia de la obra">
+        </div>
+        <p class="form-hint">Cargá la <strong>dirección</strong> (calle) o la <strong>obra</strong> — al menos uno.</p>
         <div class="direccion-acciones">
           <div class="form-group">
             <label for="zona">Zona</label>
@@ -138,7 +158,7 @@
       <%- include('../../partials/metodo_pago') %>
 
       <!-- Chofer / Camión -->
-      <div class="form-section">
+      <div class="form-section" id="seccionChoferCamion">
         <h3 class="form-section__title">Chofer y camión (opcional)</h3>
         <p class="form-hint">Podés asignarlos ahora o más tarde desde el detalle del alquiler.</p>
         <div class="form-row-2">

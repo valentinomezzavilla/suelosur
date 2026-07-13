@@ -17,14 +17,15 @@ const TransaccionesModel = {
   PREFIJO,
   codigo: codigoTransaccion,
 
-  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago }) {
+  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }) {
     const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
+    // fecha opcional: si no se pasa, usa la fecha/hora actual (carga histórica la puede fijar en el pasado).
     const { rows } = await query(`
-      INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
       RETURNING id
     `, [tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
-        cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo'])
+        cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo', fecha || null])
     return rows[0].id
   },
 

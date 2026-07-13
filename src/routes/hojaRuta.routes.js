@@ -11,6 +11,7 @@ const acceso = roles('chofer', 'admin_ventas', 'dueno')
 router.get('/',              auth, acceso, ctrl.index)
 // Tracking global del chofer (cualquier página) — debe ir antes de '/:id/...'
 router.post('/posicion',     auth, acceso, ctrl.registrarPosicion)
+router.get('/:id/iniciar',   auth, acceso, ctrl.confirmarIniciar)
 router.post('/:id/iniciar',  auth, acceso, ctrl.iniciar)
 router.get('/:id/viaje-en-curso', auth, acceso, ctrl.verEnCurso)
 router.post('/:id/ubicacion', auth, acceso, ctrl.guardarUbicacion)

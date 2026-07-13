@@ -83,6 +83,26 @@
   --bs-btn-font-weight: 600;
 }
 
+// ── Botón WhatsApp (link click-to-chat) ────────────────────────
+.btn-whatsapp {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #25d366;
+  color: #fff;
+  border: 1px solid #25d366;
+  border-radius: $radius-md;
+  font-weight: 600;
+  font-size: $fs-sm;
+  padding: 0.4rem 0.9rem;
+  transition: background 0.12s, border-color 0.12s;
+
+  &:hover  { background: #1da851; border-color: #1da851; color: #fff; }
+  &:active { transform: translateY(1px); }
+
+  svg { flex-shrink: 0; }
+}
+
 .btn-icon-danger {
   background: transparent;
   border: none;

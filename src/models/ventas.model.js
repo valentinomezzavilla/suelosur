@@ -109,7 +109,7 @@ const VentasModel = {
   },
 
   async crear({ id_cliente, cliente_nombre_libre, id_administrativo, tipo_op = 'M', observaciones = '',
-          detalles, fecha_entrega_planificada, hora_planificada, modalidad, domicilio, metodo_pago, zona }) {
+          detalles, fecha_entrega_planificada, hora_planificada, modalidad, domicilio, metodo_pago, zona, obra }) {
     // Crear cliente automáticamente si viene como texto libre
     if (!id_cliente && cliente_nombre_libre) {
       const cli = await query(`INSERT INTO clientes (nombre, activo) VALUES (?, 1) RETURNING id`,
@@ -125,14 +125,14 @@ const VentasModel = {
         INSERT INTO op_encabezado (
           id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado,
           observaciones, fecha_entrega_planificada, hora_planificada, modalidad, metodo_pago,
-          domicilio_calle, domicilio_altura, domicilio_sin_numero, zona
-        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          domicilio_calle, domicilio_altura, domicilio_sin_numero, zona, obra
+        ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [id_cliente, id_administrativo, tipo_op, nro, nro_rem,
           observaciones, fecha_entrega_planificada || null, hora_planificada || null, modalidad || null,
           metodo_pago || null, dom.calle || null,
           dom.altura ? parseInt(dom.altura) : null,
-          dom.sin_numero ? 1 : 0, zona || null])
+          dom.sin_numero ? 1 : 0, zona || null, obra || null])
       const id = rows[0].id
 
       for (const d of (detalles || [])) {
@@ -209,6 +209,8 @@ const VentasModel = {
       zona: op.zona || '',
       calle: op.domicilio_calle || '',
       numero: op.domicilio_altura || '',
+      obra: op.obra || '',
+      direccion: [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim(),
       productoNombre: detalle.producto_nombre || '',
       cantidad: detalle.cantidad_pedida || 1,
       precioProducto: detalle.precio_unitario || 0,

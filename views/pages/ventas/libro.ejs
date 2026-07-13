@@ -1,0 +1,27 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Libro de ventas</h4>
+  <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Ventas</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <p class="text-muted mb-3">Reporte detallado, un renglón por venta: fecha, remito, cantidad, material, cliente, obra, precio unitario e importe. Elegí el período y descargalo en PDF o Excel.</p>
+    <form method="GET">
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-3">
+          <label class="form-label">Desde</label>
+          <input type="date" name="desde" class="form-control" value="<%= filtros.desde || '' %>">
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Hasta</label>
+          <input type="date" name="hasta" class="form-control" value="<%= filtros.hasta || '' %>">
+        </div>
+        <div class="col-12 col-md-auto d-flex gap-2">
+          <button formaction="/ventas/libro/pdf" formtarget="_blank" class="btn btn-naranja"><%- icon('fileText', { size: 15 }) %> Generar PDF</button>
+          <button formaction="/ventas/libro/excel" class="btn btn-outline-secondary"><%- icon('download', { size: 15 }) %> Excel</button>
+        </div>
+      </div>
+      <p class="form-text mt-2">Sin fechas = histórico completo. Incluye ventas de material, alquileres de contenedor y de maquinaria (no anuladas).</p>
+    </form>
+  </div>
+</div>

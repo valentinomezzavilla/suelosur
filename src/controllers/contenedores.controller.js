@@ -5,8 +5,8 @@ const ContenedoresController = {
 
   async index(req, res) {
     try {
-      const { estado_paso, estado_general } = req.query
-      const contenedores = await ContenedoresModel.listar({ estado_paso, estado_general })
+      const { estado_paso, estado_general, q } = req.query
+      const contenedores = await ContenedoresModel.listar({ estado_paso, estado_general, q })
       const resumen      = await ContenedoresModel.resumenPorEstado()
       res.render('pages/contenedores/index', { titulo: 'Contenedores', contenedores, resumen, filtros: req.query })
     } catch (err) {
