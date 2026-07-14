@@ -156,7 +156,8 @@
           <td class="text-center">
             <a href="/contenedores/<%= c.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye', { size: 15 }) %></a>
             <a href="/contenedores/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
-            <form action="/contenedores/<%= c.id %>/toggle" method="POST" class="d-inline">
+            <form action="/contenedores/<%= c.id %>/toggle" method="POST" class="d-inline"
+                  <% if (c.activo) { %>onsubmit="return confirm('¿Dar de baja el contenedor N° <%= c.numero_contenedor %>? Va a desaparecer del listado; podés reactivarlo después desde el filtro Registro → Dados de baja.')"<% } %>>
               <button class="btn btn-sm <%= c.activo ? 'btn-outline-danger' : 'btn-outline-success' %>"
                       title="<%= c.activo ? 'Desactivar' : 'Activar' %>">
                 <%- c.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
