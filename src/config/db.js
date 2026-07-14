@@ -735,6 +735,8 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS hora_planificada TEXT`).catch(() => {})
   // Obra: nombre/referencia del destino cuando no hay una dirección de calle exacta
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS obra TEXT`).catch(() => {})
+  // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
   // Unificación de actividades a 3 categorías: ventas / contenedores / maquinas
   const _mapAct = `CASE actividad
       WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'

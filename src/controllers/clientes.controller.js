@@ -116,7 +116,7 @@ const ClientesController = {
       if (clase === 'pago')       { tipo = 'pago';   signed =  m; desc = descripcion || 'Pago / abono de deuda' }
       else if (clase === 'cargo') { tipo = 'deuda';  signed = -m; desc = descripcion || 'Cargo manual' }
       else                        { tipo = 'ajuste'; signed = (signo === 'neg' ? -m : m); desc = descripcion || 'Ajuste de saldo' }
-      await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed })
+      await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null })
       req.flash('success', 'Movimiento registrado.')
     } catch (err) {
       console.error(err); req.flash('error', 'Error al registrar el movimiento.')
@@ -225,7 +225,7 @@ const ClientesController = {
     try {
       const monto = Number(req.body.monto)
       if (!monto || monto <= 0) { req.flash('error', 'Monto inválido.'); return res.redirect('/clientes') }
-      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion: 'Pago / abono de deuda', monto })
+      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion: 'Pago / abono de deuda', monto, metodo_pago: req.body.metodo_pago || null })
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')

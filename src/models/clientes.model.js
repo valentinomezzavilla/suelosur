@@ -133,9 +133,9 @@ const ClientesModel = {
     await query(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`, [id])
   },
 
-  async agregarMovimiento(id, { tipo, descripcion, monto }) {
-    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto) VALUES (?, ?, ?, ?) RETURNING id`,
-      [id, tipo, descripcion, Number(monto)])
+  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago }) {
+    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+      [id, tipo, descripcion, Number(monto), metodo_pago || null])
     await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return rows[0].id
   },

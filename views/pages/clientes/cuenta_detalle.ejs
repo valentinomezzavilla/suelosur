@@ -3,6 +3,9 @@
   const nombre = `${cliente.nombre} ${cliente.apellido || ''}`.trim()
   const presetHref = (p) => '/clientes/cuentas/' + cliente.id + '?preset=' + p
   const tipoLabel = { deuda: 'Cargo', pago: 'Pago', ajuste: 'Ajuste' }
+  const metodoLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cta. corriente' }
+  // Deudas = cargadas a cuenta corriente; pagos = método capturado; resto = —
+  const metodoDe = (m) => m.tipo === 'deuda' ? 'Cta. corriente' : (m.metodo_pago ? (metodoLabel[m.metodo_pago] || m.metodo_pago) : '—')
   const saldoTxt = (s) => s < 0 ? `Debe ${money(Math.abs(s))}` : (s > 0 ? `A favor ${money(s)}` : 'Al día')
   const saldoCls = (s) => s < 0 ? 'text-danger' : (s > 0 ? 'text-success' : 'text-muted')
   const qsPdf = new URLSearchParams(
@@ -95,7 +98,7 @@
   <div class="card-body">
     <form action="/clientes/<%= cliente.id %>/cuenta/movimiento" method="POST">
       <div class="row g-2 align-items-end">
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Tipo</label>
           <select name="clase" class="form-select form-select-sm">
             <option value="pago">Pago / abono</option>
@@ -103,11 +106,20 @@
             <option value="ajuste">Ajuste a favor</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
           <label class="form-label">Monto</label>
           <input type="number" name="monto" min="1" step="1" class="form-control form-control-sm" placeholder="Ej: 15000" required>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-2">
+          <label class="form-label">Método (si es pago)</label>
+          <select name="metodo_pago" class="form-select form-select-sm">
+            <option value="">—</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        <div class="col-md-3">
           <label class="form-label">Descripción</label>
           <input type="text" name="descripcion" class="form-control form-control-sm" placeholder="(opcional)">
         </div>
@@ -132,6 +144,7 @@
           <th>Fecha</th>
           <th>Tipo</th>
           <th>Descripción</th>
+          <th>Método</th>
           <th class="text-end">Débito</th>
           <th class="text-end">Crédito</th>
           <th class="text-end">Saldo</th>
@@ -140,7 +153,7 @@
       <tbody>
         <% if (filtros.fechaDesde) { %>
         <tr class="table-light">
-          <td colspan="5" class="text-muted small">Saldo inicial</td>
+          <td colspan="6" class="text-muted small">Saldo inicial</td>
           <td class="text-end fw-semibold <%= saldoCls(estado.saldoInicial) %>"><%= money(estado.saldoInicial) %></td>
         </tr>
         <% } %>
@@ -153,6 +166,7 @@
             <% } else { %><span class="badge rounded-pill px-3 badge-pendiente">Ajuste</span><% } %>
           </td>
           <td><%= m.descripcion %></td>
+          <td><small class="text-muted"><%= metodoDe(m) %></small></td>
           <td class="text-end text-danger"><%= m.monto < 0 ? money(Math.abs(m.monto)) : '—' %></td>
           <td class="text-end text-success"><%= m.monto > 0 ? money(m.monto) : '—' %></td>
           <td class="text-end fw-semibold <%= saldoCls(m.saldo) %>"><%= money(m.saldo) %></td>
@@ -161,7 +175,7 @@
       </tbody>
       <tfoot>
         <tr class="table-light">
-          <td colspan="3" class="fw-semibold">Totales del período</td>
+          <td colspan="4" class="fw-semibold">Totales del período</td>
           <td class="text-end fw-bold text-danger"><%= money(estado.debitos) %></td>
           <td class="text-end fw-bold text-success"><%= money(estado.creditos) %></td>
           <td class="text-end fw-bold <%= saldoCls(estado.saldoFinal) %>"><%= money(estado.saldoFinal) %></td>
@@ -186,6 +200,14 @@
       <div class="form-group">
         <label for="inputMonto">Monto a abonar</label>
         <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="Ej: 15000">
+      </div>
+      <div class="form-group" style="margin-top:0.75rem">
+        <label for="inputMetodoAbonar">Método de pago</label>
+        <select name="metodo_pago" id="inputMetodoAbonar">
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="cheque">Cheque</option>
+        </select>
       </div>
       <div class="modal-actions" style="margin-top:1rem">
         <button type="submit" class="btn btn-success">Confirmar pago</button>
