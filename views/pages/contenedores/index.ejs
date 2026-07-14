@@ -78,13 +78,21 @@
           <% }) %>
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
         <label class="form-label">Condición general</label>
         <select name="estado_general" class="form-select form-select-sm">
           <option value="">Todas</option>
           <option value="operativo"      <%= filtros.estado_general === 'operativo'      ? 'selected' : '' %>>Operativo</option>
           <option value="en_reparacion"  <%= filtros.estado_general === 'en_reparacion'  ? 'selected' : '' %>>En reparación</option>
           <option value="baja"           <%= filtros.estado_general === 'baja'           ? 'selected' : '' %>>De baja</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Registro</label>
+        <select name="registro" class="form-select form-select-sm">
+          <option value=""      <%= !filtros.registro || filtros.registro === 'activos' ? 'selected' : '' %>>Activos</option>
+          <option value="baja"  <%= filtros.registro === 'baja'  ? 'selected' : '' %>>Dados de baja</option>
+          <option value="todos" <%= filtros.registro === 'todos' ? 'selected' : '' %>>Todos</option>
         </select>
       </div>
       <div class="col-auto">

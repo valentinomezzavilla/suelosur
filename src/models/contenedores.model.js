@@ -10,9 +10,12 @@ const SQL_ULTIMO_MOV = `
 
 const ContenedoresModel = {
 
-  async listar({ estado_paso, estado_general, q } = {}) {
-    const wheres = ['c.activo = 1']
+  async listar({ estado_paso, estado_general, q, registro } = {}) {
+    const wheres = []
     const params = []
+    // Registro: por defecto solo activos; 'baja' solo dados de baja; 'todos' ambos.
+    if (registro === 'baja')       wheres.push('c.activo = 0')
+    else if (registro !== 'todos') wheres.push('c.activo = 1')
     if (estado_general) { wheres.push('c.estado_general = ?'); params.push(estado_general) }
     if (estado_paso)    { wheres.push('um.estado_paso = ?');   params.push(estado_paso) }
     // Búsqueda: si es puramente numérica, filtra por N° de contenedor u OP (exacto,
@@ -47,7 +50,7 @@ const ContenedoresModel = {
       LEFT JOIN op_detalle_contenedor oc ON oc.id = um.id_op_contenedor
       LEFT JOIN op_encabezado op ON op.id = oc.id_orden_pedido
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
-      WHERE ${wheres.join(' AND ')} ORDER BY c.numero_contenedor
+      ${wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''} ORDER BY c.numero_contenedor
     `, params)).rows
   },
 
