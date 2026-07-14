@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const modo = getModo()
     if (elModal) elModal.textContent = modo === 'hora' ? 'Por horas' : 'Por día'
 
-    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' }
+    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' }
     const metodoPago = document.getElementById('metodoPago')?.value
     if (elPago) elPago.textContent = pagoMap[metodoPago] || '—'
 

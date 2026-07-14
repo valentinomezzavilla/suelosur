@@ -135,7 +135,7 @@ function actualizarResumen() {
     if (elDir) elDir.textContent = calle && numero ? `${calle} ${numero}` : calle || '—';
 
     // método de pago
-    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente' };
+    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' };
     const elPago  = document.getElementById('res-pago');
     if (elPago) elPago.textContent = pagoMap[metodoPagoEl?.value] || '—';
 }
