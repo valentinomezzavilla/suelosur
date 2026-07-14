@@ -16,6 +16,7 @@
     vuelta_a_planta:   'badge-pendiente',
   }
   const ultimo = contenedor.movimientos[0]
+  const libre = !ultimo || ultimo.estado_paso === 'disponible'
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -43,7 +44,8 @@
             </span>
           </h4>
           <small class="text-muted">desde el <%= formatFechaHora(ultimo.fecha_movimiento) %></small>
-          <% if (ultimo.cliente_nombre) { %>
+          <%# Si está disponible (libre), no mostramos datos del cliente anterior %>
+          <% if (ultimo.cliente_nombre && ultimo.estado_paso !== 'disponible') { %>
             <hr>
             <p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>
@@ -113,43 +115,51 @@
   <div class="col-12">
     <div class="card shadow-sm">
       <div class="card-header card-header-light">
-        Historial de movimientos (<%= contenedor.movimientos.length %>)
+        Historial de alquileres (<%= contenedor.alquileres.length %>)
       </div>
       <div class="card-body p-0">
-        <% if (!contenedor.movimientos.length) { %>
-          <p class="text-muted text-center py-4 mb-0">Sin movimientos registrados.</p>
+        <% if (!contenedor.alquileres.length) { %>
+          <p class="text-muted text-center py-4 mb-0">Este contenedor todavía no tuvo alquileres.</p>
         <% } else { %>
         <table class="table table-hover align-middle mb-0">
           <thead>
             <tr>
-              <th>Fecha</th>
-              <th>Estado</th>
+              <th>Inicio</th>
+              <th>Fin</th>
               <th>OP / Cliente</th>
-              <th>Chofer</th>
-              <th>Camión</th>
-              <th>Observaciones</th>
+              <th>Domicilio</th>
+              <th>Zona</th>
+              <th class="text-end">Precio</th>
             </tr>
           </thead>
           <tbody>
-            <% contenedor.movimientos.forEach(m => { %>
+            <% contenedor.alquileres.forEach((a, idx) => { %>
             <tr>
-              <td><small class="text-muted"><%= formatFechaHora(m.fecha_movimiento) %></small></td>
               <td>
-                <span class="badge rounded-pill px-3 <%= badgeEstado[m.estado_paso] || 'badge-pendiente' %>">
-                  <%= labelEstado[m.estado_paso] || m.estado_paso %>
-                </span>
-              </td>
-              <td>
-                <% if (m.nro_op) { %>
-                  <small class="fw-semibold">OP-<%= String(m.nro_op).padStart(4,'0') %></small><br>
-                  <small class="text-muted"><%= m.cliente_nombre %></small>
+                <% if (a.fecha_inicio) { %>
+                  <small class="text-muted"><%= formatFecha(a.fecha_inicio) %></small>
+                <% } else if (a.fecha_entrega_planificada) { %>
+                  <small class="text-muted"><%= formatFecha(a.fecha_entrega_planificada) %> <span class="badge rounded-pill px-2 badge-pendiente">programado</span></small>
                 <% } else { %>
                   <small class="text-muted">—</small>
                 <% } %>
               </td>
-              <td><small><%= m.chofer_nombre || '—' %></small></td>
-              <td><small><%= m.camion_nombre ? `${m.camion_nombre} (${m.camion_patente})` : '—' %></small></td>
-              <td><small class="text-muted"><%= m.observaciones || '—' %></small></td>
+              <td>
+                <% if (a.fecha_fin) { %>
+                  <small class="text-muted"><%= formatFecha(a.fecha_fin) %></small>
+                <% } else if (!libre && idx === 0) { %>
+                  <span class="badge rounded-pill px-2 badge-en-transito">En curso</span>
+                <% } else { %>
+                  <small class="text-muted">—</small>
+                <% } %>
+              </td>
+              <td>
+                <small class="fw-semibold">OP-<%= String(a.nro_op).padStart(4,'0') %></small><br>
+                <small class="text-muted"><%= a.cliente_nombre || '—' %></small>
+              </td>
+              <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
+              <td><small class="text-muted"><%= a.zona_entrega || '—' %></small></td>
+              <td class="text-end"><small class="fw-semibold"><%= a.precio_alquiler ? '$' + Number(a.precio_alquiler).toLocaleString('es-AR') : '—' %></small></td>
             </tr>
             <% }) %>
           </tbody>

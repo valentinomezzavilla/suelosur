@@ -68,6 +68,25 @@ const ContenedoresModel = {
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
       WHERE m.id_contenedor = ? ORDER BY m.fecha_movimiento DESC, m.id DESC
     `, [id])).rows
+
+    // Historial de ALQUILERES: un renglón por operación (OP) que usó este contenedor.
+    const alq = (await query(`
+      SELECT op.nro_op, op.estado AS op_estado, cli.nombre AS cliente_nombre,
+             oc.domicilio_entrega, oc.zona_entrega, oc.precio_alquiler, oc.plazo_alquiler,
+             op.fecha_entrega_planificada,
+             (SELECT MIN(fecha_movimiento) FROM movimiento_contenedor mm
+                WHERE mm.id_op_contenedor = oc.id AND mm.estado_paso = 'en_alquiler') AS fecha_inicio,
+             (SELECT MIN(fecha_movimiento) FROM movimiento_contenedor mm
+                WHERE mm.id_op_contenedor = oc.id AND mm.estado_paso = 'disponible') AS fecha_fin
+      FROM op_detalle_contenedor oc
+      JOIN op_encabezado op ON op.id = oc.id_orden_pedido
+      LEFT JOIN clientes cli ON cli.id = op.id_cliente
+      WHERE oc.id_contenedor = ? AND op.tipo_op = 'C' AND op.estado <> 'anulado'
+    `, [id])).rows
+    alq.sort((a, b) => String(b.fecha_inicio || b.fecha_entrega_planificada || '')
+      .localeCompare(String(a.fecha_inicio || a.fecha_entrega_planificada || '')))
+    c.alquileres = alq
+
     return c
   },
 
