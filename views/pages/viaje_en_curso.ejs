@@ -293,9 +293,9 @@
           </div>
           <input type="hidden" name="firma_cliente" id="firmaInput">
 
-          <label class="form-label fw-semibold mb-1 mt-3">Aclaración (nombre de quien firma) *</label>
+          <label class="form-label fw-semibold mb-1 mt-3">Aclaración (nombre de quien firma) <span class="text-muted fw-normal">(si firma)</span></label>
           <input type="text" name="firma_aclaracion" class="form-control form-control-sm" id="firmaNombre"
-                 placeholder="Nombre y apellido" required autocomplete="off">
+                 placeholder="Nombre y apellido" autocomplete="off">
 
           <label class="form-label fw-semibold mb-1 mt-3">📷 Foto del remito <span class="text-muted fw-normal">(opcional)</span></label>
           <input type="file" name="remito_firmado" accept="image/*,application/pdf" capture="environment"
@@ -818,9 +818,17 @@
     document.getElementById('firmaClear').addEventListener('click', function () { pad.clear(); });
 
     finalizarForm.addEventListener('submit', function (e) {
-      if (pad.isEmpty()) { e.preventDefault(); alert('Falta la firma del cliente.'); return; }
-      if (!firmaNombre.value.trim()) { e.preventDefault(); alert('Ingresá el nombre de quien recibe.'); firmaNombre.focus(); return; }
-      firmaInput.value = pad.toDataURL();
+      var tieneFirma = !pad.isEmpty();
+      // La firma es opcional: se puede finalizar sin ella y adjuntar el remito después.
+      if (tieneFirma && !firmaNombre.value.trim()) {
+        e.preventDefault(); alert('Ingresá el nombre de quien firma.'); firmaNombre.focus(); return;
+      }
+      if (!tieneFirma) {
+        if (!confirm('¿Finalizar sin firma ni foto del remito? Podés adjuntarlos después desde el detalle de la operación.')) {
+          e.preventDefault(); return;
+        }
+      }
+      firmaInput.value = tieneFirma ? pad.toDataURL() : '';
       // Distancia de la ruta (km) para el kilometraje automático del camión
       var dkm = document.getElementById('distanciaKmInput');
       if (dkm) dkm.value = routeTotalDist > 0 ? (routeTotalDist / 1000).toFixed(2) : '';

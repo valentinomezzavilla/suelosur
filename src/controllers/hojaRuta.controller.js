@@ -458,12 +458,8 @@ const HojaRutaController = {
                      || (op.tipo_op === 'C' && op.estado === 'despachado')
       const esRetiroContenedor = op.tipo_op === 'C' && op.estado === 'entregado'
 
-      // Tanto la entrega como el retiro necesitan la firma del cliente (cada uno
-      // genera su propio remito: remito de entrega y remito de retiro).
-      if ((esEntrega || esRetiroContenedor) && !req.body.firma_cliente) {
-        req.flash('error', `Falta la firma del cliente para confirmar ${esRetiroContenedor ? 'el retiro' : 'la entrega'}.`)
-        return res.redirect(back)
-      }
+      // La firma y la foto del remito son OPCIONALES al finalizar: se puede cerrar
+      // el viaje sin ellas y adjuntarlas después desde el detalle de la operación.
       // Guardar la firma EN LA BASE DE DATOS (no en disco). Render tiene filesystem
       // efímero: un archivo se borraría al reiniciar. Cada fase guarda su firma aparte.
       if (req.body.firma_cliente) {
