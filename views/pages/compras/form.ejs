@@ -1,36 +1,106 @@
+<%
+  const CAT_LABEL = {
+    material: 'Material (ingresa a stock)',
+    sueldo: 'Sueldo',
+    seguro: 'Seguro',
+    proveedor: 'Pago a proveedor',
+    mantenimiento: 'Mantenimiento / Service',
+    combustible: 'Combustible',
+    impuesto: 'Impuesto / Multa',
+    otro: 'Otro',
+  }
+%>
+
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('cart', { size: 18 }) %> Registrar Compra</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Registrar compra / pago</h4>
   <a href="/compras" class="btn btn-sm btn-outline-secondary">← Volver</a>
 </div>
 
-<div class="card shadow-sm maxw-600">
+<div class="card shadow-sm" style="max-width:720px">
   <div class="card-body">
-    <form action="/compras" method="POST">
+    <form action="/compras" method="POST" id="formEgreso">
+
+      <!-- Categoría -->
       <div class="mb-3">
-        <label class="form-label">Producto *</label>
-        <select name="id_producto" class="form-select" required>
-          <option value="">Seleccionar...</option>
-          <% productos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
+        <label class="form-label">¿Qué es? *</label>
+        <select name="categoria" id="categoria" class="form-select" required>
+          <option value="">Seleccionar…</option>
+          <% categorias.forEach(c => { %><option value="<%= c %>"><%= CAT_LABEL[c] || c %></option><% }) %>
         </select>
       </div>
-      <div class="row g-3 mb-3">
-        <div class="col-md-6"><label class="form-label">Cantidad *</label><input type="number" step="1" min="1" name="cantidad" class="form-control" required></div>
-        <div class="col-md-6"><label class="form-label">Costo unitario</label><input type="number" step="0.01" min="0" name="costo_unitario" class="form-control" placeholder="0"></div>
+
+      <!-- Material (solo categoría material) -->
+      <div class="cond" data-cats="material" style="display:none">
+        <div class="mb-3">
+          <label class="form-label">Producto *</label>
+          <select name="id_producto" id="id_producto" class="form-select">
+            <option value="">Seleccionar…</option>
+            <% productos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
+          </select>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6"><label class="form-label">Cantidad *</label><input type="number" step="1" min="1" name="cantidad" id="cantidad" class="form-control"></div>
+          <div class="col-md-6"><label class="form-label">Costo unitario</label><input type="number" step="0.01" min="0" name="costo_unitario" id="costo_unitario" class="form-control" placeholder="0"></div>
+        </div>
       </div>
-      <div class="mb-3">
+
+      <!-- Proveedor (material o proveedor) -->
+      <div class="cond mb-3" data-cats="material proveedor" style="display:none">
         <label class="form-label">Proveedor</label>
-        <input type="text" id="buscarProv" class="form-control form-control-sm mb-1" placeholder="Buscar por razón social o CUIT...">
+        <input type="text" id="buscarProv" class="form-control form-control-sm mb-1" placeholder="Buscar por razón social o CUIT…">
         <select name="id_proveedor" id="selProv" class="form-select">
           <option value="">— Sin proveedor —</option>
           <% proveedores.forEach(p => { %><option value="<%= p.id %>" data-search="<%= (p.nombre + ' ' + (p.cuit||'')).toLowerCase() %>"><%= p.nombre %><%= p.cuit ? ' (' + p.cuit + ')' : '' %></option><% }) %>
         </select>
       </div>
-      <div class="mb-4">
-        <label class="form-label">Observaciones</label>
-        <input type="text" name="observaciones" class="form-control" placeholder="N° de remito del proveedor, notas...">
+
+      <!-- Empleado (sueldo) -->
+      <div class="cond mb-3" data-cats="sueldo" style="display:none">
+        <label class="form-label">Empleado *</label>
+        <select name="id_empleado" id="id_empleado" class="form-select">
+          <option value="">Seleccionar…</option>
+          <% empleados.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %> <%= e.apellido || '' %><%= e.legajo ? ' — Legajo ' + e.legajo : '' %></option><% }) %>
+        </select>
       </div>
+
+      <!-- Vehículo (seguro / mantenimiento / combustible / impuesto) -->
+      <div class="cond mb-3" data-cats="seguro mantenimiento combustible impuesto" style="display:none">
+        <label class="form-label">Vehículo</label>
+        <select name="id_vehiculo" id="id_vehiculo" class="form-select">
+          <option value="">— Sin vehículo —</option>
+          <% vehiculos.forEach(v => { %><option value="<%= v.id %>"><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
+        </select>
+      </div>
+
+      <!-- Comunes -->
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Fecha</label>
+          <input type="date" name="fecha" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Monto *</label>
+          <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" placeholder="0" required>
+          <small class="text-muted cond" data-cats="material" style="display:none">Se calcula con cantidad × costo (podés editarlo).</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Método de pago</label>
+          <select name="metodo_pago" class="form-select">
+            <option value="">—</option>
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Descripción</label>
+        <input type="text" name="descripcion" id="descripcion" class="form-control" placeholder="Detalle, N° de comprobante, período…">
+      </div>
+
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-naranja px-4">Registrar compra</button>
+        <button type="submit" class="btn btn-naranja px-4">Registrar</button>
         <a href="/compras" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
@@ -39,9 +109,35 @@
 
 <script>
   (function () {
+    const cat = document.getElementById('categoria')
+    const conds = Array.from(document.querySelectorAll('.cond'))
+    const monto = document.getElementById('monto')
+    const cantidad = document.getElementById('cantidad')
+    const costo = document.getElementById('costo_unitario')
+
+    function toggle() {
+      const v = cat.value
+      conds.forEach(el => {
+        const cats = (el.dataset.cats || '').split(' ')
+        el.style.display = cats.includes(v) ? '' : 'none'
+      })
+    }
+    cat.addEventListener('change', toggle)
+    toggle()
+
+    // Material: monto = cantidad × costo (auto, editable)
+    function calcMaterial() {
+      if (cat.value !== 'material') return
+      const c = parseFloat(cantidad?.value) || 0
+      const u = parseFloat(costo?.value) || 0
+      if (c > 0 && u > 0) monto.value = (c * u).toFixed(2)
+    }
+    cantidad?.addEventListener('input', calcMaterial)
+    costo?.addEventListener('input', calcMaterial)
+
+    // Buscador de proveedor
     const b = document.getElementById('buscarProv'), s = document.getElementById('selProv')
-    if (!b || !s) return
-    b.addEventListener('input', () => {
+    if (b && s) b.addEventListener('input', () => {
       const q = b.value.trim().toLowerCase(); let first = ''
       Array.from(s.options).forEach(o => { if (!o.value) return; const hay = (o.dataset.search||'').includes(q); o.hidden = q && !hay; if (hay && !first) first = o.value })
       if (q && first) s.value = first

@@ -737,6 +737,31 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS obra TEXT`).catch(() => {})
   // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
+
+  // Egresos: libro único de salidas de dinero (compras / pagos). Categoriza cada
+  // salida (material, sueldo, seguro, proveedor, etc.) y la vincula opcionalmente
+  // a proveedor / empleado / vehículo. Alimentado a mano o automático desde alertas.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS egresos (
+      id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      fecha        TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
+      categoria    TEXT NOT NULL CHECK (categoria IN (
+                     'material','sueldo','seguro','proveedor',
+                     'mantenimiento','combustible','impuesto','otro'
+                   )),
+      descripcion  TEXT NOT NULL DEFAULT '',
+      monto        REAL NOT NULL DEFAULT 0,
+      metodo_pago  TEXT,
+      id_proveedor BIGINT REFERENCES proveedores(id),
+      id_empleado  BIGINT REFERENCES empleados(id),
+      id_vehiculo  BIGINT REFERENCES flota_vehiculos(id),
+      origen       TEXT DEFAULT 'manual',
+      id_usuario   BIGINT,
+      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_fecha     ON egresos(fecha)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_categoria ON egresos(categoria)`)
   // Unificación de actividades a 3 categorías: ventas / contenedores / maquinas
   const _mapAct = `CASE actividad
       WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'

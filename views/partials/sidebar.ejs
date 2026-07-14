@@ -114,8 +114,8 @@
       <a href="/clientes/cuentas" class="nav-link <%= t==='Cuentas corrientes'?'is-active':'' %>">
         <%- ic('dollar') %><span>Cuentas corrientes</span>
       </a>
-      <a href="/compras" class="nav-link <%= t==='Compras'?'is-active':'' %>">
-        <%- ic('cart') %><span>Compras</span>
+      <a href="/compras" class="nav-link <%= (typeof t!=='undefined' && t && t.toLowerCase().indexOf('compra')>=0)?'is-active':'' %>">
+        <%- ic('cart') %><span>Compras / Pagos</span>
       </a>
     </div>
     <% } %>

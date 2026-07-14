@@ -116,6 +116,7 @@ const AlertasModel = {
         titulo: g.categoria === 'seguro' ? 'Seguro del vehículo' : `Vencimiento: ${g.categoria}`,
         entidad_id: g.id_vehiculo, entidad_nombre: g.nom || '—',
         fecha: g.vencimiento, link: `/flota/${g.id_vehiculo}`,
+        resolver: `/compras/pagar-gasto/${g.id}`,
       })
     })
 

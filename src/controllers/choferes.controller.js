@@ -7,6 +7,7 @@ const DocumentosModel = require('../models/documentos.model')
 const AsignacionesModel = require('../models/asignaciones.model')
 const ControlHorarioModel = require('../models/control_horario.model')
 const PagosModel = require('../models/pagos_empleado.model')
+const EgresosModel = require('../models/egresos.model')
 const AlertasModel = require('../models/alertas.model')
 const { registrarAuditoria, historial } = require('../utils/auditoria')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
@@ -295,11 +296,17 @@ const ChoferesController = {
     try {
       const emp = await EmpleadosModel.obtener(req.params.id)
       if (!emp) { req.flash('error', 'Empleado no encontrado.'); return res.redirect(back) }
+      const montoSueldo = emp.sueldo_basico || emp.salario || 0
       await PagosModel.crear({
         id_empleado: emp.id, tipo: 'sueldo',
-        monto: emp.sueldo_basico || emp.salario || 0,
+        monto: montoSueldo,
         fecha: new Date().toISOString().slice(0, 10),
         descripcion: 'Pago registrado al resolver alerta de vencimiento',
+      })
+      // Registro automático en el libro de compras / pagos
+      await EgresosModel.crear({
+        categoria: 'sueldo', descripcion: `Sueldo — ${emp.nombre} ${emp.apellido || ''}`.trim(),
+        monto: montoSueldo, id_empleado: emp.id, origen: 'alerta', id_usuario: uid(req),
       })
       const base = emp.fecha_vencimiento_pago ? new Date(emp.fecha_vencimiento_pago + 'T00:00:00') : new Date()
       base.setMonth(base.getMonth() + 1)

@@ -63,7 +63,7 @@
           <td><small class="text-muted"><%= a.fecha ? formatFecha(a.fecha) + (a.dias!=null ? ' ('+a.dias+'d)' : '') : (a.km_restante!=null ? a.km_restante+' km' : '—') %></small></td>
           <td class="text-end">
             <% if (a.resolver) { %>
-              <form action="<%= a.resolver %>" method="POST" class="d-inline" onsubmit="return confirm('¿Registrar el pago y mover el vencimiento al mes siguiente?')">
+              <form action="<%= a.resolver %>" method="POST" class="d-inline" onsubmit="return confirm('¿Registrar el pago en Compras / Pagos y renovar el vencimiento?')">
                 <button class="btn btn-sm btn-success"><%- icon('check',{size:14}) %> Resolver</button>
               </form>
             <% } %>

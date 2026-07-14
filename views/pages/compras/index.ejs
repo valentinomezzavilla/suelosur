@@ -1,11 +1,21 @@
 <%
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
   const presetHref = (p) => '/compras?preset=' + p
+  const CAT_LABEL = {
+    material: 'Material', sueldo: 'Sueldo', seguro: 'Seguro', proveedor: 'Proveedor',
+    mantenimiento: 'Mantenimiento', combustible: 'Combustible', impuesto: 'Impuesto / Multa', otro: 'Otro',
+  }
+  const CAT_BADGE = {
+    material: 'badge-en-transito', sueldo: 'badge-activo', seguro: 'badge-alerta', proveedor: 'badge-pendiente',
+    mantenimiento: 'badge-pendiente', combustible: 'badge-en-transito', impuesto: 'badge-alerta', otro: 'badge-pendiente',
+  }
+  const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque' }
+  const detalleDe = (e) => e.proveedor_nombre || e.empleado_nombre || e.vehiculo_nombre || '—'
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('cart', { size: 18 }) %> Compras / Abastecimiento</h4>
-  <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra</a>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Compras / Pagos</h4>
+  <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra / pago</a>
 </div>
 
 <div class="periodo-chips">
@@ -14,28 +24,39 @@
   <a href="<%= presetHref('mes') %>"    class="periodo-chip <%= filtros.preset==='mes'    ? 'is-active' : '' %>">Este mes</a>
 </div>
 
-<div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px">
-  <div class="stat-card stat-card--neutral"><div class="stat-card__icon"><%- icon('chart',{size:20}) %></div>
-    <div class="stat-card__body"><span class="stat-card__value"><%= money(resumen.total) %></span><span class="stat-card__label">Total · <%= periodoLabel %></span></div></div>
-  <div class="stat-card stat-card--info"><div class="stat-card__icon"><%- icon('cart',{size:20}) %></div>
-    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.count %></span><span class="stat-card__label">Compras</span></div></div>
-  <div class="stat-card stat-card--success"><div class="stat-card__icon"><%- icon('layers',{size:20}) %></div>
-    <div class="stat-card__body"><span class="stat-card__value"><%= Number(resumen.cantidad).toLocaleString('es-AR') %></span><span class="stat-card__label">Unidades ingresadas</span></div></div>
+<div class="stat-cards" style="grid-template-columns:repeat(2,minmax(0,1fr));max-width:560px">
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon"><%- icon('chart',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(resumen.total) %></span><span class="stat-card__label">Total egresos · <%= periodoLabel %></span></div></div>
+  <div class="stat-card stat-card--neutral"><div class="stat-card__icon"><%- icon('receipt',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= resumen.count %></span><span class="stat-card__label">Registros</span></div></div>
 </div>
+
+<!-- Desglose por categoría -->
+<% const cats = Object.keys(resumen.porCategoria || {}); if (cats.length) { %>
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <% cats.sort((a,b) => resumen.porCategoria[b].monto - resumen.porCategoria[a].monto).forEach(c => { %>
+    <a href="/compras?categoria=<%= c %><%= filtros.preset ? '&preset=' + filtros.preset : '' %>" class="text-decoration-none">
+      <span class="badge rounded-pill px-3 py-2 <%= CAT_BADGE[c] || 'badge-pendiente' %>">
+        <%= CAT_LABEL[c] || c %>: <%= money(resumen.porCategoria[c].monto) %>
+      </span>
+    </a>
+  <% }) %>
+</div>
+<% } %>
 
 <form method="GET" action="/compras" class="card shadow-sm mb-3">
   <div class="card-body py-2">
     <input type="hidden" name="preset" value="rango">
     <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Categoría</label>
+        <select name="categoria" class="form-select form-select-sm">
+          <option value="">Todas</option>
+          <% categorias.forEach(c => { %><option value="<%= c %>" <%= filtros.categoria===c?'selected':'' %>><%= CAT_LABEL[c] || c %></option><% }) %>
+        </select></div>
       <div class="col-md-3"><label class="form-label">Proveedor</label>
         <select name="proveedor" class="form-select form-select-sm">
           <option value="">Todos</option>
-          <% proveedores.forEach(p => { %><option value="<%= p.id %>" <%= filtros.proveedor===p.id?'selected':'' %>><%= p.nombre %></option><% }) %>
-        </select></div>
-      <div class="col-md-3"><label class="form-label">Producto</label>
-        <select name="producto" class="form-select form-select-sm">
-          <option value="">Todos</option>
-          <% productos.forEach(p => { %><option value="<%= p.id %>" <%= filtros.producto===p.id?'selected':'' %>><%= p.nombre %></option><% }) %>
+          <% proveedores.forEach(p => { %><option value="<%= p.id %>" <%= String(filtros.proveedor)===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %>
         </select></div>
       <div class="col-md-2"><label class="form-label">Desde</label><input type="date" name="fechaDesde" value="<%= filtros.fechaDesde||'' %>" class="form-control form-control-sm"></div>
       <div class="col-md-2"><label class="form-label">Hasta</label><input type="date" name="fechaHasta" value="<%= filtros.fechaHasta||'' %>" class="form-control form-control-sm"></div>
@@ -47,24 +68,40 @@
 
 <div class="card shadow-sm">
   <div class="card-body p-0">
-    <% if (!compras.length) { %>
-      <%- include('../../partials/empty_state', { icono: '🛒', mensaje: 'No hay compras registradas en el período.', accionHref: '/compras/nueva', accionLabel: 'Registrar primera compra' }) %>
+    <% if (!egresos.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🧾', mensaje: 'No hay compras / pagos registrados en el período.', accionHref: '/compras/nueva', accionLabel: 'Registrar el primero' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Fecha</th><th>Producto</th><th>Proveedor</th><th class="text-end">Cantidad</th><th class="text-end">Costo unit.</th><th class="text-end">Total</th><th>Registró</th></tr></thead>
+      <thead><tr>
+        <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor / Empleado / Vehículo</th>
+        <th>Método</th><th class="text-end">Monto</th><th class="text-center">Acciones</th>
+      </tr></thead>
       <tbody>
-        <% compras.forEach(c => { %>
+        <% egresos.forEach(e => { %>
         <tr>
-          <td><small class="text-muted"><%= formatFecha(c.fecha) %></small></td>
-          <td class="fw-semibold"><%= c.producto_nombre %></td>
-          <td><%= c.proveedor_nombre || '— sin proveedor —' %></td>
-          <td class="text-end"><%= c.cantidad %> <small class="text-muted"><%= c.unidad_medida %></small></td>
-          <td class="text-end"><%= money(c.costo_unitario) %></td>
-          <td class="text-end fw-semibold"><%= money(c.total) %></td>
-          <td><small class="text-muted"><%= c.usuario_nombre || '—' %></small></td>
+          <td><small class="text-muted"><%= formatFecha(e.fecha) %></small></td>
+          <td><span class="badge rounded-pill px-3 <%= CAT_BADGE[e.categoria] || 'badge-pendiente' %>"><%= CAT_LABEL[e.categoria] || e.categoria %></span>
+            <% if (e.origen === 'alerta') { %><small class="text-muted d-block">auto · alerta</small><% } %></td>
+          <td><%= e.descripcion || '—' %></td>
+          <td><small><%= detalleDe(e) %></small></td>
+          <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
+          <td class="text-end fw-semibold text-danger"><%= money(e.monto) %></td>
+          <td class="text-center">
+            <form action="/compras/<%= e.id %>/eliminar" method="POST" class="d-inline"
+                  onsubmit="return confirm('¿Eliminar este registro de <%= (CAT_LABEL[e.categoria]||e.categoria) %> por <%= money(e.monto) %>?')">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
+            </form>
+          </td>
         </tr>
         <% }) %>
       </tbody>
+      <tfoot>
+        <tr class="table-light">
+          <td colspan="5" class="fw-semibold text-end">Total del período</td>
+          <td class="text-end fw-bold text-danger"><%= money(resumen.total) %></td>
+          <td></td>
+        </tr>
+      </tfoot>
     </table>
     <% } %>
   </div>
