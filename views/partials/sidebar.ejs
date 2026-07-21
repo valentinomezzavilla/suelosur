@@ -117,6 +117,9 @@
       <a href="/compras" class="nav-link <%= (typeof t!=='undefined' && t && t.toLowerCase().indexOf('compra')>=0)?'is-active':'' %>">
         <%- ic('cart') %><span>Compras / Pagos</span>
       </a>
+      <a href="/cheques" class="nav-link <%= t==='Cheques'||t==='Nuevo cheque'||t==='Editar cheque'?'is-active':'' %>">
+        <%- ic('receipt') %><span>Cheques</span>
+      </a>
     </div>
     <% } %>
 

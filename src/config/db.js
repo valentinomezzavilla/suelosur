@@ -762,6 +762,31 @@ async function initDB() {
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_fecha     ON egresos(fecha)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_categoria ON egresos(categoria)`)
+
+  // Cheques: cartera de cheques recibidos (de clientes) y emitidos (a proveedores /
+  // empleados). Guarda todos los datos del cheque y su estado en la cartera.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cheques (
+      id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      tipo_cartera   TEXT NOT NULL CHECK (tipo_cartera IN ('recibido','emitido')),
+      numero         TEXT,
+      monto          REAL NOT NULL DEFAULT 0,
+      tipo           TEXT NOT NULL DEFAULT 'fisico' CHECK (tipo IN ('fisico','echeq')),
+      banco          TEXT,
+      a_nombre_de    TEXT,
+      fecha_pago     TEXT,
+      fecha_vencimiento TEXT,
+      estado         TEXT NOT NULL DEFAULT 'en_espera' CHECK (estado IN ('habilitado','deshabilitado','en_espera')),
+      id_cliente     BIGINT REFERENCES clientes(id),
+      id_proveedor   BIGINT REFERENCES proveedores(id),
+      id_empleado    BIGINT REFERENCES empleados(id),
+      descripcion    TEXT DEFAULT '',
+      id_usuario     BIGINT,
+      created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_cheques_estado ON cheques(estado)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_cheques_cartera ON cheques(tipo_cartera)`)
   // Unificación de actividades a 3 categorías: ventas / contenedores / maquinas
   const _mapAct = `CASE actividad
       WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'

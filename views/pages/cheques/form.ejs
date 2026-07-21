@@ -1,0 +1,128 @@
+<%
+  const c = cheque || {}
+  const isEdit = !!cheque
+  const action = isEdit ? `/cheques/${c.id}` : '/cheques'
+  const sel = (a, b) => String(a) === String(b) ? 'selected' : ''
+  const chk = (a, b) => String(a) === String(b) ? 'checked' : ''
+  const val = (v) => v == null ? '' : v
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> <%= isEdit ? 'Editar cheque' : 'Nuevo cheque' %></h4>
+  <a href="/cheques" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm" style="max-width:720px">
+  <div class="card-body">
+    <form action="<%= action %>" method="POST" id="formCheque">
+
+      <!-- Recibido / Emitido -->
+      <div class="mb-3">
+        <label class="form-label d-block">Tipo de cheque *</label>
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="tipo_cartera" id="tc_rec" value="recibido" <%= chk(c.tipo_cartera || 'recibido', 'recibido') %>>
+          <label class="btn btn-outline-secondary" for="tc_rec">Recibido (de cliente)</label>
+          <input type="radio" class="btn-check" name="tipo_cartera" id="tc_emi" value="emitido" <%= chk(c.tipo_cartera, 'emitido') %>>
+          <label class="btn btn-outline-secondary" for="tc_emi">Emitido (a proveedor / empleado)</label>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">N° de cheque</label>
+          <input type="text" name="numero" class="form-control" value="<%= val(c.numero) %>" placeholder="Ej: 00012345">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Monto *</label>
+          <input type="number" step="0.01" min="0" name="monto" class="form-control" value="<%= val(c.monto) %>" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tipo</label>
+          <select name="tipo" class="form-select">
+            <option value="fisico" <%= sel(c.tipo || 'fisico', 'fisico') %>>Físico</option>
+            <option value="echeq"  <%= sel(c.tipo, 'echeq') %>>e-Cheq</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Banco emisor</label>
+          <input type="text" name="banco" class="form-control" value="<%= val(c.banco) %>" placeholder="Ej: Banco Nación">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">A nombre de</label>
+          <input type="text" name="a_nombre_de" class="form-control" value="<%= val(c.a_nombre_de) %>" placeholder="Nombre del beneficiario / librador">
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Fecha de pago</label>
+          <input type="date" name="fecha_pago" class="form-control" value="<%= val(c.fecha_pago && String(c.fecha_pago).slice(0,10)) %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Vencimiento</label>
+          <input type="date" name="fecha_vencimiento" class="form-control" value="<%= val(c.fecha_vencimiento && String(c.fecha_vencimiento).slice(0,10)) %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Estado</label>
+          <select name="estado" class="form-select">
+            <option value="en_espera"     <%= sel(c.estado || 'en_espera', 'en_espera') %>>En espera</option>
+            <option value="habilitado"    <%= sel(c.estado, 'habilitado') %>>Habilitado</option>
+            <option value="deshabilitado" <%= sel(c.estado, 'deshabilitado') %>>Deshabilitado</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Vínculo: cliente (recibido) -->
+      <div class="mb-3 cond" data-cartera="recibido">
+        <label class="form-label">Cliente que lo entregó</label>
+        <select name="id_cliente" class="form-select">
+          <option value="">— Sin vincular —</option>
+          <% clientes.forEach(x => { %><option value="<%= x.id %>" <%= sel(c.id_cliente, x.id) %>><%= x.nombre %> <%= x.apellido || '' %></option><% }) %>
+        </select>
+      </div>
+
+      <!-- Vínculo: proveedor / empleado (emitido) -->
+      <div class="row g-3 mb-3 cond" data-cartera="emitido">
+        <div class="col-md-6">
+          <label class="form-label">Proveedor</label>
+          <select name="id_proveedor" class="form-select">
+            <option value="">— Sin vincular —</option>
+            <% proveedores.forEach(x => { %><option value="<%= x.id %>" <%= sel(c.id_proveedor, x.id) %>><%= x.nombre %></option><% }) %>
+          </select>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Empleado</label>
+          <select name="id_empleado" class="form-select">
+            <option value="">— Sin vincular —</option>
+            <% empleados.forEach(x => { %><option value="<%= x.id %>" <%= sel(c.id_empleado, x.id) %>><%= x.nombre %> <%= x.apellido || '' %></option><% }) %>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="form-label">Descripción / notas</label>
+        <input type="text" name="descripcion" class="form-control" value="<%= val(c.descripcion) %>" placeholder="Detalle, concepto, N° de operación…">
+      </div>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4"><%= isEdit ? 'Guardar cambios' : 'Registrar cheque' %></button>
+        <a href="/cheques" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const conds = Array.from(document.querySelectorAll('.cond'))
+    function toggle() {
+      const v = document.querySelector('input[name="tipo_cartera"]:checked')?.value || 'recibido'
+      conds.forEach(el => { el.style.display = el.dataset.cartera === v ? '' : 'none' })
+    }
+    document.querySelectorAll('input[name="tipo_cartera"]').forEach(r => r.addEventListener('change', toggle))
+    toggle()
+  })()
+</script>

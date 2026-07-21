@@ -1,0 +1,102 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const CART_LABEL  = { recibido: 'Recibido', emitido: 'Emitido' }
+  const CART_BADGE  = { recibido: 'badge-activo', emitido: 'badge-en-transito' }
+  const EST_LABEL   = { en_espera: 'En espera', habilitado: 'Habilitado', deshabilitado: 'Deshabilitado' }
+  const EST_BADGE   = { en_espera: 'badge-pendiente', habilitado: 'badge-activo', deshabilitado: 'badge-alerta' }
+  const vinculoDe = (c) => c.cliente_nombre || c.proveedor_nombre || c.empleado_nombre || '—'
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Cheques</h4>
+  <a href="/cheques/nuevo" class="btn btn-naranja">+ Nuevo cheque</a>
+</div>
+
+<div class="stat-cards" style="grid-template-columns:repeat(2,minmax(0,1fr));max-width:620px">
+  <div class="stat-card stat-card--success"><div class="stat-card__icon"><%- icon('download',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(resumen.recibido.total) %></span>
+      <span class="stat-card__label">Recibidos · en espera <%= money(resumen.recibido.en_espera) %></span></div></div>
+  <div class="stat-card stat-card--danger"><div class="stat-card__icon"><%- icon('receipt',{size:20}) %></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= money(resumen.emitido.total) %></span>
+      <span class="stat-card__label">Emitidos · en espera <%= money(resumen.emitido.en_espera) %></span></div></div>
+</div>
+
+<form method="GET" action="/cheques" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-3"><label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q %>" class="form-control form-control-sm" placeholder="N°, banco, a nombre de…"></div>
+      <div class="col-md-2"><label class="form-label">Cartera</label>
+        <select name="tipo_cartera" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="recibido" <%= filtros.tipo_cartera==='recibido'?'selected':'' %>>Recibidos</option>
+          <option value="emitido"  <%= filtros.tipo_cartera==='emitido'?'selected':'' %>>Emitidos</option>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Estado</label>
+        <select name="estado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% estados.forEach(e => { %><option value="<%= e %>" <%= filtros.estado===e?'selected':'' %>><%= EST_LABEL[e] %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Tipo</label>
+        <select name="tipo" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="fisico" <%= filtros.tipo==='fisico'?'selected':'' %>>Físico</option>
+          <option value="echeq"  <%= filtros.tipo==='echeq'?'selected':'' %>>e-Cheq</option>
+        </select></div>
+      <div class="col-auto"><button class="btn btn-sm btn-naranja">Filtrar</button>
+        <a href="/cheques" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a></div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!cheques.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🧾', mensaje: 'No hay cheques cargados.', accionHref: '/cheques/nuevo', accionLabel: 'Cargar el primer cheque' }) %>
+    <% } else { %>
+    <div class="table-wrapper">
+    <table class="table table-hover align-middle mb-0">
+      <thead><tr>
+        <th>Cartera</th><th>N°</th><th class="text-end">Monto</th><th>Tipo</th><th>Banco</th>
+        <th>A nombre de</th><th>Cliente / Prov. / Emp.</th><th>Pago</th><th>Vence</th><th>Estado</th><th class="text-center">Acciones</th>
+      </tr></thead>
+      <tbody>
+        <% cheques.forEach(ch => { %>
+        <tr>
+          <td><span class="badge rounded-pill px-3 <%= CART_BADGE[ch.tipo_cartera] %>"><%= CART_LABEL[ch.tipo_cartera] %></span></td>
+          <td class="fw-semibold"><%= ch.numero || '—' %></td>
+          <td class="text-end fw-semibold"><%= money(ch.monto) %></td>
+          <td><small class="text-muted"><%= ch.tipo === 'echeq' ? 'e-Cheq' : 'Físico' %></small></td>
+          <td><small><%= ch.banco || '—' %></small></td>
+          <td><small><%= ch.a_nombre_de || '—' %></small></td>
+          <td><small class="text-muted"><%= vinculoDe(ch) %></small></td>
+          <td><small class="text-muted"><%= ch.fecha_pago ? formatFecha(ch.fecha_pago) : '—' %></small></td>
+          <td><small class="text-muted"><%= ch.fecha_vencimiento ? formatFecha(ch.fecha_vencimiento) : '—' %></small></td>
+          <td>
+            <form action="/cheques/<%= ch.id %>/estado" method="POST" class="d-inline">
+              <select name="estado" onchange="this.form.submit()" class="form-select form-select-sm estado-select estado-<%= ch.estado %>" style="width:auto;display:inline-block">
+                <% estados.forEach(e => { %><option value="<%= e %>" <%= ch.estado===e?'selected':'' %>><%= EST_LABEL[e] %></option><% }) %>
+              </select>
+            </form>
+          </td>
+          <td class="text-center" style="white-space:nowrap">
+            <a href="/cheques/<%= ch.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+            <form action="/cheques/<%= ch.id %>/eliminar" method="POST" class="d-inline"
+                  onsubmit="return confirm('¿Eliminar el cheque <%= ch.numero || '' %> por <%= money(ch.monto) %>?')">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<style>
+  .estado-select.estado-habilitado    { border-color:#a7f3d0; color:#065f46; }
+  .estado-select.estado-en_espera     { border-color:#fde68a; color:#92400e; }
+  .estado-select.estado-deshabilitado { border-color:#fecaca; color:#991b1b; }
+</style>
