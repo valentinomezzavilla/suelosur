@@ -787,6 +787,8 @@ async function initDB() {
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cheques_estado ON cheques(estado)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cheques_cartera ON cheques(tipo_cartera)`)
+  // Movimiento de cuenta corriente que generó el cheque al habilitarse (para poder revertir).
+  await pool.query(`ALTER TABLE cheques ADD COLUMN IF NOT EXISTS id_mov_cuenta BIGINT`).catch(() => {})
   // Unificación de actividades a 3 categorías: ventas / contenedores / maquinas
   const _mapAct = `CASE actividad
       WHEN 'camion_viajes' THEN 'ventas' WHEN 'camion_contenedores' THEN 'contenedores'

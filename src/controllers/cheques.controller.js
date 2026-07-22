@@ -12,6 +12,30 @@ async function datosForm() {
   }
 }
 
+// Sincroniza el efecto del cheque en la cuenta corriente del cliente:
+// un cheque RECIBIDO de un cliente, cuando está HABILITADO, acredita su monto
+// (movimiento tipo 'pago', suma al saldo). Si deja de estar habilitado, se revierte.
+// Devuelve 'creado' | 'revertido' | null. Idempotente (no duplica el crédito).
+async function sincronizarImpactoCC(chequeId) {
+  const ch = await ChequesModel.obtener(chequeId)
+  if (!ch) return null
+  const teniaMov = !!ch.id_mov_cuenta
+  const debeImpactar = ch.tipo_cartera === 'recibido' && ch.id_cliente && ch.estado === 'habilitado'
+  if (teniaMov) {
+    await ClientesModel.eliminarMovimiento(ch.id_mov_cuenta)
+    await ChequesModel.setMovCuenta(chequeId, null)
+  }
+  if (debeImpactar) {
+    const desc = `Cheque${ch.numero ? ' N° ' + ch.numero : ''}${ch.banco ? ' — ' + ch.banco : ''}`
+    const movId = await ClientesModel.agregarMovimiento(ch.id_cliente, {
+      tipo: 'pago', descripcion: desc, monto: ch.monto, metodo_pago: 'cheque',
+    })
+    await ChequesModel.setMovCuenta(chequeId, movId)
+    return 'creado'
+  }
+  return teniaMov ? 'revertido' : null
+}
+
 const ChequesController = {
 
   async index(req, res) {
@@ -37,8 +61,11 @@ const ChequesController = {
   async crear(req, res) {
     try {
       if (!(parseFloat(req.body.monto) > 0)) { req.flash('error', 'Ingresá un monto válido.'); return res.redirect('/cheques/nuevo') }
-      await ChequesModel.crear({ ...req.body, id_usuario: req.session.user?.id })
-      req.flash('success', 'Cheque registrado en la cartera.')
+      const id = await ChequesModel.crear({ ...req.body, id_usuario: req.session.user?.id })
+      const impacto = await sincronizarImpactoCC(id)
+      req.flash('success', impacto === 'creado'
+        ? 'Cheque registrado y acreditado en la cuenta del cliente.'
+        : 'Cheque registrado en la cartera.')
       res.redirect('/cheques')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al registrar el cheque.'); res.redirect('/cheques/nuevo') }
   },
@@ -54,6 +81,7 @@ const ChequesController = {
   async actualizar(req, res) {
     try {
       await ChequesModel.actualizar(req.params.id, req.body)
+      await sincronizarImpactoCC(req.params.id)
       req.flash('success', 'Cheque actualizado.')
       res.redirect('/cheques')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al actualizar.'); res.redirect(`/cheques/${req.params.id}/editar`) }
@@ -62,13 +90,19 @@ const ChequesController = {
   async cambiarEstado(req, res) {
     try {
       await ChequesModel.cambiarEstado(req.params.id, req.body.estado)
-      req.flash('success', 'Estado del cheque actualizado.')
+      const impacto = await sincronizarImpactoCC(req.params.id)
+      req.flash('success',
+        impacto === 'creado'    ? 'Cheque habilitado y acreditado en la cuenta del cliente.'
+      : impacto === 'revertido' ? 'Cheque actualizado. Se revirtió el crédito en la cuenta del cliente.'
+      :                           'Estado del cheque actualizado.')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al cambiar el estado.') }
     res.redirect('/cheques')
   },
 
   async eliminar(req, res) {
     try {
+      const ch = await ChequesModel.obtener(req.params.id)
+      if (ch && ch.id_mov_cuenta) await ClientesModel.eliminarMovimiento(ch.id_mov_cuenta)
       await ChequesModel.eliminar(req.params.id)
       req.flash('success', 'Cheque eliminado.')
     } catch (err) { console.error(err); req.flash('error', 'Error al eliminar.') }

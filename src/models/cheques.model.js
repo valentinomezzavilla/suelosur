@@ -61,6 +61,11 @@ const ChequesModel = {
     await query(`UPDATE cheques SET estado = ? WHERE id = ?`, [estado, id])
   },
 
+  // Guarda (o limpia) el id del movimiento de cuenta corriente que generó el cheque.
+  async setMovCuenta(id, movId) {
+    await query(`UPDATE cheques SET id_mov_cuenta = ? WHERE id = ?`, [movId || null, id])
+  },
+
   async obtener(id) {
     return (await query(`SELECT * FROM cheques WHERE id = ?`, [id])).rows[0]
   },

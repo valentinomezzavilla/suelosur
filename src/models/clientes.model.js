@@ -140,6 +140,15 @@ const ClientesModel = {
     return rows[0].id
   },
 
+  // Elimina un movimiento y revierte su efecto en el saldo (usado para deshacer
+  // el crédito de un cheque cuando se deshabilita).
+  async eliminarMovimiento(movId) {
+    const m = (await query(`SELECT cliente_id, monto FROM movimientos_cuenta WHERE id = ?`, [movId])).rows[0]
+    if (!m) return
+    await query(`DELETE FROM movimientos_cuenta WHERE id = ?`, [movId])
+    await query(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(m.monto), m.cliente_id])
+  },
+
   async movimientos(clienteId) {
     return (await query(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at DESC`, [clienteId])).rows
   },

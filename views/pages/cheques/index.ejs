@@ -69,7 +69,8 @@
           <td><small class="text-muted"><%= ch.tipo === 'echeq' ? 'e-Cheq' : 'Físico' %></small></td>
           <td><small><%= ch.banco || '—' %></small></td>
           <td><small><%= ch.a_nombre_de || '—' %></small></td>
-          <td><small class="text-muted"><%= vinculoDe(ch) %></small></td>
+          <td><small class="text-muted"><%= vinculoDe(ch) %></small>
+            <% if (ch.id_mov_cuenta) { %><small class="text-success d-block">✓ acreditado en cta.</small><% } %></td>
           <td><small class="text-muted"><%= ch.fecha_pago ? formatFecha(ch.fecha_pago) : '—' %></small></td>
           <td><small class="text-muted"><%= ch.fecha_vencimiento ? formatFecha(ch.fecha_vencimiento) : '—' %></small></td>
           <td>

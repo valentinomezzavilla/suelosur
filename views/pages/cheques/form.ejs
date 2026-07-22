@@ -82,6 +82,7 @@
           <option value="">— Sin vincular —</option>
           <% clientes.forEach(x => { %><option value="<%= x.id %>" <%= sel(c.id_cliente, x.id) %>><%= x.nombre %> <%= x.apellido || '' %></option><% }) %>
         </select>
+        <p class="form-text mb-0">Si vinculás un cliente y el cheque queda en estado <strong>Habilitado</strong>, se acredita automáticamente en su cuenta corriente (suma al saldo a favor y queda como movimiento). Si se deshabilita, se revierte.</p>
       </div>
 
       <!-- Vínculo: proveedor / empleado (emitido) -->
