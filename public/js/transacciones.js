@@ -6,10 +6,18 @@
         cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente',
     };
 
+    // SVGs que renderiza el servidor con el helper icon()
+    const iconsEl = document.getElementById('tx-icons');
+    const ICONS = iconsEl ? JSON.parse(iconsEl.textContent) : {};
+
     document.querySelectorAll('.btn-ver-transaccion').forEach(btn => {
         btn.addEventListener('click', () => {
             document.getElementById('modal-t-id').textContent = '#' + btn.dataset.id;
-            document.getElementById('modal-t-tipo').textContent = btn.dataset.tipo;
+            // Mismo badge por tipo que usa la tabla, para que el color no cambie de una a otra
+            const tipo = btn.dataset.tipo || '';
+            const badgeTipo = document.getElementById('modal-t-tipo');
+            badgeTipo.textContent = tipo;
+            badgeTipo.className = 'badge badge--tipo-' + tipo.toLowerCase().replace(/ /g, '-');
             document.getElementById('modal-t-cliente').textContent = btn.dataset.cliente;
             document.getElementById('modal-t-descripcion').textContent = btn.dataset.descripcion;
             document.getElementById('modal-t-fecha').textContent = btn.dataset.fecha;
@@ -27,7 +35,7 @@
                 remito.target = '_blank';
                 remito.rel = 'noopener';
                 remito.className = 'tx-file-link';
-                remito.innerHTML = '📄 Ver remito' + (btn.dataset.nroRemito ? ' N° ' + btn.dataset.nroRemito : '');
+                remito.innerHTML = (ICONS.remito || '') + '<span>Ver remito' + (btn.dataset.nroRemito ? ' N° ' + btn.dataset.nroRemito : '') + '</span>';
                 linksBox.appendChild(remito);
 
                 if (btn.dataset.remitoFirmado === '1') {
@@ -36,7 +44,7 @@
                     firmado.target = '_blank';
                     firmado.rel = 'noopener';
                     firmado.className = 'tx-file-link tx-file-link--firmado';
-                    firmado.innerHTML = '✅ Remito firmado';
+                    firmado.innerHTML = (ICONS.firmado || '') + '<span>Remito firmado</span>';
                     linksBox.appendChild(firmado);
                 }
             } else {

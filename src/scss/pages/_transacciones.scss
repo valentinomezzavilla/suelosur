@@ -1,0 +1,205 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Modal de detalle de transacción
+// ═══════════════════════════════════════════════════════════════
+.tx-modal {
+  max-width: 540px;
+}
+
+// El código de la transacción va debajo del título, como chip monoespaciado.
+.tx-modal__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.tx-modal__id {
+  align-self: flex-start;
+  padding: 0.15rem 0.55rem;
+  border-radius: $radius-sm;
+  background: $accent-soft;
+  border: 1px solid rgba(28, 91, 173, 0.2);
+  color: $accent-dark;
+  font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+  font-size: $fs-xs;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+
+.tx-modal__body {
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+// ── Bloque destacado: el monto es el dato principal ────────────
+.tx-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: $radius-lg;
+  background: linear-gradient(135deg, $bg-card-alt 0%, $accent-soft 100%);
+  border: 1px solid $border;
+}
+
+.tx-hero__label {
+  display: block;
+  color: $muted;
+  font-size: $fs-xs;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 0.2rem;
+}
+
+.tx-hero__value {
+  display: block;
+  color: $success;
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.5px;
+}
+
+// ── Datos en filas etiqueta / valor ────────────────────────────
+.tx-datos {
+  display: flex;
+  flex-direction: column;
+}
+
+.tx-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid $border-line;
+
+  &:last-child { border-bottom: 0; }
+}
+
+.tx-row__label {
+  color: $muted;
+  font-size: $fs-sm;
+  flex-shrink: 0;
+}
+
+.tx-row__value {
+  color: $ink;
+  font-weight: 600;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+// La descripción suele ser larga: ocupa el ancho completo, alineada a la izquierda.
+.tx-row--bloque {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+
+  .tx-row__value {
+    text-align: left;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+}
+
+.tx-pago {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  background: $bg-card-alt;
+  border: 1px solid $border;
+  color: $ink-soft;
+  font-size: $fs-sm;
+  font-weight: 600;
+}
+
+// ── Archivos adjuntos ──────────────────────────────────────────
+.tx-files__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: $muted;
+  font-size: $fs-xs;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 0.6rem;
+}
+
+.tx-files__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.tx-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.85rem;
+  border-radius: $radius-md;
+  border: 1px solid $border;
+  background: $bg-card;
+  color: $ink-soft;
+  font-size: $fs-sm;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: $shadow-xs;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+  &:hover {
+    background: $accent-soft;
+    border-color: rgba(28, 91, 173, 0.35);
+    color: $accent-dark;
+  }
+
+  &--firmado {
+    background: $success-soft;
+    border-color: $success-border;
+    color: $success-text;
+
+    &:hover { background: #d1fae5; border-color: $success; color: $success-text; }
+  }
+}
+
+.tx-files__empty {
+  color: $muted-light;
+  font-size: $fs-sm;
+  font-style: italic;
+}
+
+// ── Pie ────────────────────────────────────────────────────────
+.tx-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid $border-soft;
+  background: $bg-card-alt;
+}
+
+@include sm-down {
+  .tx-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.6rem;
+  }
+
+  .tx-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+
+    .tx-row__value { text-align: left; }
+  }
+}

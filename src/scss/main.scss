@@ -43,6 +43,7 @@
 @use 'pages/alquileres';
 @use 'pages/configuracion';
 @use 'pages/detalle';
+@use 'pages/transacciones';
 
 // ── Utilidades (al final, para que ganen por especificidad) ────
 @use 'utilities/helpers';

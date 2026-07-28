@@ -56,6 +56,16 @@ const SQL_FIN_ALQUILER = `
   END
 `
 
+// Datos del alquiler que corresponde mostrar en cada fila:
+//  · pendiente de inicio → los del alquiler que viene;
+//  · disponible          → ninguno (el contenedor está libre: mostrar el cliente del
+//                          alquiler anterior, o de uno anulado, confunde);
+//  · resto de los estados → los del alquiler en curso.
+const datoDeLaOp = (campoProximo, campoActual) => `
+  CASE WHEN ${SQL_PEND_INICIO} THEN prox.${campoProximo}
+       WHEN um.estado_paso = 'disponible' THEN NULL
+       ELSE ${campoActual} END`
+
 const ContenedoresModel = {
 
   async listar({ estado_paso, estado_general, q, registro } = {}) {
@@ -96,11 +106,11 @@ const ContenedoresModel = {
       SELECT c.id, c.numero_contenedor, c.estado_general, c.fecha_ultima_pintada,
              c.observaciones, c.activo, um.fecha_movimiento,
              ${SQL_ESTADO_PASO} AS estado_paso,
-             CASE WHEN ${SQL_PEND_INICIO} THEN prox.domicilio_entrega ELSE oc.domicilio_entrega END AS domicilio_entrega,
-             CASE WHEN ${SQL_PEND_INICIO} THEN prox.zona_entrega      ELSE oc.zona_entrega      END AS zona_entrega,
-             CASE WHEN ${SQL_PEND_INICIO} THEN prox.plazo_alquiler    ELSE oc.plazo_alquiler    END AS plazo_alquiler,
-             CASE WHEN ${SQL_PEND_INICIO} THEN prox.cliente_nombre    ELSE cli.nombre           END AS cliente_nombre,
-             CASE WHEN ${SQL_PEND_INICIO} THEN prox.nro_op            ELSE op.nro_op            END AS nro_op,
+             ${datoDeLaOp('domicilio_entrega', 'oc.domicilio_entrega')} AS domicilio_entrega,
+             ${datoDeLaOp('zona_entrega',      'oc.zona_entrega')}      AS zona_entrega,
+             ${datoDeLaOp('plazo_alquiler',    'oc.plazo_alquiler')}    AS plazo_alquiler,
+             ${datoDeLaOp('cliente_nombre',    'cli.nombre')}           AS cliente_nombre,
+             ${datoDeLaOp('nro_op',            'op.nro_op')}            AS nro_op,
              prox.fecha_entrega_planificada AS fecha_inicio_programada,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado,
              (${SQL_INICIO_ALQUILER}) AS fecha_inicio_alquiler,
