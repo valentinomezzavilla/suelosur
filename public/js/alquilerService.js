@@ -47,8 +47,25 @@ if (btnBuscar) {
 }
 
 // ── Fechas: mínimo 4 días, máximo 9 ───────────────────────────
+// (En carga histórica no rige ningún tope: el alquiler ya pasó y duró lo que duró.)
 const fechaInicio = document.getElementById('fechaInicio');
 const fechaFin    = document.getElementById('fechaFin');
+
+function modoFinalizado() { return !!document.getElementById('checkFinalizado')?.checked; }
+function sinFechaFin()    { return !!document.getElementById('checkSinFechaFin')?.checked; }
+
+// Ventana permitida para la fecha de fin según el plazo mínimo/máximo. En carga
+// histórica no se aplica: el alquiler ya pasó y duró lo que haya durado.
+function aplicarVentanaFechaFin(limpiarValor) {
+    if (!fechaInicio || !fechaFin) return;
+    if (modoFinalizado() || !fechaInicio.value) { fechaFin.min = ''; fechaFin.max = ''; return; }
+    const inicio = new Date(fechaInicio.value + 'T00:00:00');
+    const minFin = new Date(inicio); minFin.setDate(minFin.getDate() + 4);
+    const maxFin = new Date(inicio); maxFin.setDate(maxFin.getDate() + 9);
+    fechaFin.min = toInputDate(minFin);
+    fechaFin.max = toInputDate(maxFin);
+    if (limpiarValor) fechaFin.value = '';
+}
 
 if (fechaInicio && fechaFin) {
     const hoy = new Date();
@@ -57,12 +74,7 @@ if (fechaInicio && fechaFin) {
 
     fechaInicio.addEventListener('change', () => {
         if (!fechaInicio.value) return;
-        const inicio = new Date(fechaInicio.value + 'T00:00:00');
-        const minFin = new Date(inicio); minFin.setDate(minFin.getDate() + 4);
-        const maxFin = new Date(inicio); maxFin.setDate(maxFin.getDate() + 9);
-        fechaFin.min   = toInputDate(minFin);
-        fechaFin.max   = toInputDate(maxFin);
-        fechaFin.value = '';
+        aplicarVentanaFechaFin(!modoFinalizado());
         actualizarResumen();
     });
 }
@@ -106,7 +118,7 @@ function actualizarResumen() {
     const elTotalV  = document.getElementById('res-total-valor');
 
     if (elInicio) elInicio.textContent = formatFechaLocal(inicioVal);
-    if (elFin)    elFin.textContent    = formatFechaLocal(finVal);
+    if (elFin)    elFin.textContent    = sinFechaFin() ? 'Sin informar' : formatFechaLocal(finVal);
 
     if (inicioVal && finVal) {
         const dias = Math.round((new Date(finVal) - new Date(inicioVal)) / 86400000);
@@ -221,15 +233,35 @@ const finalizadoHint        = document.getElementById('finalizadoHint');
 const seccionChoferCamion   = document.getElementById('seccionChoferCamion');
 const modalContLabel        = document.getElementById('modal-cont-label');
 const fechaInicioMinDefault = fechaInicio ? fechaInicio.min : '';
+const checkSinFechaFin      = document.getElementById('checkSinFechaFin');
+const rowSinFechaFin        = document.getElementById('rowSinFechaFin');
+const grupoFechaFin         = document.getElementById('grupoFechaFin');
+
+// Oculta la fecha de fin cuando el alquiler viejo no la tiene registrada.
+// Al quedar oculta, validarFormulario la saltea sola (ignora los campos no visibles).
+function aplicarSinFechaFin(activo) {
+    if (grupoFechaFin) grupoFechaFin.style.display = activo ? 'none' : '';
+    if (fechaFin) {
+        fechaFin.required = !activo;
+        if (activo) { fechaFin.value = ''; fechaFin.min = ''; fechaFin.max = ''; }
+    }
+    actualizarResumen();
+}
 
 function aplicarModoFinalizado(activo) {
     if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
     if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
-    if (fechaInicio)         fechaInicio.min = activo ? '' : fechaInicioMinDefault;   // permitir fechas pasadas
+    if (rowSinFechaFin)      rowSinFechaFin.style.display = activo ? '' : 'none';
+    // Histórico: ninguna fecha limita. Ni el inicio al día de hoy ni el fin al plazo.
+    if (fechaInicio) fechaInicio.min = activo ? '' : fechaInicioMinDefault;
+    aplicarVentanaFechaFin(false);
+    if (!activo && checkSinFechaFin) checkSinFechaFin.checked = false;
+    aplicarSinFechaFin(activo && !!checkSinFechaFin?.checked);
     if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';
 }
 
 checkFinalizado?.addEventListener('change', () => aplicarModoFinalizado(checkFinalizado.checked));
+checkSinFechaFin?.addEventListener('change', () => aplicarSinFechaFin(checkSinFechaFin.checked));
 
 // Abrir el modal SIN contenedor, directo en modo histórico
 document.getElementById('btnCargarFinalizado')?.addEventListener('click', () => {
@@ -280,17 +312,18 @@ formAlquiler?.addEventListener('submit', (e) => {
         e.preventDefault();
         return;
     }
-    if (!contenedorSeleccionado) { e.preventDefault(); alert('Seleccioná un contenedor.'); return; }
+    // La carga histórica no ocupa un contenedor físico: no hace falta elegir uno.
+    if (!modoFinalizado() && !contenedorSeleccionado) { e.preventDefault(); alert('Seleccioná un contenedor.'); return; }
     const clienteId = document.getElementById('inputClienteId')?.value;
     if (!clienteId) { e.preventDefault(); alert('Buscá y seleccioná un cliente antes de confirmar.'); return; }
 
     // Validar campos obligatorios manualmente
     const campos = [
         { id: 'fechaInicio', nombre: 'Fecha de inicio' },
-        { id: 'fechaFin',    nombre: 'Fecha de fin' },
         { id: 'calle',       nombre: 'Calle' },
         { id: 'numero',      nombre: 'Número' },
     ];
+    if (!sinFechaFin()) campos.push({ id: 'fechaFin', nombre: 'Fecha de fin' });
     const faltantes = campos.filter(c => !document.getElementById(c.id)?.value.trim());
     if (faltantes.length) {
         e.preventDefault();
@@ -299,8 +332,9 @@ formAlquiler?.addEventListener('submit', (e) => {
         if (primero) primero.focus();
         return;
     }
-    if (typeof validarFormulario === 'function' &&
-        !validarFormulario(e.target, ['#fechaInicio', '#fechaFin', '#calle', '#numero'])) {
+    const requeridos = ['#fechaInicio', '#calle', '#numero'];
+    if (!sinFechaFin()) requeridos.push('#fechaFin');
+    if (typeof validarFormulario === 'function' && !validarFormulario(e.target, requeridos)) {
         e.preventDefault();
     }
 });

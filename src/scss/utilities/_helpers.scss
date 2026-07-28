@@ -44,6 +44,16 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 .col-w-140 { width: 140px; }
 .col-w-160 { width: 160px; }
 
+// Tarjetas de resumen: se reparten el ancho disponible sin depender de que la cantidad
+// de estados divida justo las 12 columnas de la grilla.
+.tile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  > * { flex: 1 1 130px; }
+}
+
 .min-vh-100 { min-height: 100vh; }
 .min-vh-60  { min-height: 60vh; }
 

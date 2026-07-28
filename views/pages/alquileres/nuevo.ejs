@@ -130,11 +130,15 @@
             <label for="fechaInicio">Fecha inicio *</label>
             <input type="date" name="fechaInicio" id="fechaInicio" required>
           </div>
-          <div class="form-group">
+          <div class="form-group" id="grupoFechaFin">
             <label for="fechaFin">Fecha fin *</label>
             <input type="date" name="fechaFin" id="fechaFin" required>
           </div>
         </div>
+        <label class="toggle-row" id="rowSinFechaFin" style="display:none">
+          <input type="checkbox" id="checkSinFechaFin" name="sin_fecha_fin" value="1">
+          <span>No informar fecha de fin</span>
+        </label>
         <div class="form-group">
           <label for="horaEntrega">Hora de entrega</label>
           <input type="time" name="horaEntrega" id="horaEntrega">

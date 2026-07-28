@@ -17,6 +17,9 @@
   }
   const ultimo = contenedor.movimientos[0]
   const libre = !ultimo || ultimo.estado_paso === 'disponible'
+  // Volvió a planta pero ya tiene el próximo alquiler cargado: no está libre todavía.
+  const pendInicio = libre && !!contenedor.proximoAlquiler
+  const proximo = contenedor.proximoAlquiler
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -39,13 +42,21 @@
         <p class="text-muted small mb-2">Estado actual</p>
         <% if (ultimo) { %>
           <h4>
-            <span class="badge rounded-pill px-3 py-2 <%= badgeEstado[ultimo.estado_paso] || 'badge-pendiente' %>">
-              <%= labelEstado[ultimo.estado_paso] || ultimo.estado_paso %>
+            <span class="badge rounded-pill px-3 py-2 <%= pendInicio ? 'badge-pendiente' : (badgeEstado[ultimo.estado_paso] || 'badge-pendiente') %>">
+              <%= pendInicio ? 'Pendiente inicio' : (labelEstado[ultimo.estado_paso] || ultimo.estado_paso) %>
             </span>
           </h4>
           <small class="text-muted">desde el <%= formatFechaHora(ultimo.fecha_movimiento) %></small>
+          <% if (pendInicio) { %>
+            <hr>
+            <p class="mb-1 fw-semibold"><%= proximo.cliente_nombre %></p>
+            <small class="text-muted">OP-<%= String(proximo.nro_op).padStart(4,'0') %></small><br>
+            <small class="text-muted">📍 <%= proximo.domicilio_entrega || 'A coordinar' %></small><br>
+            <small class="text-muted">Zona: <%= proximo.zona_entrega || '—' %></small><br>
+            <small class="text-muted">Inicio programado:
+              <%= proximo.fecha_entrega_planificada ? formatFecha(proximo.fecha_entrega_planificada) : 'sin fecha' %></small>
           <%# Si está disponible (libre), no mostramos datos del cliente anterior %>
-          <% if (ultimo.cliente_nombre && ultimo.estado_paso !== 'disponible') { %>
+          <% } else if (ultimo.cliente_nombre && ultimo.estado_paso !== 'disponible') { %>
             <hr>
             <p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>

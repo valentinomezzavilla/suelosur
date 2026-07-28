@@ -1,9 +1,10 @@
 <%
-  const conteo = { disponible:0, pendiente_despacho:0, despachado:0, en_alquiler:0, pendiente_retiro:0, vuelta_a_planta:0 }
+  const conteo = { disponible:0, pendiente_inicio:0, pendiente_despacho:0, despachado:0, en_alquiler:0, pendiente_retiro:0, vuelta_a_planta:0 }
   resumen.forEach(r => { if (conteo[r.estado_paso] !== undefined) conteo[r.estado_paso] = r.total })
 
   const badgeEstado = {
     disponible:        'badge-activo',
+    pendiente_inicio:  'badge-pendiente',
     pendiente_despacho:'badge-pendiente',
     despachado:        'badge-en-transito',
     en_alquiler:       'badge-en-transito',
@@ -12,6 +13,7 @@
   }
   const labelEstado = {
     disponible:        'Disponible',
+    pendiente_inicio:  'Pend. inicio',
     pendiente_despacho:'Pend. despacho',
     despachado:        'En camino',
     en_alquiler:       'En alquiler',
@@ -38,16 +40,16 @@
 </div>
 
 <!-- Resumen de estados -->
-<div class="row g-2 mb-4">
+<div class="tile-grid mb-4">
   <% [
     { key:'disponible',        label:'Disponibles',       icono:'home' },
+    { key:'pendiente_inicio',  label:'Pend. inicio',      icono:'clipboard' },
     { key:'pendiente_despacho',label:'Pend. despacho',    icono:'checkCircle' },
     { key:'despachado',        label:'En camino',         icono:'truck' },
     { key:'en_alquiler',       label:'En alquiler',       icono:'clock' },
     { key:'pendiente_retiro',  label:'Pend. retiro',      icono:'alert' },
     { key:'vuelta_a_planta',   label:'Vuelta a planta',   icono:'box' },
   ].forEach(s => { %>
-  <div class="col-6 col-md-2">
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
       <div class="card shadow-sm h-100 text-center py-2">
         <div class="mb-1"><%- icon(s.icono, { size: 20 }) %></div>
@@ -55,7 +57,6 @@
         <small class="<%= badgeEstado[s.key] %> badge rounded-pill px-2"><%= s.label %></small>
       </div>
     </a>
-  </div>
   <% }) %>
 </div>
 
@@ -118,6 +119,7 @@
           <th>Domicilio</th>
           <th>Zona</th>
           <th>Inicio alquiler</th>
+          <th>Fin alquiler</th>
           <th class="text-center">Días</th>
           <th class="text-center">Condición</th>
           <th class="text-center">Acciones</th>
@@ -145,6 +147,16 @@
           <td>
             <% if (c.fecha_inicio_alquiler) { %>
               <small><%= formatFecha(c.fecha_inicio_alquiler) %></small>
+            <% } else if (c.fecha_inicio_programada) { %>
+              <small class="text-muted"><%= formatFecha(c.fecha_inicio_programada) %></small>
+              <span class="badge rounded-pill px-2 badge-pendiente">programado</span>
+            <% } else { %>
+              <small class="text-muted">—</small>
+            <% } %>
+          </td>
+          <td>
+            <% if (c.fecha_fin_alquiler) { %>
+              <small><%= formatFecha(c.fecha_fin_alquiler) %></small>
             <% } else { %>
               <small class="text-muted">—</small>
             <% } %>

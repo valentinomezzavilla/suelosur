@@ -314,12 +314,20 @@ const AlquileresModel = {
   },
 
   async contenedoresDisponibles() {
-    // Un contenedor está disponible solo cuando su último movimiento es 'disponible'.
+    // Un contenedor está disponible cuando su último movimiento es 'disponible' y además
+    // no tiene otro alquiler ya cargado sin entregar (si no, contenedorOcupado lo rechaza
+    // al confirmar y el usuario lo elige para nada).
     const disponibles = (await query(`
       SELECT c.id, c.numero_contenedor FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       WHERE c.activo = 1 AND c.estado_general = 'operativo'
         AND um.estado_paso = 'disponible'
+        AND NOT EXISTS (
+          SELECT 1 FROM op_detalle_contenedor oc2
+          JOIN op_encabezado op2 ON op2.id = oc2.id_orden_pedido
+          WHERE oc2.id_contenedor = c.id AND op2.tipo_op = 'C'
+            AND op2.estado IN ('pendiente', 'despachado')
+        )
       ORDER BY c.numero_contenedor
     `)).rows
 

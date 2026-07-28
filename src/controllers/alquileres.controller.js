@@ -56,19 +56,32 @@ const AlquileresController = {
       }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
-      let plazo_alquiler = 5
-      if (fechaInicio && fechaFin) {
-        plazo_alquiler = Math.round((new Date(fechaFin) - new Date(fechaInicio)) / 86400000)
+      const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
+      // En la carga histórica la fecha de fin puede no conocerse: el plazo queda en 0.
+      const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
+      const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
+
+      let plazo_alquiler = esHistorico ? 0 : 5
+      if (fechaInicio && fechaFinReal) {
+        plazo_alquiler = Math.round((new Date(fechaFinReal) - new Date(fechaInicio)) / 86400000)
+        if (plazo_alquiler < 0) {
+          req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
       }
 
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
-      if (req.body.finalizado === '1' || req.body.finalizado === 'on') {
+      if (esHistorico) {
+        if (!fechaInicio) {
+          req.flash('error', 'Indicá la fecha de inicio del alquiler.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
         const result = await AlquileresModel.crearFinalizado({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
           zona_entrega, plazo_alquiler, precio_alquiler,
           metodo_pago: metodoPago, observaciones, obra,
-          fecha_inicio: fechaInicio || null, fecha_fin: fechaFin || null,
+          fecha_inicio: fechaInicio || null, fecha_fin: fechaFinReal,
         })
         const monto = parseFloat(precio_alquiler) || 0
         await TransaccionesModel.crear({
@@ -76,7 +89,7 @@ const AlquileresController = {
           cliente_id: clienteIdClean, cliente: result.cliente_nombre, monto,
           descripcion: `Alquiler contenedor (histórico)${domicilio_entrega ? ' — ' + domicilio_entrega : ''}`,
           metodo_pago: metodoPago || 'efectivo',
-          fecha: fechaFin || fechaInicio || null,
+          fecha: fechaFinReal || fechaInicio || null,
         })
         if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
           await ClientesModel.agregarMovimiento(clienteIdClean, {

@@ -20,6 +20,42 @@ const SQL_INICIO_ALQUILER = `
     ), '')
 `
 
+// Próximo alquiler del contenedor que todavía no arrancó: OP de contenedor asignada y
+// sin entregar. Correlaciona con el alias `c` (contenedores), va como LEFT JOIN LATERAL.
+const SQL_PROXIMA_OP = `
+  SELECT op2.id AS op_id, op2.nro_op, op2.fecha_entrega_planificada,
+         oc2.domicilio_entrega, oc2.zona_entrega, oc2.plazo_alquiler,
+         cli2.nombre AS cliente_nombre
+  FROM op_detalle_contenedor oc2
+  JOIN op_encabezado op2 ON op2.id = oc2.id_orden_pedido
+  LEFT JOIN clientes cli2 ON cli2.id = op2.id_cliente
+  WHERE oc2.id_contenedor = c.id AND op2.tipo_op = 'C'
+    AND op2.estado IN ('pendiente', 'despachado')
+  ORDER BY op2.fecha_entrega_planificada ASC NULLS LAST, op2.id ASC
+  LIMIT 1
+`
+
+// Un contenedor que volvió a planta pero ya tiene el próximo alquiler cargado no está
+// libre: se muestra como 'pendiente_inicio' en vez de 'disponible'.
+const SQL_PEND_INICIO = `(um.estado_paso = 'disponible' AND prox.op_id IS NOT NULL)`
+const SQL_ESTADO_PASO = `CASE WHEN ${SQL_PEND_INICIO} THEN 'pendiente_inicio' ELSE um.estado_paso END`
+
+// Fin del alquiler = el mismo inicio que muestra la fila + el plazo en días. Manda la
+// entrega real y, si todavía no se entregó, la fecha programada. (El módulo de alquileres
+// prioriza al revés: usa la planificada aunque la entrega real haya sido posterior, y
+// entonces el fin puede caer antes del inicio.)
+const SQL_FIN_ALQUILER = `
+  CASE
+    WHEN ${SQL_PEND_INICIO}
+      THEN NULLIF(LEFT(prox.fecha_entrega_planificada, 10), '')::date + prox.plazo_alquiler
+    WHEN um.estado_paso <> 'disponible'
+      THEN COALESCE(
+             NULLIF(LEFT((${SQL_INICIO_ALQUILER}), 10), '')::date,
+             NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date
+           ) + oc.plazo_alquiler
+  END
+`
+
 const ContenedoresModel = {
 
   async listar({ estado_paso, estado_general, q, registro } = {}) {
@@ -29,15 +65,17 @@ const ContenedoresModel = {
     if (registro === 'baja')       wheres.push('c.activo = 0')
     else if (registro !== 'todos') wheres.push('c.activo = 1')
     if (estado_general) { wheres.push('c.estado_general = ?'); params.push(estado_general) }
-    if (estado_paso)    { wheres.push('um.estado_paso = ?');   params.push(estado_paso) }
+    if (estado_paso)    { wheres.push(`(${SQL_ESTADO_PASO}) = ?`); params.push(estado_paso) }
     // Búsqueda: si es puramente numérica, filtra por N° de contenedor u OP (exacto,
     // así "5" trae el contenedor 5 y no todo lo que contenga un 5). Si tiene letras,
     // busca texto libre en el resto de los datos.
     if (q && String(q).trim()) {
       const term = String(q).trim()
       if (/^\d+$/.test(term)) {
-        wheres.push(`(CAST(c.numero_contenedor AS TEXT) = ? OR COALESCE(CAST(op.nro_op AS TEXT), '') = ?)`)
-        params.push(term, term)
+        wheres.push(`(CAST(c.numero_contenedor AS TEXT) = ?
+          OR COALESCE(CAST(op.nro_op AS TEXT), '') = ?
+          OR COALESCE(CAST(prox.nro_op AS TEXT), '') = ?)`)
+        params.push(term, term, term)
       } else {
         const like = `%${term}%`
         wheres.push(`(
@@ -47,22 +85,32 @@ const ContenedoresModel = {
           OR COALESCE(cli.nombre, '')        ILIKE ?
           OR COALESCE(oc.domicilio_entrega, '') ILIKE ?
           OR COALESCE(oc.zona_entrega, '')   ILIKE ?
+          OR COALESCE(prox.cliente_nombre, '')     ILIKE ?
+          OR COALESCE(prox.domicilio_entrega, '')  ILIKE ?
+          OR COALESCE(prox.zona_entrega, '')       ILIKE ?
         )`)
-        for (let i = 0; i < 6; i++) params.push(like)
+        for (let i = 0; i < 9; i++) params.push(like)
       }
     }
     return (await query(`
       SELECT c.id, c.numero_contenedor, c.estado_general, c.fecha_ultima_pintada,
-             c.observaciones, c.activo, um.estado_paso, um.fecha_movimiento,
-             oc.domicilio_entrega, oc.zona_entrega, oc.plazo_alquiler,
-             cli.nombre AS cliente_nombre, op.nro_op,
+             c.observaciones, c.activo, um.fecha_movimiento,
+             ${SQL_ESTADO_PASO} AS estado_paso,
+             CASE WHEN ${SQL_PEND_INICIO} THEN prox.domicilio_entrega ELSE oc.domicilio_entrega END AS domicilio_entrega,
+             CASE WHEN ${SQL_PEND_INICIO} THEN prox.zona_entrega      ELSE oc.zona_entrega      END AS zona_entrega,
+             CASE WHEN ${SQL_PEND_INICIO} THEN prox.plazo_alquiler    ELSE oc.plazo_alquiler    END AS plazo_alquiler,
+             CASE WHEN ${SQL_PEND_INICIO} THEN prox.cliente_nombre    ELSE cli.nombre           END AS cliente_nombre,
+             CASE WHEN ${SQL_PEND_INICIO} THEN prox.nro_op            ELSE op.nro_op            END AS nro_op,
+             prox.fecha_entrega_planificada AS fecha_inicio_programada,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado,
-             (${SQL_INICIO_ALQUILER}) AS fecha_inicio_alquiler
+             (${SQL_INICIO_ALQUILER}) AS fecha_inicio_alquiler,
+             to_char(${SQL_FIN_ALQUILER}, 'YYYY-MM-DD') AS fecha_fin_alquiler
       FROM contenedores c
       LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       LEFT JOIN op_detalle_contenedor oc ON oc.id = um.id_op_contenedor
       LEFT JOIN op_encabezado op ON op.id = oc.id_orden_pedido
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
+      LEFT JOIN LATERAL (${SQL_PROXIMA_OP}) prox ON TRUE
       ${wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''} ORDER BY c.numero_contenedor
     `, params)).rows
   },
@@ -99,6 +147,20 @@ const ContenedoresModel = {
     alq.sort((a, b) => String(b.fecha_inicio || b.fecha_entrega_planificada || '')
       .localeCompare(String(a.fecha_inicio || a.fecha_entrega_planificada || '')))
     c.alquileres = alq
+
+    // Alquiler ya cargado que todavía no arrancó: mientras exista, el contenedor no está
+    // libre aunque su último movimiento diga 'disponible'.
+    c.proximoAlquiler = (await query(`
+      SELECT op.id, op.nro_op, op.fecha_entrega_planificada,
+             oc.domicilio_entrega, oc.zona_entrega, cli.nombre AS cliente_nombre
+      FROM op_detalle_contenedor oc
+      JOIN op_encabezado op ON op.id = oc.id_orden_pedido
+      LEFT JOIN clientes cli ON cli.id = op.id_cliente
+      WHERE oc.id_contenedor = ? AND op.tipo_op = 'C'
+        AND op.estado IN ('pendiente', 'despachado')
+      ORDER BY op.fecha_entrega_planificada ASC NULLS LAST, op.id ASC
+      LIMIT 1
+    `, [id])).rows[0] || null
 
     return c
   },
@@ -157,9 +219,10 @@ const ContenedoresModel = {
 
   async resumenPorEstado() {
     return (await query(`
-      SELECT um.estado_paso, COUNT(*) AS total FROM contenedores c
+      SELECT ${SQL_ESTADO_PASO} AS estado_paso, COUNT(*) AS total FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
-      WHERE c.activo = 1 GROUP BY um.estado_paso
+      LEFT JOIN LATERAL (${SQL_PROXIMA_OP}) prox ON TRUE
+      WHERE c.activo = 1 GROUP BY 1
     `)).rows
   },
 
