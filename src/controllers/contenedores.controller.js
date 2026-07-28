@@ -1,14 +1,20 @@
 'use strict'
 const ContenedoresModel = require('../models/contenedores.model')
+const paginar           = require('../utils/paginar')
 
 const ContenedoresController = {
 
   async index(req, res) {
     try {
-      const { estado_paso, estado_general, q, registro } = req.query
-      const contenedores = await ContenedoresModel.listar({ estado_paso, estado_general, q, registro })
-      const resumen      = await ContenedoresModel.resumenPorEstado()
-      res.render('pages/contenedores/index', { titulo: 'Contenedores', contenedores, resumen, filtros: req.query })
+      const { estado_paso, estado_general, q, registro, page } = req.query
+      const todos   = await ContenedoresModel.listar({ estado_paso, estado_general, q, registro })
+      const resumen = await ContenedoresModel.resumenPorEstado()
+      // Las tarjetas de resumen siguen contando el total, no solo la página actual.
+      const { items: contenedores, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
+      res.render('pages/contenedores/index', {
+        titulo: 'Contenedores', contenedores, resumen,
+        total, page: pag, limit, totalPaginas, filtros: req.query,
+      })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los contenedores.')
