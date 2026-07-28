@@ -3,20 +3,37 @@ const ZonasModel = require('../models/zonas.model')
 
 const ZonasController = {
 
-  // Configuración de tarifas de flete por zona
+  // ABM de zonas + tarifa de flete de cada una
   async config(req, res) {
     try {
       const zonas = await ZonasModel.listar()
+      // Cuántos registros usa cada zona: las que tienen historia no se pueden eliminar.
+      for (const z of zonas) z.usos = await ZonasModel.usos(z.nombre)
       res.render('pages/zonas/config', { titulo: 'Zonas y tarifas', zonas })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar las zonas.'); res.redirect('/') }
   },
 
-  async guardarTarifas(req, res) {
+  async crear(req, res) {
     try {
-      // req.body.tarifa = { Norte: '35000', Sur: '40000', ... }
-      await ZonasModel.guardarTarifas(req.body.tarifa || {})
-      req.flash('success', 'Tarifas de zona actualizadas.')
-    } catch (err) { console.error(err); req.flash('error', 'Error al guardar las tarifas.') }
+      const nombre = await ZonasModel.crear(req.body)
+      req.flash('success', `Zona "${nombre}" creada.`)
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al crear la zona.') }
+    res.redirect('/zonas')
+  },
+
+  async actualizar(req, res) {
+    try {
+      const nombre = await ZonasModel.actualizar(req.params.id, req.body)
+      req.flash('success', `Zona "${nombre}" actualizada.`)
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al actualizar la zona.') }
+    res.redirect('/zonas')
+  },
+
+  async eliminar(req, res) {
+    try {
+      const nombre = await ZonasModel.eliminar(req.params.id)
+      req.flash('success', `Zona "${nombre}" eliminada.`)
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al eliminar la zona.') }
     res.redirect('/zonas')
   },
 

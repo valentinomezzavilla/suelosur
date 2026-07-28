@@ -53,6 +53,7 @@
           <th class="text-center">Contenedor</th>
           <th>Domicilio</th>
           <th class="text-center">Plazo</th>
+          <th class="text-center">Inicio de alquiler</th>
           <th class="text-center">Fin de alquiler</th>
           <th class="text-center">${opts.colDias || 'Días restantes'}</th>
           <th class="text-center">Estado</th>
@@ -72,6 +73,11 @@
             <td class="text-center">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : '<span class="text-muted fst-italic">Sin asignar</span>'}</td>
             <td><small class="text-muted">${a.domicilio_entrega || '—'}</small></td>
             <td class="text-center"><small>${a.plazo_alquiler}d</small></td>
+            <td class="text-center">${a.fecha_entrega_real
+              ? formatFecha(a.fecha_entrega_real)
+              : (a.fecha_entrega_planificada
+                  ? `${formatFecha(a.fecha_entrega_planificada)} <span class="badge rounded-pill px-2 badge-pendiente">programado</span>`
+                  : '—')}</td>
             <td class="text-center fw-semibold">${a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—'}</td>
             <td class="text-center ${semaforoDias(a.dias_restantes)} fw-semibold">
               ${opts.mostrarDias === 'planificada' ? (a.fecha_entrega_planificada ? formatFecha(a.fecha_entrega_planificada) : '—')

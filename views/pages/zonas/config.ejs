@@ -3,23 +3,103 @@
   <a href="/zonas/planificador" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 15 }) %> Planificador por zona</a>
 </div>
 
-<div class="card shadow-sm maxw-600">
-  <div class="card-header bg-white fw-semibold">Tarifa de flete por zona</div>
-  <div class="card-body">
-    <p class="text-muted small mb-3">Estos valores autocompletan el precio del flete al crear una venta con viaje, según la zona de entrega.</p>
-    <form action="/zonas/tarifas" method="POST">
-      <div class="row g-3">
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Zonas</div>
+  <div class="card-body p-0">
+    <p class="text-muted small px-3 pt-3 mb-2">
+      La tarifa autocompleta el precio del flete al crear una venta con viaje, según la zona de entrega.
+      El orden define cómo se agrupan las paradas en el planificador. Las zonas inactivas dejan de ofrecerse
+      en los formularios, pero siguen visibles en el historial.
+    </p>
+    <%# Un form por zona, fuera de la tabla: los inputs se asocian con form="zona-N" %>
+    <% zonas.forEach(z => { %><form action="/zonas/<%= z.id %>" method="POST" id="zona-<%= z.id %>"></form><% }) %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Zona</th>
+          <th>Tarifa de flete</th>
+          <th class="text-center">Orden</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">En uso</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
         <% zonas.forEach(z => { %>
-          <div class="col-md-6">
-            <label class="form-label">📍 <%= z.nombre %></label>
-            <div class="input-group">
+        <tr class="<%= z.activo ? '' : 'text-muted' %>">
+          <td>
+            <input type="text" name="nombre" form="zona-<%= z.id %>" class="form-control form-control-sm"
+                   value="<%= z.nombre %>" required maxlength="60">
+          </td>
+          <td>
+            <div class="input-group input-group-sm maxw-200">
               <span class="input-group-text">$</span>
-              <input type="number" min="0" step="100" name="tarifa[<%= z.nombre %>]" class="form-control" value="<%= z.tarifa_flete || 0 %>">
+              <input type="number" name="tarifa_flete" form="zona-<%= z.id %>" class="form-control"
+                     min="0" step="100" value="<%= z.tarifa_flete || 0 %>">
             </div>
-          </div>
+          </td>
+          <td class="text-center">
+            <input type="number" name="orden" form="zona-<%= z.id %>" class="form-control form-control-sm maxw-80 mx-auto"
+                   min="0" value="<%= z.orden || 0 %>">
+          </td>
+          <td class="text-center">
+            <select name="activo" form="zona-<%= z.id %>" class="form-select form-select-sm maxw-120 mx-auto">
+              <option value="1" <%= z.activo ? 'selected' : '' %>>Activa</option>
+              <option value="0" <%= z.activo ? '' : 'selected' %>>Inactiva</option>
+            </select>
+          </td>
+          <td class="text-center">
+            <% if (z.usos) { %>
+              <small class="text-muted"><%= z.usos %> registro<%= z.usos === 1 ? '' : 's' %></small>
+            <% } else { %>
+              <small class="text-muted">—</small>
+            <% } %>
+          </td>
+          <td class="text-center text-nowrap">
+            <button class="btn btn-sm btn-naranja" form="zona-<%= z.id %>" title="Guardar cambios">
+              <%- icon('check', { size: 15 }) %>
+            </button>
+            <% if (z.usos) { %>
+              <button class="btn btn-sm btn-outline-secondary" disabled
+                      title="No se puede eliminar: la usan <%= z.usos %> registro(s). Marcala como inactiva.">
+                <%- icon('trash', { size: 15 }) %>
+              </button>
+            <% } else { %>
+              <form action="/zonas/<%= z.id %>/eliminar" method="POST" class="d-inline"
+                    onsubmit="return confirm('¿Eliminar la zona <%= z.nombre %>?')">
+                <button class="btn btn-sm btn-outline-danger" title="Eliminar zona">
+                  <%- icon('trash', { size: 15 }) %>
+                </button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
         <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-header bg-white fw-semibold">Nueva zona</div>
+  <div class="card-body">
+    <form action="/zonas" method="POST">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label">Nombre</label>
+          <input type="text" name="nombre" class="form-control" required maxlength="60" placeholder="Ej.: Noroeste">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Tarifa de flete</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input type="number" name="tarifa_flete" class="form-control" min="0" step="100" value="0">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <button class="btn btn-naranja w-100">Agregar zona</button>
+        </div>
       </div>
-      <button class="btn btn-naranja mt-3">Guardar tarifas</button>
     </form>
   </div>
 </div>

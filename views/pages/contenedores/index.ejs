@@ -117,6 +117,7 @@
           <th>Cliente / OP</th>
           <th>Domicilio</th>
           <th>Zona</th>
+          <th>Inicio alquiler</th>
           <th class="text-center">Días</th>
           <th class="text-center">Condición</th>
           <th class="text-center">Acciones</th>
@@ -141,6 +142,13 @@
           </td>
           <td><small class="text-muted"><%= c.domicilio_entrega || '—' %></small></td>
           <td><small class="text-muted"><%= c.zona_entrega || '—' %></small></td>
+          <td>
+            <% if (c.fecha_inicio_alquiler) { %>
+              <small><%= formatFecha(c.fecha_inicio_alquiler) %></small>
+            <% } else { %>
+              <small class="text-muted">—</small>
+            <% } %>
+          </td>
           <td class="text-center">
             <% if (c.estado_paso === 'en_alquiler' || c.estado_paso === 'pendiente_retiro') { %>
               <span class="<%= semaforoDias(c.dias_en_estado, c.plazo_alquiler) %>">

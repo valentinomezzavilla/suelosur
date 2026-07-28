@@ -8,6 +8,18 @@ const SQL_ULTIMO_MOV = `
   ) m WHERE m.rn = 1
 `
 
+// Inicio del alquiler vigente: primer movimiento 'en_alquiler' (= entrega en domicilio)
+// posterior a la última vez que el contenedor volvió a estar disponible en planta.
+// Devuelve NULL si el contenedor no está alquilado en este momento.
+const SQL_INICIO_ALQUILER = `
+  SELECT MIN(ma.fecha_movimiento) FROM movimiento_contenedor ma
+  WHERE ma.id_contenedor = c.id AND ma.estado_paso = 'en_alquiler'
+    AND ma.fecha_movimiento > COALESCE((
+      SELECT MAX(md.fecha_movimiento) FROM movimiento_contenedor md
+      WHERE md.id_contenedor = c.id AND md.estado_paso = 'disponible'
+    ), '')
+`
+
 const ContenedoresModel = {
 
   async listar({ estado_paso, estado_general, q, registro } = {}) {
@@ -44,7 +56,8 @@ const ContenedoresModel = {
              c.observaciones, c.activo, um.estado_paso, um.fecha_movimiento,
              oc.domicilio_entrega, oc.zona_entrega, oc.plazo_alquiler,
              cli.nombre AS cliente_nombre, op.nro_op,
-             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
+             (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado,
+             (${SQL_INICIO_ALQUILER}) AS fecha_inicio_alquiler
       FROM contenedores c
       LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       LEFT JOIN op_detalle_contenedor oc ON oc.id = um.id_op_contenedor

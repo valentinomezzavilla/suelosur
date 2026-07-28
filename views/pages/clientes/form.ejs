@@ -47,9 +47,13 @@
           <label class="form-label">Zona</label>
           <select name="zona" class="form-select">
             <option value="">Seleccionar...</option>
-            <% ['Norte','Sur','Este','Oeste','Centro'].forEach(z => { %>
-              <option value="<%= z %>" <%= cliente?.zona === z ? 'selected' : '' %>><%= z %></option>
+            <% zonas.forEach(z => { %>
+              <option value="<%= z.nombre %>" <%= cliente?.zona === z.nombre ? 'selected' : '' %>><%= z.nombre %></option>
             <% }) %>
+            <%# La zona guardada puede estar inactiva: la conservamos para no perderla al editar %>
+            <% if (cliente?.zona && !zonas.some(z => z.nombre === cliente.zona)) { %>
+              <option value="<%= cliente.zona %>" selected><%= cliente.zona %> (inactiva)</option>
+            <% } %>
           </select>
         </div>
       </div>

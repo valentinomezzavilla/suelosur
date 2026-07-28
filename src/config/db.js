@@ -812,9 +812,12 @@ async function initDB() {
       created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
   `)
-  // Seed de zonas estándar (si la tabla está vacía)
-  for (const [nombre, orden] of [['Norte', 1], ['Sur', 2], ['Este', 3], ['Oeste', 4], ['Centro', 5]]) {
-    await pool.query(`INSERT INTO zonas (nombre, orden) VALUES ($1, $2) ON CONFLICT (nombre) DO NOTHING`, [nombre, orden])
+  // Seed de zonas estándar SOLO si la tabla está vacía: las zonas se administran desde
+  // /zonas, así que reinsertarlas en cada arranque revertiría borrados y renombrados.
+  if (Number((await pool.query(`SELECT COUNT(*) AS n FROM zonas`)).rows[0].n) === 0) {
+    for (const [nombre, orden] of [['Norte', 1], ['Sur', 2], ['Este', 3], ['Oeste', 4], ['Centro', 5]]) {
+      await pool.query(`INSERT INTO zonas (nombre, orden) VALUES ($1, $2) ON CONFLICT (nombre) DO NOTHING`, [nombre, orden])
+    }
   }
   // Historial de kilometraje (auditoría de incrementos automáticos)
   await pool.query(`

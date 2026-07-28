@@ -135,7 +135,8 @@ const ClientesController = {
   },
 
   async nuevo(req, res) {
-    res.render('pages/clientes/form', { titulo: 'Nuevo Cliente', cliente: null })
+    const zonas = await require('../models/zonas.model').listarActivas()
+    res.render('pages/clientes/form', { titulo: 'Nuevo Cliente', cliente: null, zonas })
   },
 
   async crear(req, res) {
@@ -171,7 +172,8 @@ const ClientesController = {
     try {
       const cliente = await ClientesModel.obtener(req.params.id)
       if (!cliente) { req.flash('error', 'No encontrado.'); return res.redirect('/clientes') }
-      res.render('pages/clientes/form', { titulo: 'Editar Cliente', cliente })
+      const zonas = await require('../models/zonas.model').listarActivas()
+      res.render('pages/clientes/form', { titulo: 'Editar Cliente', cliente, zonas })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes')
     }
