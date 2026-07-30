@@ -57,8 +57,10 @@ const plazosCfgEl = document.getElementById('plazos-config');
 const plazosCfg = plazosCfgEl ? JSON.parse(plazosCfgEl.textContent) : { cuenta_corriente: 15, estandar: 4 };
 const plazoActual = document.getElementById('plazoActual');
 
-function modoFinalizado() { return !!document.getElementById('checkFinalizado')?.checked; }
-function sinFechaFin()    { return !!document.getElementById('checkSinFechaFin')?.checked; }
+function modoFinalizado()  { return !!document.getElementById('checkFinalizado')?.checked; }
+function sinFechaFin()     { return !!document.getElementById('checkSinFechaFin')?.checked; }
+// Con el check tildado el usuario fija la fecha de fin a mano y la regla no la pisa.
+function fechaFinManual()  { return !!document.getElementById('checkEditarFechaFin')?.checked; }
 
 function clienteTieneCuentaCorriente() {
     return !!(typeof getClienteSeleccionado === 'function' && getClienteSeleccionado()?.cuentaCorriente);
@@ -71,7 +73,7 @@ function plazoDelCliente() {
 // Recalcula la fecha de fin a partir del inicio y del plazo que le toca al cliente.
 function aplicarFechaFinAutomatica() {
     if (!fechaInicio || !fechaFin) return;
-    if (modoFinalizado()) { fechaFin.readOnly = false; return; }
+    if (modoFinalizado() || fechaFinManual()) { fechaFin.readOnly = false; return; }
     fechaFin.readOnly = true;
     fechaFin.min = ''; fechaFin.max = '';
     if (!fechaInicio.value) { fechaFin.value = ''; return; }
@@ -255,6 +257,8 @@ const checkSinFechaFin      = document.getElementById('checkSinFechaFin');
 const rowSinFechaFin        = document.getElementById('rowSinFechaFin');
 const grupoFechaFin         = document.getElementById('grupoFechaFin');
 const hintPlazo             = document.getElementById('hintPlazo');
+const checkEditarFechaFin   = document.getElementById('checkEditarFechaFin');
+const rowEditarFechaFin     = document.getElementById('rowEditarFechaFin');
 
 // Oculta la fecha de fin cuando el alquiler viejo no la tiene registrada.
 // Al quedar oculta, validarFormulario la saltea sola (ignora los campos no visibles).
@@ -271,8 +275,11 @@ function aplicarModoFinalizado(activo) {
     if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
     if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
     if (rowSinFechaFin)      rowSinFechaFin.style.display = activo ? '' : 'none';
-    // En histórico la fecha de fin se carga a mano; si no, la calcula la forma de pago.
-    if (hintPlazo) hintPlazo.style.display = activo ? 'none' : '';
+    // En histórico la fecha de fin ya se carga a mano, así que el check de edición
+    // y el cartel de la regla no tienen sentido.
+    if (hintPlazo)           hintPlazo.style.display = activo ? 'none' : '';
+    if (rowEditarFechaFin)   rowEditarFechaFin.style.display = activo ? 'none' : '';
+    if (activo && checkEditarFechaFin) checkEditarFechaFin.checked = false;
     if (fechaInicio) fechaInicio.min = activo ? '' : fechaInicioMinDefault;
     aplicarFechaFinAutomatica();
     if (!activo && checkSinFechaFin) checkSinFechaFin.checked = false;
@@ -282,6 +289,8 @@ function aplicarModoFinalizado(activo) {
 
 checkFinalizado?.addEventListener('change', () => aplicarModoFinalizado(checkFinalizado.checked));
 checkSinFechaFin?.addEventListener('change', () => aplicarSinFechaFin(checkSinFechaFin.checked));
+// Al destildar "editar fecha de fin" vuelve a mandar la regla del cliente.
+checkEditarFechaFin?.addEventListener('change', () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
 
 // Abrir el modal SIN contenedor, directo en modo histórico
 document.getElementById('btnCargarFinalizado')?.addEventListener('click', () => {

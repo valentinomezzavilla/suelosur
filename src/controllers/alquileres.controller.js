@@ -63,12 +63,13 @@ const AlquileresController = {
       const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
 
-      // En un alquiler nuevo el plazo lo fija que el cliente tenga cuenta corriente
-      // habilitada (la fecha de fin del formulario es el reflejo de esa regla).
-      // En la carga histórica manda lo que se cargó a mano.
+      // El plazo lo fija que el cliente tenga cuenta corriente habilitada (la fecha de
+      // fin del formulario es el reflejo de esa regla). Se calcula desde las fechas
+      // cargadas cuando la carga es histórica o cuando se pidió editar el fin a mano.
+      const fechaFinManual = req.body.editar_fecha_fin === '1' || req.body.editar_fecha_fin === 'on'
       const cliente = await ClientesModel.obtener(clienteIdClean)
       let plazo_alquiler = esHistorico ? 0 : plazoPorCuentaCorriente(!!cliente?.cuenta_corriente)
-      if (esHistorico && fechaInicio && fechaFinReal) {
+      if ((esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
         plazo_alquiler = Math.round((new Date(fechaFinReal) - new Date(fechaInicio)) / 86400000)
         if (plazo_alquiler < 0) {
           req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
