@@ -11,11 +11,10 @@
     despachado:        'En camino',
     en_alquiler:       'En alquiler',
     pendiente_retiro:  'Pendiente retiro',
-    vuelta_a_planta:   'Volviendo a planta',
   }
   const iconCont = {
     disponible: '🏠', pendiente_despacho: '📋', despachado: '🚛',
-    en_alquiler: '⏳', pendiente_retiro: '⚠️', vuelta_a_planta: '🔄',
+    en_alquiler: '⏳', pendiente_retiro: '⚠️',
   }
   const estadoCont = alquiler.estadoContenedor?.estado_paso
   const estaAnulado = alquiler.estado === 'anulado'
@@ -130,13 +129,8 @@
               <% if (alquiler.estado === 'entregado' && estadoCont === 'pendiente_retiro') { %>
                 <span class="badge rounded-pill px-3 badge-alerta align-self-center">Esperando retiro del chofer</span>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
-                      onsubmit="return confirm('¿Registrar la devolución a planta sin pasar por el chofer?')">
-                  <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta (manual)</button>
-                </form>
-              <% } %>
-              <% if (alquiler.estado === 'entregado' && estadoCont === 'vuelta_a_planta') { %>
-                <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST">
-                  <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta</button>
+                      onsubmit="return confirm('¿Registrar el retiro sin pasar por el chofer? El contenedor queda disponible.')">
+                  <button class="btn btn-sm btn-outline-success">🏠 Registrar retiro (manual)</button>
                 </form>
               <% } %>
               <% if (alquiler.estado === 'pendiente' || alquiler.estado === 'despachado') { %>

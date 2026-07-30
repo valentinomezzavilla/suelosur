@@ -4,6 +4,7 @@ const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const ConfigContenedoresModel = require('../models/config_contenedores.model')
 const OperacionesModel        = require('../models/operaciones.model')
+const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
 
 const AlquileresController = {
 
@@ -31,6 +32,7 @@ const AlquileresController = {
       res.render('pages/alquileres/nuevo', {
         titulo: 'Nuevo Alquiler de Contenedor',
         disponibles, porLiberar, configPrecios, choferesDisp, camionesDisp, zonas,
+        configPlazos: { cuenta_corriente: PLAZO_CUENTA_CORRIENTE, estandar: PLAZO_ESTANDAR },
         scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/alquilerService.js'],
       })
     } catch (err) {
@@ -42,7 +44,7 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, horaEntrega, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra } = req.body
+      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
@@ -61,8 +63,12 @@ const AlquileresController = {
       const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
 
-      let plazo_alquiler = esHistorico ? 0 : 5
-      if (fechaInicio && fechaFinReal) {
+      // En un alquiler nuevo el plazo lo fija que el cliente tenga cuenta corriente
+      // habilitada (la fecha de fin del formulario es el reflejo de esa regla).
+      // En la carga histórica manda lo que se cargó a mano.
+      const cliente = await ClientesModel.obtener(clienteIdClean)
+      let plazo_alquiler = esHistorico ? 0 : plazoPorCuentaCorriente(!!cliente?.cuenta_corriente)
+      if (esHistorico && fechaInicio && fechaFinReal) {
         plazo_alquiler = Math.round((new Date(fechaFinReal) - new Date(fechaInicio)) / 86400000)
         if (plazo_alquiler < 0) {
           req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
@@ -112,14 +118,14 @@ const AlquileresController = {
           zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, obra, alquiler_actual_id,
-          fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
+          fecha_entrega_planificada: fechaInicio || null,
         })
       } else {
         result = await AlquileresModel.crear({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, observaciones, obra,
-          fecha_entrega_planificada: fechaInicio || null, hora_planificada: horaEntrega || null,
+          fecha_entrega_planificada: fechaInicio || null,
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
       }

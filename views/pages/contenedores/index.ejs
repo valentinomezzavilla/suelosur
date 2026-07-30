@@ -1,5 +1,5 @@
 <%
-  const conteo = { disponible:0, pendiente_inicio:0, pendiente_despacho:0, despachado:0, en_alquiler:0, pendiente_retiro:0, vuelta_a_planta:0 }
+  const conteo = { disponible:0, pendiente_inicio:0, pendiente_despacho:0, despachado:0, en_alquiler:0, pendiente_retiro:0 }
   resumen.forEach(r => { if (conteo[r.estado_paso] !== undefined) conteo[r.estado_paso] = r.total })
 
   const badgeEstado = {
@@ -9,7 +9,6 @@
     despachado:        'badge-en-transito',
     en_alquiler:       'badge-en-transito',
     pendiente_retiro:  'badge-alerta',
-    vuelta_a_planta:   'badge-pendiente',
   }
   const labelEstado = {
     disponible:        'Disponible',
@@ -18,7 +17,6 @@
     despachado:        'En camino',
     en_alquiler:       'En alquiler',
     pendiente_retiro:  'Pend. retiro',
-    vuelta_a_planta:   'Vuelta a planta',
   }
   function semaforoDias(dias, plazo) {
     if (!plazo || plazo <= 0) return ''
@@ -48,7 +46,6 @@
     { key:'despachado',        label:'En camino',         icono:'truck' },
     { key:'en_alquiler',       label:'En alquiler',       icono:'clock' },
     { key:'pendiente_retiro',  label:'Pend. retiro',      icono:'alert' },
-    { key:'vuelta_a_planta',   label:'Vuelta a planta',   icono:'box' },
   ].forEach(s => { %>
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
       <div class="card shadow-sm h-100 text-center py-2">

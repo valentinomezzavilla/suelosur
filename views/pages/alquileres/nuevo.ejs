@@ -6,6 +6,7 @@
 </div>
 
 <script id="precios-config" type="application/json"><%- JSON.stringify(configPrecios) %></script>
+<script id="plazos-config" type="application/json"><%- JSON.stringify(configPlazos) %></script>
 
 <!-- ── Paso 1: seleccionar contenedor ─────────────────────────── -->
 <div class="form-section">
@@ -135,15 +136,16 @@
             <input type="date" name="fechaFin" id="fechaFin" required>
           </div>
         </div>
+        <p class="form-hint" id="hintPlazo">
+          La fecha de fin se calcula sola: los clientes con <strong>cuenta corriente habilitada</strong>
+          tienen <strong><%= configPlazos.cuenta_corriente %> días</strong> desde el inicio;
+          el resto, <strong><%= configPlazos.estandar %> días</strong>.
+          <span id="plazoActual" class="fw-semibold"></span>
+        </p>
         <label class="toggle-row" id="rowSinFechaFin" style="display:none">
           <input type="checkbox" id="checkSinFechaFin" name="sin_fecha_fin" value="1">
           <span>No informar fecha de fin</span>
         </label>
-        <div class="form-group">
-          <label for="horaEntrega">Hora de entrega</label>
-          <input type="time" name="horaEntrega" id="horaEntrega">
-          <p class="form-hint">Opcional. Se usa para avisar si el camión/chofer ya tiene otra operación en ese horario.</p>
-        </div>
       </div>
 
       <!-- Precio -->

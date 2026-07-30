@@ -291,7 +291,7 @@ async function initDB() {
       estado_paso      TEXT NOT NULL
                          CHECK (estado_paso IN (
                            'disponible','pendiente_despacho','despachado',
-                           'en_alquiler','pendiente_retiro','vuelta_a_planta'
+                           'en_alquiler','pendiente_retiro'
                          )),
       observaciones    TEXT DEFAULT ''
     )
@@ -1094,6 +1094,28 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_retiro TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS firma_retiro_aclaracion TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS archivo_remito_retiro TEXT`).catch(() => {})
+
+  // ─────────────────────────────────────────────────────────────────
+  // MIGRACIÓN: se elimina el estado 'vuelta_a_planta'. El contenedor queda en
+  // 'pendiente_retiro' hasta que el retiro se completa, y ahí pasa directo a
+  // 'disponible'. Que el chofer ya haya salido se marca en la operación.
+  // ─────────────────────────────────────────────────────────────────
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS retiro_iniciado_en TEXT`).catch(() => {})
+  // Los retiros que estaban en curso conservan esa marca antes de perder el estado
+  await pool.query(`
+    UPDATE op_encabezado op
+    SET retiro_iniciado_en = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+    FROM op_detalle_contenedor oc
+    JOIN (
+      SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
+      FROM movimiento_contenedor ORDER BY id_contenedor, fecha_movimiento DESC, id DESC
+    ) u ON u.id_contenedor = oc.id_contenedor
+    WHERE oc.id_orden_pedido = op.id AND u.estado_paso = 'vuelta_a_planta'
+      AND op.retiro_iniciado_en IS NULL
+  `).catch(() => {})
+  await pool.query(`UPDATE movimiento_contenedor SET estado_paso = 'pendiente_retiro' WHERE estado_paso = 'vuelta_a_planta'`).catch(() => {})
+  await pool.query(`ALTER TABLE movimiento_contenedor DROP CONSTRAINT IF EXISTS movimiento_contenedor_estado_paso_check`).catch(() => {})
+  await pool.query(`ALTER TABLE movimiento_contenedor ADD CONSTRAINT movimiento_contenedor_estado_paso_check CHECK (estado_paso IN ('disponible','pendiente_despacho','despachado','en_alquiler','pendiente_retiro'))`).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

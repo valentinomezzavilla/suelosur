@@ -46,25 +46,43 @@ if (btnBuscar) {
     });
 }
 
-// ── Fechas: mínimo 4 días, máximo 9 ───────────────────────────
-// (En carga histórica no rige ningún tope: el alquiler ya pasó y duró lo que duró.)
+// ── Fechas ────────────────────────────────────────────────────
+// La fecha de fin la determina si el cliente tiene cuenta corriente habilitada:
+// esos clientes tienen un plazo más largo. En carga histórica no rige la regla ni
+// ningún tope, porque el alquiler ya pasó y duró lo que haya durado.
 const fechaInicio = document.getElementById('fechaInicio');
 const fechaFin    = document.getElementById('fechaFin');
+
+const plazosCfgEl = document.getElementById('plazos-config');
+const plazosCfg = plazosCfgEl ? JSON.parse(plazosCfgEl.textContent) : { cuenta_corriente: 15, estandar: 4 };
+const plazoActual = document.getElementById('plazoActual');
 
 function modoFinalizado() { return !!document.getElementById('checkFinalizado')?.checked; }
 function sinFechaFin()    { return !!document.getElementById('checkSinFechaFin')?.checked; }
 
-// Ventana permitida para la fecha de fin según el plazo mínimo/máximo. En carga
-// histórica no se aplica: el alquiler ya pasó y duró lo que haya durado.
-function aplicarVentanaFechaFin(limpiarValor) {
+function clienteTieneCuentaCorriente() {
+    return !!(typeof getClienteSeleccionado === 'function' && getClienteSeleccionado()?.cuentaCorriente);
+}
+
+function plazoDelCliente() {
+    return clienteTieneCuentaCorriente() ? plazosCfg.cuenta_corriente : plazosCfg.estandar;
+}
+
+// Recalcula la fecha de fin a partir del inicio y del plazo que le toca al cliente.
+function aplicarFechaFinAutomatica() {
     if (!fechaInicio || !fechaFin) return;
-    if (modoFinalizado() || !fechaInicio.value) { fechaFin.min = ''; fechaFin.max = ''; return; }
-    const inicio = new Date(fechaInicio.value + 'T00:00:00');
-    const minFin = new Date(inicio); minFin.setDate(minFin.getDate() + 4);
-    const maxFin = new Date(inicio); maxFin.setDate(maxFin.getDate() + 9);
-    fechaFin.min = toInputDate(minFin);
-    fechaFin.max = toInputDate(maxFin);
-    if (limpiarValor) fechaFin.value = '';
+    if (modoFinalizado()) { fechaFin.readOnly = false; return; }
+    fechaFin.readOnly = true;
+    fechaFin.min = ''; fechaFin.max = '';
+    if (!fechaInicio.value) { fechaFin.value = ''; return; }
+    const fin = new Date(fechaInicio.value + 'T00:00:00');
+    fin.setDate(fin.getDate() + plazoDelCliente());
+    fechaFin.value = toInputDate(fin);
+    if (plazoActual) {
+        plazoActual.textContent = clienteTieneCuentaCorriente()
+            ? `Cliente con cuenta corriente: ${plazosCfg.cuenta_corriente} días.`
+            : `Cliente sin cuenta corriente: ${plazosCfg.estandar} días.`;
+    }
 }
 
 if (fechaInicio && fechaFin) {
@@ -73,8 +91,7 @@ if (fechaInicio && fechaFin) {
     fechaInicio.min = toInputDate(hoy);
 
     fechaInicio.addEventListener('change', () => {
-        if (!fechaInicio.value) return;
-        aplicarVentanaFechaFin(!modoFinalizado());
+        aplicarFechaFinAutomatica();
         actualizarResumen();
     });
 }
@@ -156,8 +173,9 @@ function actualizarResumen() {
     document.getElementById(id)?.addEventListener('change', actualizarResumen);
     document.getElementById(id)?.addEventListener('input',  actualizarResumen);
 });
-document.addEventListener('clienteSeleccionado',   actualizarResumen);
-document.addEventListener('clienteDeseleccionado', actualizarResumen);
+// El plazo depende del cliente, así que al elegirlo hay que recalcular la fecha de fin.
+document.addEventListener('clienteSeleccionado',   () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
+document.addEventListener('clienteDeseleccionado', () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
 
 // ── Modal ─────────────────────────────────────────────────────
 const modalAlquiler = document.getElementById('modal-alquiler');
@@ -203,8 +221,8 @@ document.querySelectorAll('.btn-seleccionar-cont').forEach(btn => {
         if (contenedorSeleccionado.fin && fechaInicio) {
             fechaInicio.min   = contenedorSeleccionado.fin;
             fechaInicio.value = '';
-            if (fechaFin) fechaFin.value = '';
         }
+        aplicarFechaFinAutomatica();
 
         abrirModalAlquiler();
         actualizarResumen();
@@ -236,6 +254,7 @@ const fechaInicioMinDefault = fechaInicio ? fechaInicio.min : '';
 const checkSinFechaFin      = document.getElementById('checkSinFechaFin');
 const rowSinFechaFin        = document.getElementById('rowSinFechaFin');
 const grupoFechaFin         = document.getElementById('grupoFechaFin');
+const hintPlazo             = document.getElementById('hintPlazo');
 
 // Oculta la fecha de fin cuando el alquiler viejo no la tiene registrada.
 // Al quedar oculta, validarFormulario la saltea sola (ignora los campos no visibles).
@@ -252,9 +271,10 @@ function aplicarModoFinalizado(activo) {
     if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
     if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
     if (rowSinFechaFin)      rowSinFechaFin.style.display = activo ? '' : 'none';
-    // Histórico: ninguna fecha limita. Ni el inicio al día de hoy ni el fin al plazo.
+    // En histórico la fecha de fin se carga a mano; si no, la calcula la forma de pago.
+    if (hintPlazo) hintPlazo.style.display = activo ? 'none' : '';
     if (fechaInicio) fechaInicio.min = activo ? '' : fechaInicioMinDefault;
-    aplicarVentanaFechaFin(false);
+    aplicarFechaFinAutomatica();
     if (!activo && checkSinFechaFin) checkSinFechaFin.checked = false;
     aplicarSinFechaFin(activo && !!checkSinFechaFin?.checked);
     if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';

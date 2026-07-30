@@ -5,7 +5,6 @@
     despachado:        'En camino',
     en_alquiler:       'En alquiler',
     pendiente_retiro:  'Pendiente retiro',
-    vuelta_a_planta:   'Vuelta a planta',
   }
   const badgeEstado = {
     disponible:        'badge-activo',
@@ -13,7 +12,6 @@
     despachado:        'badge-en-transito',
     en_alquiler:       'badge-en-transito',
     pendiente_retiro:  'badge-alerta',
-    vuelta_a_planta:   'badge-pendiente',
   }
   const ultimo = contenedor.movimientos[0]
   const libre = !ultimo || ultimo.estado_paso === 'disponible'
