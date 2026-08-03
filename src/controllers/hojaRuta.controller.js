@@ -120,7 +120,12 @@ async function construirTareas(empId) {
       // El chofer NO ve los contenedores en alquiler activo (en_domicilio): no hay
       // nada que hacer hasta que la oficina marque "pendiente retiro".
       const fe = await fechaEntrega(o.id_contenedor, o.id_oc)
-      const fin = (() => { if (!fe) return null; const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + (o.plazo_alquiler || 0)); return d.toISOString().slice(0, 10) })()
+      // Sin plazo definido el alquiler no tiene fecha de fin
+      const fin = (() => {
+        if (!fe || o.plazo_alquiler == null) return null
+        const d = new Date(fe + 'T00:00:00'); d.setDate(d.getDate() + o.plazo_alquiler)
+        return d.toISOString().slice(0, 10)
+      })()
       const dr = diasRestantes(fin)
       if (ec === 'pendiente_retiro') {
         // El retiro ya iniciado es la tarea en curso; el contenedor recién queda

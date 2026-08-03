@@ -22,6 +22,7 @@ router.post('/contenedores/:id/despachar',       auth, acceso, ctrlCont.despacha
 router.post('/contenedores/:id/entregar',        auth, acceso, ctrlCont.entregar)
 router.post('/contenedores/:id/retirar',         auth, acceso, ctrlCont.retirar)
 router.post('/contenedores/:id/devolver',        auth, acceso, ctrlCont.devolverAPlanta)
+router.post('/contenedores/:id/ampliar',         auth, acceso, ctrlCont.ampliar)
 router.post('/contenedores/:id/anular',          auth, acceso, ctrlCont.anular)
 
 // ── Alquileres de maquinaria ──────────────────────────────────

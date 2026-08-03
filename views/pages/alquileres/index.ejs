@@ -72,7 +72,7 @@
             <td class="fw-semibold">${a.cliente_nombre}</td>
             <td class="text-center">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : '<span class="text-muted fst-italic">Sin asignar</span>'}</td>
             <td><small class="text-muted">${a.domicilio_entrega || '—'}</small></td>
-            <td class="text-center"><small>${a.plazo_alquiler}d</small></td>
+            <td class="text-center"><small>${a.plazo_alquiler != null ? a.plazo_alquiler + 'd' : '—'}</small></td>
             <td class="text-center">${a.fecha_entrega_real
               ? formatFecha(a.fecha_entrega_real)
               : (a.fecha_entrega_planificada

@@ -16,6 +16,24 @@ const SQL_MOV_ALQUILER = `
   ORDER BY id_contenedor, fecha_movimiento ASC
 `
 
+// Igual que el anterior pero por operación: un contenedor con historial tuvo varios
+// alquileres, y cada uno arrancó en su propia entrega.
+const SQL_MOV_ALQUILER_OP = `
+  SELECT DISTINCT ON (id_op_contenedor) id_op_contenedor, fecha_movimiento AS fecha_alquiler
+  FROM movimiento_contenedor
+  WHERE estado_paso = 'en_alquiler' AND id_op_contenedor IS NOT NULL
+  ORDER BY id_op_contenedor, fecha_movimiento ASC
+`
+
+// plazo_alquiler NULL = alquiler sin fecha de fin definida. Hay que distinguirlo del
+// "no vino nada" (que toma el default), por eso no alcanza con `parseInt(x) || n`.
+function normalizarPlazo(plazo, porDefecto) {
+  if (plazo === null) return null                              // sin fecha de fin
+  if (plazo === undefined || plazo === '') return porDefecto   // no vino: default
+  const n = parseInt(plazo, 10)
+  return Number.isNaN(n) ? porDefecto : n
+}
+
 const AlquileresModel = {
 
   // Auto-vence alquileres: los que llegaron a su fecha fin y siguen 'en_alquiler'
@@ -52,8 +70,11 @@ const AlquileresModel = {
       JOIN clientes cli ON cli.id = op.id_cliente
       LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
-      LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor
-      LEFT JOIN (${SQL_MOV_ALQUILER}) ma ON ma.id_contenedor = oc.id_contenedor
+      -- El último movimiento tiene que ser DE ESTA operación: si no, las ops viejas de
+      -- un contenedor con historial se cuelan como si siguieran en curso.
+      LEFT JOIN (${SQL_ULTIMO_MOV}) um
+             ON um.id_contenedor = oc.id_contenedor AND um.id_op_contenedor = oc.id
+      LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
       WHERE op.tipo_op = 'C'
     `
     const todosEnCurso = (await query(`${baseSelect}
@@ -129,9 +150,11 @@ const AlquileresModel = {
       // Base: fecha_entrega_planificada (inicio editable); si falta, la entrega real.
       const baseInicio = (op.fecha_entrega_planificada && String(op.fecha_entrega_planificada).slice(0, 10))
         || (movEntrega && String(movEntrega.fecha_movimiento).slice(0, 10))
-      if (baseInicio) {
+      // Sin plazo definido no hay fecha de fin: el alquiler sigue por tiempo indeterminado.
+      const sinPlazo = op.detalle.plazo_alquiler == null
+      if (baseInicio && !sinPlazo) {
         const ini = new Date(baseInicio + 'T00:00:00')
-        ini.setDate(ini.getDate() + (op.detalle.plazo_alquiler || 0))
+        ini.setDate(ini.getDate() + op.detalle.plazo_alquiler)
         op.fechaFinAlquiler = ini.toISOString().slice(0, 10)
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
         op.diasRestantes = Math.round((ini - hoy) / 86400000)
@@ -174,7 +197,7 @@ const AlquileresModel = {
       const { rows: detRows } = await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
         [id_op, id_contenedor || null,
          domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
-         zona_entrega || '', parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0,
+         zona_entrega || '', normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0,
          metodo_pago || null])
       if (id_contenedor) {
         await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_despacho', 'Contenedor reservado para despacho')`,
@@ -204,7 +227,7 @@ const AlquileresModel = {
             plazo_alquiler = ?, precio_alquiler = ?, metodo_pago = ?
         WHERE id_orden_pedido = ?
       `, [domicilio_entrega, calle || null, numero || null, zona_entrega || '',
-          parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op])
+          normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op])
     })
   },
 
@@ -362,6 +385,8 @@ const AlquileresModel = {
         AND c.estado_general = 'operativo'
         AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
         AND oc.alquiler_siguiente_id IS NULL
+        -- Sin fecha de fin no se sabe cuándo se libera: no se puede encadenar un próximo alquiler
+        AND oc.plazo_alquiler IS NOT NULL
       ORDER BY horas_restantes ASC
     `)).rows
 
@@ -391,7 +416,7 @@ const AlquileresModel = {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [id_op, id_contenedor, domicilio_entrega || '',
           domicilio_calle || null, domicilio_numero || null,
-          zona_entrega || '', parseInt(plazo_alquiler) || 5, parseFloat(precio_alquiler) || 0,
+          zona_entrega || '', normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0,
           metodo_pago || null])
 
       await q(`
@@ -401,6 +426,57 @@ const AlquileresModel = {
 
       return { id: id_op, nro_op: nro, nro_remito: nro_rem }
     })
+  },
+
+  // Carga de un alquiler que YA ESTÁ EN CURSO: arrancó antes de hoy y el contenedor
+  // está en el domicilio del cliente. Se crea directamente como 'entregado', ocupando
+  // el contenedor, sin pasar por despacho ni generar tareas de chofer.
+  // El movimiento se registra con la fecha de hoy (es cuando se toma conocimiento);
+  // el inicio real del alquiler queda en fecha_entrega_planificada.
+  async crearEnCurso({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_inicio, obra }) {
+    if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
+      throw new Error('Ese contenedor ya está alquilado o reservado en otra operación.')
+    }
+    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
+    return await transaction(async (q) => {
+      const { rows } = await q(`
+        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_emision, fecha_entrega_planificada, obra)
+        VALUES (?, ?, 'C', ?, ?, 'entregado', ?, ?, ?, ?, ?)
+        RETURNING id
+      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '',
+          fecha_inicio || null, fecha_inicio || null, obra || null])
+      const id_op = rows[0].id
+      const { rows: detRows } = await q(`
+        INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+      `, [id_op, id_contenedor || null, domicilio_entrega || '',
+          domicilio_calle || null, domicilio_numero || null, zona_entrega || '',
+          normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null])
+      if (id_contenedor) {
+        await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', 'Alquiler en curso cargado — el contenedor ya estaba en el domicilio')`,
+          [id_contenedor, detRows[0].id])
+      }
+      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+    })
+  },
+
+  // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor
+  // había pasado a 'pendiente_retiro' por vencimiento, vuelve a estar en alquiler.
+  async ampliarPlazo(id_op, diasExtra) {
+    const oc = (await query(`SELECT id, id_contenedor, plazo_alquiler FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (!oc) throw new Error('El alquiler no tiene detalle de contenedor.')
+    if (oc.plazo_alquiler == null) throw new Error('Este alquiler no tiene fecha de fin: no hay nada que ampliar.')
+    const nuevoPlazo = oc.plazo_alquiler + diasExtra
+    await query(`UPDATE op_detalle_contenedor SET plazo_alquiler = ? WHERE id = ?`, [nuevoPlazo, oc.id])
+    if (oc.id_contenedor) {
+      const ec = (await query(`SELECT estado_paso FROM movimiento_contenedor WHERE id_contenedor = ? ORDER BY fecha_movimiento DESC, id DESC LIMIT 1`, [oc.id_contenedor])).rows[0]?.estado_paso
+      if (ec === 'pendiente_retiro') {
+        await query(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', ?)`,
+          [oc.id_contenedor, oc.id, `Alquiler ampliado ${diasExtra} días — sigue en el domicilio`])
+      }
+    }
+    return nuevoPlazo
   },
 
   // Carga histórica: alquiler que YA terminó. Se crea directamente como
@@ -422,7 +498,7 @@ const AlquileresModel = {
         INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?)
       `, [id_op, domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
-          zona_entrega || '', parseInt(plazo_alquiler) || 0, parseFloat(precio_alquiler) || 0, metodo_pago || null])
+          zona_entrega || '', normalizarPlazo(plazo_alquiler, 0), parseFloat(precio_alquiler) || 0, metodo_pago || null])
       return { id: id_op, nro_op: nro, nro_remito: nro_rem, cliente_nombre: cli?.nombre || '' }
     })
   },

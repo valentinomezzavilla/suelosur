@@ -146,10 +146,18 @@
           <input type="checkbox" id="checkEditarFechaFin" name="editar_fecha_fin" value="1">
           <span>Editar fecha de fin manualmente</span>
         </label>
+        <p class="form-hint" id="avisoEnCurso" style="display:none">
+          <strong>Alquiler ya en curso:</strong> la fecha de inicio es anterior a hoy, así que se carga
+          con el contenedor ya entregado en el domicilio, sin pasar por despacho.
+        </p>
         <label class="toggle-row" id="rowSinFechaFin" style="display:none">
           <input type="checkbox" id="checkSinFechaFin" name="sin_fecha_fin" value="1">
-          <span>No informar fecha de fin</span>
+          <span>Sin fecha de fin (tiempo indeterminado)</span>
         </label>
+        <p class="form-hint" id="hintSinFechaFin" style="display:none">
+          El contenedor queda en el domicilio hasta que lo marques para retiro a mano.
+          No se vence solo ni aparece en “próximos a finalizar”.
+        </p>
       </div>
 
       <!-- Precio -->

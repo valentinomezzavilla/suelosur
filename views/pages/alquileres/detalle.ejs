@@ -51,7 +51,7 @@
         <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
         <% if (alquiler.obra) { %><p class="mb-1"><strong>Obra:</strong> <%= alquiler.obra %></p><% } %>
         <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
-        <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler %> días</p>
+        <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler != null ? alquiler.detalle.plazo_alquiler + ' días' : 'Sin fecha de fin' %></p>
         <p class="mb-0"><strong>Precio:</strong>
           <% const precio = alquiler.detalle?.precio_alquiler || 0 %>
           <%= precio > 0 ? `$${precio.toFixed(2)}` : '—' %>
@@ -105,6 +105,12 @@
                 <div class="fw-bold fs-5 <%= clase %>"><%= formatFecha(alquiler.fechaFinAlquiler) %></div>
                 <small class="<%= clase %>"><%= txt %></small>
               </div>
+            <% } else if (alquiler.detalle?.plazo_alquiler == null) { %>
+              <div class="ms-auto text-end">
+                <small class="text-muted d-block">Fin de alquiler</small>
+                <div class="fw-bold fs-6 text-muted">Sin fecha de fin</div>
+                <small class="text-muted">Se retira cuando lo marques</small>
+              </div>
             <% } %>
           </div>
 
@@ -119,6 +125,13 @@
               <% if (alquiler.estado === 'despachado' && estadoCont === 'despachado') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/entregar" method="POST">
                   <button class="btn btn-sm btn-naranja">📦 Confirmar entrega</button>
+                </form>
+              <% } %>
+              <%# Vencido: se puede ampliar el alquiler en vez de retirarlo %>
+              <% if (alquiler.estado === 'entregado' && alquiler.diasRestantes != null && alquiler.diasRestantes <= 0
+                     && ['en_alquiler','pendiente_retiro'].includes(estadoCont)) { %>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/ampliar" method="POST">
+                  <button class="btn btn-sm btn-naranja">📅 Ampliar <%= diasAmpliacion %> días</button>
                 </form>
               <% } %>
               <% if (alquiler.estado === 'entregado' && estadoCont === 'en_alquiler') { %>

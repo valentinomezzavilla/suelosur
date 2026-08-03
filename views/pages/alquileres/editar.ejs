@@ -3,12 +3,14 @@
   const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente']]
   const calle = d.domicilio_calle || d.domicilio_entrega || ''
   const numero = d.domicilio_numero || ''
-  // Fecha inicio = entrega planificada; fecha fin = inicio + plazo (días)
+  // Fecha inicio = entrega planificada; fecha fin = inicio + plazo (días).
+  // Plazo nulo = alquiler sin fecha de fin, así que no hay fin que mostrar.
   const fechaInicioVal = alquiler.fecha_entrega_planificada || ''
+  const sinFechaFinVal = d.plazo_alquiler == null
   let fechaFinVal = ''
-  if (fechaInicioVal) {
+  if (fechaInicioVal && !sinFechaFinVal) {
     const _fin = new Date(fechaInicioVal)
-    _fin.setDate(_fin.getDate() + (parseInt(d.plazo_alquiler) || 0))
+    _fin.setDate(_fin.getDate() + parseInt(d.plazo_alquiler))
     fechaFinVal = _fin.toISOString().slice(0, 10)
   }
 %>
@@ -34,7 +36,14 @@
           </select>
         </div>
         <div class="col-md-3"><label class="form-label">Fecha inicio</label><input type="date" name="fechaInicio" class="form-control" value="<%= fechaInicioVal %>"></div>
-        <div class="col-md-3"><label class="form-label">Fecha fin</label><input type="date" name="fechaFin" class="form-control" value="<%= fechaFinVal %>"></div>
+        <div class="col-md-3">
+          <label class="form-label">Fecha fin</label>
+          <input type="date" name="fechaFin" class="form-control" value="<%= fechaFinVal %>" <%= sinFechaFinVal ? 'disabled' : '' %>>
+          <label class="toggle-row mt-1">
+            <input type="checkbox" name="sin_fecha_fin" value="1" id="editSinFechaFin" <%= sinFechaFinVal ? 'checked' : '' %>>
+            <span class="small">Sin fecha de fin</span>
+          </label>
+        </div>
         <div class="col-md-3"><label class="form-label">Precio</label><input type="number" step="0.01" min="0" name="precio_alquiler" class="form-control" value="<%= d.precio_alquiler || 0 %>"></div>
         <div class="col-md-3"><label class="form-label">Método de pago</label>
           <select name="metodo_pago" class="form-select">
@@ -51,3 +60,16 @@
     </form>
   </div>
 </div>
+
+<script>
+  // El check libera o bloquea la fecha de fin
+  (function () {
+    var chk = document.getElementById('editSinFechaFin')
+    var fin = document.querySelector('input[name="fechaFin"]')
+    if (!chk || !fin) return
+    chk.addEventListener('change', function () {
+      fin.disabled = chk.checked
+      if (chk.checked) fin.value = ''
+    })
+  })()
+</script>

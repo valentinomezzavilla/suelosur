@@ -56,7 +56,7 @@
               <% } %>
             </td>
             <td class="text-center fw-bold"><%= c.dias_en_domicilio %></td>
-            <td class="text-center"><small class="text-muted"><%= c.plazo_alquiler %></small></td>
+            <td class="text-center"><small class="text-muted"><%= c.plazo_alquiler != null ? c.plazo_alquiler : '—' %></small></td>
             <td class="text-center">
               <span class="<%= c.dias_excedidos > 2 ? 'dias-rojo' : 'dias-alerta' %>">
                 +<%= c.dias_excedidos %>

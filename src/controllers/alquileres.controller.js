@@ -59,17 +59,31 @@ const AlquileresController = {
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
       const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
-      // En la carga histórica la fecha de fin puede no conocerse: el plazo queda en 0.
+      // Alquiler sin fecha de fin: o no se conoce (carga histórica) o el contenedor
+      // queda en el domicilio por tiempo indeterminado.
       const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
+      // Inicio anterior a hoy = el alquiler ya venía en curso, se carga como entregado.
+      const hoyISO = new Date().toISOString().slice(0, 10)
+      const esEnCurso = !esHistorico && !!fechaInicio && String(fechaInicio).slice(0, 10) < hoyISO
       const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
 
       // El plazo lo fija que el cliente tenga cuenta corriente habilitada (la fecha de
       // fin del formulario es el reflejo de esa regla). Se calcula desde las fechas
       // cargadas cuando la carga es histórica o cuando se pidió editar el fin a mano.
+      // NULL = alquiler sin fecha de fin, sigue en curso por tiempo indeterminado.
       const fechaFinManual = req.body.editar_fecha_fin === '1' || req.body.editar_fecha_fin === 'on'
       const cliente = await ClientesModel.obtener(clienteIdClean)
-      let plazo_alquiler = esHistorico ? 0 : plazoPorCuentaCorriente(!!cliente?.cuenta_corriente)
-      if ((esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
+      const tieneCC = !!cliente?.cuenta_corriente
+      // Dejar el alquiler sin fecha de fin solo se permite si el cliente tiene cuenta
+      // corriente o si el alquiler ya venía en curso (arrancó antes de hoy).
+      if (sinFechaFin && !esHistorico && !tieneCC && !esEnCurso) {
+        req.flash('error', 'Solo los clientes con cuenta corriente pueden quedar sin fecha de fin. Para un alquiler que ya venía en curso, cargá una fecha de inicio anterior a hoy.')
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      let plazo_alquiler = (sinFechaFin || (esHistorico && !fechaFinReal))
+        ? null
+        : plazoPorCuentaCorriente(tieneCC)
+      if (!sinFechaFin && (esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
         plazo_alquiler = Math.round((new Date(fechaFinReal) - new Date(fechaInicio)) / 86400000)
         if (plazo_alquiler < 0) {
           req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
@@ -106,6 +120,34 @@ const AlquileresController = {
           })
         }
         req.flash('success', `Alquiler finalizado OP-${String(result.nro_op).padStart(4, '0')} cargado (histórico).`)
+        return res.redirect('/alquileres/contenedores')
+      }
+
+      // ── Alquiler que ya venía en curso: se carga entregado y ocupando el contenedor ──
+      if (esEnCurso && !alquiler_actual_id) {
+        const result = await AlquileresModel.crearEnCurso({
+          id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
+          domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
+          zona_entrega, plazo_alquiler, precio_alquiler,
+          id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
+          observaciones, obra, fecha_inicio: fechaInicio,
+        })
+        // Igual que al confirmar una entrega: el alquiler ya generó su ingreso.
+        const monto = parseFloat(precio_alquiler) || 0
+        await TransaccionesModel.crear({
+          tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
+          cliente_id: clienteIdClean, cliente: cliente?.nombre || '', monto,
+          descripcion: `Alquiler contenedor${domicilio_entrega ? ' — ' + domicilio_entrega : ''}`,
+          metodo_pago: metodoPago || 'efectivo', fecha: fechaInicio || null,
+        })
+        if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
+          await ClientesModel.agregarMovimiento(clienteIdClean, {
+            tipo: 'deuda',
+            descripcion: `Alquiler contenedor OP-${String(result.nro_op).padStart(4, '0')}`,
+            monto: -monto,
+          })
+        }
+        req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}.`)
         return res.redirect('/alquileres/contenedores')
       }
 
@@ -154,11 +196,13 @@ const AlquileresController = {
       }
       const solapamiento = req.session.solapamiento?.opId === String(alquiler.id) ? req.session.solapamiento : null
       if (solapamiento) delete req.session.solapamiento
+      const clienteAlq = await ClientesModel.obtener(alquiler.id_cliente)
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
+        diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),
       })
     } catch (err) {
       console.error(err)
@@ -184,8 +228,10 @@ const AlquileresController = {
   async actualizar(req, res) {
     try {
       const { fechaInicio, fechaFin } = req.body
-      let plazo_alquiler = req.body.plazo_alquiler
-      if (fechaInicio && fechaFin) {
+      // Sin el check y sin fecha de fin no hay forma de saber el plazo: queda sin fin.
+      const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
+      let plazo_alquiler = null
+      if (!sinFechaFin && fechaInicio && fechaFin) {
         plazo_alquiler = Math.max(1, Math.round((new Date(fechaFin) - new Date(fechaInicio)) / 86400000))
       }
       await AlquileresModel.actualizar(req.params.id, {
@@ -262,6 +308,23 @@ const AlquileresController = {
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar retiro.')
+    }
+    res.redirect(`/alquileres/contenedores/${req.params.id}`)
+  },
+
+  // Amplía el alquiler por el mismo plazo que le corresponde al cliente
+  // (15 días con cuenta corriente, 4 sin ella). Se puede repetir.
+  async ampliar(req, res) {
+    try {
+      const alquiler = await AlquileresModel.obtener(req.params.id)
+      if (!alquiler) throw new Error('Alquiler no encontrado.')
+      const cliente = await ClientesModel.obtener(alquiler.id_cliente)
+      const dias = plazoPorCuentaCorriente(!!cliente?.cuenta_corriente)
+      await AlquileresModel.ampliarPlazo(req.params.id, dias)
+      req.flash('success', `Alquiler ampliado ${dias} días.`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al ampliar el alquiler.')
     }
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },

@@ -66,6 +66,19 @@ function clienteTieneCuentaCorriente() {
     return !!(typeof getClienteSeleccionado === 'function' && getClienteSeleccionado()?.cuentaCorriente);
 }
 
+// Inicio anterior a hoy = el alquiler ya venía en curso (se carga con el contenedor
+// ya en el domicilio del cliente).
+function inicioEsPasado() {
+    if (!fechaInicio?.value) return false;
+    return fechaInicio.value < toInputDate(new Date());
+}
+
+// Dejar el alquiler sin fecha de fin se permite a los clientes con cuenta corriente
+// y a cualquier alquiler que ya venía en curso.
+function permiteSinFechaFin() {
+    return modoFinalizado() || clienteTieneCuentaCorriente() || inicioEsPasado();
+}
+
 function plazoDelCliente() {
     return clienteTieneCuentaCorriente() ? plazosCfg.cuenta_corriente : plazosCfg.estandar;
 }
@@ -88,14 +101,26 @@ function aplicarFechaFinAutomatica() {
 }
 
 if (fechaInicio && fechaFin) {
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    fechaInicio.min = toInputDate(hoy);
-
+    // La fecha de inicio es libre: puede ser pasada (alquiler ya en curso) o futura.
     fechaInicio.addEventListener('change', () => {
+        sincronizarOpcionesDeFin();
         aplicarFechaFinAutomatica();
         actualizarResumen();
     });
+}
+
+// Muestra u oculta el check de "sin fecha de fin" según a quién le corresponde,
+// y avisa cuando el alquiler se va a cargar como ya en curso.
+function sincronizarOpcionesDeFin() {
+    const permite = permiteSinFechaFin();
+    if (rowSinFechaFin) rowSinFechaFin.style.display = permite ? '' : 'none';
+    if (!permite && checkSinFechaFin?.checked) {
+        checkSinFechaFin.checked = false;
+        aplicarSinFechaFin(false);
+    }
+    if (avisoEnCurso) {
+        avisoEnCurso.style.display = (inicioEsPasado() && !modoFinalizado()) ? '' : 'none';
+    }
 }
 
 // ── Precio editable (toggle) ──────────────────────────────────
@@ -176,8 +201,8 @@ function actualizarResumen() {
     document.getElementById(id)?.addEventListener('input',  actualizarResumen);
 });
 // El plazo depende del cliente, así que al elegirlo hay que recalcular la fecha de fin.
-document.addEventListener('clienteSeleccionado',   () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
-document.addEventListener('clienteDeseleccionado', () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
+document.addEventListener('clienteSeleccionado',   () => { sincronizarOpcionesDeFin(); aplicarFechaFinAutomatica(); actualizarResumen(); });
+document.addEventListener('clienteDeseleccionado', () => { sincronizarOpcionesDeFin(); aplicarFechaFinAutomatica(); actualizarResumen(); });
 
 // ── Modal ─────────────────────────────────────────────────────
 const modalAlquiler = document.getElementById('modal-alquiler');
@@ -252,38 +277,40 @@ const checkFinalizado       = document.getElementById('checkFinalizado');
 const finalizadoHint        = document.getElementById('finalizadoHint');
 const seccionChoferCamion   = document.getElementById('seccionChoferCamion');
 const modalContLabel        = document.getElementById('modal-cont-label');
-const fechaInicioMinDefault = fechaInicio ? fechaInicio.min : '';
 const checkSinFechaFin      = document.getElementById('checkSinFechaFin');
 const rowSinFechaFin        = document.getElementById('rowSinFechaFin');
 const grupoFechaFin         = document.getElementById('grupoFechaFin');
 const hintPlazo             = document.getElementById('hintPlazo');
 const checkEditarFechaFin   = document.getElementById('checkEditarFechaFin');
 const rowEditarFechaFin     = document.getElementById('rowEditarFechaFin');
+const hintSinFechaFin       = document.getElementById('hintSinFechaFin');
+const avisoEnCurso          = document.getElementById('avisoEnCurso');
 
-// Oculta la fecha de fin cuando el alquiler viejo no la tiene registrada.
-// Al quedar oculta, validarFormulario la saltea sola (ignora los campos no visibles).
+// Alquiler sin fecha de fin: se oculta el campo (validarFormulario saltea solo
+// los campos no visibles) y el fin deja de ser obligatorio.
 function aplicarSinFechaFin(activo) {
-    if (grupoFechaFin) grupoFechaFin.style.display = activo ? 'none' : '';
+    if (grupoFechaFin)    grupoFechaFin.style.display = activo ? 'none' : '';
+    if (hintSinFechaFin)  hintSinFechaFin.style.display = activo ? '' : 'none';
+    if (hintPlazo)        hintPlazo.style.display = (activo || modoFinalizado()) ? 'none' : '';
+    if (rowEditarFechaFin) rowEditarFechaFin.style.display = (activo || modoFinalizado()) ? 'none' : '';
     if (fechaFin) {
         fechaFin.required = !activo;
         if (activo) { fechaFin.value = ''; fechaFin.min = ''; fechaFin.max = ''; }
     }
+    // Al destildarlo hay que volver a calcular el fin, que había quedado vacío.
+    if (!activo) aplicarFechaFinAutomatica();
     actualizarResumen();
 }
 
 function aplicarModoFinalizado(activo) {
     if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
     if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
-    if (rowSinFechaFin)      rowSinFechaFin.style.display = activo ? '' : 'none';
     // En histórico la fecha de fin ya se carga a mano, así que el check de edición
-    // y el cartel de la regla no tienen sentido.
-    if (hintPlazo)           hintPlazo.style.display = activo ? 'none' : '';
-    if (rowEditarFechaFin)   rowEditarFechaFin.style.display = activo ? 'none' : '';
+    // y el cartel de la regla no tienen sentido. El de "sin fecha de fin" sirve en ambos.
     if (activo && checkEditarFechaFin) checkEditarFechaFin.checked = false;
-    if (fechaInicio) fechaInicio.min = activo ? '' : fechaInicioMinDefault;
+    sincronizarOpcionesDeFin();
     aplicarFechaFinAutomatica();
-    if (!activo && checkSinFechaFin) checkSinFechaFin.checked = false;
-    aplicarSinFechaFin(activo && !!checkSinFechaFin?.checked);
+    aplicarSinFechaFin(!!checkSinFechaFin?.checked);
     if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';
 }
 

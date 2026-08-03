@@ -8,16 +8,20 @@ const SQL_ULTIMO_MOV = `
   ) m WHERE m.rn = 1
 `
 
-// Inicio del alquiler vigente: primer movimiento 'en_alquiler' (= entrega en domicilio)
-// posterior a la última vez que el contenedor volvió a estar disponible en planta.
+// Inicio del alquiler vigente. Manda la fecha de inicio cargada en la operación (la
+// misma que usa el módulo de alquileres y que se puede editar); si falta, se usa la
+// entrega real de esa operación. Los alquileres cargados como "ya en curso" tienen el
+// movimiento fechado el día de la carga, por eso no alcanza con mirar el movimiento.
 // Devuelve NULL si el contenedor no está alquilado en este momento.
 const SQL_INICIO_ALQUILER = `
-  SELECT MIN(ma.fecha_movimiento) FROM movimiento_contenedor ma
-  WHERE ma.id_contenedor = c.id AND ma.estado_paso = 'en_alquiler'
-    AND ma.fecha_movimiento > COALESCE((
-      SELECT MAX(md.fecha_movimiento) FROM movimiento_contenedor md
-      WHERE md.id_contenedor = c.id AND md.estado_paso = 'disponible'
-    ), '')
+  CASE WHEN um.estado_paso IN ('en_alquiler', 'pendiente_retiro') THEN
+    COALESCE(
+      NULLIF(LEFT(op.fecha_entrega_planificada, 10), ''),
+      LEFT((SELECT MIN(ma.fecha_movimiento) FROM movimiento_contenedor ma
+            WHERE ma.id_contenedor = c.id AND ma.estado_paso = 'en_alquiler'
+              AND ma.id_op_contenedor = um.id_op_contenedor), 10)
+    )
+  END
 `
 
 // Próximo alquiler del contenedor que todavía no arrancó: OP de contenedor asignada y

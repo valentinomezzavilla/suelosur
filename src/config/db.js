@@ -1114,6 +1114,20 @@ async function initDB() {
       AND op.retiro_iniciado_en IS NULL
   `).catch(() => {})
   await pool.query(`UPDATE movimiento_contenedor SET estado_paso = 'pendiente_retiro' WHERE estado_paso = 'vuelta_a_planta'`).catch(() => {})
+
+  // ─────────────────────────────────────────────────────────────────
+  // MIGRACIÓN: plazo_alquiler nulo = alquiler sin fecha de fin definida (sigue en
+  // curso por tiempo indeterminado). Con NULL las cuentas de vencimiento dan NULL,
+  // así que esos alquileres no se auto-vencen ni aparecen como "por finalizar".
+  // ─────────────────────────────────────────────────────────────────
+  await pool.query(`ALTER TABLE op_detalle_contenedor ALTER COLUMN plazo_alquiler DROP NOT NULL`).catch(() => {})
+  // Las cargas históricas sin fecha de fin se guardaban con plazo 0: pasan a NULL.
+  await pool.query(`
+    UPDATE op_detalle_contenedor oc SET plazo_alquiler = NULL
+    FROM op_encabezado op
+    WHERE op.id = oc.id_orden_pedido AND op.tipo_op = 'C'
+      AND oc.plazo_alquiler = 0 AND oc.id_contenedor IS NULL
+  `).catch(() => {})
   await pool.query(`ALTER TABLE movimiento_contenedor DROP CONSTRAINT IF EXISTS movimiento_contenedor_estado_paso_check`).catch(() => {})
   await pool.query(`ALTER TABLE movimiento_contenedor ADD CONSTRAINT movimiento_contenedor_estado_paso_check CHECK (estado_paso IN ('disponible','pendiente_despacho','despachado','en_alquiler','pendiente_retiro'))`).catch(() => {})
 
