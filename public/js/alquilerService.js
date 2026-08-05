@@ -58,6 +58,10 @@ const plazosCfg = plazosCfgEl ? JSON.parse(plazosCfgEl.textContent) : { cuenta_c
 const plazoActual = document.getElementById('plazoActual');
 
 function modoFinalizado()  { return !!document.getElementById('checkFinalizado')?.checked; }
+// Histórico que todavía sigue en curso: ocupa el contenedor y no lleva fecha de fin.
+function historicoEnCurso() {
+    return modoFinalizado() && document.getElementById('estadoHistorico')?.value === 'en_curso';
+}
 function sinFechaFin()     { return !!document.getElementById('checkSinFechaFin')?.checked; }
 // Con el check tildado el usuario fija la fecha de fin a mano y la regla no la pisa.
 function fechaFinManual()  { return !!document.getElementById('checkEditarFechaFin')?.checked; }
@@ -148,9 +152,15 @@ function actualizarResumen() {
     const elCliente = document.getElementById('res-cliente');
     if (elCliente) elCliente.textContent = clienteNombre;
 
-    // contenedor (muestra el N° real, no el UUID)
+    // contenedor (muestra el N° real, no el UUID). En el histórico en curso se elige
+    // desde un select propio, no desde las tarjetas.
     const elCont = document.getElementById('res-contenedor');
-    if (elCont) elCont.textContent = contenedorSeleccionado ? `#${contenedorSeleccionado.numero}` : '—';
+    if (elCont) {
+        const selHist = document.getElementById('contHistorico');
+        const textoHist = historicoEnCurso() && selHist?.value
+            ? selHist.options[selHist.selectedIndex]?.text : '';
+        elCont.textContent = textoHist || (contenedorSeleccionado ? `#${contenedorSeleccionado.numero}` : '—');
+    }
 
     // fechas y días
     const inicioVal = fechaInicio?.value;
@@ -162,7 +172,7 @@ function actualizarResumen() {
     const elTotalV  = document.getElementById('res-total-valor');
 
     if (elInicio) elInicio.textContent = formatFechaLocal(inicioVal);
-    if (elFin)    elFin.textContent    = sinFechaFin() ? 'Sin informar' : formatFechaLocal(finVal);
+    if (elFin)    elFin.textContent    = (sinFechaFin() || historicoEnCurso()) ? 'Sin informar' : formatFechaLocal(finVal);
 
     if (inicioVal && finVal) {
         const dias = Math.round((new Date(finVal) - new Date(inicioVal)) / 86400000);
@@ -285,6 +295,11 @@ const checkEditarFechaFin   = document.getElementById('checkEditarFechaFin');
 const rowEditarFechaFin     = document.getElementById('rowEditarFechaFin');
 const hintSinFechaFin       = document.getElementById('hintSinFechaFin');
 const avisoEnCurso          = document.getElementById('avisoEnCurso');
+const bloqueHistorico       = document.getElementById('bloqueHistorico');
+const estadoHistorico       = document.getElementById('estadoHistorico');
+const grupoContHistorico    = document.getElementById('grupoContHistorico');
+const selContHistorico      = document.getElementById('contHistorico');
+const enCursoHint           = document.getElementById('enCursoHint');
 
 // Alquiler sin fecha de fin: se oculta el campo (validarFormulario saltea solo
 // los campos no visibles) y el fin deja de ser obligatorio.
@@ -302,19 +317,45 @@ function aplicarSinFechaFin(activo) {
     actualizarResumen();
 }
 
+// Dentro del histórico: "ya finalizó" pide fecha de fin y no toca contenedores;
+// "sigue en curso" pide el contenedor y no lleva fecha de fin.
+function aplicarEstadoHistorico() {
+    const enCurso = historicoEnCurso();
+    if (grupoContHistorico) grupoContHistorico.style.display = enCurso ? '' : 'none';
+    if (finalizadoHint)     finalizadoHint.style.display = enCurso ? 'none' : '';
+    if (enCursoHint)        enCursoHint.style.display = enCurso ? '' : 'none';
+    if (grupoFechaFin)      grupoFechaFin.style.display = enCurso ? 'none' : '';
+    if (fechaFin && enCurso) { fechaFin.value = ''; fechaFin.required = false; }
+    if (rowSinFechaFin)     rowSinFechaFin.style.display = enCurso ? 'none' : (permiteSinFechaFin() ? '' : 'none');
+    if (!enCurso && selContHistorico) selContHistorico.value = '';
+    sincronizarContenedorHistorico();
+    actualizarResumen();
+}
+
+// El select del histórico escribe en el mismo hidden que usa la selección por tarjetas.
+function sincronizarContenedorHistorico() {
+    if (!historicoEnCurso()) return;
+    const inputId = document.getElementById('inputContenedorId');
+    if (inputId) inputId.value = selContHistorico?.value || '';
+}
+
 function aplicarModoFinalizado(activo) {
-    if (finalizadoHint)      finalizadoHint.style.display = activo ? '' : 'none';
+    if (bloqueHistorico)     bloqueHistorico.style.display = activo ? '' : 'none';
     if (seccionChoferCamion) seccionChoferCamion.style.display = activo ? 'none' : '';
     // En histórico la fecha de fin ya se carga a mano, así que el check de edición
     // y el cartel de la regla no tienen sentido. El de "sin fecha de fin" sirve en ambos.
     if (activo && checkEditarFechaFin) checkEditarFechaFin.checked = false;
+    if (!activo && selContHistorico) selContHistorico.value = '';
     sincronizarOpcionesDeFin();
     aplicarFechaFinAutomatica();
     aplicarSinFechaFin(!!checkSinFechaFin?.checked);
-    if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler finalizado (histórico)';
+    if (activo) aplicarEstadoHistorico();
+    if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler histórico';
 }
 
 checkFinalizado?.addEventListener('change', () => aplicarModoFinalizado(checkFinalizado.checked));
+estadoHistorico?.addEventListener('change', aplicarEstadoHistorico);
+selContHistorico?.addEventListener('change', () => { sincronizarContenedorHistorico(); actualizarResumen(); });
 checkSinFechaFin?.addEventListener('change', () => aplicarSinFechaFin(checkSinFechaFin.checked));
 // Al destildar "editar fecha de fin" vuelve a mandar la regla del cliente.
 checkEditarFechaFin?.addEventListener('change', () => { aplicarFechaFinAutomatica(); actualizarResumen(); });
@@ -368,8 +409,14 @@ formAlquiler?.addEventListener('submit', (e) => {
         e.preventDefault();
         return;
     }
-    // La carga histórica no ocupa un contenedor físico: no hace falta elegir uno.
-    if (!modoFinalizado() && !contenedorSeleccionado) { e.preventDefault(); alert('Seleccioná un contenedor.'); return; }
+    // El histórico ya finalizado no ocupa contenedor; el que sigue en curso sí.
+    if (historicoEnCurso()) {
+        if (!selContHistorico?.value) {
+            e.preventDefault(); alert('Elegí el contenedor que está en el domicilio del cliente.'); return;
+        }
+    } else if (!modoFinalizado() && !contenedorSeleccionado) {
+        e.preventDefault(); alert('Seleccioná un contenedor.'); return;
+    }
     const clienteId = document.getElementById('inputClienteId')?.value;
     if (!clienteId) { e.preventDefault(); alert('Buscá y seleccioná un cliente antes de confirmar.'); return; }
 
@@ -379,7 +426,7 @@ formAlquiler?.addEventListener('submit', (e) => {
         { id: 'calle',       nombre: 'Calle' },
         { id: 'numero',      nombre: 'Número' },
     ];
-    if (!sinFechaFin()) campos.push({ id: 'fechaFin', nombre: 'Fecha de fin' });
+    if (!sinFechaFin() && !historicoEnCurso()) campos.push({ id: 'fechaFin', nombre: 'Fecha de fin' });
     const faltantes = campos.filter(c => !document.getElementById(c.id)?.value.trim());
     if (faltantes.length) {
         e.preventDefault();
@@ -389,7 +436,7 @@ formAlquiler?.addEventListener('submit', (e) => {
         return;
     }
     const requeridos = ['#fechaInicio', '#calle', '#numero'];
-    if (!sinFechaFin()) requeridos.push('#fechaFin');
+    if (!sinFechaFin() && !historicoEnCurso()) requeridos.push('#fechaFin');
     if (typeof validarFormulario === 'function' && !validarFormulario(e.target, requeridos)) {
         e.preventDefault();
     }

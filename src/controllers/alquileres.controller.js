@@ -58,13 +58,17 @@ const AlquileresController = {
       }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+      // Carga histórica: un alquiler viejo que puede haber terminado o seguir en curso.
       const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
-      // Alquiler sin fecha de fin: o no se conoce (carga histórica) o el contenedor
-      // queda en el domicilio por tiempo indeterminado.
-      const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
+      const historicoEnCurso = esHistorico && req.body.estado_historico === 'en_curso'
+      // Alquiler sin fecha de fin: o no se conoce, o el contenedor queda en el
+      // domicilio por tiempo indeterminado. Los históricos en curso nunca la tienen.
+      const sinFechaFin = historicoEnCurso
+        || req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       // Inicio anterior a hoy = el alquiler ya venía en curso, se carga como entregado.
       const hoyISO = new Date().toISOString().slice(0, 10)
-      const esEnCurso = !esHistorico && !!fechaInicio && String(fechaInicio).slice(0, 10) < hoyISO
+      const esEnCurso = historicoEnCurso
+        || (!esHistorico && !!fechaInicio && String(fechaInicio).slice(0, 10) < hoyISO)
       const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
 
       // El plazo lo fija que el cliente tenga cuenta corriente habilitada (la fecha de
@@ -92,7 +96,7 @@ const AlquileresController = {
       }
 
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
-      if (esHistorico) {
+      if (esHistorico && !historicoEnCurso) {
         if (!fechaInicio) {
           req.flash('error', 'Indicá la fecha de inicio del alquiler.')
           return res.redirect('/alquileres/contenedores/nuevo')
@@ -125,6 +129,14 @@ const AlquileresController = {
 
       // ── Alquiler que ya venía en curso: se carga entregado y ocupando el contenedor ──
       if (esEnCurso && !alquiler_actual_id) {
+        if (!fechaInicio) {
+          req.flash('error', 'Indicá la fecha de inicio del alquiler.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
+        if (!id_contenedor) {
+          req.flash('error', 'Elegí el contenedor que está en el domicilio del cliente.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
         const result = await AlquileresModel.crearEnCurso({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
