@@ -508,17 +508,8 @@ const HojaRutaController = {
         }
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {
-        const al = await AlquileresModel.obtener(op.id)
+        // La entrega solo arranca el período; el cobro se genera al retirar.
         await AlquileresModel.entregar(op.id)
-        const monto = al.detalle?.precio_alquiler || 0
-        await TransaccionesModel.crear({
-          tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: al.nro_remito,
-          cliente_id: al.id_cliente, cliente: al.cliente_nombre, monto,
-          descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, metodo_pago: al.metodo_pago || 'efectivo',
-        })
-        if (al.metodo_pago === 'cuenta_corriente' && al.id_cliente) {
-          await ClientesModel.agregarMovimiento(al.id_cliente, { tipo: 'deuda', descripcion: `Alquiler contenedor #${al.detalle?.numero_contenedor || '?'}`, monto: -monto })
-        }
         req.flash('success', 'Contenedor entregado. Comenzó el período de alquiler.')
       } else if (esRetiroContenedor) {
         const oc = (await query(`SELECT id_contenedor, alquiler_siguiente_id FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [op.id])).rows[0]
@@ -528,11 +519,14 @@ const HojaRutaController = {
         const quiereProximo = req.body.destino_retiro === 'proximo' && oc?.alquiler_siguiente_id
         if (quiereProximo) {
           const idB = await AlquileresModel.iniciarProximoAlquiler(op.id)
+          // El alquiler anterior termina acá aunque el contenedor no pase por planta.
+          await AlquileresModel.cobrarAlCerrar(op.id)
           req.flash('success', 'Contenedor retirado. En camino al próximo alquiler.')
           return res.redirect(`/hoja-de-ruta/${idB}/viaje-en-curso`)
         }
         const al = await AlquileresModel.obtener(op.id)
         await AlquileresModel.devolverAPlanta(op.id)
+        await AlquileresModel.cobrarAlCerrar(op.id)
         if (al?.detalle?.alquiler_siguiente_id) {
           await AlquileresModel.activarProgramado(al.detalle.alquiler_siguiente_id)
         }

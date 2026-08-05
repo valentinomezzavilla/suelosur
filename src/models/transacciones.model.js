@@ -29,6 +29,14 @@ const TransaccionesModel = {
     return rows[0].id
   },
 
+  // ¿La operación ya generó su ingreso? Evita cobrar dos veces la misma operación
+  // (por ejemplo, alquileres viejos que ya habían cobrado al entregar).
+  async existePorOperacion(id_op_encabezado) {
+    if (!id_op_encabezado) return false
+    const r = (await query(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
+    return !!r
+  },
+
   async listar() {
     return (await query(`SELECT * FROM transacciones ORDER BY created_at DESC`)).rows
   },

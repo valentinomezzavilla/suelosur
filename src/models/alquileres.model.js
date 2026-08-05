@@ -1,6 +1,9 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const FlotaModel = require('./flota.model')
+const ConfigContenedoresModel = require('./config_contenedores.model')
+const TransaccionesModel = require('./transacciones.model')
+const ClientesModel = require('./clientes.model')
 
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
@@ -459,6 +462,84 @@ const AlquileresModel = {
       }
       return { id: id_op, nro_op: nro, nro_remito: nro_rem }
     })
+  },
+
+  // Datos para cerrar el alquiler y cobrarlo: el precio pactado al inicio (que puede
+  // ser de hace meses) y el sugerido con la tarifa vigente hoy. El cobro se hace al
+  // retirar el contenedor, no al entregarlo.
+  async datosCierre(id_op) {
+    const op = (await query(`
+      SELECT op.fecha_entrega_planificada, oc.precio_alquiler, oc.plazo_alquiler,
+             oc.domicilio_entrega, cont.numero_contenedor
+      FROM op_encabezado op
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      WHERE op.id = ? LIMIT 1
+    `, [id_op])).rows[0]
+    if (!op) return null
+
+    const precioInicial = parseFloat(op.precio_alquiler) || 0
+    const cfg = await ConfigContenedoresModel.obtenerPrecios()
+
+    // Días reales que estuvo afuera, desde el inicio cargado hasta hoy
+    const inicio = op.fecha_entrega_planificada ? String(op.fecha_entrega_planificada).slice(0, 10) : null
+    let dias = null
+    if (inicio) {
+      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+      dias = Math.max(0, Math.round((hoy - new Date(inicio + 'T00:00:00')) / 86400000))
+    }
+    // Tarifa vigente: el precio base a partir del plazo largo, o por día si fue corto
+    const precioActual = (dias != null && dias > 0 && dias < 9) ? dias * cfg.precioDia : cfg.precioAlquiler
+
+    const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+    let mesInicio = null
+    if (inicio) {
+      const [a, m] = inicio.split('-')
+      mesInicio = `${MESES[Number(m) - 1]} ${a}`
+    }
+    return {
+      precioInicial, precioActual, dias, inicio, mesInicio,
+      numero_contenedor: op.numero_contenedor, domicilio_entrega: op.domicilio_entrega,
+      // Distinto = conviene mostrar el precio de referencia entre paréntesis
+      cambioDePrecio: precioInicial > 0 && Math.round(precioInicial) !== Math.round(precioActual),
+    }
+  },
+
+  // Genera el ingreso del alquiler al cerrarlo (cuando se retira el contenedor).
+  // `montoManual` permite ajustar el precio en el momento del cierre; si no viene,
+  // usa la tarifa vigente. Si la operación ya tenía un ingreso, no hace nada.
+  async cobrarAlCerrar(id_op, montoManual) {
+    if (await TransaccionesModel.existePorOperacion(id_op)) return null
+    const op = (await query(`
+      SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, cli.nombre AS cliente_nombre
+      FROM op_encabezado op JOIN clientes cli ON cli.id = op.id_cliente WHERE op.id = ?
+    `, [id_op])).rows[0]
+    const cierre = await this.datosCierre(id_op)
+    if (!op || !cierre) return null
+
+    const manual = montoManual != null && String(montoManual).trim() !== ''
+    const monto = manual ? (parseFloat(montoManual) || 0) : cierre.precioActual
+
+    // Si el alquiler arrancó con otro precio, se deja la referencia en la descripción
+    const referencia = (cierre.cambioDePrecio && cierre.mesInicio)
+      ? ` (Precio inicial ${cierre.mesInicio}: $${Math.round(cierre.precioInicial).toLocaleString('es-AR')})`
+      : ''
+    const detalle = `Alquiler contenedor #${cierre.numero_contenedor || '?'}${cierre.domicilio_entrega ? ' — ' + cierre.domicilio_entrega : ''}`
+
+    await TransaccionesModel.crear({
+      tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: op.nro_remito,
+      cliente_id: op.id_cliente, cliente: op.cliente_nombre, monto,
+      descripcion: detalle + referencia,
+      metodo_pago: op.metodo_pago || 'efectivo',
+    })
+    if (op.metodo_pago === 'cuenta_corriente' && op.id_cliente) {
+      await ClientesModel.agregarMovimiento(op.id_cliente, {
+        tipo: 'deuda',
+        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
+        monto: -monto,
+      })
+    }
+    return monto
   },
 
   // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor

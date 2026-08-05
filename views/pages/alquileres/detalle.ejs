@@ -141,10 +141,6 @@
               <% } %>
               <% if (alquiler.estado === 'entregado' && estadoCont === 'pendiente_retiro') { %>
                 <span class="badge rounded-pill px-3 badge-alerta align-self-center">Esperando retiro del chofer</span>
-                <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
-                      onsubmit="return confirm('¿Registrar el retiro sin pasar por el chofer? El contenedor queda disponible.')">
-                  <button class="btn btn-sm btn-outline-success">🏠 Registrar retiro (manual)</button>
-                </form>
               <% } %>
               <% if (alquiler.estado === 'pendiente' || alquiler.estado === 'despachado') { %>
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/anular" method="POST"
@@ -153,6 +149,32 @@
                 </form>
               <% } %>
             </div>
+
+            <%# Cierre del alquiler: es el momento en que se cobra %>
+            <% if (alquiler.estado === 'entregado' && ['en_alquiler','pendiente_retiro'].includes(estadoCont) && cierre) { %>
+              <div class="cierre-alquiler mt-3">
+                <p class="fw-semibold mb-1">Cerrar alquiler y cobrar</p>
+                <p class="text-muted small mb-2">
+                  El ingreso se registra al retirar el contenedor.
+                  <% if (cierre.cambioDePrecio) { %>
+                    Precio pactado al inicio (<%= cierre.mesInicio %>):
+                    <strong>$<%= Math.round(cierre.precioInicial).toLocaleString('es-AR') %></strong>.
+                  <% } %>
+                  <% if (cierre.dias != null) { %>Lleva <%= cierre.dias %> días.<% } %>
+                </p>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
+                      class="d-flex flex-wrap gap-2 align-items-end"
+                      onsubmit="return confirm('¿Cerrar el alquiler? Se registra el ingreso y el contenedor queda disponible.')">
+                  <div>
+                    <label for="precioFinal" class="form-label mb-1 small">Monto a cobrar</label>
+                    <input type="number" step="0.01" min="0" name="precio_final" id="precioFinal"
+                           class="form-control form-control-sm" style="max-width:170px"
+                           value="<%= Math.round(cierre.precioActual) %>">
+                  </div>
+                  <button class="btn btn-sm btn-outline-success">🏠 Registrar retiro y cobrar</button>
+                </form>
+              </div>
+            <% } %>
           <% } %>
         <% } %>
 

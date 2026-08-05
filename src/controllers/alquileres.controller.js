@@ -144,22 +144,8 @@ const AlquileresController = {
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, obra, fecha_inicio: fechaInicio,
         })
-        // Igual que al confirmar una entrega: el alquiler ya generó su ingreso.
-        const monto = parseFloat(precio_alquiler) || 0
-        await TransaccionesModel.crear({
-          tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
-          cliente_id: clienteIdClean, cliente: cliente?.nombre || '', monto,
-          descripcion: `Alquiler contenedor${domicilio_entrega ? ' — ' + domicilio_entrega : ''}`,
-          metodo_pago: metodoPago || 'efectivo', fecha: fechaInicio || null,
-        })
-        if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
-          await ClientesModel.agregarMovimiento(clienteIdClean, {
-            tipo: 'deuda',
-            descripcion: `Alquiler contenedor OP-${String(result.nro_op).padStart(4, '0')}`,
-            monto: -monto,
-          })
-        }
-        req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}.`)
+        // El alquiler sigue abierto: el ingreso se genera recién al retirar el contenedor.
+        req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. Se cobra al retirar el contenedor.`)
         return res.redirect('/alquileres/contenedores')
       }
 
@@ -178,8 +164,10 @@ const AlquileresController = {
       } else {
         result = await AlquileresModel.crear({
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
-          domicilio_entrega, zona_entrega, plazo_alquiler, precio_alquiler,
-          id_contenedor: id_contenedor || null, observaciones, obra,
+          domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
+          zona_entrega, plazo_alquiler, precio_alquiler,
+          id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
+          observaciones, obra,
           fecha_entrega_planificada: fechaInicio || null,
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
@@ -215,6 +203,7 @@ const AlquileresController = {
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
         diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),
+        cierre: alquiler.detalle ? await AlquileresModel.datosCierre(alquiler.id) : null,
       })
     } catch (err) {
       console.error(err)
@@ -282,30 +271,11 @@ const AlquileresController = {
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
 
+  // La entrega solo arranca el período: el cobro se genera al retirar el contenedor.
   async entregar(req, res) {
     try {
-      const alquiler = await AlquileresModel.obtener(req.params.id)
       await AlquileresModel.entregar(req.params.id)
-      if (alquiler) {
-        await TransaccionesModel.crear({
-          tipo: 'Alquiler',
-          id_op_encabezado: alquiler.id,
-          nro_remito: alquiler.nro_remito,
-          cliente_id: alquiler.id_cliente,
-          cliente: alquiler.cliente_nombre,
-          monto: alquiler.detalle?.precio_alquiler || 0,
-          descripcion: `Alquiler contenedor #${alquiler.detalle?.numero_contenedor || '?'} — ${alquiler.detalle?.domicilio_entrega || ''}`,
-          metodo_pago: alquiler.metodo_pago || 'efectivo',
-        })
-        if (alquiler.metodo_pago === 'cuenta_corriente' && alquiler.id_cliente) {
-          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
-            tipo: 'deuda',
-            descripcion: `Alquiler contenedor #${alquiler.detalle?.numero_contenedor || '?'}`,
-            monto: -(alquiler.detalle?.precio_alquiler || 0),
-          })
-        }
-      }
-      req.flash('success', 'Entrega confirmada.')
+      req.flash('success', 'Entrega confirmada. Comenzó el período de alquiler.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al confirmar entrega.')
@@ -345,10 +315,14 @@ const AlquileresController = {
     try {
       const alquiler = await AlquileresModel.obtener(req.params.id)
       await AlquileresModel.devolverAPlanta(req.params.id)
+      // El alquiler termina acá: es el momento en que se cobra.
+      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, req.body.precio_final)
       if (alquiler?.detalle?.alquiler_siguiente_id) {
         await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
-      req.flash('success', 'Contenedor devuelto a planta — ciclo completado.')
+      req.flash('success', monto != null
+        ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}.`
+        : 'Contenedor retirado — ciclo completado.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar devolución.')
