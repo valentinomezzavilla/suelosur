@@ -26,7 +26,7 @@
         <tr>
           <%- include('../../partials/th_sort', { sortKey: 'nombre', sortLabel: 'Nombre',            currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
           <%- include('../../partials/th_sort', { sortKey: 'unidad', sortLabel: 'Unidad',            currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
-          <%- include('../../partials/th_sort', { sortKey: 'precio', sortLabel: 'Precio Referencia', currentSort: filtros.sort, currentDir: filtros.dir, filtros, align: 'right' }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'stock', sortLabel: 'Stock disponible',  currentSort: filtros.sort, currentDir: filtros.dir, filtros, align: 'right' }) %>
           <th class="text-center">Estado</th>
           <th class="text-center">Acciones</th>
         </tr>
@@ -36,8 +36,11 @@
         <tr class="<%= !p.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold"><%= p.nombre %></td>
           <td><small class="text-muted"><%= p.unidad_medida %></small></td>
-          <td class="text-end fw-semibold text-orange">
-            $<%= Number(p.precio_referencia || 0).toLocaleString('es-AR') %>
+          <%# Disponible = en planta menos lo comprometido. En cero va apagado para
+              que un producto sin stock no se lea como si estuviera bien. %>
+          <% const disp = Number(p.disponible_real || 0) %>
+          <td class="text-end fw-semibold <%= disp > 0 ? 'text-orange' : 'text-muted' %>">
+            <%= disp.toFixed(2) %>
           </td>
           <td class="text-center">
             <% if (p.activo) { %>

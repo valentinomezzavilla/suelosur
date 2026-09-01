@@ -21,7 +21,7 @@ const ProductosController = {
       const sortMap = {
         nombre:        (p) => (p.nombre || '').toLowerCase(),
         unidad:        (p) => (p.unidad_medida || '').toLowerCase(),
-        precio:        (p) => Number(p.precio_referencia || 0),
+        stock:         (p) => Number(p.disponible_real || 0),
       }
       const sortKey = sortMap[sort] ? sort : 'nombre'
       const dirNorm = String(dir || '').toUpperCase() === 'DESC' ? 'DESC' : 'ASC'

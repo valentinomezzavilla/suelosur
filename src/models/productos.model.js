@@ -4,7 +4,15 @@ const { query } = require('../config/db')
 const ProductosModel = {
 
   async listar() {
-    return (await query(`SELECT * FROM productos ORDER BY nombre`)).rows
+    // Disponible real = lo que hay en planta menos lo ya comprometido en pedidos.
+    // LEFT JOIN porque un producto puede no tener fila de stock todavía.
+    return (await query(`
+      SELECT p.*,
+             (COALESCE(s.cantidad_actual, 0) - COALESCE(s.cant_pendiente_entregar, 0)) AS disponible_real
+      FROM productos p
+      LEFT JOIN stock s ON s.id_producto = p.id
+      ORDER BY p.nombre
+    `)).rows
   },
 
   async listarActivos() {

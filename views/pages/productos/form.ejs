@@ -17,7 +17,7 @@
       <div class="mb-3">
         <label class="form-label">Unidad de medida</label>
         <select name="unidad_medida" class="form-select">
-          <% ['Tonelada','Metro cúbico','Camión','Hora'].forEach(u => { %>
+          <% ['Tonelada','m³','Camión','Hora','Otro'].forEach(u => { %>
             <option value="<%= u %>" <%= (producto?.unidad_medida || 'Tonelada') === u ? 'selected' : '' %>><%= u %></option>
           <% }) %>
         </select>
