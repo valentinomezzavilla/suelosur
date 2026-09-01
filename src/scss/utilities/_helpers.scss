@@ -41,6 +41,10 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 
 // ── Tamaños ────────────────────────────────────────────────────
 .col-w-50  { width: 50px;  }
+.col-w-100 { width: 100px; }
+// En una tabla de ancho automático el navegador reparte el sobrante entre todas las
+// columnas. Poniendo esta en 100% se lo queda ella y el resto respeta su ancho fijo.
+.col-w-resto { width: 100%; }
 .col-w-140 { width: 140px; }
 .col-w-160 { width: 160px; }
 
