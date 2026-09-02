@@ -56,6 +56,34 @@
         });
     });
 
+    // ── Borrado con confirmación ──────────────────────────────
+    const modalBorrar = document.getElementById('modal-borrar-transaccion');
+    const formBorrar  = document.getElementById('formBorrarTransaccion');
+
+    function cerrarModalBorrar() {
+        if (modalBorrar) modalBorrar.style.display = 'none';
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('.btn-borrar-transaccion').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.getElementById('borrar-t-id').textContent = '#' + btn.dataset.codigo;
+            document.getElementById('borrar-t-cliente').textContent = btn.dataset.cliente || '—';
+            document.getElementById('borrar-t-monto').textContent = btn.dataset.monto || '—';
+            // Con operación detrás, el borrado arrastra bastante más que la transacción
+            document.getElementById('borrar-t-alcance').textContent = btn.dataset.tieneOp
+                ? 'Se elimina la transacción y la operación completa, con su remito, sus detalles y sus movimientos.'
+                : 'Se elimina la transacción de forma permanente.';
+            if (formBorrar) formBorrar.action = '/transacciones/' + btn.dataset.id + '/eliminar';
+            if (modalBorrar) modalBorrar.style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+        });
+    });
+
+    document.getElementById('cerrarModalBorrar')?.addEventListener('click', cerrarModalBorrar);
+    document.getElementById('cancelarModalBorrar')?.addEventListener('click', cerrarModalBorrar);
+    modalBorrar?.addEventListener('click', e => { if (e.target === e.currentTarget) cerrarModalBorrar(); });
+
     function cerrarModal() {
         document.getElementById('modal-transaccion').style.display = 'none';
         document.body.style.overflow = '';

@@ -203,3 +203,23 @@
     .tx-row__value { text-align: left; }
   }
 }
+
+// ── Aviso de borrado irreversible ──────────────────────────────
+.tx-alerta-borrado {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border-radius: $radius-lg;
+  background: $danger-soft;
+  border: 1px solid $danger-border;
+  color: $danger-text;
+
+  p {
+    margin-top: 0.2rem;
+    font-size: $fs-sm;
+    line-height: 1.45;
+  }
+
+  .ic { flex-shrink: 0; margin-top: 0.1rem; }
+}

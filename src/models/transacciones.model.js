@@ -1,5 +1,5 @@
 'use strict'
-const { query } = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -35,6 +35,45 @@ const TransaccionesModel = {
     if (!id_op_encabezado) return false
     const r = (await query(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
     return !!r
+  },
+
+  async obtener(id) {
+    return (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
+  },
+
+  // Elimina la transacción y, si tiene una operación detrás, la operación entera con
+  // todo lo que cuelga de ella. Si solo se borrara la transacción, la operación
+  // seguiría contando en el dashboard y en los listados.
+  // El orden importa: ninguna FK está en cascada, así que van primero los hijos.
+  async eliminar(id) {
+    const tx = (await query(`SELECT id, id_op_encabezado FROM transacciones WHERE id = ?`, [id])).rows[0]
+    if (!tx) throw new Error('La transacción no existe.')
+    const idOp = tx.id_op_encabezado
+
+    await transaction(async (q) => {
+      await q(`DELETE FROM transacciones WHERE id = ?`, [id])
+      if (!idOp) return
+
+      // Movimientos de contenedor / maquinaria (cuelgan del detalle, no de la op)
+      await q(`DELETE FROM movimiento_contenedor WHERE id_op_contenedor IN
+               (SELECT id FROM op_detalle_contenedor WHERE id_orden_pedido = ?)`, [idOp])
+      await q(`DELETE FROM movimiento_maquinaria WHERE id_op_maquinaria IN
+               (SELECT id FROM op_detalle_maquinaria WHERE id_orden_pedido = ?)`, [idOp])
+
+      // Un alquiler puede estar encadenado como "próximo" de otro: hay que soltarlo
+      await q(`UPDATE op_detalle_contenedor SET alquiler_siguiente_id = NULL WHERE alquiler_siguiente_id = ?`, [idOp])
+
+      await q(`DELETE FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [idOp])
+      await q(`DELETE FROM op_detalle_maquinaria WHERE id_orden_pedido = ?`, [idOp])
+      await q(`DELETE FROM op_detalle_material   WHERE id_orden_pedido = ?`, [idOp])
+      await q(`DELETE FROM circuito_paradas      WHERE id_op_encabezado = ?`, [idOp])
+      await q(`DELETE FROM historial_kilometraje WHERE id_op = ?`, [idOp])
+      await q(`DELETE FROM rastreo_chofer        WHERE id_op = ?`, [idOp])
+      // Otras transacciones de la misma operación (no debería haber, pero por las dudas)
+      await q(`DELETE FROM transacciones WHERE id_op_encabezado = ?`, [idOp])
+      await q(`DELETE FROM op_encabezado WHERE id = ?`, [idOp])
+    })
+    return { id, id_op_encabezado: idOp }
   },
 
   async listar() {

@@ -53,6 +53,24 @@ const TransaccionesController = {
       console.error(err); req.flash('error', 'Error al cargar transacciones.'); res.redirect('back')
     }
   },
+
+  // Borra la transacción junto con su operación. Es irreversible: la confirmación
+  // se pide en el modal de la vista.
+  async eliminar(req, res) {
+    try {
+      const tx = await TransaccionesModel.obtener(req.params.id)
+      if (!tx) throw new Error('La transacción no existe.')
+      const codigo = TransaccionesModel.codigo(tx)
+      const { id_op_encabezado } = await TransaccionesModel.eliminar(req.params.id)
+      req.flash('success', id_op_encabezado
+        ? `Transacción ${codigo} y su operación eliminadas.`
+        : `Transacción ${codigo} eliminada.`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al eliminar la transacción.')
+    }
+    res.redirect('back')
+  },
 }
 
 module.exports = TransaccionesController

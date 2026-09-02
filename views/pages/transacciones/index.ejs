@@ -139,6 +139,16 @@
                                                 data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
                                                 Ver
                                             </button>
+                                            <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
+                                                <button type="button" class="btn-secondary btn-sm btn-borrar-transaccion"
+                                                    data-id="<%= t.id %>" data-codigo="<%= codigoTx(t) %>"
+                                                    data-cliente="<%= t.cliente %>"
+                                                    data-monto="$<%= t.monto?.toLocaleString('es-AR') %>"
+                                                    data-tiene-op="<%= t.id_op_encabezado ? '1' : '' %>"
+                                                    title="Eliminar">
+                                                    <%- icon('trash', { size: 14 }) %>
+                                                </button>
+                                            <% } %>
                                         </td>
                                     </tr>
                                     <% }) %>
@@ -215,6 +225,46 @@
 
                 <div class="tx-modal__actions">
                     <button type="button" class="btn-secondary" id="cerrarModalTransaccionBtn">Cerrar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confirmación de borrado: la operación no se puede recuperar -->
+        <div id="modal-borrar-transaccion" class="modal-overlay" style="display:none">
+            <div class="modal-box tx-modal">
+                <div class="modal-header">
+                    <div class="tx-modal__heading">
+                        <h2 class="modal-title">Eliminar transacción</h2>
+                        <span id="borrar-t-id" class="tx-modal__id"></span>
+                    </div>
+                    <button type="button" class="modal-close" id="cerrarModalBorrar" aria-label="Cerrar"><%- icon('x', { size: 18 }) %></button>
+                </div>
+
+                <div class="tx-modal__body">
+                    <div class="tx-alerta-borrado">
+                        <%- icon('alert', { size: 20 }) %>
+                        <div>
+                            <strong>Esta acción no se puede deshacer.</strong>
+                            <p class="mb-0" id="borrar-t-alcance"></p>
+                        </div>
+                    </div>
+                    <div class="tx-datos">
+                        <div class="tx-row">
+                            <span class="tx-row__label">Cliente</span>
+                            <span class="tx-row__value" id="borrar-t-cliente"></span>
+                        </div>
+                        <div class="tx-row">
+                            <span class="tx-row__label">Monto</span>
+                            <span class="tx-row__value" id="borrar-t-monto"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tx-modal__actions">
+                    <button type="button" class="btn-secondary" id="cancelarModalBorrar">Cancelar</button>
+                    <form method="POST" id="formBorrarTransaccion" class="d-inline">
+                        <button type="submit" class="btn btn-danger">Sí, eliminar</button>
+                    </form>
                 </div>
             </div>
         </div>
