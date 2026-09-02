@@ -50,9 +50,33 @@ const TransaccionesModel = {
     if (!tx) throw new Error('La transacción no existe.')
     const idOp = tx.id_op_encabezado
 
+    // Estado de la operación: define qué stock hay que devolver
+    const op = idOp
+      ? (await query(`SELECT estado FROM op_encabezado WHERE id = ?`, [idOp])).rows[0]
+      : null
+
     await transaction(async (q) => {
       await q(`DELETE FROM transacciones WHERE id = ?`, [id])
       if (!idOp) return
+
+      // Devolver el stock que la operación había movido, si no la operación
+      // desaparece pero el material sigue descontado.
+      //  · entregada  → ya salió de planta: vuelve a cantidad_actual
+      //  · en curso   → estaba reservado: se libera lo pendiente de entregar
+      //  · anulada    → el stock ya se había liberado al anularla
+      if (op && op.estado !== 'anulado') {
+        const detalles = (await q(
+          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [idOp])).rows
+        for (const d of detalles) {
+          if (op.estado === 'entregado') {
+            await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`,
+              [d.cantidad_pedida, d.id_producto])
+          } else {
+            await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar - ?) WHERE id_producto = ?`,
+              [d.cantidad_pedida, d.id_producto])
+          }
+        }
+      }
 
       // Movimientos de contenedor / maquinaria (cuelgan del detalle, no de la op)
       await q(`DELETE FROM movimiento_contenedor WHERE id_op_contenedor IN
