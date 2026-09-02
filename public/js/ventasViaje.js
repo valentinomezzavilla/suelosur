@@ -16,9 +16,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const hiddenFinalizar = document.getElementById('inputFinalizarAhora');
     const fechaInput     = document.getElementById('fechaViaje');
 
-    // fecha minima: hoy
+    // La fecha es libre: se pueden cargar viajes ya hechos con su fecha real.
+    // Por comodidad arranca en hoy, pero se puede mover hacia atrás o hacia adelante.
     const hoy = new Date().toISOString().split('T')[0];
-    if (fechaInput) fechaInput.min = hoy;
+    if (fechaInput && !fechaInput.value) fechaInput.value = hoy;
 
     // cuando selecciono un cliente, le cargo el telefono y la zona automaticamente
     document.addEventListener('clienteSeleccionado', (e) => {

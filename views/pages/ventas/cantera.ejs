@@ -77,6 +77,12 @@
                 <%- include('../../partials/metodo_pago') %>
 
                 <div class="carrito-seccion">
+                    <label class="form-label" for="fechaCantera">Fecha de la venta</label>
+                    <input type="date" id="fechaCantera" class="form-control">
+                    <small class="text-muted">Se puede cargar una venta de un día anterior: impacta en esa fecha.</small>
+                </div>
+
+                <div class="carrito-seccion">
                     <label class="form-label" for="obsCantera">Observación</label>
                     <textarea id="obsCantera" class="form-control" rows="2" placeholder="Nota opcional de la venta…"></textarea>
                 </div>
@@ -101,4 +107,5 @@
         <input type="hidden" name="metodoPago" id="formMetodoPago">
         <input type="hidden" name="precioTotal" id="formPrecioTotal">
         <input type="hidden" name="observaciones" id="formObservaciones">
+        <input type="hidden" name="fecha" id="formFecha">
     </form>

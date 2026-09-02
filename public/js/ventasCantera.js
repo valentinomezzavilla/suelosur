@@ -176,9 +176,15 @@ document.addEventListener('DOMContentLoaded', () => {
         formPrecioTotal.value = checkPrecio.checked ? inputPrecio.value : calcularTotal();
         const formObs = document.getElementById('formObservaciones');
         if (formObs) formObs.value = document.getElementById('obsCantera')?.value?.trim() || '';
+        const formFecha = document.getElementById('formFecha');
+        if (formFecha) formFecha.value = document.getElementById('fechaCantera')?.value || '';
 
         document.getElementById('formCantera').submit();
     });
+
+    // La fecha arranca en hoy pero se puede mover hacia atrás para cargar ventas viejas
+    const fechaCantera = document.getElementById('fechaCantera');
+    if (fechaCantera && !fechaCantera.value) fechaCantera.value = new Date().toISOString().slice(0, 10);
 
     renderCarrito();
 });

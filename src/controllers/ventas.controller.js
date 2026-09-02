@@ -7,6 +7,16 @@ const AsignacionesModel = require('../models/asignaciones.model')
 const { query }         = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 
+// Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
+// carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
+// hoy o futura (un viaje programado) la emisión sigue siendo hoy.
+function fechaRetroactiva(fecha) {
+  if (!fecha) return null
+  const f = String(fecha).slice(0, 10)
+  const hoy = new Date().toISOString().slice(0, 10)
+  return f < hoy ? f : null
+}
+
 const VentasController = {
 
   async index(req, res) {
@@ -54,7 +64,8 @@ const VentasController = {
 
   async finalizarCantera(req, res) {
     try {
-      const { clienteId, clienteNombre, items, metodoPago, precioTotal } = req.body
+      const { clienteId, clienteNombre, items, metodoPago, precioTotal, fecha } = req.body
+      const fechaRetro = fechaRetroactiva(fecha)
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       let carrito = []
       try { carrito = JSON.parse(items || '[]') } catch (_) {}
@@ -80,6 +91,7 @@ const VentasController = {
         metodo_pago:         metodoPago || 'efectivo',
         observaciones:       desc,
         detalles,
+        fecha_emision:       fechaRetro,
       })
 
       await VentasModel.entregar(id_op)
@@ -93,6 +105,7 @@ const VentasController = {
         monto:           total,
         descripcion:     desc,
         metodo_pago:     metodoPago || 'efectivo',
+        fecha:           fechaRetro,
       })
 
       if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
@@ -208,6 +221,7 @@ const VentasController = {
         metodo_pago:         metodoPago || 'efectivo',
         observaciones:       descripcion || '',
         fecha_entrega_planificada: fecha || null,
+        fecha_emision:       fechaRetroactiva(fecha),
         hora_planificada:    hora || null,
         zona:                zona || null,
         obra:                obra || null,
@@ -245,6 +259,7 @@ const VentasController = {
           monto:           total,
           descripcion:     `Viaje a ${direccion}`,
           metodo_pago:     metodoPago || 'efectivo',
+          fecha:           fechaRetroactiva(fecha),
         })
         if (metodoPago === 'cuenta_corriente' && clienteId) {
           await ClientesModel.agregarMovimiento(clienteId, {
