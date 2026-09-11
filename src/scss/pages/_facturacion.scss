@@ -210,3 +210,22 @@
 }
 
 .fact-estado .card-body { padding: 0.85rem 1.1rem; }
+
+// ── Configuración de facturación ──
+.cfg-mono {
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.cfg-ayuda code {
+  display: block;
+  margin: 0.35rem 0;
+  padding: 0.45rem 0.6rem;
+  background: $bg-card-alt;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  color: $ink;
+  font-size: 0.72rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
