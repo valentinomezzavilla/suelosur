@@ -3,13 +3,18 @@
 
 // ── Tabla base (cabecera clara, moderna) ───────────────────────
 .table {
+  --bs-table-border-color: #{$border-line};
+  --bs-table-hover-bg:     #{$bg-hover};
+  --bs-table-striped-bg:   #{$bg-card-alt};
+  margin-bottom: 0;
+
   thead th {
     background: $bg-card-alt;
     color: $muted;
     font-weight: 600;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.06em;
     border: none;
     border-bottom: 1px solid $border;
     padding: 0.7rem 1rem;
@@ -17,15 +22,24 @@
   }
   tbody td {
     border-color: $border-line;
-    padding: 0.7rem 1rem;
+    padding: 0.72rem 1rem;
     font-size: $fs-sm;
+    color: $dark;
     vertical-align: middle;
   }
   tbody tr {
-    transition: background 0.1s;
-    &:hover { background: $accent-soft; }
+    transition: background $dur-fast $ease;
+    &:hover { background: $bg-hover; }
   }
-  tfoot tr.total-row { background: $accent-soft; }
+  tbody tr:last-child td { border-bottom: none; }
+  tfoot tr.total-row { background: $accent-soft; font-weight: 700; }
+}
+
+// Bootstrap .table-light en cabeceras: mismo tono que el resto
+.table-light {
+  --bs-table-bg: #{$bg-card-alt};
+  --bs-table-color: #{$muted};
+  --bs-table-border-color: #{$border};
 }
 
 // ── Tabla "modern" (la que viene reemplazándola) ───────────────
@@ -39,23 +53,23 @@
     background: $bg-card-alt;
     color: $muted;
     font-weight: 600;
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    padding: 0.65rem 1rem;
-    border-bottom: 1px solid $border-soft;
+    letter-spacing: 0.06em;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid $border;
     text-align: left;
   }
 
   tbody td {
-    padding: 0.55rem 1rem;
+    padding: 0.6rem 1rem;
     border-bottom: 1px solid $border-line;
     font-size: $fs-sm;
     vertical-align: middle;
   }
 
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover         { background: #f9fafb; }
+  tbody tr:hover         { background: $bg-hover; }
 
   .form-control,
   .form-select { font-size: $fs-sm; }
@@ -67,7 +81,7 @@
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.12s;
+  transition: color $dur-fast;
 
   &:hover    { color: $accent; }
   &.is-active { color: $accent; font-weight: 700; }

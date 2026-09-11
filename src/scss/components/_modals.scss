@@ -9,8 +9,17 @@
 }
 
 .modal-content {
-  border-radius: $radius-lg;
+  border-radius: $radius-xl;
   border: 1px solid $border;
+  box-shadow: $shadow-lg;
+  overflow: hidden;
+}
+
+.modal-backdrop.show { opacity: 0.55; }
+
+.modal-footer {
+  background: $bg-card-alt;
+  border-top-color: $border-soft;
 }
 
 // En mobile dejamos el modal full-width

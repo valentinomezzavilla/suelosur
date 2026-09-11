@@ -4,88 +4,103 @@
 
 // ── Paleta de marca Suelosur ───────────────────────────────────
 $accent:        #1c5bad;  // azul corporativo (logo)
-$accent-dark:   #154a8e;
-$accent-soft:   #e9f1fb;
+$accent-dark:   #164a8f;
+$accent-soft:   #eaf1fb;
 
-// Naranja del logo (acento primario visual — UI principal)
+// Naranja del logo (acento de marca: indicadores, detalles)
 $orange:      #e8912a;
 $orange-dark: #c97520;
-$orange-soft: #fff3e8;
+$orange-soft: #fff4e8;
 
 // Amarillo / dorado (compat — preferir $orange en código nuevo)
 $brand-yellow:      #f5b301;
 $brand-yellow-dark: #d99a00;
 $brand-yellow-soft: #fff6e0;
 
-// ── Neutros ────────────────────────────────────────────────────
-$dark:          #1e2535;
-$dark-2:        #2e3650;
-$ink:           #111827;
-$ink-soft:      #374151;
-$muted:         #6b7280;
-$muted-soft:    #888;
-$muted-light:   #bbb;
+// ── Neutros (escala slate) ─────────────────────────────────────
+$dark:          #1e293b;
+$dark-2:        #2e3a52;
+$ink:           #0f172a;
+$ink-soft:      #334155;
+$muted:         #64748b;
+$muted-soft:    #748196;
+$muted-light:   #b4bfcd;
 
-$border:        #e4e9f2;
-$border-soft:   #eef1f6;
-$border-line:   #f3f4f7;
+$border:        #e2e8f0;
+$border-soft:   #edf1f6;
+$border-line:   #f1f4f8;
+// Bordes de controles de formulario: más marcados para que se distingan del fondo
+$border-input:       #cbd5e1;
+$border-input-hover: #a9b6c7;
 
-$bg-app:        #f4f6f9;
+$bg-app:        #f4f6fa;
 $bg-card:       #ffffff;
-$bg-card-alt:   #f8fafb;
+$bg-card-alt:   #f8fafc;
+$bg-hover:      #f5f8fd;
 
-$sidebar-bg:    #0d1b35;  // azul marino corporativo (logo login)
-$sidebar-border:rgba(255, 255, 255, 0.06);
-$sidebar-text:  rgba(255, 255, 255, 0.72);
-$sidebar-muted: rgba(255, 255, 255, 0.32);
+$sidebar-bg:     #0b1a33;  // azul marino corporativo (logo login)
+$sidebar-bg-2:   #0f2242;
+$sidebar-border: rgba(255, 255, 255, 0.07);
+$sidebar-text:   rgba(255, 255, 255, 0.74);
+$sidebar-muted:  rgba(255, 255, 255, 0.4);
+$sidebar-hover:  rgba(255, 255, 255, 0.06);
+$sidebar-active: rgba(255, 255, 255, 0.1);
 
 // ── Estados ────────────────────────────────────────────────────
-$success:       #27ae60;
-$success-soft:  #ecfdf5;
-$success-border:#a7f3d0;
-$success-text:  #065f46;
+$success:       #1a8f4c;
+$success-soft:  #ecf8f1;
+$success-border:#b9e5cb;
+$success-text:  #14532d;
 
-$warning:       #f39c12;
-$warning-soft:  #fffbeb;
-$warning-border:#fde68a;
-$warning-text:  #92400e;
+$warning:       #e08a0b;
+$warning-soft:  #fff8eb;
+$warning-border:#f8dfa6;
+$warning-text:  #8a4b06;
 
-$danger:        #e74c3c;
-$danger-soft:   #fef2f2;
-$danger-border: #fecaca;
-$danger-text:   #991b1b;
+$danger:        #dc3a2f;
+$danger-soft:   #fdf1f0;
+$danger-border: #f6c6c1;
+$danger-text:   #962218;
 
-$info:          #2980b9;
+$info:          #1f73b7;
+$info-soft:     #e9f3fb;
+$info-border:   #bcd8f0;
+$info-text:     #174e7d;
 
 // ── Espaciado / radios ─────────────────────────────────────────
 $radius-sm: 6px;
 $radius-md: 8px;
-$radius-lg: 10px;
-$radius-xl: 14px;
+$radius-lg: 12px;
+$radius-xl: 16px;
 
 // ── Altura uniforme de controles (inputs, selects, botones) ────
 $control-h:    40px;
 $control-h-sm: 32px;
 
 // ── Sombras (sistema de elevación) ─────────────────────────────
-$shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
-$shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
-$shadow-md: 0 4px 14px rgba(16, 24, 40, 0.08);
-$shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.12);
+$shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+$shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07), 0 1px 2px rgba(15, 23, 42, 0.04);
+$shadow-md: 0 6px 16px -4px rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.04);
+$shadow-lg: 0 18px 40px -10px rgba(15, 23, 42, 0.2);
 
 // ── Focus ring ─────────────────────────────────────────────────
-$focus-ring: 0 0 0 3px rgba(28, 91, 173, 0.2);
+$focus-ring: 0 0 0 3px rgba(28, 91, 173, 0.22);
+
+// ── Movimiento ─────────────────────────────────────────────────
+$ease:     cubic-bezier(0.2, 0, 0, 1);
+$dur-fast: 0.15s;
+$dur:      0.2s;
 
 // ── Layout ─────────────────────────────────────────────────────
-$sidebar-w:        240px;
-$sidebar-w-mobile: 280px;
+$sidebar-w:        248px;
+$sidebar-w-mobile: 284px;
 $navbar-h:         60px;
 $content-pad:      1.75rem;
 $content-pad-mob:  1rem;
 
 // ── Tipografía ─────────────────────────────────────────────────
-$font-base:   "Segoe UI", system-ui, -apple-system, sans-serif;
-$fs-base:     0.95rem;
+$font-base:   "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+$fs-base:     0.9375rem;
 $fs-sm:       0.85rem;
 $fs-xs:       0.75rem;
 $fs-xxs:      0.68rem;

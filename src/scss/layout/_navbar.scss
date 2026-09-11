@@ -2,9 +2,14 @@
 @use '../abstracts/mixins'    as *;
 
 .app-navbar {
-  background: #fff;
-  border-bottom: 2px solid $orange;
-  padding: 0.9rem 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: rgba(255, 255, 255, 0.88);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid $border;
+  padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -12,22 +17,42 @@
   min-height: $navbar-h;
 
   @include md-down {
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
   }
 
   .nav-title {
-    color: $dark;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    color: $ink;
     margin: 0;
-    font-weight: 600;
-    font-size: 1.05rem;
-    letter-spacing: -0.2px;
+    font-weight: 700;
+    font-size: 1.02rem;
+    letter-spacing: -0.015em;
+    min-width: 0;
     @include truncate;
+
+    // Detalle de marca: barra naranja junto al título
+    &::before {
+      content: '';
+      flex-shrink: 0;
+      width: 4px;
+      height: 18px;
+      border-radius: 4px;
+      background: linear-gradient(180deg, $orange 0%, $orange-dark 100%);
+    }
   }
 
   .nav-date {
-    color: $muted;
-    font-size: 0.78rem;
+    color: $ink-soft;
+    font-size: 0.76rem;
+    font-weight: 500;
     text-transform: capitalize;
+    background: $bg-app;
+    border: 1px solid $border;
+    border-radius: 999px;
+    padding: 0.3rem 0.8rem;
+    white-space: nowrap;
 
     @include sm-down { display: none; }
   }
@@ -36,18 +61,21 @@
 // ── Botón hamburguesa (visible solo en mobile) ─────────────────
 .navbar-toggle {
   @include reset-button;
-  display: none;
-  width: 36px;
-  height: 36px;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
   border-radius: $radius-md;
   align-items: center;
   justify-content: center;
-  color: $dark;
-  transition: background 0.12s;
+  color: $ink;
+  border: 1px solid $border;
+  background: #fff;
+  transition: background $dur-fast $ease, border-color $dur-fast $ease;
 
-  &:hover { background: $bg-app; }
+  &:hover { background: $bg-app; border-color: $border-input; }
 
   @include md-down { display: inline-flex; }
 
-  svg { width: 22px; height: 22px; }
+  svg { width: 20px; height: 20px; }
 }

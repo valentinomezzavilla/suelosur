@@ -2,12 +2,14 @@
 
 .alert {
   border: 1px solid transparent;
-  border-radius: $radius-md;
+  border-radius: $radius-lg;
   font-size: $fs-sm;
-  padding: 0.7rem 1rem;
+  font-weight: 500;
+  padding: 0.75rem 1rem;
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  box-shadow: $shadow-xs;
 
   .alert-dot {
     width: 8px;
@@ -20,20 +22,26 @@
     background: $success-soft;
     border-color: $success-border;
     color: $success-text;
-    .alert-dot { background: #10b981; }
+    .alert-dot { background: $success; box-shadow: 0 0 0 3px rgba(26, 143, 76, 0.18); }
   }
 
   &.alert-danger {
     background: $danger-soft;
     border-color: $danger-border;
     color: $danger-text;
-    .alert-dot { background: $danger; }
+    .alert-dot { background: $danger; box-shadow: 0 0 0 3px rgba(220, 58, 47, 0.18); }
   }
 
   &.alert-warning {
     background: $warning-soft;
     border-color: $warning-border;
     color: $warning-text;
-    .alert-dot { background: $warning; }
+    .alert-dot { background: $warning; box-shadow: 0 0 0 3px rgba(224, 138, 11, 0.2); }
+  }
+
+  &.alert-info {
+    background: $info-soft;
+    border-color: $info-border;
+    color: $info-text;
   }
 }

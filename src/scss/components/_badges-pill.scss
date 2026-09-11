@@ -5,11 +5,11 @@
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.2em 0.55em;
+  padding: 0.3em 0.62em;
   font-size: 0.7rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.03em;
   border-radius: 999px;
   border: 1px solid transparent;
   text-transform: uppercase;
@@ -17,34 +17,34 @@
 
   &--con-stock,
   &--disponible {
-    background: #eafaf1;
-    color: #1e8449;
-    border-color: #58d68d;
+    background: $success-soft;
+    color: $success-text;
+    border-color: $success-border;
   }
 
   &--sin-stock {
-    background: #fdf0ef;
-    color: #922b21;
-    border-color: $danger;
+    background: $danger-soft;
+    color: $danger-text;
+    border-color: $danger-border;
   }
 
   &--alquilado,
   &--pendiente {
-    background: #fef9e7;
-    color: #b7770d;
-    border-color: #f9ca24;
+    background: $warning-soft;
+    color: $warning-text;
+    border-color: $warning-border;
   }
 
   &--en-transito,
   &--despachado {
-    background: #eaf4fb;
-    color: #1a5276;
-    border-color: #3498db;
+    background: $info-soft;
+    color: $info-text;
+    border-color: $info-border;
   }
 
   &--anulado {
-    background: #f3f4f6;
-    color: #6b7280;
-    border-color: #9ca3af;
+    background: #f1f5f9;
+    color: $muted;
+    border-color: $border-input;
   }
 }

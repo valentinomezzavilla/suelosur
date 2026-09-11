@@ -1,6 +1,41 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// Controles Bootstrap: borde visible, radio y hover consistentes
+.form-control,
+.form-select {
+  border-color: $border-input;
+  border-radius: $radius-md;
+  color: $ink;
+  box-shadow: $shadow-xs;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  &:hover:not(:focus):not(:disabled):not([readonly]) { border-color: $border-input-hover; }
+  &::placeholder { color: #94a3b8; }
+  &:disabled { background-color: $bg-card-alt; }
+}
+
+.form-control-sm,
+.form-select-sm { border-radius: 7px; }
+
+.input-group-text {
+  background: $bg-card-alt;
+  border-color: $border-input;
+  color: $muted;
+}
+
+.form-check-input {
+  border-color: $border-input-hover;
+
+  &:checked {
+    background-color: $accent;
+    border-color: $accent;
+  }
+  &:focus { box-shadow: $focus-ring; border-color: $accent; }
+}
+
+.form-text { color: $muted; }
+
 // Wrapper para inputs de contraseña con botón ver/ocultar
 .pwd-input-wrap {
   position: relative;
@@ -18,19 +53,21 @@
   font-size: 1.1rem;
   line-height: 1;
   color: $muted;
-  &:hover { color: $dark; }
+  &:hover { color: $ink; }
 }
 
 .form-control:focus,
 .form-select:focus {
   border-color: $accent;
-  box-shadow: 0 0 0 0.2rem rgba(28, 91, 173, 0.18);
+  box-shadow: $focus-ring;
 }
 
 .form-label {
   font-weight: 600;
-  font-size: $fs-sm;
-  color: #555;
+  font-size: 0.8rem;
+  color: $ink-soft;
+  margin-bottom: 0.35rem;
+  letter-spacing: 0.01em;
 }
 
 // ── Selección de modalidad (radio styled) ──────────────────────
@@ -44,24 +81,26 @@
 
 .modalidad-option {
   display: block;
-  border: 1px solid #d1d5db;
-  border-radius: $radius-md;
+  border: 1px solid $border-input;
+  border-radius: $radius-lg;
   padding: 0.85rem 1rem;
   cursor: pointer;
-  transition: border-color 0.12s, background 0.12s;
+  background: #fff;
+  transition: border-color $dur-fast $ease, background $dur-fast $ease, box-shadow $dur-fast $ease;
   margin: 0;
 
-  &:hover { border-color: #9ca3af; background: $bg-card-alt; }
+  &:hover { border-color: $border-input-hover; background: $bg-card-alt; }
 
   input[type=radio] { display: none; }
 
   input[type=radio]:checked + .modalidad-label .modalidad-title {
-    color: $accent;
+    color: $accent-dark;
   }
 
   &:has(input[type=radio]:checked) {
     border-color: $accent;
     background: $accent-soft;
+    box-shadow: inset 0 0 0 1px $accent;
   }
 }
 
@@ -74,7 +113,7 @@
 .modalidad-title {
   font-weight: 600;
   font-size: 0.9rem;
-  color: $dark;
+  color: $ink;
 }
 
 .modalidad-sub {
@@ -93,28 +132,30 @@
 
 .pago-option {
   display: block;
-  border: 1px solid #d1d5db;
+  border: 1px solid $border-input;
   border-radius: $radius-md;
   padding: 0.65rem 0.9rem;
   cursor: pointer;
   text-align: center;
-  transition: border-color 0.12s, background 0.12s;
+  background: #fff;
+  transition: border-color $dur-fast $ease, background $dur-fast $ease, box-shadow $dur-fast $ease;
   margin: 0;
 
   input[type=radio] { display: none; }
 
-  &:hover { border-color: #9ca3af; background: $bg-card-alt; }
+  &:hover { border-color: $border-input-hover; background: $bg-card-alt; }
 
   &:has(input[type=radio]:checked) {
     border-color: $accent;
     background: $accent-soft;
+    box-shadow: inset 0 0 0 1px $accent;
 
-    .pago-label { color: $accent; font-weight: 600; }
+    .pago-label { color: $accent-dark; font-weight: 600; }
   }
 }
 
 .pago-label {
   font-size: $fs-sm;
   font-weight: 500;
-  color: $dark;
+  color: $ink;
 }

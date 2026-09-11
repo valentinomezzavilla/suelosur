@@ -1,50 +1,72 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// Tarjetas Bootstrap: borde suave, radio mayor y elevación mínima
 .card {
+  --bs-card-border-color:  #{$border};
+  --bs-card-border-radius: #{$radius-lg};
+  --bs-card-inner-border-radius: #{$radius-lg - 1px};
+  --bs-card-cap-bg:        #{$bg-card};
+  --bs-card-cap-padding-y: 0.8rem;
+  --bs-card-cap-padding-x: 1.1rem;
+  --bs-card-spacer-x:      1.1rem;
   border: 1px solid $border;
   border-radius: $radius-lg;
+  box-shadow: $shadow-xs;
+}
+
+.card-header {
+  font-weight: 600;
+  color: $ink;
+  border-bottom-color: $border-soft;
+}
+
+.card-footer {
+  background: $bg-card-alt;
+  border-top-color: $border-soft;
 }
 
 .card-header-light {
   background: $bg-card-alt;
   border-bottom: 1px solid $border-soft;
-  padding: 0.5rem 1rem;
+  padding: 0.6rem 1.1rem;
   font-size: 0.82rem;
   font-weight: 600;
+  color: $ink;
 }
 
 .card-header-orange {
   background: $accent-soft;
-  color: $accent;
-  border-bottom: 1px solid $accent-soft;
-  padding: 0.5rem 1rem;
+  color: $accent-dark;
+  border-bottom: 1px solid rgba(28, 91, 173, 0.12);
+  padding: 0.6rem 1.1rem;
   font-size: 0.82rem;
   font-weight: 600;
 }
 
-.card-accent-orange { border-left: 4px solid $orange; }
-.card-accent-green  { border-left: 4px solid $success; }
-.card-accent-blue   { border-left: 4px solid $info; }
+.card-accent-orange { border-left: 3px solid $orange; }
+.card-accent-green  { border-left: 3px solid $success; }
+.card-accent-blue   { border-left: 3px solid $info; }
 
 .card-modern {
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-lg;
+  box-shadow: $shadow-xs;
   overflow: hidden;
 }
 
 .card-modern-header {
   padding: 0.85rem 1.15rem;
   border-bottom: 1px solid $border-soft;
-  background: $bg-card-alt;
+  background: $bg-card;
 }
 
 .card-modern-title {
-  font-weight: 600;
-  font-size: 0.82rem;
-  color: $dark;
-  letter-spacing: 0.1px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: $ink-soft;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -85,64 +107,68 @@
   padding: 1rem 1.1rem;
   text-decoration: none;
   overflow: hidden;
-  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+  box-shadow: $shadow-xs;
+  transition: transform $dur $ease, box-shadow $dur $ease, border-color $dur $ease;
 
-  // Barra de acento a la izquierda
+  // Barra de acento superior
   &::before {
     content: '';
     position: absolute;
     left: 0;
+    right: 0;
     top: 0;
-    bottom: 0;
-    width: 4px;
+    height: 3px;
     background: var(--stat-color);
+    opacity: 0.85;
   }
 
   &:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(16, 24, 40, 0.08);
-    border-color: var(--stat-color);
+    box-shadow: $shadow-md;
+    border-color: color-mix(in srgb, var(--stat-color) 45%, #{$border});
   }
 
   &__icon {
     flex-shrink: 0;
-    width: 46px;
-    height: 46px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.4rem;
-    border-radius: 50%;
+    font-size: 1.35rem;
+    border-radius: $radius-lg;
     background: var(--stat-soft);
+    color: var(--stat-color);
     line-height: 1;
   }
 
   &__body {
     display: flex;
     flex-direction: column;
-    gap: 0.1rem;
+    gap: 0.2rem;
     min-width: 0;
   }
 
   &__value {
-    font-size: 1.7rem;
+    font-size: 1.65rem;
     font-weight: 700;
     line-height: 1;
-    color: $dark;
+    letter-spacing: -0.02em;
+    color: $ink;
   }
 
   &__label {
     font-size: $fs-xs;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
     color: var(--stat-color);
   }
 
   // Tonos por estado
   &--neutral { --stat-color: #{$accent};  --stat-soft: #{$accent-soft}; }
   &--warning { --stat-color: #{$warning}; --stat-soft: #{$warning-soft}; }
-  &--info    { --stat-color: #{$info};    --stat-soft: #eaf4fb; }
+  &--info    { --stat-color: #{$info};    --stat-soft: #{$info-soft}; }
   &--success { --stat-color: #{$success}; --stat-soft: #{$success-soft}; }
   &--danger  { --stat-color: #{$danger};  --stat-soft: #{$danger-soft}; }
 
@@ -150,7 +176,7 @@
   &--active {
     border-color: var(--stat-color);
     background: var(--stat-soft);
-    box-shadow: inset 0 0 0 1px var(--stat-color);
+    box-shadow: inset 0 0 0 1px var(--stat-color), $shadow-xs;
 
     .stat-card__value { color: var(--stat-color); }
   }
@@ -158,22 +184,22 @@
 
 .kpi-card        { border-radius: $radius-lg; }
 .placeholder-card{ border-radius: $radius-lg; }
-.resumen-card    { border: 1px solid $accent-soft; }
-.box-credenciales{ background: $bg-app; border: 1px dashed #ddd; }
+.resumen-card    { border: 1px solid $border; }
+.box-credenciales{ background: $bg-app; border: 1px dashed $border-input; border-radius: $radius-md; }
 
 .page-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 1.1rem;
   flex-wrap: wrap;
 }
 
 .page-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: $dark;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: $ink;
   margin: 0;
-  letter-spacing: -0.3px;
+  letter-spacing: -0.02em;
 }

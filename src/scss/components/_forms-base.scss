@@ -6,16 +6,17 @@
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-lg;
-  padding: 1.15rem 1.25rem;
+  padding: 1.2rem 1.3rem;
   margin-bottom: 1rem;
+  box-shadow: $shadow-xs;
 
   &__title {
-    font-size: 0.85rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    color: $dark;
+    color: $ink-soft;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    margin: 0 0 0.85rem;
+    letter-spacing: 0.07em;
+    margin: 0 0 0.9rem;
   }
 
   @include md-down {
@@ -27,15 +28,15 @@
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.9rem;
 
   &:last-child { margin-bottom: 0; }
 
   label {
-    font-size: $fs-xs;
+    font-size: 0.78rem;
     font-weight: 600;
     color: $ink-soft;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.01em;
   }
 
   input:not([type="radio"]):not([type="checkbox"]),
@@ -43,14 +44,17 @@
   textarea {
     width: 100%;
     min-height: $control-h;
-    border: 1px solid $border;
+    border: 1px solid $border-input;
     border-radius: $radius-md;
     padding: 0 0.75rem;
     font-size: $fs-sm;
     background: #fff;
-    color: $dark;
+    color: $ink;
     font-family: inherit;
-    transition: border-color 0.12s, box-shadow 0.12s;
+    box-shadow: $shadow-xs;
+    transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+    &:hover:not(:focus):not(:disabled):not([readonly]) { border-color: $border-input-hover; }
 
     &:focus {
       outline: none;
@@ -58,7 +62,9 @@
       box-shadow: $focus-ring;
     }
 
-    &::placeholder { color: #9ca3af; }
+    &:disabled { background: $bg-card-alt; color: $muted; }
+
+    &::placeholder { color: #94a3b8; }
   }
 
   // Radios / checkboxes: tamaño nativo, nunca estirados
@@ -111,10 +117,10 @@
 .form-group--action {
   align-self: end;
   justify-content: flex-end;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.9rem;
 }
 
-// Botón "Buscar en mapa" — misma altura que los inputs hermanos, contorno teal visible
+// Botón "Buscar en mapa" — misma altura que los inputs hermanos, contorno de marca
 .btn-buscar-mapa {
   align-self: stretch;
   width: 100%;
@@ -125,6 +131,7 @@
   background: #fff;
   color: $accent;
   border: 1.5px solid $accent;
+  border-radius: $radius-md;
 
   &:hover {
     background: $accent;
@@ -166,20 +173,21 @@
 .input-sm {
   width: 100%;
   min-height: $control-h-sm;
-  border: 1px solid $border;
+  border: 1px solid $border-input;
   border-radius: $radius-md;
   padding: 0 0.6rem;
   font-size: $fs-sm;
   background: #fff;
-  color: $dark;
-  transition: border-color 0.12s, box-shadow 0.12s;
+  color: $ink;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
 
+  &:hover:not(:focus) { border-color: $border-input-hover; }
   &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
 }
 
 .input-readonly {
-  background: $bg-app !important;
-  color: $dark;
+  background: $bg-card-alt !important;
+  color: $ink;
   font-weight: 600;
   cursor: default;
 }
@@ -212,24 +220,26 @@
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid $border;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid $border-input;
   border-radius: $radius-md;
   cursor: pointer;
   margin: 0 0 0.5rem;
   font-size: $fs-sm;
-  color: $dark;
-  transition: border-color 0.12s, background 0.12s;
+  color: $ink;
+  background: #fff;
+  transition: border-color $dur-fast $ease, background $dur-fast $ease, box-shadow $dur-fast $ease;
 
-  &:hover { border-color: #9ca3af; background: $bg-card-alt; }
+  &:hover { border-color: $border-input-hover; background: $bg-card-alt; }
 
   input[type=radio] { accent-color: $accent; }
 
   &:has(input[type=radio]:checked) {
     border-color: $accent;
     background: $accent-soft;
-    color: $accent;
+    color: $accent-dark;
     font-weight: 600;
+    box-shadow: inset 0 0 0 1px $accent;
   }
 }
 

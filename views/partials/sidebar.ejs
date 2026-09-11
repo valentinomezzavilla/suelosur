@@ -29,7 +29,7 @@
   const alertaBadge = () => _ar && _ar.total ? `<span class="badge rounded-pill ms-auto ${_urgentes>0?'badge-alerta':'badge-pendiente'}" style="font-size:0.65rem">${_ar.total}</span>` : ''
 %>
 
-<nav class="app-sidebar">
+<nav class="app-sidebar" id="appSidebar">
   <div class="sidebar-brand">
     <a href="/dashboard" class="brand-logo-link" aria-label="Ir al dashboard">
       <div class="brand-logo-wrap">
@@ -135,7 +135,7 @@
       <a href="/alertas" class="nav-link <%= t==='Centro de Alertas'?'is-active':'' %>">
         <%- ic('list') %><span>Alertas</span><%- alertaBadge() %>
       </a>
-      <a href="/facturacion" class="nav-link">
+      <a href="/facturacion" class="nav-link <%= t==='Facturación'?'is-active':'' %>">
         <%- ic('receipt') %><span>Facturación</span>
       </a>
     </div>

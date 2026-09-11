@@ -7,15 +7,67 @@
   --dark:        #{$dark};
   --mid:         #{$dark-2};
   --sidebar-w:   #{$sidebar-w};
+
+  // Bootstrap: alinear sus componentes a los tokens de Suelosur.
+  // (No se toca --bs-body-bg: las celdas de tabla lo usan como fondo.)
+  --bs-body-font-family: #{$font-base};
+  --bs-body-color:       #{$dark};
+  --bs-emphasis-color:   #{$ink};
+  --bs-heading-color:    #{$ink};
+  --bs-secondary-color:  #{$muted};
+  --bs-border-color:     #{$border};
+  --bs-border-radius:    #{$radius-md};
+  --bs-border-radius-sm: #{$radius-sm};
+  --bs-border-radius-lg: #{$radius-lg};
+  --bs-border-radius-xl: #{$radius-xl};
+  --bs-link-color:       #{$accent};
+  --bs-link-color-rgb:   28, 91, 173;
+  --bs-link-hover-color: #{$accent-dark};
+  --bs-link-hover-color-rgb: 22, 74, 143;
+  --bs-primary:          #{$accent};
+  --bs-primary-rgb:      28, 91, 173;
+  --bs-box-shadow-sm:    #{$shadow-sm};
+  --bs-box-shadow:       #{$shadow-md};
+  --bs-box-shadow-lg:    #{$shadow-lg};
+  --bs-focus-ring-color: rgba(28, 91, 173, 0.22);
 }
 
 body {
   font-family: $font-base;
   font-size:   $fs-base;
+  line-height: 1.55;
   color:       $dark;
   background:  $bg-app;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: $ink;
+  letter-spacing: -0.015em;
+}
+
+// Títulos de página (h4 al inicio de cada vista)
+.main-content h4.fw-bold,
+.main-content h4.fw-semibold {
+  font-size: 1.35rem;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em;
+
+  .ic { color: $accent; }
+}
+
+// Números alineados en columnas de dinero / métricas
+.table,
+.table-modern,
+.data-table,
+.stat-card__value,
+.total-display,
+.transaccion-monto,
+.rs-total-value,
+.input-total {
+  font-variant-numeric: tabular-nums;
 }
 
 // Foco accesible y consistente en controles Bootstrap (filtros, modales)
@@ -25,6 +77,44 @@ body {
   box-shadow: $focus-ring;
 }
 
+// Foco visible por teclado en links y botones (no aparece al hacer clic)
+a:focus-visible,
+button:focus-visible,
+.btn:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid $accent;
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+::selection { background: rgba(28, 91, 173, 0.18); }
+
 // Botones Bootstrap usados en cabeceras: misma altura/peso que el resto
-.btn { font-weight: 600; }
-.btn-sm { font-weight: 600; }
+.btn {
+  --bs-btn-font-weight: 600;
+  --bs-btn-border-radius: #{$radius-md};
+  --bs-btn-focus-box-shadow: #{$focus-ring};
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  transition: color $dur-fast $ease, background-color $dur-fast $ease,
+              border-color $dur-fast $ease, box-shadow $dur-fast $ease, transform 0.06s;
+
+  &:active { transform: translateY(1px); }
+}
+.btn-sm {
+  --bs-btn-border-radius: 7px;
+  font-weight: 600;
+}
+
+// Respeta "reducir movimiento" del sistema operativo
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .modal-box,
+  .stat-card:hover,
+  .module-card:hover { animation: none !important; transform: none !important; }
+}

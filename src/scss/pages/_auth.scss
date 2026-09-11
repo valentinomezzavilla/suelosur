@@ -3,7 +3,10 @@
 
 .auth-body {
   min-height: 100vh;
-  background: #0d1b35;
+  background:
+    radial-gradient(900px 520px at 12% -8%, rgba(28, 91, 173, 0.42), transparent 62%),
+    radial-gradient(760px 460px at 105% 108%, rgba(232, 145, 42, 0.2), transparent 60%),
+    $sidebar-bg;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -12,38 +15,65 @@
 
 // ── Card principal ─────────────────────────────────────────────
 .login-card {
+  position: relative;
   background: #fff;
   border-radius: 20px;
   width: 100%;
   max-width: 420px;
-  padding: 2.75rem 2.25rem 2rem;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
+  padding: 2.6rem 2.25rem 2rem;
+  box-shadow: 0 30px 70px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
   text-align: center;
+  overflow: hidden;
+
+  // Franja superior con los colores del logo
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, $orange 0%, $orange 35%, $accent 65%, $accent 100%);
+  }
+
+  @include sm-down {
+    padding: 2.2rem 1.4rem 1.6rem;
+    border-radius: 16px;
+  }
 }
 
 // ── Logo ───────────────────────────────────────────────────────
 .login-logo-wrap {
-  margin-bottom: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: $bg-card-alt;
+  border: 1px solid $border;
+  margin-bottom: 1.2rem;
 }
 
 .login-logo {
-  width: 58px;
-  height: 58px;
+  width: 46px;
+  height: 46px;
   object-fit: contain;
 }
 
 // ── Textos de cabecera ─────────────────────────────────────────
 .login-title {
-  font-size: 1.55rem;
+  font-size: 1.5rem;
   font-weight: 700;
-  color: $dark;
-  margin: 0 0 0.2rem;
-  letter-spacing: -0.3px;
+  color: $ink;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.025em;
 }
 
 .login-subtitle {
   font-size: 0.88rem;
-  color: $muted;
+  font-weight: 500;
+  color: $ink-soft;
   margin: 0 0 0.15rem;
 }
 
@@ -55,6 +85,7 @@
 
 .login-desc-accent {
   color: $accent;
+  font-weight: 500;
 }
 
 // ── Formulario ─────────────────────────────────────────────────
@@ -70,28 +101,31 @@
 
 .login-label {
   display: block;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: $dark;
+  color: $ink-soft;
   margin-bottom: 0.4rem;
 }
 
 .login-input {
   display: block;
   width: 100%;
+  min-height: 46px;
   padding: 0.65rem 0.9rem;
-  background: #eef3fd;
-  border: 1.5px solid transparent;
-  border-radius: $radius-md;
-  font-size: 0.9rem;
-  color: $dark;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  background: #fff;
+  border: 1px solid $border-input;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  color: $ink;
+  box-shadow: $shadow-xs;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
 
-  &::placeholder { color: $muted-light; }
+  &::placeholder { color: #94a3b8; }
+
+  &:hover:not(:focus) { border-color: $border-input-hover; }
 
   &:focus {
     outline: none;
-    background: #fff;
     border-color: $accent;
     box-shadow: $focus-ring;
   }
@@ -102,45 +136,52 @@
   position: relative;
 
   .login-input {
-    padding-right: 2.75rem;
+    padding-right: 2.9rem;
   }
 }
 
 .login-eye {
   position: absolute;
-  right: 0.7rem;
+  right: 0.45rem;
   top: 50%;
   transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
   background: none;
   border: none;
+  border-radius: $radius-md;
   padding: 0;
   cursor: pointer;
   color: $muted;
   display: flex;
   align-items: center;
+  justify-content: center;
   line-height: 1;
-  transition: color 0.12s;
+  transition: color $dur-fast, background $dur-fast;
 
-  &:hover { color: $accent; }
+  &:hover { color: $accent; background: $accent-soft; }
 }
 
 // ── Botón principal ────────────────────────────────────────────
 .login-submit {
   display: block;
   width: 100%;
+  min-height: 48px;
   padding: 0.8rem;
-  background: #0d1b35;
+  background: $accent;
   color: #fff;
   border: none;
-  border-radius: $radius-md;
+  border-radius: 10px;
   font-size: 1rem;
   font-weight: 600;
   cursor: pointer;
-  letter-spacing: 0.1px;
-  transition: background 0.15s;
+  letter-spacing: 0.005em;
+  box-shadow: 0 6px 16px -4px rgba(28, 91, 173, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  transition: background $dur-fast $ease, box-shadow $dur-fast $ease, transform 0.06s;
 
-  &:hover  { background: #0a1528; }
-  &:active { background: #071020; }
+  &:hover  { background: $accent-dark; box-shadow: 0 8px 20px -4px rgba(28, 91, 173, 0.6); }
+  &:active { transform: translateY(1px); }
+  &:focus-visible { outline: 2px solid $accent; outline-offset: 3px; }
 }
 
 // ── Pie de página ──────────────────────────────────────────────
@@ -153,6 +194,7 @@
 
 .login-footer-link {
   color: $accent;
+  font-weight: 500;
   text-decoration: none;
 
   &:hover { text-decoration: underline; }
