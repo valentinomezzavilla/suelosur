@@ -109,6 +109,7 @@ const AlquileresController = {
           fecha_inicio: fechaInicio || null, fecha_fin: fechaFinReal,
         })
         const monto = parseFloat(precio_alquiler) || 0
+        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, monto)
         await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
           cliente_id: clienteIdClean, cliente: result.cliente_nombre, monto,
@@ -144,6 +145,7 @@ const AlquileresController = {
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, obra, fecha_inicio: fechaInicio,
         })
+        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
         // El alquiler sigue abierto: el ingreso se genera recién al retirar el contenedor.
         req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. Se cobra al retirar el contenedor.`)
         return res.redirect('/alquileres/contenedores')
@@ -172,6 +174,7 @@ const AlquileresController = {
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
       }
+      await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
 
       req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4,'0')} ${esProgramado ? 'programado' : 'creado'}.`)
       res.redirect('/alquileres/contenedores')
@@ -200,6 +203,7 @@ const AlquileresController = {
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
+        facturacion: await require('../models/facturacion.model').estadoOp(alquiler.id),
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
         diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),

@@ -1,0 +1,212 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+.card-accent-red { border-left: 3px solid $danger; }
+
+// ── Gráfico de barras: facturado por mes (una serie, un solo tono) ──
+.fact-chart {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+  height: 220px;
+  padding-top: 1.75rem;
+  border-bottom: 1px solid $border-input;
+  // grilla recesiva: una línea cada 25%
+  background-image: linear-gradient($border-line 1px, transparent 1px);
+  background-size: 100% 25%;
+  background-position: 0 1.75rem;
+  background-repeat: repeat-y;
+  background-clip: content-box;
+}
+
+// La columna entera es el área de hover/foco (más grande que la barra)
+.fact-col {
+  position: relative;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  border-radius: $radius-sm;
+  cursor: default;
+  outline: none;
+
+  &:hover .fact-bar,
+  &:focus-visible .fact-bar { background: $accent-dark; }
+
+  &:hover .fact-tip,
+  &:focus-visible .fact-tip { opacity: 1; }
+
+  &:hover .fact-val,
+  &:focus-visible .fact-val { visibility: hidden; }
+
+  &:focus-visible { box-shadow: $focus-ring; }
+}
+
+.fact-bar {
+  width: min(44px, 70%);
+  background: $accent;
+  border-radius: 4px 4px 0 0;
+  transition: background $dur-fast $ease;
+}
+
+.fact-val {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: $ink;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.fact-tip {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  background: $ink;
+  color: #fff;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  padding: 0.4rem 0.6rem;
+  border-radius: $radius-sm;
+  white-space: nowrap;
+  text-align: center;
+  box-shadow: $shadow-md;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity $dur-fast $ease;
+  font-variant-numeric: tabular-nums;
+}
+
+.fact-axis {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.75rem;
+  margin-top: 0.4rem;
+
+  span {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: $muted;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+}
+
+// ── Desglose por tipo (barras horizontales finas) ──
+.fact-tipo {
+  margin-bottom: 0.8rem;
+
+  &__head {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: $fs-sm;
+    color: $ink;
+    margin-bottom: 0.3rem;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.fact-track {
+  height: 6px;
+  background: $border-line;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.fact-fill {
+  height: 100%;
+  background: $accent;
+  border-radius: 3px;
+}
+
+.fact-top {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: top;
+
+  li {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid $border-line;
+    font-size: $fs-sm;
+    font-variant-numeric: tabular-nums;
+
+    &:last-child { border-bottom: none; }
+  }
+}
+
+.fact-filtro-q { flex: 1 1 220px; }
+
+// Aviso de operaciones anuladas que requieren nota de crédito
+// (no usa .alert: main.js cierra solas las .alert a los 4 segundos)
+.fact-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.8rem 1rem;
+  background: $danger-soft;
+  border: 1px solid $danger-border;
+  border-radius: $radius-lg;
+  color: $danger-text;
+  font-size: $fs-sm;
+  font-weight: 500;
+}
+
+// Barra de selección para facturar varias OP juntas
+.fact-sel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid $border-soft;
+  background: $bg-card-alt;
+  font-size: $fs-sm;
+  color: $ink-soft;
+}
+
+.fact-col-sel { width: 40px; }
+
+.fact-sel {
+  width: 18px;
+  height: 18px;
+  accent-color: $accent;
+  cursor: pointer;
+}
+
+.fact-preview {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  background: $bg-card-alt;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  font-variant-numeric: tabular-nums;
+
+  span { display: block; font-size: 0.7rem; color: $muted; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+  strong { font-size: 0.95rem; color: $ink; }
+}
+
+.fact-modo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+
+  .radio-option { margin: 0; }
+  .radio-option:has(input:disabled) { opacity: 0.55; cursor: not-allowed; }
+}
+
+.fact-estado .card-body { padding: 0.85rem 1.1rem; }

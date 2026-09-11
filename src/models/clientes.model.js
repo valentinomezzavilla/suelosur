@@ -74,22 +74,23 @@ const ClientesModel = {
     return (r.m || 0) + 1
   },
 
-  async crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente }) {
+  async crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente, cuit, razon_social, condicion_iva }) {
     const numero = await this.proximoNumero()
     const { rows } = await query(`
-      INSERT INTO clientes (numero, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO clientes (numero, nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente, cuit, razon_social, condicion_iva)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `, [numero, nombre, apellido || '', domicilio_ppal || null, zona || null,
         tel_whatsapp || null, telefono || null, email || null, dni || null,
-        tipo_cliente || null, cuenta_corriente ? 1 : 0])
+        tipo_cliente || null, cuenta_corriente ? 1 : 0,
+        cuit || null, razon_social || null, condicion_iva || null])
     return rows[0].id
   },
 
   async actualizar(id, datos) {
     const fields = []
     const values = []
-    const map = { nombre:1, apellido:1, domicilio_ppal:1, zona:1, tel_whatsapp:1, telefono:1, email:1, dni:1, tipo_cliente:1 }
+    const map = { nombre:1, apellido:1, domicilio_ppal:1, zona:1, tel_whatsapp:1, telefono:1, email:1, dni:1, tipo_cliente:1, cuit:1, razon_social:1, condicion_iva:1 }
     for (const [k, v] of Object.entries(datos)) {
       if (map[k]) { fields.push(`${k} = ?`); values.push(v ?? null) }
     }

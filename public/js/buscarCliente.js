@@ -119,7 +119,7 @@
         const apellido = document.getElementById('nuevoClienteApellido').value.trim();
         const telefono = document.getElementById('nuevoClienteTelefono').value.trim();
         const dni      = document.getElementById('nuevoClienteDni').value.trim();
-        if (!nombre || !apellido || !telefono) { alert('Nombre, apellido y telefono son obligatorios.'); return; }
+        if (!nombre) { alert('El nombre es obligatorio.'); return; }
         try {
             const resp = await fetch('/clientes/api/crear', {
                 method: 'POST',

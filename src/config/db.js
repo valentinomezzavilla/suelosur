@@ -737,6 +737,63 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS obra TEXT`).catch(() => {})
   // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
+  // Facturación: operaciones marcadas "para facturar" y su estado de facturación.
+  // monto_facturar guarda el total cargado al crear (la venta con viaje no guarda el flete hasta entregarse).
+  for (const col of [
+    'para_facturar INTEGER DEFAULT 0',
+    'monto_facturar REAL',
+    'facturado INTEGER DEFAULT 0',
+    'nro_factura TEXT',
+    'fecha_factura TEXT',
+    'facturado_por BIGINT',
+    'facturado_en TEXT',
+  ]) {
+    await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {})
+  }
+  // Una factura puede cubrir varias OP del mismo cliente; la nota de crédito se registra por OP anulada.
+  for (const col of ['factura_id BIGINT', 'nc_numero TEXT', 'nc_fecha TEXT', 'nc_cae TEXT']) {
+    await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {})
+  }
+  // Datos fiscales del cliente (condicion_iva: RI / MT / EX / CF)
+  for (const col of ['cuit TEXT', 'razon_social TEXT', 'condicion_iva TEXT']) {
+    await pool.query(`ALTER TABLE clientes ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {})
+  }
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS facturas (
+      id                     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      cliente_id             BIGINT REFERENCES clientes(id),
+      tipo_comprobante       TEXT NOT NULL CHECK (tipo_comprobante IN ('A','B','C')),
+      punto_venta            INTEGER,
+      nro_cbte               INTEGER,
+      numero                 TEXT NOT NULL,
+      fecha                  TEXT NOT NULL,
+      receptor_nombre        TEXT,
+      receptor_cuit          TEXT,
+      receptor_condicion_iva TEXT,
+      alicuota_iva           REAL DEFAULT 0,
+      neto                   REAL DEFAULT 0,
+      iva                    REAL DEFAULT 0,
+      total                  REAL DEFAULT 0,
+      origen                 TEXT NOT NULL DEFAULT 'manual' CHECK (origen IN ('manual','afip')),
+      cae                    TEXT,
+      cae_vto                TEXT,
+      estado                 TEXT NOT NULL DEFAULT 'emitida' CHECK (estado IN ('emitida','revertida')),
+      id_usuario             BIGINT REFERENCES users(id),
+      created_at             TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  // Ticket de acceso de AFIP (WSAA): dura 12 h y AFIP rechaza pedir otro mientras siga vigente,
+  // por eso se persiste (el filesystem de Render es efímero).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS afip_ta (
+      servicio TEXT NOT NULL,
+      entorno  TEXT NOT NULL,
+      token    TEXT NOT NULL,
+      sign     TEXT NOT NULL,
+      expira   TEXT NOT NULL,
+      PRIMARY KEY (servicio, entorno)
+    )
+  `)
 
   // Egresos: libro único de salidas de dinero (compras / pagos). Categoriza cada
   // salida (material, sueldo, seguro, proveedor, etc.) y la vincula opcionalmente

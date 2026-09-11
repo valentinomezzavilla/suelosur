@@ -70,6 +70,29 @@
                value="<%= cliente?.tel_whatsapp || '' %>" placeholder="Ej: 3514001234">
       </div>
 
+      <h6 class="fw-bold text-dark-title mt-4 mb-2">Datos fiscales <span class="text-muted fw-normal small">(opcionales, se usan para facturar)</span></h6>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label" for="cuit">CUIT</label>
+          <input type="text" name="cuit" id="cuit" class="form-control" inputmode="numeric"
+                 value="<%= cliente?.cuit || '' %>" placeholder="Ej: 30-71234567-8">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="condicion_iva">Condición frente al IVA</label>
+          <select name="condicion_iva" id="condicion_iva" class="form-select">
+            <option value="">Sin especificar</option>
+            <% [['RI','Responsable Inscripto'],['MT','Monotributista'],['EX','Exento'],['CF','Consumidor final']].forEach(([k, l]) => { %>
+              <option value="<%= k %>" <%= cliente?.condicion_iva === k ? 'selected' : '' %>><%= l %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="razon_social">Razón social</label>
+          <input type="text" name="razon_social" id="razon_social" class="form-control"
+                 value="<%= cliente?.razon_social || '' %>" placeholder="Como figura en AFIP">
+        </div>
+      </div>
+
       <div class="mb-4">
         <div class="form-check">
           <input type="checkbox" class="form-check-input" id="cuentaCorriente" name="cuentaCorriente" value="true"

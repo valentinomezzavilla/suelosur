@@ -1,0 +1,44 @@
+<%# Estado de facturación de una operación (detalle de venta / alquiler). Recibe: opId, fact, volver %>
+<%
+  const _f = typeof fact !== 'undefined' ? fact : null
+  const _rol = user?.rol
+  const _puede = ['admin_ventas', 'admin_contable', 'dueno'].includes(_rol)
+  const _contable = ['admin_contable', 'dueno'].includes(_rol)
+%>
+<% if (_f) { %>
+<div class="card shadow-sm fact-estado">
+  <div class="card-header card-header-light d-flex justify-content-between align-items-center">
+    <span>Facturación</span>
+    <% if (_contable && (_f.para_facturar || _f.facturado)) { %>
+      <a href="/facturacion?tab=<%= _f.facturado ? 'facturado' : 'pendiente' %>" class="small text-decoration-none">Ir a Facturación →</a>
+    <% } %>
+  </div>
+  <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <div>
+      <% if (_f.requiereNC) { %>
+        <span class="badge badge-alerta">Anulada · requiere nota de crédito</span>
+        <div class="small text-muted mt-1">Factura <%= _f.comprobante %> del <%= formatFecha(_f.fecha_factura) %></div>
+      <% } else if (_f.facturado) { %>
+        <span class="badge badge-activo">Facturada</span>
+        <span class="fw-semibold ms-1"><%= _f.comprobante %></span>
+        <div class="small text-muted mt-1">
+          Fecha <%= formatFecha(_f.fecha_factura) %><% if (_f.cae) { %> · CAE <%= _f.cae %><% } %><% if (_f.nc_numero) { %> · Nota de crédito <%= _f.nc_numero %><% } %>
+        </div>
+      <% } else if (_f.para_facturar) { %>
+        <span class="badge badge-pendiente">Para facturar</span>
+        <div class="small text-muted mt-1">Aparece en Facturación → Pendiente Facturar.</div>
+      <% } else { %>
+        <span class="badge badge--anulado">No marcada para facturar</span>
+      <% } %>
+    </div>
+    <% if (_puede && !_f.facturado && !_f.anulada) { %>
+      <form method="POST" action="/facturacion/<%= opId %>/<%= _f.para_facturar ? 'quitar' : 'marcar' %>">
+        <input type="hidden" name="volver" value="<%= volver %>">
+        <button type="submit" class="btn btn-sm <%= _f.para_facturar ? 'btn-outline-secondary' : 'btn-naranja' %>">
+          <%= _f.para_facturar ? 'Quitar de facturación' : 'Marcar para facturar' %>
+        </button>
+      </form>
+    <% } %>
+  </div>
+</div>
+<% } %>
