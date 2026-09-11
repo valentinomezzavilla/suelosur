@@ -1,0 +1,154 @@
+<%
+  const e = estado
+  const c = e.cert
+  const entornoLbl = { homologacion: 'Homologación (pruebas)', produccion: 'Producción (facturas reales)' }
+%>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Configuración de facturación</h4>
+    <p class="text-muted mb-0">Datos de la empresa y credenciales de AFIP / ARCA para emitir facturas electrónicas.</p>
+  </div>
+  <a href="/facturacion" class="btn btn-sm btn-outline-secondary">← Volver a Facturación</a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-7">
+    <form method="POST" action="/facturacion/configuracion" enctype="multipart/form-data" class="card shadow-sm">
+      <div class="card-body">
+
+        <div class="form-section">
+          <h3 class="form-section__title">Empresa</h3>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="cuit">CUIT de la empresa</label>
+              <input class="form-control" id="cuit" name="cuit" inputmode="numeric" value="<%= e.cuit || '' %>" placeholder="30-71234567-8">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="condicion_iva">Condición frente al IVA</label>
+              <select class="form-select" id="condicion_iva" name="condicion_iva">
+                <% Object.entries(condicionesEmpresa).forEach(([k, l]) => { %>
+                  <option value="<%= k %>" <%= e.condicion_iva === k ? 'selected' : '' %>><%= l %></option>
+                <% }) %>
+              </select>
+              <p class="form-hint">Responsable Inscripto emite facturas A y B; Monotributista, factura C.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">AFIP</h3>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="pto_vta">Punto de venta</label>
+              <input class="form-control" type="number" min="1" max="99998" id="pto_vta" name="pto_vta" value="<%= e.pto_vta || '' %>" placeholder="Ej: 3">
+              <p class="form-hint">El habilitado para web services.</p>
+            </div>
+            <div class="col-md-8">
+              <span class="form-label d-block">Entorno</span>
+              <div class="fact-modo">
+                <% Object.entries(entornoLbl).forEach(([k, l]) => { %>
+                  <label class="radio-option"><input type="radio" name="entorno" value="<%= k %>" <%= e.entorno === k ? 'checked' : '' %>> <%= l %></label>
+                <% }) %>
+              </div>
+              <p class="form-hint">Usá homologación hasta confirmar que todo funciona. En producción, cada factura es real.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Certificado digital</h3>
+          <label class="form-label" for="cert_file"><%= e.tieneCert ? 'Reemplazar certificado (.crt)' : 'Certificado (.crt)' %></label>
+          <input class="form-control" type="file" id="cert_file" name="cert_file" accept=".crt,.pem,.cer">
+          <details class="mt-2">
+            <summary class="small text-muted">O pegar el contenido del certificado</summary>
+            <textarea class="form-control mt-2 cfg-mono" name="cert_texto" rows="4" placeholder="-----BEGIN CERTIFICATE-----"></textarea>
+          </details>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Clave privada</h3>
+          <label class="form-label" for="key_file"><%= e.tieneKey ? 'Reemplazar clave privada (.key)' : 'Clave privada (.key)' %></label>
+          <input class="form-control" type="file" id="key_file" name="key_file" accept=".key,.pem">
+          <details class="mt-2">
+            <summary class="small text-muted">O pegar el contenido de la clave</summary>
+            <textarea class="form-control mt-2 cfg-mono" name="key_texto" rows="4" placeholder="-----BEGIN PRIVATE KEY-----" autocomplete="off"></textarea>
+          </details>
+          <p class="form-hint">Se guarda cifrada y nunca se vuelve a mostrar. Si no subís archivos nuevos, se conservan los actuales.</p>
+          <% if (e.tieneCert || e.tieneKey || e.keyError) { %>
+            <label class="toggle-row mt-2 text-danger">
+              <input type="checkbox" name="quitar_credenciales" value="1"> Borrar el certificado y la clave guardados
+            </label>
+          <% } %>
+        </div>
+
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-naranja">Guardar configuración</button>
+          <a href="/facturacion" class="btn btn-outline-secondary">Cancelar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm mb-3">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span>Estado</span>
+        <% if (e.completo) { %>
+          <span class="badge <%= e.entorno === 'produccion' ? 'badge-activo' : 'badge-en-transito' %>">Lista · <%= e.entorno === 'produccion' ? 'producción' : 'homologación' %></span>
+        <% } else { %>
+          <span class="badge badge-pendiente">Incompleta</span>
+        <% } %>
+      </div>
+      <div class="card-body">
+        <% if (!e.completo) { %>
+          <p class="small mb-3">Falta: <strong><%= e.faltan.join(', ') %></strong>. Mientras tanto las facturas se cargan con número manual.</p>
+        <% } %>
+        <% if (e.keyError) { %><p class="small text-danger mb-3"><%= e.keyError %></p><% } %>
+        <div class="ficha">
+          <div class="ficha-row"><span class="ficha-label">CUIT</span><span class="ficha-value"><%= e.cuit || '—' %></span></div>
+          <div class="ficha-row"><span class="ficha-label">Condición IVA</span><span class="ficha-value"><%= condicionesEmpresa[e.condicion_iva] %></span></div>
+          <div class="ficha-row"><span class="ficha-label">Punto de venta</span><span class="ficha-value"><%= e.pto_vta || '—' %></span></div>
+          <div class="ficha-row"><span class="ficha-label">Certificado</span>
+            <span class="ficha-value">
+              <% if (!c) { %>No cargado
+              <% } else if (c.invalido) { %><span class="text-danger">Inválido</span>
+              <% } else { %>
+                <%= c.titular || 'Cargado' %>
+                <div class="small text-muted fw-normal">
+                  <% if (c.cuit) { %>CUIT <%= c.cuit %> · <% } %>vence <%= formatFecha(c.hasta) %>
+                  <% if (c.vencido) { %><span class="badge badge-alerta ms-1">Vencido</span>
+                  <% } else if (c.diasRestantes <= 30) { %><span class="badge badge-pendiente ms-1">Vence en <%= c.diasRestantes %> días</span><% } %>
+                </div>
+                <% if (c.emisor) { %><div class="small text-muted fw-normal">Emitido por <%= c.emisor %></div><% } %>
+              <% } %>
+            </span>
+          </div>
+          <div class="ficha-row"><span class="ficha-label">Clave privada</span><span class="ficha-value"><%= e.tieneKey ? 'Cargada' : 'No cargada' %></span></div>
+        </div>
+        <% if (e.updated_at) { %>
+          <p class="small text-muted mt-3 mb-0">Última modificación: <%= formatFechaHora(e.updated_at) %><%= e.usuario ? ` por ${e.usuario}` : '' %></p>
+        <% } %>
+        <form method="POST" action="/facturacion/configuracion/probar" class="mt-3">
+          <button type="submit" class="btn btn-outline-secondary btn-sm w-100" <%= e.completo ? '' : 'disabled' %>>Probar conexión con AFIP</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card shadow-sm cfg-ayuda">
+      <div class="card-header bg-white">Cómo obtener el certificado</div>
+      <div class="card-body small">
+        <ol class="ps-3 mb-0">
+          <li class="mb-2">Generá la clave privada y el pedido de certificado (CSR) en una computadora con OpenSSL:
+            <code>openssl genrsa -out suelosur.key 2048</code>
+            <code>openssl req -new -key suelosur.key -subj "/C=AR/O=Suelosur SAS/CN=suelosur/serialNumber=CUIT <%= e.cuit || '30XXXXXXXXX' %>" -out suelosur.csr</code>
+          </li>
+          <li class="mb-2"><strong>Homologación:</strong> en AFIP con clave fiscal, entrá a "WSASS - Autogestión Certificados Homologación", creá el certificado pegando el CSR y autorizá el servicio <em>wsfe</em>.</li>
+          <li class="mb-2"><strong>Producción:</strong> en "Administración de Certificados Digitales" agregá un alias, subí el CSR y descargá el .crt. Después, en "Administrador de Relaciones de Clave Fiscal", asociá el servicio de Facturación Electrónica a ese certificado.</li>
+          <li class="mb-2">Creá un punto de venta de tipo web services en "Administración de puntos de venta y domicilios".</li>
+          <li>Subí acá el .crt y el .key, guardá y tocá <strong>Probar conexión con AFIP</strong>.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>

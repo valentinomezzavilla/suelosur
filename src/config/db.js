@@ -794,6 +794,23 @@ async function initDB() {
       PRIMARY KEY (servicio, entorno)
     )
   `)
+  // Datos para facturar (se cargan desde Facturación › Configuración). Fila única.
+  // La clave privada del certificado se guarda cifrada (ver utils/cifrado.js).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS config_facturacion (
+      id            INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+      cuit          TEXT,
+      condicion_iva TEXT NOT NULL DEFAULT 'RI' CHECK (condicion_iva IN ('RI','MT')),
+      pto_vta       INTEGER,
+      entorno       TEXT NOT NULL DEFAULT 'homologacion' CHECK (entorno IN ('homologacion','produccion')),
+      cert_pem      TEXT,
+      cert_huella   TEXT,
+      key_cifrada   TEXT,
+      updated_by    BIGINT REFERENCES users(id),
+      updated_at    TEXT
+    )
+  `)
+  await pool.query(`INSERT INTO config_facturacion (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
 
   // Egresos: libro único de salidas de dinero (compras / pagos). Categoriza cada
   // salida (material, sueldo, seguro, proveedor, etc.) y la vincula opcionalmente

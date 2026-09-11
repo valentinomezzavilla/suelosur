@@ -21,9 +21,14 @@
     <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Facturación</h4>
     <p class="text-muted mb-0">Operaciones de ventas y alquileres marcadas como "Operación para Facturar".</p>
   </div>
-  <span class="badge <%= afipHabilitado ? 'badge-activo' : 'badge--anulado' %>" title="Factura electrónica AFIP / ARCA">
-    AFIP: <%= afipHabilitado ? (afipEntorno === 'produccion' ? 'producción' : 'homologación') : 'no configurado' %>
-  </span>
+  <div class="d-flex align-items-center gap-2">
+    <span class="badge <%= afipHabilitado ? 'badge-activo' : 'badge--anulado' %>" title="Factura electrónica AFIP / ARCA">
+      AFIP: <%= afipHabilitado ? (afipEntorno === 'produccion' ? 'producción' : 'homologación') : 'no configurado' %>
+    </span>
+    <% if (user?.rol === 'dueno') { %>
+      <a href="/facturacion/configuracion" class="btn btn-outline-secondary btn-sm">Configuración</a>
+    <% } %>
+  </div>
 </div>
 
 <!-- KPIs -->
@@ -392,7 +397,7 @@
           <h3 class="form-section__title">Emisión</h3>
           <div class="fact-modo mb-3">
             <label class="radio-option"><input type="radio" name="modo" value="manual" checked> Ya la emití: cargo el número</label>
-            <label class="radio-option" title="<%= afipHabilitado ? '' : 'Configurá AFIP_CUIT, AFIP_PTO_VTA, AFIP_CERT y AFIP_KEY para habilitarlo' %>">
+            <label class="radio-option" title="<%= afipHabilitado ? '' : 'Se configura en Facturación › Configuración' %>">
               <input type="radio" name="modo" value="afip" <%= afipHabilitado ? '' : 'disabled' %>>
               Emitir con AFIP (CAE)<% if (!afipHabilitado) { %> — no configurado<% } %>
             </label>

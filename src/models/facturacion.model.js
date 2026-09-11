@@ -27,11 +27,8 @@ const tipoDe = (op) => op.tipo_op === 'C' ? 'contenedor'
   : op.tipo_op === 'MA' ? 'maquinaria'
   : (op.modalidad === 'flete' ? 'viaje' : 'cantera')
 
-// Una S.A.S. no puede ser monotributista: por defecto la empresa factura como Responsable Inscripto.
-const empresaCondicionIva = () => String(process.env.EMPRESA_CONDICION_IVA || 'RI').toUpperCase() === 'MT' ? 'MT' : 'RI'
-
 // RI factura A a inscriptos y monotributistas (RG 5003) y B al resto; un monotributista siempre C.
-const tipoSugerido = (condCliente) => empresaCondicionIva() === 'MT' ? 'C'
+const tipoSugerido = (condCliente, empresa = 'RI') => empresa === 'MT' ? 'C'
   : (['RI', 'MT'].includes(condCliente) ? 'A' : 'B')
 
 // Los montos de las operaciones son finales (IVA incluido).
@@ -126,7 +123,7 @@ const errorUsuario = (msg) => Object.assign(new Error(msg), { usuario: true })
 
 module.exports = {
   TIPOS, CONDICIONES_IVA, ALICUOTAS,
-  empresaCondicionIva, tipoSugerido, desglose, cuitValido, documentoReceptor, conceptoAfip, redondear,
+  tipoSugerido, desglose, cuitValido, documentoReceptor, conceptoAfip, redondear,
 
   // Se llama al crear cualquier venta/alquiler: marca la OP si se tildó "Operación para Facturar".
   async marcarAlCrear(id_op, flag, monto) {

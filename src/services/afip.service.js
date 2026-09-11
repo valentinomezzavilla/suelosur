@@ -1,16 +1,13 @@
 'use strict'
 // ─────────────────────────────────────────────────────────────────
 // Factura electrónica AFIP / ARCA — WSAA (login) + WSFEv1 (CAE).
-// Se activa solo si están configuradas las variables de entorno:
-//   AFIP_CUIT       CUIT emisor (solo números)
-//   AFIP_PTO_VTA    punto de venta electrónico habilitado en AFIP
-//   AFIP_CERT       certificado X.509 en PEM (los saltos de línea pueden ir como \n)
-//   AFIP_KEY        clave privada en PEM
-//   AFIP_ENTORNO    'homologacion' (por defecto) o 'produccion'
+// Los datos (CUIT, punto de venta, certificado, clave, entorno) se cargan en
+// Facturación › Configuración; mientras estén incompletos queda apagada.
 // ─────────────────────────────────────────────────────────────────
 const https = require('https')
 const forge = require('node-forge')
 const { query } = require('../config/db')
+const ConfigFacturacion = require('../models/config_facturacion.model')
 
 const URLS = {
   homologacion: {
@@ -28,28 +25,29 @@ const NC_TIPO     = { A: 3, B: 8, C: 13 }
 const COND_IVA_ID = { RI: 1, EX: 4, CF: 5, MT: 6 }
 const ALIC_ID     = { 0: 3, 10.5: 4, 21: 5, 27: 6 }
 
-const pem = (v) => String(v || '').replace(/\\n/g, '\n').trim()
 const pad = (n, len) => String(n).padStart(len, '0')
 const importe = (n) => (Math.round((Number(n) || 0) * 100) / 100).toFixed(2)
 const yyyymmdd = (iso) => String(iso).slice(0, 10).replace(/-/g, '')
 const isoDesdeAfip = (v) => v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}-${v.slice(4, 6)}-${v.slice(6, 8)}` : v
 
-function config() {
+async function config() {
+  const c = await ConfigFacturacion.obtener()
   return {
-    cuit:    String(process.env.AFIP_CUIT || '').replace(/\D/g, ''),
-    ptoVta:  parseInt(process.env.AFIP_PTO_VTA, 10) || 0,
-    cert:    pem(process.env.AFIP_CERT),
-    key:     pem(process.env.AFIP_KEY),
-    entorno: process.env.AFIP_ENTORNO === 'produccion' ? 'produccion' : 'homologacion',
+    cuit:      c.cuit || '',
+    ptoVta:    c.pto_vta || 0,
+    cert:      c.cert || '',
+    key:       c.key || '',
+    entorno:   c.entorno,
+    condicion: c.condicion_iva,
   }
 }
 
-function habilitado() {
-  const c = config()
+async function habilitado() {
+  const c = await config()
   return !!(c.cuit && c.ptoVta && c.cert && c.key)
 }
 
-const entorno = () => config().entorno
+const entorno = async () => (await config()).entorno
 
 const unescapeXml = (s) => String(s)
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
@@ -79,7 +77,7 @@ function soapPost(url, body, soapAction) {
       res.on('end', () => resolve({ status: res.statusCode, body: data }))
     })
     req.on('timeout', () => req.destroy(new Error('AFIP no respondió a tiempo.')))
-    req.on('error', reject)
+    req.on('error', (err) => reject(new Error(`AFIP: no se pudo conectar (${err.message}).`)))
     req.write(body)
     req.end()
   })
@@ -119,13 +117,24 @@ function construirTRA(ahora = Date.now()) {
 const memo = {}
 const vigente = (ta) => ta && Date.parse(ta.expira) - Date.now() > 5 * 60000
 
+// El ticket depende del certificado: se descarta al cambiar certificado, CUIT o entorno.
+async function invalidarTA() {
+  Object.keys(memo).forEach(k => delete memo[k])
+  await query(`DELETE FROM afip_ta`)
+}
+
 async function obtenerTA() {
-  const c = config()
+  const c = await config()
   if (vigente(memo[c.entorno])) return memo[c.entorno]
   const { rows } = await query(`SELECT token, sign, expira FROM afip_ta WHERE servicio = 'wsfe' AND entorno = ?`, [c.entorno])
   if (vigente(rows[0])) { memo[c.entorno] = rows[0]; return rows[0] }
 
-  const cms = firmarTRA(construirTRA(), c.cert, c.key)
+  let cms
+  try {
+    cms = firmarTRA(construirTRA(), c.cert, c.key)
+  } catch (_) {
+    throw new Error('AFIP (login): no se pudo firmar con el certificado cargado. Revisá el certificado y la clave privada.')
+  }
   const body = '<?xml version="1.0" encoding="UTF-8"?>'
     + '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:wsaa="http://wsaa.view.sua.dvadac.desein.afip.gov">'
     + `<soapenv:Header/><soapenv:Body><wsaa:loginCms><wsaa:in0>${cms}</wsaa:in0></wsaa:loginCms></soapenv:Body></soapenv:Envelope>`
@@ -147,7 +156,7 @@ async function obtenerTA() {
 }
 
 async function wsfe(metodo, interior) {
-  const c = config()
+  const c = await config()
   const ta = await obtenerTA()
   const body = '<?xml version="1.0" encoding="utf-8"?>'
     + '<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ar="http://ar.gov.afip.dif.FEV1/">'
@@ -205,8 +214,8 @@ function construirDetalle({ nro, concepto, docTipo, docNro, fecha, total, neto, 
 // Emite una factura (o nota de crédito si notaCredito=true) y devuelve el CAE.
 async function emitir({ tipoLetra, notaCredito = false, concepto, docTipo, docNro, condicionIva,
                         total, neto, iva, alicuota, fecha, asociado }) {
-  if (!habilitado()) throw new Error('La facturación electrónica con AFIP no está configurada.')
-  const c = config()
+  if (!(await habilitado())) throw new Error('La facturación electrónica con AFIP no está configurada.')
+  const c = await config()
   const cbteTipo = (notaCredito ? NC_TIPO : CBTE_TIPO)[tipoLetra]
   if (!cbteTipo) throw new Error(`Tipo de comprobante inválido: ${tipoLetra}`)
   const nro = (await ultimoAutorizado(c.ptoVta, cbteTipo)) + 1
@@ -232,4 +241,14 @@ async function emitir({ tipoLetra, notaCredito = false, concepto, docTipo, docNr
   }
 }
 
-module.exports = { habilitado, entorno, emitir, firmarTRA, construirTRA, construirDetalle }
+// Login real + consulta del último comprobante: confirma certificado, CUIT y punto de venta.
+async function probarConexion() {
+  if (!(await habilitado())) throw new Error('Completá CUIT, punto de venta, certificado y clave privada antes de probar.')
+  const c = await config()
+  const ta = await obtenerTA()
+  const letra = c.condicion === 'MT' ? 'C' : 'B'
+  const ultimo = await ultimoAutorizado(c.ptoVta, CBTE_TIPO[letra])
+  return { entorno: c.entorno, expira: ta.expira, letra, ptoVta: c.ptoVta, ultimo }
+}
+
+module.exports = { habilitado, entorno, emitir, probarConexion, invalidarTA, firmarTRA, construirTRA, construirDetalle }

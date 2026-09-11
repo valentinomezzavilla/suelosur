@@ -1,12 +1,14 @@
 'use strict'
-const FacturacionModel = require('../models/facturacion.model')
-const ClientesModel    = require('../models/clientes.model')
-const Afip             = require('../services/afip.service')
+const FacturacionModel  = require('../models/facturacion.model')
+const ConfigFacturacion = require('../models/config_facturacion.model')
+const ClientesModel     = require('../models/clientes.model')
+const Afip              = require('../services/afip.service')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { fmtFecha } = require('../utils/fecha')
 
 const ENTIDAD = 'operacion'
 const volver = (tab, extra = '') => `/facturacion?tab=${tab}${extra}`
+const RUTA_CONFIG = '/facturacion/configuracion'
 const hoyISO = () => new Date().toISOString().slice(0, 10)
 const fechaValida = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : hoyISO()
 const errorUsuario = (msg) => Object.assign(new Error(msg), { usuario: true })
@@ -37,6 +39,7 @@ module.exports = {
     try {
       const tab = req.query.tab === 'facturado' ? 'facturado' : 'pendiente'
       const filtros = leerFiltros(req.query)
+      const cfg     = await ConfigFacturacion.obtener()
       const rows    = await FacturacionModel.todos()
       const resumen = FacturacionModel.resumen(rows)
       const lista   = FacturacionModel.filtrar(rows, { estado: tab, ...filtros })
@@ -46,9 +49,9 @@ module.exports = {
         tipos: FacturacionModel.TIPOS,
         condiciones: FacturacionModel.CONDICIONES_IVA,
         alicuotas: FacturacionModel.ALICUOTAS,
-        empresaCondicion: FacturacionModel.empresaCondicionIva(),
-        afipHabilitado: Afip.habilitado(),
-        afipEntorno: Afip.entorno(),
+        empresaCondicion: cfg.condicion_iva,
+        afipHabilitado: await Afip.habilitado(),
+        afipEntorno: cfg.entorno,
         hoy: hoyISO(),
         scripts: ['/js/facturacion.js'],
       })
@@ -79,9 +82,9 @@ module.exports = {
       const condicion = FacturacionModel.CONDICIONES_IVA[req.body.condicion_iva] ? req.body.condicion_iva : (cli.condicion_iva || 'CF')
       const cuit  = String(req.body.cuit || '').replace(/\D/g, '')
       const razon = String(req.body.razon_social || '').trim()
-      const empresa = FacturacionModel.empresaCondicionIva()
+      const empresa = (await ConfigFacturacion.obtener()).condicion_iva
       const tipo = ['A', 'B', 'C'].includes(req.body.tipo_comprobante)
-        ? req.body.tipo_comprobante : FacturacionModel.tipoSugerido(condicion)
+        ? req.body.tipo_comprobante : FacturacionModel.tipoSugerido(condicion, empresa)
 
       if (empresa === 'MT' && tipo !== 'C') throw errorUsuario('La empresa está configurada como monotributista: solo puede emitir factura C.')
       if (empresa === 'RI' && tipo === 'C') throw errorUsuario('La factura C es solo para emisores monotributistas. Elegí A o B.')
@@ -99,7 +102,7 @@ module.exports = {
 
       let emision = { origen: 'manual', numero: String(req.body.numero || '').trim() }
       if (req.body.modo === 'afip') {
-        if (!Afip.habilitado()) throw errorUsuario('La facturación electrónica con AFIP no está configurada.')
+        if (!(await Afip.habilitado())) throw errorUsuario('La facturación electrónica con AFIP no está configurada.')
         const doc = FacturacionModel.documentoReceptor({ cuit, dni: cli.dni })
         const r = await Afip.emitir({
           tipoLetra: tipo, concepto: FacturacionModel.conceptoAfip(sel),
@@ -186,7 +189,7 @@ module.exports = {
       let cae = null
       if (req.body.modo === 'afip') {
         if (op.factura_origen !== 'afip') throw errorUsuario('La factura original no se emitió con AFIP: registrá la nota de crédito manualmente.')
-        if (!Afip.habilitado()) throw errorUsuario('La facturación electrónica con AFIP no está configurada.')
+        if (!(await Afip.habilitado())) throw errorUsuario('La facturación electrónica con AFIP no está configurada.')
         const alicuota = Number(op.alicuota_iva) || 0
         const { neto, iva } = FacturacionModel.desglose(op.monto, op.tipo_comprobante, alicuota)
         const doc = FacturacionModel.documentoReceptor({ cuit: op.cuit, dni: op.dni })
@@ -277,5 +280,82 @@ module.exports = {
       req.flash('error', 'Error al exportar.')
       res.redirect(volver('pendiente'))
     }
+  },
+
+  // ── Configuración de facturación (solo Dueño) ──────────────────
+  async configuracion(req, res) {
+    try {
+      res.render('pages/facturacion/configuracion', {
+        titulo: 'Configuración de facturación',
+        estado: await ConfigFacturacion.estado(),
+        condicionesEmpresa: ConfigFacturacion.CONDICIONES_EMPRESA,
+      })
+    } catch (err) {
+      console.error(err)
+      req.flash('error', 'Error al cargar la configuración.')
+      res.redirect('/facturacion')
+    }
+  },
+
+  async guardarConfiguracion(req, res) {
+    try {
+      const b = req.body
+      const actual = await ConfigFacturacion.obtener()
+      const cuit = String(b.cuit || '').replace(/\D/g, '')
+      if (cuit && !FacturacionModel.cuitValido(cuit)) throw errorUsuario('El CUIT de la empresa no es válido.')
+      const pto = b.pto_vta ? parseInt(b.pto_vta, 10) : null
+      if (b.pto_vta && !(pto >= 1 && pto <= 99998)) throw errorUsuario('El punto de venta debe ser un número entre 1 y 99998.')
+      const condicion = b.condicion_iva === 'MT' ? 'MT' : 'RI'
+      const entorno = b.entorno === 'produccion' ? 'produccion' : 'homologacion'
+      const quitar = b.quitar_credenciales === '1'
+
+      const certIn = req.files?.cert_file?.[0]?.buffer || String(b.cert_texto || '').trim()
+      const keyIn  = req.files?.key_file?.[0]?.buffer || String(b.key_texto || '').trim()
+      const certPem = !quitar && certIn.length ? ConfigFacturacion.leerCertificado(certIn) : null
+      const keyPem  = !quitar && keyIn.length ? ConfigFacturacion.leerClave(keyIn) : null
+
+      if (!quitar) {
+        const certFinal = certPem || actual.cert
+        const keyFinal = keyPem || actual.key
+        if (certFinal && keyFinal && !ConfigFacturacion.coinciden(certFinal, keyFinal)) {
+          throw errorUsuario('La clave privada no corresponde al certificado. Subí el par que generaste junto.')
+        }
+      }
+
+      const { huella } = await ConfigFacturacion.guardar({
+        cuit, condicion_iva: condicion, pto_vta: pto, entorno, certPem, keyPem, quitarCredenciales: quitar,
+      }, req.session.user.id)
+
+      // El ticket de AFIP está atado al certificado, al CUIT y al entorno
+      if (quitar || cuit !== (actual.cuit || '') || entorno !== actual.entorno || (huella && huella !== actual.cert_huella)) {
+        await Afip.invalidarTA()
+      }
+
+      await registrarAuditoria({
+        entidad_tipo: 'config_facturacion', entidad_id: 1, accion: 'modificar', usuario: req.session.user.id,
+        detalle: { cuit, pto_vta: pto, entorno, condicion_iva: condicion, certificado: !!certPem, clave: !!keyPem, quitar },
+      })
+
+      if (certPem) {
+        const info = ConfigFacturacion.infoCertificado(certPem)
+        if (info?.vencido) req.flash('warning', `El certificado venció el ${fmtFecha(info.hasta)}. Generá uno nuevo en AFIP.`)
+        if (info?.cuit && cuit && info.cuit !== cuit) req.flash('warning', `El certificado es del CUIT ${info.cuit} y el CUIT cargado es ${cuit}.`)
+      }
+      req.flash('success', quitar ? 'Se borraron el certificado y la clave privada.' : 'Configuración de facturación guardada.')
+    } catch (err) {
+      req.flash('error', mensajeError(err, 'Error al guardar la configuración.'))
+    }
+    res.redirect(RUTA_CONFIG)
+  },
+
+  async probarConexion(req, res) {
+    try {
+      const r = await Afip.probarConexion()
+      req.flash('success', `Conexión con AFIP correcta (${r.entorno === 'produccion' ? 'producción' : 'homologación'}). `
+        + `Último comprobante ${r.letra} del punto de venta ${r.ptoVta}: N° ${r.ultimo}.`)
+    } catch (err) {
+      req.flash('error', err.usuario || /^AFIP|Completá/.test(err.message) ? err.message : `No se pudo probar la conexión: ${err.message}`)
+    }
+    res.redirect(RUTA_CONFIG)
   },
 }
