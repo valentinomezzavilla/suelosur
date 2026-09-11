@@ -47,7 +47,7 @@ const AlquileresMaquinariaController = {
       }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
-      const { nro_op } = await AlquileresMaquinariaModel.crear({
+      const { id: id_op, nro_op } = await AlquileresMaquinariaModel.crear({
         id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
         domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero,
         zona_entrega, plazo_alquiler,
@@ -59,6 +59,7 @@ const AlquileresMaquinariaController = {
         fecha_entrega_planificada: fechaEntrega || null,
         hora_planificada: horaEntrega || null,
       })
+      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, parseFloat(precio_total) || 0)
       req.flash('success', `Alquiler maquinaria OP-${String(nro_op).padStart(4,'0')} creado.`)
       res.redirect('/alquileres/maquinaria')
     } catch (err) {
@@ -84,6 +85,7 @@ const AlquileresMaquinariaController = {
       res.render('pages/alquileres/maquinaria_detalle', {
         titulo: `Alquiler Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
+        facturacion: await require('../models/facturacion.model').estadoOp(alquiler.id),
         camionesDisp: await OperacionesModel.camionesDisponibles('maquinas'),
         recursosEditable: alquiler.estado !== 'anulado',
       })

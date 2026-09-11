@@ -15,7 +15,8 @@
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
-  transition: background 0.14s, color 0.14s, border-color 0.14s, box-shadow 0.14s, transform 0.06s;
+  transition: background $dur-fast $ease, color $dur-fast $ease, border-color $dur-fast $ease,
+              box-shadow $dur-fast $ease, transform 0.06s;
   text-decoration: none;
   white-space: nowrap;
 
@@ -32,6 +33,11 @@
     font-size: $fs-xs;
   }
 
+  &:focus-visible {
+    outline: none;
+    box-shadow: $focus-ring;
+  }
+
   &:active { transform: translateY(1px); }
 }
 
@@ -40,16 +46,17 @@
   background: $accent;
   color: #fff;
   border-color: $accent;
-  box-shadow: 0 1px 2px rgba(28, 91, 173, 0.25);
-  &:hover { background: $accent-dark; border-color: $accent-dark; color: #fff; box-shadow: 0 2px 8px rgba(28, 91, 173, 0.3); }
+  box-shadow: 0 1px 2px rgba(28, 91, 173, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  &:hover { background: $accent-dark; border-color: $accent-dark; color: #fff; box-shadow: 0 4px 12px -2px rgba(28, 91, 173, 0.4); }
 }
 
 .btn-secondary {
   @extend %btn-base;
-  background: #eef2f5;
-  color: $ink;
-  border-color: #cbd5e1;
-  &:hover { background: #e2e8f0; border-color: #94a3b8; color: $dark; }
+  background: #fff;
+  color: $ink-soft;
+  border-color: $border-input;
+  box-shadow: $shadow-xs;
+  &:hover { background: $bg-card-alt; border-color: $border-input-hover; color: $ink; }
 }
 
 // Botón de contorno con color de marca (acento visible, no plano)
@@ -63,11 +70,11 @@
 
 .btn-secondary-yellow {
   @extend %btn-base;
-  background: $brand-yellow;
+  background: $orange;
   color: $ink;
-  border-color: $brand-yellow;
-  box-shadow: 0 1px 2px rgba(245, 179, 1, 0.3);
-  &:hover { background: $brand-yellow-dark; border-color: $brand-yellow-dark; color: $ink; }
+  border-color: $orange;
+  box-shadow: 0 1px 2px rgba(232, 145, 42, 0.3);
+  &:hover { background: #f0a444; border-color: $orange-dark; color: $ink; }
 }
 
 .btn-primary-green {
@@ -75,7 +82,8 @@
   background: $success;
   color: #fff;
   border-color: $success;
-  &:hover { background: #1f8a4c; border-color: #1f8a4c; color: #fff; }
+  box-shadow: 0 1px 2px rgba(26, 143, 76, 0.25);
+  &:hover { background: #157a40; border-color: #157a40; color: #fff; }
 }
 
 .btn-danger {
@@ -83,7 +91,7 @@
   background: $danger;
   color: #fff;
   border-color: $danger;
-  &:hover { background: #c0392b; border-color: #c0392b; color: #fff; }
+  &:hover { background: #bf2e24; border-color: #bf2e24; color: #fff; }
 }
 
 .btn-finalizar {
@@ -95,7 +103,8 @@
   padding: 0.85rem 1rem;
   font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 2px 6px rgba(28, 91, 173, 0.3);
 
   &:hover { background: $accent-dark; border-color: $accent-dark; color: #fff; }
 }

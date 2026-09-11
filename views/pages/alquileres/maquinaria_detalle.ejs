@@ -118,6 +118,10 @@
 <% } %>
 
 <div class="mt-3">
+  <%- include('../../partials/facturacion_estado', { opId: alquiler.id, fact: facturacion, volver: `/alquileres/maquinaria/${alquiler.id}` }) %>
+</div>
+
+<div class="mt-3">
   <%- include('../../partials/recursos_operacion', { opId: alquiler.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable, solapamiento }) %>
 </div>
 

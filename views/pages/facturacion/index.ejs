@@ -1,0 +1,445 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
+  const nroOp = (n) => 'OP-' + String(n).padStart(4, '0')
+  const linkOp = (o) => o.tipo === 'contenedor' ? `/alquileres/contenedores/${o.id}`
+    : o.tipo === 'maquinaria' ? `/alquileres/maquinaria/${o.id}` : `/ventas/${o.id}`
+  const badgeMap    = { pendiente: 'badge-pendiente', despachado: 'badge-en-transito', entregado: 'badge-activo' }
+  const labelEstado = { pendiente: 'Pendiente', despachado: 'Despachado', entregado: 'Entregado' }
+  const pagoLbl     = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' }
+  const r = resumen
+  const maxMes  = Math.max(0, ...r.porMes.map(m => m.total))
+  const maxTipo = Math.max(0, ...r.porTipo.map(t => t.total))
+  const esFact = tab === 'facturado'
+  const suma = (k) => lista.reduce((a, o) => a + (Number(o[k]) || 0), 0)
+  const qsExport = new URLSearchParams(Object.entries({ tab, ...filtros }).filter(([, v]) => v)).toString()
+%>
+
+<div id="factRoot" data-empresa="<%= empresaCondicion %>" data-afip="<%= afipHabilitado ? '1' : '0' %>">
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Facturación</h4>
+    <p class="text-muted mb-0">Operaciones de ventas y alquileres marcadas como "Operación para Facturar".</p>
+  </div>
+  <span class="badge <%= afipHabilitado ? 'badge-activo' : 'badge--anulado' %>" title="Factura electrónica AFIP / ARCA">
+    AFIP: <%= afipHabilitado ? (afipEntorno === 'produccion' ? 'producción' : 'homologación') : 'no configurado' %>
+  </span>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-3">
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm h-100 card-accent-orange kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Pendiente de facturar</p>
+      <h3 class="fw-bold text-dark-title mb-1"><%= money(r.pendiente.total) %></h3>
+      <small class="text-muted"><%= r.pendiente.count %> operaci<%= r.pendiente.count === 1 ? 'ón' : 'ones' %></small>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm h-100 card-accent-green kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Facturado en <%= r.mesLabel.toLowerCase() %></p>
+      <h3 class="fw-bold text-dark-title mb-1"><%= money(r.facturadoMes.total) %></h3>
+      <small class="text-muted"><%= r.facturadoMes.count %> operaci<%= r.facturadoMes.count === 1 ? 'ón' : 'ones' %></small>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm h-100 card-accent-blue kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Facturado en el año</p>
+      <h3 class="fw-bold text-dark-title mb-1"><%= money(r.facturadoAnio.total) %></h3>
+      <small class="text-muted"><%= r.facturadoAnio.count %> operaci<%= r.facturadoAnio.count === 1 ? 'ón' : 'ones' %></small>
+    </div></div>
+  </div>
+  <div class="col-sm-6 col-xl-3">
+    <div class="card shadow-sm h-100 card-accent-red kpi-card"><div class="card-body">
+      <p class="text-muted small mb-1">Pendientes hace más de 30 días</p>
+      <h3 class="fw-bold text-dark-title mb-1"><%= r.pendientesViejos.count %></h3>
+      <small class="text-muted"><%= money(r.pendientesViejos.total) %> sin facturar</small>
+    </div></div>
+  </div>
+</div>
+
+<!-- Gráfico + desglose -->
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <span>Facturado por mes</span><small class="text-muted fw-normal">Últimos 6 meses</small>
+      </div>
+      <div class="card-body">
+        <% if (maxMes === 0) { %>
+          <div class="empty-state empty-state--compact">
+            <div class="empty-state__icon"><%- icon('chart', { size: 28 }) %></div>
+            <p class="empty-state__msg">Todavía no hay facturas registradas en los últimos 6 meses.</p>
+          </div>
+        <% } else { %>
+          <div class="fact-chart" role="group" aria-label="Facturado por mes, últimos 6 meses">
+            <% r.porMes.forEach((m, i) => {
+                 const h = Math.round(m.total / maxMes * 100)
+                 const alto = m.total > 0 ? Math.max(h, 2) : 0 %>
+              <div class="fact-col" tabindex="0" aria-label="<%= m.labelLargo %>: <%= money(m.total) %>, <%= m.count %> operaci<%= m.count === 1 ? 'ón' : 'ones' %>">
+                <% if (i === r.porMes.length - 1 && m.total > 0) { %>
+                  <span class="fact-val" style="bottom: calc(<%= alto %>% + 6px)"><%= money(m.total) %></span>
+                <% } %>
+                <div class="fact-bar" style="height: <%= alto %>%"></div>
+                <span class="fact-tip" style="bottom: calc(<%= alto %>% + 8px)">
+                  <strong><%= m.labelLargo %></strong><br><%= money(m.total) %> · <%= m.count %> operaci<%= m.count === 1 ? 'ón' : 'ones' %>
+                </span>
+              </div>
+            <% }) %>
+          </div>
+          <div class="fact-axis" aria-hidden="true">
+            <% r.porMes.forEach(m => { %><span><%= m.label %></span><% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card shadow-sm h-100">
+      <div class="card-header bg-white">Pendiente por tipo de operación</div>
+      <div class="card-body">
+        <% r.porTipo.forEach(t => { %>
+          <div class="fact-tipo">
+            <div class="fact-tipo__head">
+              <span class="fw-semibold"><%= t.label %></span>
+              <span><%= money(t.total) %> <span class="text-muted">· <%= t.count %></span></span>
+            </div>
+            <div class="fact-track" aria-hidden="true">
+              <div class="fact-fill" style="width: <%= maxTipo ? Math.round(t.total / maxTipo * 100) : 0 %>%"></div>
+            </div>
+          </div>
+        <% }) %>
+
+        <div class="dashboard-section-title mt-3">Clientes con más pendiente</div>
+        <% if (!r.topClientes.length) { %>
+          <p class="text-muted small mb-0">No hay operaciones pendientes de facturar.</p>
+        <% } else { %>
+          <ol class="fact-top">
+            <% r.topClientes.forEach(c => { %>
+              <li><span><%= c.cliente %> <span class="text-muted small">· <%= c.count %></span></span><span class="fw-semibold"><%= money(c.total) %></span></li>
+            <% }) %>
+          </ol>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<% if (r.requiereNC.count > 0) { %>
+  <div class="fact-banner" role="status">
+    <span>
+      <strong><%= r.requiereNC.count %> operaci<%= r.requiereNC.count === 1 ? 'ón facturada fue anulada' : 'ones facturadas fueron anuladas' %></strong>
+      y requiere<%= r.requiereNC.count === 1 ? '' : 'n' %> nota de crédito (<%= money(r.requiereNC.total) %>).
+    </span>
+    <a href="/facturacion?tab=facturado&nc=1" class="btn btn-sm btn-outline-danger">Ver operaciones</a>
+  </div>
+<% } %>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mt-4 mb-3">
+  <li class="nav-item">
+    <a class="nav-link <%= !esFact ? 'active' : '' %>" href="/facturacion?tab=pendiente" <%- !esFact ? 'aria-current="page"' : '' %>>
+      Pendiente Facturar <span class="badge rounded-pill badge-pendiente ms-1"><%= r.pendiente.count %></span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link <%= esFact ? 'active' : '' %>" href="/facturacion?tab=facturado" <%- esFact ? 'aria-current="page"' : '' %>>
+      Facturado <span class="badge rounded-pill badge-activo ms-1"><%= r.facturado.count %></span>
+    </a>
+  </li>
+</ul>
+
+<!-- Filtros -->
+<form method="GET" action="/facturacion" class="filtros-bar">
+  <input type="hidden" name="tab" value="<%= tab %>">
+  <div class="filtro-group fact-filtro-q">
+    <label for="fq">Buscar</label>
+    <input id="fq" type="text" name="q" value="<%= filtros.q %>" placeholder="Cliente, CUIT, N° de OP<%= esFact ? ', N° de factura o CAE' : '' %>">
+  </div>
+  <div class="filtro-group">
+    <label for="ftipo">Tipo</label>
+    <select id="ftipo" name="tipo">
+      <option value="">Todos</option>
+      <% Object.entries(tipos).forEach(([k, l]) => { %>
+        <option value="<%= k %>" <%= filtros.tipo === k ? 'selected' : '' %>><%= l %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="filtro-group">
+    <label for="fdesde"><%= esFact ? 'Facturado desde' : 'Desde' %></label>
+    <input id="fdesde" type="date" name="desde" value="<%= filtros.desde %>">
+  </div>
+  <div class="filtro-group">
+    <label for="fhasta">Hasta</label>
+    <input id="fhasta" type="date" name="hasta" value="<%= filtros.hasta %>">
+  </div>
+  <% if (esFact) { %>
+    <label class="toggle-row mb-2">
+      <input type="checkbox" name="nc" value="1" <%= filtros.nc ? 'checked' : '' %>> Solo requieren nota de crédito
+    </label>
+  <% } %>
+  <div class="d-flex gap-2 flex-wrap">
+    <button type="submit" class="btn btn-naranja btn-sm">Filtrar</button>
+    <a href="/facturacion?tab=<%= tab %>" class="btn btn-outline-secondary btn-sm">Limpiar</a>
+    <a href="/facturacion/exportar/excel?<%= qsExport %>" class="btn btn-outline-secondary btn-sm"><%- icon('download', { size: 14 }) %> Excel</a>
+    <a href="/facturacion/exportar/pdf?<%= qsExport %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"><%- icon('fileText', { size: 14 }) %> PDF</a>
+  </div>
+</form>
+
+<!-- Tabla -->
+<div class="card shadow-sm">
+  <% if (!esFact && lista.length) { %>
+    <div class="fact-sel-bar">
+      <span id="selInfo">Tildá operaciones de un mismo cliente para emitir una sola factura.</span>
+      <button type="button" class="btn btn-naranja btn-sm" id="btnFacturarSel" disabled>Facturar seleccionadas</button>
+    </div>
+  <% } %>
+  <div class="card-body p-0">
+    <% if (!lista.length) { %>
+      <div class="empty-state">
+        <div class="empty-state__icon"><%- icon('fileText', { size: 32 }) %></div>
+        <p class="empty-state__msg">
+          <%= esFact ? 'No hay operaciones facturadas con estos filtros.' : 'No hay operaciones pendientes de facturar con estos filtros.' %>
+        </p>
+      </div>
+    <% } else if (!esFact) { %>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th class="fact-col-sel"><span class="visually-hidden">Seleccionar</span></th>
+              <th>OP</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Pago</th>
+              <th class="text-end">Monto</th><th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% lista.forEach(o => { %>
+              <tr>
+                <td>
+                  <input type="checkbox" class="fact-sel js-sel" aria-label="Seleccionar <%= nroOp(o.nro_op) %>"
+                         data-id="<%= o.id %>" data-cliente-id="<%= o.cliente_id %>" data-cliente="<%= o.cliente %>"
+                         data-monto="<%= o.monto %>" data-cuit="<%= o.cuit || '' %>" data-dni="<%= o.dni || '' %>"
+                         data-razon="<%= o.razon_social || '' %>" data-cond="<%= o.condicion_iva || '' %>"
+                         data-op="<%= nroOp(o.nro_op) %>">
+                </td>
+                <td><a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a></td>
+                <td class="text-nowrap">
+                  <%= formatFecha(o.fecha_emision) %>
+                  <% if (o.dias > 30) { %><span class="badge badge-alerta ms-1" title="Pendiente hace <%= o.dias %> días">+30 días</span><% } %>
+                </td>
+                <td>
+                  <%= o.cliente %>
+                  <div class="small text-muted">
+                    <%= o.condicion_iva_label || 'Condición IVA sin cargar' %><% if (o.cuit) { %> · CUIT <%= o.cuit %><% } %>
+                  </div>
+                </td>
+                <td><small class="text-muted"><%= o.tipo_label %></small></td>
+                <td><span class="badge <%= badgeMap[o.estado] || '' %>"><%= labelEstado[o.estado] || o.estado %></span></td>
+                <td><small><%= pagoLbl[o.metodo_pago] || '—' %></small></td>
+                <td class="text-end fw-semibold"><%= money(o.monto) %></td>
+                <td class="text-end text-nowrap">
+                  <button type="button" class="btn btn-naranja btn-sm js-facturar-uno" data-id="<%= o.id %>">Facturar</button>
+                  <form method="POST" action="/facturacion/<%= o.id %>/quitar" class="d-inline"
+                        onsubmit="return confirm('¿Quitar esta operación de la lista para facturar?')">
+                    <button type="submit" class="btn btn-outline-secondary btn-sm">Quitar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="7" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
+              <td class="text-end fw-bold"><%= money(suma('monto')) %></td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>OP</th><th>Comprobante</th><th>Fecha</th><th>Cliente</th><th>Tipo</th>
+              <th class="text-end">Neto</th><th class="text-end">IVA</th><th class="text-end">Total</th>
+              <th>Registrada por</th><th class="text-end">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% lista.forEach(o => { %>
+              <tr>
+                <td><a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a></td>
+                <td class="text-nowrap">
+                  <span class="fw-semibold"><%= o.comprobante %></span>
+                  <% if (o.cae) { %><div class="small text-muted">CAE <%= o.cae %></div><% } %>
+                  <% if (o.requiereNC) { %>
+                    <div><span class="badge badge-alerta mt-1">Anulada · requiere NC</span></div>
+                  <% } else if (o.nc_numero) { %>
+                    <div><span class="badge badge--anulado mt-1">Anulada · NC <%= o.nc_numero %></span></div>
+                  <% } %>
+                </td>
+                <td><%= formatFecha(o.fecha_factura) %></td>
+                <td>
+                  <%= o.razon_social || o.cliente %>
+                  <% if (o.cuit) { %><div class="small text-muted">CUIT <%= o.cuit %></div><% } %>
+                </td>
+                <td><small class="text-muted"><%= o.tipo_label %></small></td>
+                <td class="text-end"><%= money(o.neto) %></td>
+                <td class="text-end"><%= money(o.iva) %></td>
+                <td class="text-end fw-semibold"><%= money(o.monto) %></td>
+                <td><small class="text-muted"><%= o.facturado_por_nombre || '—' %></small></td>
+                <td class="text-end text-nowrap">
+                  <% if (o.requiereNC) { %>
+                    <button type="button" class="btn btn-outline-danger btn-sm js-nc"
+                            data-id="<%= o.id %>" data-origen="<%= o.factura_origen || 'manual' %>"
+                            data-label="<%= nroOp(o.nro_op) %> · <%= o.comprobante %> · <%= money(o.monto) %>">Registrar NC</button>
+                  <% } else if (!o.anulada && o.factura_origen !== 'afip') { %>
+                    <form method="POST" action="/facturacion/<%= o.id %>/revertir" class="d-inline"
+                          onsubmit="return confirm('¿Revertir la factura <%= o.comprobante %>? Todas las operaciones que cubre vuelven a Pendiente Facturar.')">
+                      <button type="submit" class="btn btn-outline-secondary btn-sm">Revertir</button>
+                    </form>
+                  <% } else { %>
+                    <span class="text-muted small">—</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td colspan="5" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
+              <td class="text-end fw-bold"><%= money(suma('neto')) %></td>
+              <td class="text-end fw-bold"><%= money(suma('iva')) %></td>
+              <td class="text-end fw-bold"><%= money(suma('monto')) %></td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    <% } %>
+  </div>
+</div>
+
+<!-- Modal: registrar factura -->
+<div class="modal fade" id="modalFacturar" tabindex="-1" aria-labelledby="modalFacturarTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <form class="modal-content" method="POST" action="/facturacion/facturar" id="formFacturar">
+      <input type="hidden" name="op_ids" id="facturarIds">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalFacturarTitulo">Registrar factura</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="facturarResumen"></p>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Datos fiscales del cliente</h3>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="fCond">Condición IVA</label>
+              <select class="form-select" name="condicion_iva" id="fCond">
+                <% Object.entries(condiciones).forEach(([k, l]) => { %><option value="<%= k %>"><%= l %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="fCuit">CUIT</label>
+              <input class="form-control" name="cuit" id="fCuit" inputmode="numeric" placeholder="30-71234567-8">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="fRazon">Razón social</label>
+              <input class="form-control" name="razon_social" id="fRazon" placeholder="Como figura en AFIP">
+            </div>
+          </div>
+          <p class="form-hint">Se guardan en la ficha del cliente para las próximas facturas.</p>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Comprobante</h3>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="fTipo">Tipo de factura</label>
+              <select class="form-select" name="tipo_comprobante" id="fTipo">
+                <% if (empresaCondicion === 'MT') { %>
+                  <option value="C">Factura C</option>
+                <% } else { %>
+                  <option value="A">Factura A</option>
+                  <option value="B">Factura B</option>
+                <% } %>
+              </select>
+            </div>
+            <div class="col-md-4" id="wrapAlicuota">
+              <label class="form-label" for="fAlicuota">Alícuota IVA</label>
+              <select class="form-select" name="alicuota" id="fAlicuota">
+                <% alicuotas.forEach(a => { %><option value="<%= a %>" <%= a === 21 ? 'selected' : '' %>><%= String(a).replace('.', ',') %>%</option><% }) %>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="fFecha">Fecha</label>
+              <input class="form-control" type="date" name="fecha" id="fFecha" value="<%= hoy %>">
+            </div>
+          </div>
+          <div class="fact-preview mt-3" aria-live="polite">
+            <div><span>Neto</span><strong id="pvNeto">$0</strong></div>
+            <div><span>IVA</span><strong id="pvIva">$0</strong></div>
+            <div><span>Total</span><strong id="pvTotal">$0</strong></div>
+          </div>
+          <p class="form-hint">Los montos de las operaciones son finales (IVA incluido).</p>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Emisión</h3>
+          <div class="fact-modo mb-3">
+            <label class="radio-option"><input type="radio" name="modo" value="manual" checked> Ya la emití: cargo el número</label>
+            <label class="radio-option" title="<%= afipHabilitado ? '' : 'Configurá AFIP_CUIT, AFIP_PTO_VTA, AFIP_CERT y AFIP_KEY para habilitarlo' %>">
+              <input type="radio" name="modo" value="afip" <%= afipHabilitado ? '' : 'disabled' %>>
+              Emitir con AFIP (CAE)<% if (!afipHabilitado) { %> — no configurado<% } %>
+            </label>
+          </div>
+          <div id="camposManual">
+            <label class="form-label" for="fNumero">N° de comprobante *</label>
+            <input class="form-control" name="numero" id="fNumero" maxlength="40" placeholder="Ej: 0001-00001234">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-naranja">Registrar factura</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: nota de crédito -->
+<div class="modal fade" id="modalNC" tabindex="-1" aria-labelledby="modalNCTitulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <form class="modal-content" method="POST" action="" id="formNC">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalNCTitulo">Registrar nota de crédito</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-0" id="ncLabel"></p>
+        <div class="fact-modo">
+          <label class="radio-option"><input type="radio" name="modo" value="manual" checked> Ya la emití: cargo el número</label>
+          <label class="radio-option"><input type="radio" name="modo" value="afip" id="ncModoAfip"> Emitir con AFIP (CAE)</label>
+        </div>
+        <div id="ncCamposManual">
+          <label class="form-label" for="ncNumero">N° de nota de crédito *</label>
+          <input class="form-control" name="numero" id="ncNumero" maxlength="40" placeholder="Ej: 0001-00000045">
+        </div>
+        <div>
+          <label class="form-label" for="ncFecha">Fecha</label>
+          <input class="form-control" type="date" name="fecha" id="ncFecha" value="<%= hoy %>">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="submit" class="btn btn-naranja">Registrar nota de crédito</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+</div>

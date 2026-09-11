@@ -1,13 +1,17 @@
 @use '../abstracts/variables' as *;
 
+// Acción principal de cabeceras ("+ Nueva venta", "Guardar", etc.)
 .btn-naranja {
   background: $accent;
   color: #fff;
-  border: none;
+  border: 1px solid $accent;
   border-radius: $radius-md;
   font-weight: 600;
+  box-shadow: 0 1px 2px rgba(28, 91, 173, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 
-  &:hover { background: $accent-dark; color: #fff; }
+  &:hover,
+  &:focus-visible { background: $accent-dark; border-color: $accent-dark; color: #fff; box-shadow: 0 4px 12px -2px rgba(28, 91, 173, 0.4); }
+  &:active { background: $accent-dark; color: #fff; }
 }
 
 .btn-logout {
@@ -21,10 +25,10 @@
   color: #fff;
   border: 1px solid $accent;
   border-radius: $radius-md;
-  font-weight: 500;
+  font-weight: 600;
   font-size: $fs-sm;
   padding: 0.5rem 1rem;
-  transition: background 0.12s, transform 0.05s;
+  transition: background $dur-fast $ease, transform 0.05s;
 
   &:hover  { background: $accent-dark; border-color: $accent-dark; color: #fff; }
   &:active { transform: translateY(1px); }
@@ -32,39 +36,52 @@
 
 .btn-secondary-modern {
   background: #fff;
-  color: $dark;
-  border: 1px solid #d1d5db;
+  color: $ink-soft;
+  border: 1px solid $border-input;
   border-radius: $radius-md;
-  font-weight: 500;
+  font-weight: 600;
   font-size: $fs-sm;
   padding: 0.5rem 1rem;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background $dur-fast $ease, border-color $dur-fast $ease;
 
-  &:hover { background: #f3f4f6; border-color: #9ca3af; }
+  &:hover { background: $bg-card-alt; border-color: $border-input-hover; color: $ink; }
 }
 
 .btn-ghost {
-  background: #eef2f5;
+  background: #fff;
   color: $ink-soft;
-  border: 1px solid #cbd5e1;
+  border: 1px solid $border-input;
   font-weight: 600;
   font-size: $fs-sm;
   padding: 0.4rem 0.9rem;
   border-radius: $radius-md;
-  transition: color 0.12s, background 0.12s, border-color 0.12s;
+  transition: color $dur-fast $ease, background $dur-fast $ease, border-color $dur-fast $ease;
 
-  &:hover { color: $dark; background: #e2e8f0; border-color: #94a3b8; }
+  &:hover { color: $ink; background: $bg-card-alt; border-color: $border-input-hover; }
 }
 
-// ── Refuerzo de botones Bootstrap tenues (más visibles) ────────
+// ── Botones Bootstrap de contorno: visibles y con hover suave ──
 .btn-outline-secondary {
   --bs-btn-color: #{$ink-soft};
-  --bs-btn-border-color: #cbd5e1;
+  --bs-btn-border-color: #{$border-input};
   --bs-btn-bg: #fff;
-  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-color: #{$accent-dark};
+  --bs-btn-hover-bg: #{$accent-soft};
+  --bs-btn-hover-border-color: #{$accent};
+  --bs-btn-active-color: #{$accent-dark};
+  --bs-btn-active-bg: #{$accent-soft};
+  --bs-btn-active-border-color: #{$accent};
+  --bs-btn-font-weight: 600;
+  box-shadow: $shadow-xs;
+}
+
+.btn-outline-primary {
+  --bs-btn-color: #{$accent};
+  --bs-btn-border-color: #{$accent};
   --bs-btn-hover-bg: #{$accent};
   --bs-btn-hover-border-color: #{$accent};
-  --bs-btn-font-weight: 600;
+  --bs-btn-active-bg: #{$accent-dark};
+  --bs-btn-active-border-color: #{$accent-dark};
 }
 
 .btn-outline-success {
@@ -72,6 +89,8 @@
   --bs-btn-border-color: #{$success};
   --bs-btn-hover-bg: #{$success};
   --bs-btn-hover-border-color: #{$success};
+  --bs-btn-active-bg: #157a40;
+  --bs-btn-active-border-color: #157a40;
   --bs-btn-font-weight: 600;
 }
 
@@ -80,7 +99,27 @@
   --bs-btn-border-color: #{$danger};
   --bs-btn-hover-bg: #{$danger};
   --bs-btn-hover-border-color: #{$danger};
+  --bs-btn-active-bg: #bf2e24;
+  --bs-btn-active-border-color: #bf2e24;
   --bs-btn-font-weight: 600;
+}
+
+.btn-success {
+  --bs-btn-bg: #{$success};
+  --bs-btn-border-color: #{$success};
+  --bs-btn-hover-bg: #157a40;
+  --bs-btn-hover-border-color: #157a40;
+  --bs-btn-active-bg: #136b38;
+  --bs-btn-active-border-color: #136b38;
+}
+
+.btn-warning {
+  --bs-btn-bg: #{$orange};
+  --bs-btn-border-color: #{$orange};
+  --bs-btn-color: #{$ink};
+  --bs-btn-hover-bg: #f0a444;
+  --bs-btn-hover-border-color: #{$orange-dark};
+  --bs-btn-hover-color: #{$ink};
 }
 
 // ── Botón WhatsApp (link click-to-chat) ────────────────────────
@@ -95,7 +134,7 @@
   font-weight: 600;
   font-size: $fs-sm;
   padding: 0.4rem 0.9rem;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background $dur-fast $ease, border-color $dur-fast $ease;
 
   &:hover  { background: #1da851; border-color: #1da851; color: #fff; }
   &:active { transform: translateY(1px); }
@@ -109,11 +148,11 @@
   color: $danger;
   font-size: 1.1rem;
   line-height: 1;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: $radius-sm;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background $dur-fast $ease;
 
-  &:hover { background: rgba(231, 76, 60, 0.1); }
+  &:hover { background: $danger-soft; }
 }

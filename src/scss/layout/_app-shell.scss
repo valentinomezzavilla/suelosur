@@ -9,11 +9,10 @@
 .main-content {
   flex: 1;
   min-width: 0;
-  padding: $content-pad 2rem;
+  padding: $content-pad 2rem 2.5rem;
   background: $bg-app;
-  overflow-y: auto;
 
   @include md-down {
-    padding: $content-pad-mob;
+    padding: $content-pad-mob $content-pad-mob 2rem;
   }
 }

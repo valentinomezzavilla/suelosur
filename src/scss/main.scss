@@ -44,6 +44,7 @@
 @use 'pages/configuracion';
 @use 'pages/detalle';
 @use 'pages/transacciones';
+@use 'pages/facturacion';
 
 // ── Utilidades (al final, para que ganen por especificidad) ────
 @use 'utilities/helpers';

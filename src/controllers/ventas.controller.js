@@ -93,6 +93,7 @@ const VentasController = {
         detalles,
         fecha_emision:       fechaRetro,
       })
+      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 
       await VentasModel.entregar(id_op)
 
@@ -232,6 +233,7 @@ const VentasController = {
           precio_unitario: Number(precioProducto) || 0,
         }],
       })
+      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 
       // Asignar chofer y camión si se seleccionaron
       if (idChofer || idCamion) {
@@ -294,6 +296,7 @@ const VentasController = {
       if (solapamiento) delete req.session.solapamiento
       res.render('pages/ventas/detalle', {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
+        facturacion: await require('../models/facturacion.model').estadoOp(op.id),
         recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('ventas'),
         recursosEditable: op.estado !== 'anulado' && op.estado !== 'entregado',

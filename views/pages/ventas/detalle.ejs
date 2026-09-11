@@ -203,6 +203,10 @@
   <% } %>
 
   <div class="col-12">
+    <%- include('../../partials/facturacion_estado', { opId: op.id, fact: facturacion, volver: `/ventas/${op.id}` }) %>
+  </div>
+
+  <div class="col-12">
     <%- include('../../partials/recursos_operacion', { opId: op.id, recursos, choferes: choferesDisp, camiones: camionesDisp, editable: recursosEditable, solapamiento }) %>
   </div>
 

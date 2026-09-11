@@ -173,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         formItems.value       = JSON.stringify(carrito);
         formMetodoPago.value  = document.getElementById('metodoPago')?.value || 'efectivo';
+        const formParaFacturar = document.getElementById('formParaFacturar');
+        if (formParaFacturar) formParaFacturar.value = document.getElementById('paraFacturar')?.checked ? '1' : '';
         formPrecioTotal.value = checkPrecio.checked ? inputPrecio.value : calcularTotal();
         const formObs = document.getElementById('formObservaciones');
         if (formObs) formObs.value = document.getElementById('obsCantera')?.value?.trim() || '';

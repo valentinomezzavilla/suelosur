@@ -142,8 +142,13 @@ const ClientesController = {
   async crear(req, res) {
     try {
       const { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuentaCorriente } = req.body
+      const fiscal = {
+        cuit:          String(req.body.cuit || '').replace(/\D/g, '') || null,
+        razon_social:  String(req.body.razon_social || '').trim() || null,
+        condicion_iva: ['RI', 'MT', 'EX', 'CF'].includes(req.body.condicion_iva) ? req.body.condicion_iva : null,
+      }
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/clientes/nuevo') }
-      await ClientesModel.crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
+      await ClientesModel.crear({ nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente, ...fiscal })
       req.flash('success', 'Cliente creado.')
       res.redirect('/clientes')
     } catch (err) {
@@ -182,8 +187,13 @@ const ClientesController = {
   async actualizar(req, res) {
     try {
       const { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuentaCorriente } = req.body
+      const fiscal = {
+        cuit:          String(req.body.cuit || '').replace(/\D/g, '') || null,
+        razon_social:  String(req.body.razon_social || '').trim() || null,
+        condicion_iva: ['RI', 'MT', 'EX', 'CF'].includes(req.body.condicion_iva) ? req.body.condicion_iva : null,
+      }
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/clientes/${req.params.id}/editar`) }
-      await ClientesModel.actualizar(req.params.id, { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente })
+      await ClientesModel.actualizar(req.params.id, { nombre, apellido, domicilio_ppal, zona, tel_whatsapp, telefono, email, dni, tipo_cliente, cuenta_corriente: cuentaCorriente, ...fiscal })
       req.flash('success', 'Cliente actualizado.')
       res.redirect('/clientes')
     } catch (err) {
@@ -258,7 +268,7 @@ const ClientesController = {
   async crearApi(req, res) {
     try {
       const { nombre, apellido, dni, telefono, email } = req.body
-      if (!nombre || !apellido || !telefono) return res.status(400).json({ error: 'Nombre, apellido y teléfono son obligatorios.' })
+      if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' })
       const id    = await ClientesModel.crear({ nombre, apellido, dni, telefono, email })
       const nuevo = await ClientesModel.obtener(id)
       res.json({

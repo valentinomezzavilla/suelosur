@@ -16,14 +16,15 @@
   display: flex;
   flex-direction: column;
   background: $bg-card;
-  border: 1.5px solid $border;
+  border: 1px solid $border;
   border-radius: $radius-xl;
   padding: 1.25rem 1.15rem;
   text-decoration: none;
   color: $dark;
   position: relative;
   overflow: hidden;
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+  box-shadow: $shadow-xs;
+  transition: transform $dur $ease, box-shadow $dur $ease, border-color $dur $ease;
 
   // Franja de acento superior (aparece en hover)
   &::after {
@@ -39,8 +40,8 @@
   }
 
   &:hover {
-    transform: translateY(-4px);
-    box-shadow: $shadow-lg;
+    transform: translateY(-3px);
+    box-shadow: $shadow-md;
     border-color: var(--mc, #{$border});
     color: $dark;
 
@@ -87,8 +88,9 @@
   font-weight: 700;
   color: var(--mc, #{$muted});
   letter-spacing: 0.1px;
-  opacity: 0;
-  transition: opacity 0.16s, transform 0.16s;
+  // visible siempre (en táctiles no hay hover); se refuerza al pasar el mouse
+  opacity: 0.55;
+  transition: opacity $dur, transform $dur $ease;
 }
 
 // ── Separador de sección en el dashboard ──────────────────────
