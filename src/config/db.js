@@ -748,7 +748,10 @@ async function initDB() {
   // revertir el cargo correspondiente y el saldo del cliente queda mal. Se vincula por
   // mejor esfuerzo: mismo cliente, mismo monto (con signo invertido) y la transacción
   // más cercana en el tiempo — no hay una relación explícita en los datos viejos.
-  await (async () => {
+  // Sin await a propósito: es "mejor esfuerzo", no crítica para arrancar. Si se
+  // queda esperando una conexión (ej. problema de red puntual), no puede trabar el
+  // arranque del server ni el bind del puerto.
+  ;(async () => {
     const sinVincular = (await pool.query(
       `SELECT id, cliente_id, monto, created_at FROM movimientos_cuenta WHERE tipo = 'deuda' AND id_op_encabezado IS NULL`
     )).rows
