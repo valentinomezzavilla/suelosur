@@ -33,6 +33,24 @@
   }
   tbody tr:last-child td { border-bottom: none; }
   tfoot tr.total-row { background: $accent-soft; font-weight: 700; }
+
+  // Venta a cta. corriente ya entregada (con cargo generado) y todavía sin saldar
+  // — ver ClientesModel.saldadaPorOperacion. El color nunca es la única señal: la fila
+  // también lleva el badge "Sin saldar" en Historial de ventas.
+  // Bootstrap pinta el fondo por celda (background-color + box-shadow en cada <td>,
+  // no en el <tr>), así que hay que tocar las celdas para que el tinte se vea.
+  tbody tr.venta-cc-pendiente > td {
+    box-shadow: inset 0 0 0 9999px #{$warning-soft};
+  }
+  tbody tr.venta-cc-pendiente:hover > td {
+    box-shadow: inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 65%, $bg-hover)};
+  }
+  tbody tr.venta-cc-pendiente > td:first-child {
+    box-shadow: inset 3px 0 0 $warning, inset 0 0 0 9999px #{$warning-soft};
+  }
+  tbody tr.venta-cc-pendiente:hover > td:first-child {
+    box-shadow: inset 3px 0 0 $warning, inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 65%, $bg-hover)};
+  }
 }
 
 // Bootstrap .table-light en cabeceras: mismo tono que el resto

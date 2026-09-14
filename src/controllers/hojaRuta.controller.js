@@ -504,7 +504,7 @@ const HojaRutaController = {
           descripcion: full.observaciones || 'Venta con viaje', metodo_pago: full.metodo_pago || 'efectivo',
         })
         if (full.metodo_pago === 'cuenta_corriente' && full.id_cliente) {
-          await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}`, monto: -(full.total || 0) })
+          await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}`, monto: -(full.total || 0), id_op_encabezado: op.id })
         }
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {

@@ -740,6 +740,39 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS obra TEXT`).catch(() => {})
   // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
+  // Cuenta corriente: venta de origen del cargo (para saber, venta por venta, si ya fue saldada)
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS id_op_encabezado BIGINT REFERENCES op_encabezado(id)`).catch(() => {})
+  // Backfill: las deudas de cta. corriente cargadas antes de que existiera esta columna
+  // quedan sin vincular a su venta/alquiler de origen. Sin ese vínculo, corregir el
+  // método de pago de esa transacción (pasarla a efectivo/transferencia) no puede
+  // revertir el cargo correspondiente y el saldo del cliente queda mal. Se vincula por
+  // mejor esfuerzo: mismo cliente, mismo monto (con signo invertido) y la transacción
+  // más cercana en el tiempo — no hay una relación explícita en los datos viejos.
+  await (async () => {
+    const sinVincular = (await pool.query(
+      `SELECT id, cliente_id, monto, created_at FROM movimientos_cuenta WHERE tipo = 'deuda' AND id_op_encabezado IS NULL`
+    )).rows
+    if (!sinVincular.length) return
+    const candidatas = (await pool.query(
+      `SELECT id_op_encabezado, cliente_id, monto, COALESCE(fecha, created_at) AS fecha FROM transacciones
+       WHERE metodo_pago = 'cuenta_corriente' AND id_op_encabezado IS NOT NULL`
+    )).rows
+    const usadas = new Set()
+    for (const d of sinVincular) {
+      let mejor = null, mejorDif = Infinity
+      for (const c of candidatas) {
+        if (usadas.has(c.id_op_encabezado)) continue
+        if (c.cliente_id !== d.cliente_id) continue
+        if (Math.abs(Number(c.monto) + Number(d.monto)) > 0.01) continue
+        const dif = Math.abs(new Date(c.fecha) - new Date(d.created_at))
+        if (dif < mejorDif) { mejorDif = dif; mejor = c }
+      }
+      if (mejor) {
+        usadas.add(mejor.id_op_encabezado)
+        await pool.query(`UPDATE movimientos_cuenta SET id_op_encabezado = $1 WHERE id = $2`, [mejor.id_op_encabezado, d.id])
+      }
+    }
+  })().catch(e => console.error('Backfill id_op_encabezado (movimientos_cuenta):', e.message))
   // Facturación: operaciones marcadas "para facturar" y su estado de facturación.
   // monto_facturar guarda el total cargado al crear (la venta con viaje no guarda el flete hasta entregarse).
   for (const col of [

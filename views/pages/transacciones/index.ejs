@@ -107,8 +107,10 @@
                                 <td colspan="7" class="td-vacia">No hay transacciones que coincidan con los filtros</td>
                             </tr>
                             <% } %>
-                                <% transacciones.forEach(t=> { %>
-                                    <tr>
+                                <% transacciones.forEach(t=> {
+                                    const sinSaldar = t.metodo_pago === 'cuenta_corriente' && t.saldada === false
+                                %>
+                                    <tr class="<%= sinSaldar ? 'venta-cc-pendiente' : '' %>" <%= sinSaldar ? 'title="Venta a cuenta corriente — todavía no se saldó"' : '' %>>
                                         <td class="fw-semibold text-orange"><%= codigoTx(t) %>
                                         </td>
                                         <td>
@@ -127,11 +129,16 @@
                                             <%= formatFecha(t.fecha) %>
                                         </td>
                                         <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %>
+                                            <% if (sinSaldar) { %>
+                                                <div><span class="badge rounded-pill px-2 py-1 badge-pendiente" style="font-size:0.62rem;white-space:nowrap">Sin saldar</span></div>
+                                            <% } %>
                                         </td>
                                         <td>
                                             <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
+                                                data-real-id="<%= t.id %>"
                                                 data-id="<%= codigoTx(t) %>" data-tipo="<%= t.tipo %>"
-                                                data-cliente="<%= t.cliente %>" data-descripcion="<%= t.descripcion %>"
+                                                data-cliente="<%= t.cliente %>" data-cliente-id="<%= t.cliente_id || '' %>"
+                                                data-descripcion="<%= t.descripcion %>"
                                                 data-fecha="<%= formatFecha(t.fecha) %>" data-monto="<%= t.monto %>"
                                                 data-metodo-pago="<%= t.metodo_pago || '' %>"
                                                 data-op-id="<%= t.id_op_encabezado || '' %>"
@@ -207,10 +214,27 @@
                             <span class="tx-row__label">Fecha</span>
                             <span class="tx-row__value" id="modal-t-fecha"></span>
                         </div>
-                        <div class="tx-row">
+                        <div class="tx-row" id="filaMetodoPago">
                             <span class="tx-row__label">Método de pago</span>
-                            <span class="tx-row__value"><span class="tx-pago" id="modal-t-metodo-pago"></span></span>
+                            <span class="tx-row__value">
+                                <span class="tx-pago" id="modal-t-metodo-pago"></span>
+                                <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
+                                    <button type="button" class="tx-link-btn" id="btnEditarMetodoPago">Corregir</button>
+                                <% } %>
+                            </span>
                         </div>
+                        <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
+                        <form id="formMetodoPago" method="POST" class="tx-metodo-edit" style="display:none">
+                            <select name="metodo_pago" id="selectMetodoPagoEdit">
+                                <option value="efectivo">Efectivo</option>
+                                <option value="transferencia">Transferencia</option>
+                                <option value="cheque">Cheque</option>
+                                <option value="cuenta_corriente" id="optCuentaCorriente">Cuenta corriente</option>
+                            </select>
+                            <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                            <button type="button" class="btn-secondary btn-sm" id="btnCancelarMetodoPago">Cancelar</button>
+                        </form>
+                        <% } %>
                         <div class="tx-row tx-row--bloque">
                             <span class="tx-row__label">Descripción</span>
                             <span class="tx-row__value" id="modal-t-descripcion"></span>

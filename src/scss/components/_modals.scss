@@ -128,3 +128,72 @@
   flex-wrap: wrap;
   padding-top: 0.25rem;
 }
+
+// Modal "Saldar deuda" (cuentas corrientes): resumen del importe a pagar,
+// atajo para precargar el total y prefijo "$" en el input de monto.
+.abonar-resumen {
+  background: $danger-soft;
+  border: 1px solid $danger-border;
+  border-radius: $radius-lg;
+  padding: 0.85rem 1.1rem;
+  margin-bottom: 1.15rem;
+
+  &__label {
+    font-size: $fs-xxs;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: $danger-text;
+    margin: 0 0 0.15rem;
+  }
+
+  &__monto {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: $danger-text;
+    line-height: 1.15;
+  }
+
+  &__concepto {
+    margin: 0.4rem 0 0;
+    font-size: $fs-sm;
+    color: $danger-text;
+  }
+}
+
+.abonar-quickfill {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: $accent;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+.abonar-input-monto {
+  position: relative;
+
+  &::before {
+    content: "$";
+    position: absolute;
+    left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: $muted;
+    font-weight: 600;
+    font-size: $fs-sm;
+    pointer-events: none;
+  }
+
+  input {
+    padding-left: 1.65rem !important;
+  }
+}

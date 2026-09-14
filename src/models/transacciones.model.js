@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const ClientesModel = require('./clientes.model')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -39,6 +40,56 @@ const TransaccionesModel = {
 
   async obtener(id) {
     return (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
+  },
+
+  // Cambia el método de pago de una transacción ya cargada (p.ej. se finalizó como
+  // "efectivo" y en realidad era "cuenta corriente"). Mantiene todo consistente:
+  //  · Si sale de cuenta corriente: revierte el cargo pendiente en la cuenta del cliente.
+  //  · Si entra a cuenta corriente: genera el cargo correspondiente.
+  //  · El método de la OP asociada (si tiene) se actualiza igual, para que el resto
+  //    de la app (remito, detalle de venta) muestre lo mismo.
+  async cambiarMetodoPago(id, nuevoMetodo) {
+    const METODOS = ['efectivo', 'transferencia', 'cheque', 'cuenta_corriente']
+    if (!METODOS.includes(nuevoMetodo)) throw new Error('Método de pago inválido.')
+
+    const tx = (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
+    if (!tx) throw new Error('La transacción no existe.')
+    const anterior = tx.metodo_pago || 'efectivo'
+    if (anterior === nuevoMetodo) return
+
+    if (nuevoMetodo === 'cuenta_corriente' && (!tx.cliente_id || !tx.id_op_encabezado)) {
+      throw new Error('No se puede pasar a cuenta corriente: la transacción no tiene cliente y operación asociados.')
+    }
+
+    await transaction(async (q) => {
+      await q(`UPDATE transacciones SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, id])
+      if (tx.id_op_encabezado) {
+        await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
+      }
+
+      // Salía de cta. corriente: revertir el cargo (si seguía en pie) en el saldo del cliente.
+      if (anterior === 'cuenta_corriente' && tx.id_op_encabezado) {
+        const deuda = (await q(
+          `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda' LIMIT 1`,
+          [tx.id_op_encabezado]
+        )).rows[0]
+        if (deuda) {
+          await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [deuda.id])
+          await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(deuda.monto), deuda.cliente_id])
+        }
+      }
+
+      // Entra a cta. corriente: generar el cargo correspondiente.
+      if (nuevoMetodo === 'cuenta_corriente' && tx.id_op_encabezado) {
+        const monto = Number(tx.monto) || 0
+        await q(
+          `INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado)
+           VALUES (?, 'deuda', ?, ?, ?)`,
+          [tx.cliente_id, `${tx.tipo}: ${tx.descripcion || ''}`.trim(), -monto, tx.id_op_encabezado]
+        )
+        await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [monto, tx.cliente_id])
+      }
+    })
   },
 
   // Elimina la transacción y, si tiene una operación detrás, la operación entera con
@@ -87,6 +138,19 @@ const TransaccionesModel = {
       // Un alquiler puede estar encadenado como "próximo" de otro: hay que soltarlo
       await q(`UPDATE op_detalle_contenedor SET alquiler_siguiente_id = NULL WHERE alquiler_siguiente_id = ?`, [idOp])
 
+      // Si la venta/alquiler era a cuenta corriente, el cargo en la cuenta del cliente
+      // queda apuntando a una operación que está por desaparecer: hay que revertirlo
+      // (si no, además de quedar un cargo fantasma, la FK contra op_encabezado rompe
+      // el DELETE de más abajo).
+      const deudas = (await q(
+        `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda'`,
+        [idOp]
+      )).rows
+      for (const deuda of deudas) {
+        await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [deuda.id])
+        await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(deuda.monto), deuda.cliente_id])
+      }
+
       await q(`DELETE FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [idOp])
       await q(`DELETE FROM op_detalle_maquinaria WHERE id_orden_pedido = ?`, [idOp])
       await q(`DELETE FROM op_detalle_material   WHERE id_orden_pedido = ?`, [idOp])
@@ -131,6 +195,16 @@ const TransaccionesModel = {
       LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
       ORDER BY sub.${orderCol} ${orderDir} LIMIT ? OFFSET ?
     `, [...params, limit, offset])).rows
+
+    // Ventas a cuenta corriente: venta por venta, ¿el cliente ya la saldó?
+    // (ver ClientesModel.saldadaPorOperacion — FIFO contra las deudas del cliente)
+    const idsCC = rows
+      .filter(r => r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado)
+      .map(r => r.id_op_encabezado)
+    const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
+    rows.forEach(r => {
+      if (r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado) r.saldada = !!saldadas[r.id_op_encabezado]
+    })
 
     return { rows, total, sumaTotal, page, limit, totalPaginas: Math.ceil(total / limit) }
   },

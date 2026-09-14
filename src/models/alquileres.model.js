@@ -537,6 +537,7 @@ const AlquileresModel = {
         tipo: 'deuda',
         descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
         monto: -monto,
+        id_op_encabezado: op.id,
       })
     }
     return monto

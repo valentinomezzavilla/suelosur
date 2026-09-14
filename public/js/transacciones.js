@@ -10,6 +10,25 @@
     const iconsEl = document.getElementById('tx-icons');
     const ICONS = iconsEl ? JSON.parse(iconsEl.textContent) : {};
 
+    // ── Corregir método de pago ───────────────────────────────
+    const formMetodoPago      = document.getElementById('formMetodoPago');
+    const selectMetodoPago    = document.getElementById('selectMetodoPagoEdit');
+    const optCuentaCorriente  = document.getElementById('optCuentaCorriente');
+    const btnEditarMetodoPago = document.getElementById('btnEditarMetodoPago');
+    const btnCancelarMetodoPago = document.getElementById('btnCancelarMetodoPago');
+
+    function cerrarEdicionMetodoPago() {
+        if (formMetodoPago) formMetodoPago.style.display = 'none';
+        const fila = document.getElementById('filaMetodoPago');
+        if (fila) fila.style.display = '';
+    }
+    btnCancelarMetodoPago?.addEventListener('click', cerrarEdicionMetodoPago);
+    btnEditarMetodoPago?.addEventListener('click', () => {
+        const fila = document.getElementById('filaMetodoPago');
+        if (fila) fila.style.display = 'none';
+        if (formMetodoPago) formMetodoPago.style.display = 'flex';
+    });
+
     document.querySelectorAll('.btn-ver-transaccion').forEach(btn => {
         btn.addEventListener('click', () => {
             document.getElementById('modal-t-id').textContent = '#' + btn.dataset.id;
@@ -24,6 +43,19 @@
             document.getElementById('modal-t-monto').textContent = '$' + Number(btn.dataset.monto).toLocaleString('es-AR');
             const mp = btn.dataset.metodoPago;
             document.getElementById('modal-t-metodo-pago').textContent = PAGO_LABEL[mp] || (mp ? mp : '—');
+
+            // Corregir método de pago: solo tiene sentido si hay una operación y un
+            // cliente detrás (si no, no hay a quién cargarle/quitarle la deuda).
+            cerrarEdicionMetodoPago();
+            if (formMetodoPago) {
+                formMetodoPago.action = '/transacciones/' + btn.dataset.realId + '/metodo-pago';
+                selectMetodoPago.value = mp || 'efectivo';
+                const puedeCC = !!(btn.dataset.opId && btn.dataset.clienteId);
+                if (optCuentaCorriente) {
+                    optCuentaCorriente.disabled = !puedeCC;
+                    optCuentaCorriente.title = puedeCC ? '' : 'Esta transacción no tiene cliente/operación asociados';
+                }
+            }
 
             // Archivos asociados (remito y remito firmado de la operación)
             const opId = btn.dataset.opId;
@@ -87,6 +119,7 @@
     function cerrarModal() {
         document.getElementById('modal-transaccion').style.display = 'none';
         document.body.style.overflow = '';
+        cerrarEdicionMetodoPago();
     }
     document.getElementById('cerrarModalTransaccion')?.addEventListener('click', cerrarModal);
     document.getElementById('cerrarModalTransaccionBtn')?.addEventListener('click', cerrarModal);

@@ -122,6 +122,7 @@ const AlquileresController = {
             tipo: 'deuda',
             descripcion: `Alquiler contenedor (histórico) OP-${String(result.nro_op).padStart(4, '0')}`,
             monto: -monto,
+            id_op_encabezado: result.id,
           })
         }
         req.flash('success', `Alquiler finalizado OP-${String(result.nro_op).padStart(4, '0')} cargado (histórico).`)

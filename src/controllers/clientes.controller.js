@@ -237,7 +237,11 @@ const ClientesController = {
     try {
       const monto = Number(req.body.monto)
       if (!monto || monto <= 0) { req.flash('error', 'Monto inválido.'); return res.redirect('/clientes') }
-      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion: 'Pago / abono de deuda', monto, metodo_pago: req.body.metodo_pago || null })
+      // Si viene de "Saldar" en una fila puntual del ledger, la descripción hace
+      // referencia a esa operación; si no, queda el genérico de siempre.
+      const concepto = (req.body.descripcion || '').trim()
+      const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
+      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion, monto, metodo_pago: req.body.metodo_pago || null })
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')

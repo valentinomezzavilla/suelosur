@@ -115,6 +115,13 @@
 
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: $bg-hover; }
+
+  // Venta a cta. corriente ya entregada y todavía sin saldar (ver /ventas)
+  tbody tr.venta-cc-pendiente {
+    background: $warning-soft;
+    box-shadow: inset 3px 0 0 $warning;
+    &:hover { background: color-mix(in srgb, $warning-soft 65%, $bg-hover); }
+  }
 }
 
 .td-vacia {

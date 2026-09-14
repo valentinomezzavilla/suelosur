@@ -134,9 +134,9 @@ const ClientesModel = {
     await query(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`, [id])
   },
 
-  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago }) {
-    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago) VALUES (?, ?, ?, ?, ?) RETURNING id`,
-      [id, tipo, descripcion, Number(monto), metodo_pago || null])
+  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }) {
+    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null])
     await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return rows[0].id
   },
@@ -160,6 +160,58 @@ const ClientesModel = {
     if (fechaDesde) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('LEFT(created_at, 10) <= ?'); params.push(fechaHasta) }
     return (await query(`SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`, params)).rows
+  },
+
+  // Saldo pendiente de ventas puntuales a cuenta corriente (venta por venta, no el
+  // saldo global del cliente). No hay un vínculo pago↔venta explícito: los pagos se
+  // aplican en orden FIFO contra las deudas más antiguas del cliente, igual que ya
+  // refleja el saldo corrido de estadoCuenta(). Devuelve { [id_op_encabezado]: boolean saldada }.
+  async saldadaPorOperacion(opIds) {
+    const ids = [...new Set((opIds || []).filter(Boolean))]
+    if (!ids.length) return {}
+    const ph = ids.map(() => '?').join(',')
+
+    const clientesIds = (await query(
+      `SELECT DISTINCT cliente_id FROM movimientos_cuenta WHERE id_op_encabezado IN (${ph})`, ids
+    )).rows.map(r => r.cliente_id)
+    if (!clientesIds.length) return {}
+
+    const movs = (await query(
+      `SELECT cliente_id, id_op_encabezado, monto FROM movimientos_cuenta
+       WHERE cliente_id IN (${clientesIds.map(() => '?').join(',')})
+       ORDER BY cliente_id, created_at ASC, id ASC`,
+      clientesIds
+    )).rows
+
+    const deudas = {} // id_op_encabezado -> { total, pagado }
+    let clienteActual = null
+    let cola = [] // deudas abiertas del cliente actual, más vieja primero
+    for (const m of movs) {
+      if (m.cliente_id !== clienteActual) { clienteActual = m.cliente_id; cola = [] }
+      const monto = Number(m.monto)
+      if (monto < 0) {
+        const entrada = { idOp: m.id_op_encabezado, restante: -monto }
+        cola.push(entrada)
+        if (m.id_op_encabezado) deudas[m.id_op_encabezado] = { total: entrada.restante, pagado: 0 }
+      } else if (monto > 0) {
+        let disponible = monto
+        while (disponible > 1e-6 && cola.length) {
+          const cabeza = cola[0]
+          const consumido = Math.min(disponible, cabeza.restante)
+          cabeza.restante -= consumido
+          disponible -= consumido
+          if (cabeza.idOp && deudas[cabeza.idOp]) deudas[cabeza.idOp].pagado += consumido
+          if (cabeza.restante <= 1e-6) cola.shift()
+        }
+      }
+    }
+
+    const resultado = {}
+    for (const id of ids) {
+      const d = deudas[id]
+      resultado[id] = d ? d.pagado >= d.total - 1e-6 : true
+    }
+    return resultado
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────

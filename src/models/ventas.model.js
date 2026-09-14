@@ -1,6 +1,7 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const FlotaModel = require('./flota.model')
+const ClientesModel = require('./clientes.model')
 
 const VentasModel = {
 
@@ -57,7 +58,7 @@ const VentasModel = {
       ${where}
     `, params)).rows[0]?.n || 0
     const ops = (await query(`
-      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito,
+      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito, op.metodo_pago,
              COALESCE(c.nombre, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
              (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
@@ -67,6 +68,13 @@ const VentasModel = {
       JOIN users    u ON u.id = op.id_administrativo
       ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?
     `, [...params, limit, offset])).rows
+
+    // Ventas a cuenta corriente ya entregadas (con cargo generado): venta por venta,
+    // ¿el cliente ya la saldó? (ver ClientesModel.saldadaPorOperacion)
+    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado === 'entregado').map(o => o.id)
+    const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
+    ops.forEach(o => { if (idsCC.includes(o.id)) o.saldada = !!saldadas[o.id] })
+
     return { ops, total, page, limit, totalPaginas: Math.ceil(total / limit) || 1 }
   },
 

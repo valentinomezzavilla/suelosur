@@ -133,6 +133,7 @@ const VentasController = {
           tipo: 'deuda',
           descripcion: `Venta Cantera: ${desc}`,
           monto: -total,
+          id_op_encabezado: id_op,
         })
       }
 
@@ -291,6 +292,7 @@ const VentasController = {
             tipo: 'deuda',
             descripcion: `Venta Viaje: ${direccion}`,
             monto: -total,
+            id_op_encabezado: id_op,
           })
         }
       }

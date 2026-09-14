@@ -54,6 +54,21 @@ const TransaccionesController = {
     }
   },
 
+  // Corrige el método de pago de una transacción ya cargada (p.ej. se finalizó como
+  // "efectivo" y en realidad era "cuenta corriente"). Ver TransaccionesModel.cambiarMetodoPago.
+  async cambiarMetodoPago(req, res) {
+    try {
+      const tx = await TransaccionesModel.obtener(req.params.id)
+      if (!tx) throw new Error('La transacción no existe.')
+      await TransaccionesModel.cambiarMetodoPago(req.params.id, req.body.metodo_pago)
+      req.flash('success', `Método de pago de ${TransaccionesModel.codigo(tx)} actualizado.`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al actualizar el método de pago.')
+    }
+    res.redirect('back')
+  },
+
   // Borra la transacción junto con su operación. Es irreversible: la confirmación
   // se pide en el modal de la vista.
   async eliminar(req, res) {
@@ -62,9 +77,10 @@ const TransaccionesController = {
       if (!tx) throw new Error('La transacción no existe.')
       const codigo = TransaccionesModel.codigo(tx)
       const { id_op_encabezado } = await TransaccionesModel.eliminar(req.params.id)
-      req.flash('success', id_op_encabezado
+      const avisoCC = tx.metodo_pago === 'cuenta_corriente' ? ' Se revirtió el cargo en la cuenta corriente del cliente.' : ''
+      req.flash('success', (id_op_encabezado
         ? `Transacción ${codigo} y su operación eliminadas.`
-        : `Transacción ${codigo} eliminada.`)
+        : `Transacción ${codigo} eliminada.`) + avisoCC)
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al eliminar la transacción.')

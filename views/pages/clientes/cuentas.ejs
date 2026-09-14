@@ -121,21 +121,38 @@
   <div class="modal-box">
     <div class="modal-header">
       <h2 class="modal-title">Saldar deuda — <span id="modal-abonar-nombre"></span></h2>
-      <button type="button" class="modal-close" id="cerrarModalAbonar">✕</button>
+      <button type="button" class="modal-close" id="cerrarModalAbonar" aria-label="Cerrar">✕</button>
     </div>
-    <p style="margin:0.75rem 0 0.25rem; font-size:0.9rem; color:#64748b">
-      Deuda total: <strong id="modal-abonar-deuda"></strong>
-    </p>
-    <form id="formAbonar" method="POST" style="margin-top:1rem">
-      <div class="form-group">
-        <label for="inputMonto">Monto a abonar</label>
-        <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="Ej: 15000">
+    <div class="modal-body">
+      <div class="abonar-resumen">
+        <p class="abonar-resumen__label" id="modal-abonar-deuda-label">Deuda total</p>
+        <div class="abonar-resumen__monto" id="modal-abonar-deuda"></div>
+        <p id="modal-abonar-concepto" class="abonar-resumen__concepto d-none"></p>
       </div>
-      <div class="modal-actions" style="margin-top:1rem">
-        <button type="submit" class="btn btn-success">Confirmar pago</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPagarTotal">Pagar total</button>
-        <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
-      </div>
-    </form>
+      <form id="formAbonar" method="POST">
+        <input type="hidden" name="descripcion" id="inputDescripcionAbonar">
+        <div class="form-group">
+          <div class="d-flex justify-content-between align-items-center">
+            <label for="inputMonto" class="mb-0">Monto a abonar</label>
+            <button type="button" class="abonar-quickfill" id="btnPagarTotal">Usar el total</button>
+          </div>
+          <div class="abonar-input-monto">
+            <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="0" inputmode="numeric">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="inputMetodoAbonar">Método de pago</label>
+          <select name="metodo_pago" id="inputMetodoAbonar">
+            <option value="efectivo">Efectivo</option>
+            <option value="transferencia">Transferencia</option>
+            <option value="cheque">Cheque</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
+          <button type="submit" class="btn btn-success">Confirmar pago</button>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
