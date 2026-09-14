@@ -28,14 +28,14 @@ const StockModel = {
       [cantidad_actual, stock_minimo, id_producto])
   },
 
-  async registrarIngreso(id_producto, cantidad, { id_proveedor, costo_unitario, usuario, observaciones } = {}) {
+  async registrarIngreso(id_producto, cantidad, { id_proveedor, costo_unitario, costo_flete, usuario, observaciones } = {}) {
     await transaction(async (q) => {
       await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`, [cantidad, id_producto])
       await q(`
-        INSERT INTO stock_ingresos (id_producto, id_proveedor, cantidad, costo_unitario, id_usuario, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO stock_ingresos (id_producto, id_proveedor, cantidad, costo_unitario, costo_flete, id_usuario, observaciones)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [id_producto, id_proveedor || null, cantidad,
-          parseFloat(costo_unitario) || 0, usuario || null, observaciones || ''])
+          parseFloat(costo_unitario) || 0, parseFloat(costo_flete) || 0, usuario || null, observaciones || ''])
     })
   },
 

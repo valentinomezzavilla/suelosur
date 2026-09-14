@@ -686,6 +686,7 @@ async function initDB() {
       id_proveedor   BIGINT REFERENCES proveedores(id),
       cantidad       REAL NOT NULL,
       costo_unitario REAL DEFAULT 0,
+      costo_flete    REAL DEFAULT 0,
       id_usuario     BIGINT,
       observaciones  TEXT DEFAULT '',
       fecha          TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
@@ -826,6 +827,7 @@ async function initDB() {
       descripcion  TEXT NOT NULL DEFAULT '',
       monto        REAL NOT NULL DEFAULT 0,
       metodo_pago  TEXT,
+      fletero      TEXT,
       id_proveedor BIGINT REFERENCES proveedores(id),
       id_empleado  BIGINT REFERENCES empleados(id),
       id_vehiculo  BIGINT REFERENCES flota_vehiculos(id),
@@ -1204,6 +1206,12 @@ async function initDB() {
   `).catch(() => {})
   await pool.query(`ALTER TABLE movimiento_contenedor DROP CONSTRAINT IF EXISTS movimiento_contenedor_estado_paso_check`).catch(() => {})
   await pool.query(`ALTER TABLE movimiento_contenedor ADD CONSTRAINT movimiento_contenedor_estado_paso_check CHECK (estado_paso IN ('disponible','pendiente_despacho','despachado','en_alquiler','pendiente_retiro'))`).catch(() => {})
+
+  // Costo de flete de una compra de material, aparte del costo unitario del producto
+  await pool.query(`ALTER TABLE stock_ingresos ADD COLUMN IF NOT EXISTS costo_flete REAL DEFAULT 0`).catch(() => {})
+
+  // Fletero (persona/empresa que hizo el transporte) de una compra de material
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS fletero TEXT`).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

@@ -74,7 +74,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead><tr>
         <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor / Empleado / Vehículo</th>
-        <th>Método</th><th class="text-end">Monto</th><th class="text-center">Acciones</th>
+        <th>Fletero</th><th>Método</th><th class="text-end">Monto</th><th class="text-center">Acciones</th>
       </tr></thead>
       <tbody>
         <% egresos.forEach(e => { %>
@@ -84,6 +84,7 @@
             <% if (e.origen === 'alerta') { %><small class="text-muted d-block">auto · alerta</small><% } %></td>
           <td><%= e.descripcion || '—' %></td>
           <td><small><%= detalleDe(e) %></small></td>
+          <td><small class="text-muted"><%= e.fletero || '—' %></small></td>
           <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
           <td class="text-end fw-semibold text-danger"><%= money(e.monto) %></td>
           <td class="text-center">
@@ -97,7 +98,7 @@
       </tbody>
       <tfoot>
         <tr class="table-light">
-          <td colspan="5" class="fw-semibold text-end">Total del período</td>
+          <td colspan="6" class="fw-semibold text-end">Total del período</td>
           <td class="text-end fw-bold text-danger"><%= money(resumen.total) %></td>
           <td></td>
         </tr>

@@ -48,17 +48,18 @@ const ComprasController = {
     try {
       const { categoria, fecha, monto, metodo_pago, descripcion,
               id_proveedor, id_empleado, id_vehiculo,
-              id_producto, cantidad, costo_unitario } = req.body
+              id_producto, cantidad, costo_unitario, costo_flete, fletero } = req.body
 
       if (!EgresosModel.CATEGORIAS.includes(categoria)) {
         req.flash('error', 'Elegí una categoría válida.'); return res.redirect('/compras/nueva')
       }
 
-      const cant = parseFloat(cantidad) || 0
+      const cant  = parseFloat(cantidad) || 0
       const costo = parseFloat(costo_unitario) || 0
-      // Monto: el ingresado; para material, si no viene, se calcula cantidad × costo.
+      const flete = parseFloat(costo_flete) || 0
+      // Monto: el ingresado; para material, si no viene, se calcula (cantidad × costo) + flete.
       let montoNum = parseFloat(monto) || 0
-      if (categoria === 'material' && !montoNum && cant > 0) montoNum = cant * costo
+      if (categoria === 'material' && !montoNum && cant > 0) montoNum = cant * costo + flete
 
       if (montoNum <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect('/compras/nueva') }
 
@@ -68,13 +69,15 @@ const ComprasController = {
       if (categoria === 'material') {
         if (!id_producto || cant <= 0) { req.flash('error', 'Para material, elegí el producto y una cantidad válida.'); return res.redirect('/compras/nueva') }
         await StockModel.registrarIngreso(id_producto, cant, {
-          id_proveedor: id_proveedor || null, costo_unitario, usuario: req.session.user?.id, observaciones: desc,
+          id_proveedor: id_proveedor || null, costo_unitario, costo_flete: flete,
+          usuario: req.session.user?.id, observaciones: desc,
         })
         if (!desc) desc = 'Compra de material'
       }
 
       await EgresosModel.crear({
         fecha: fecha || null, categoria, descripcion: desc, monto: montoNum, metodo_pago: metodo_pago || null,
+        fletero: categoria === 'material' ? (fletero || null) : null,
         id_proveedor: (categoria === 'material' || categoria === 'proveedor') ? (id_proveedor || null) : null,
         id_empleado:  categoria === 'sueldo' ? (id_empleado || null) : null,
         id_vehiculo:  ['seguro', 'mantenimiento', 'combustible', 'impuesto'].includes(categoria) ? (id_vehiculo || null) : null,

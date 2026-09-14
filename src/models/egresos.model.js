@@ -12,13 +12,13 @@ const EgresosModel = {
 
   CATEGORIAS,
 
-  async crear({ fecha, categoria, descripcion, monto, metodo_pago, id_proveedor, id_empleado, id_vehiculo, origen, id_usuario }) {
+  async crear({ fecha, categoria, descripcion, monto, metodo_pago, fletero, id_proveedor, id_empleado, id_vehiculo, origen, id_usuario }) {
     if (!CATEGORIAS.includes(categoria)) throw new Error('Categoría inválida.')
     const { rows } = await query(`
-      INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, id_proveedor, id_empleado, id_vehiculo, origen, id_usuario)
-      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, id_proveedor, id_empleado, id_vehiculo, origen, id_usuario)
+      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
-    `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null,
+    `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null, (fletero || '').trim() || null,
         id_proveedor || null, id_empleado || null, id_vehiculo || null, origen || 'manual', id_usuario || null])
     return rows[0].id
   },

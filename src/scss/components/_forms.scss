@@ -12,7 +12,9 @@
 
   &:hover:not(:focus):not(:disabled):not([readonly]) { border-color: $border-input-hover; }
   &::placeholder { color: #94a3b8; }
-  &:disabled { background-color: $bg-card-alt; }
+  // Igual que :disabled — un campo readonly también tiene que leerse como bloqueado
+  // (si no, se ve idéntico a uno editable y el check de "Editar" pierde sentido visual).
+  &:disabled, &[readonly] { background-color: $bg-card-alt; }
 }
 
 .form-control-sm,
