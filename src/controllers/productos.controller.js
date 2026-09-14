@@ -21,6 +21,8 @@ const ProductosController = {
       const sortMap = {
         nombre:        (p) => (p.nombre || '').toLowerCase(),
         unidad:        (p) => (p.unidad_medida || '').toLowerCase(),
+        precioDeposito:(p) => Number(p.precio_cantera || 0),
+        precioViaje:   (p) => Number(p.precio_viaje || 0),
         stock:         (p) => Number(p.disponible_real || 0),
       }
       const sortKey = sortMap[sort] ? sort : 'nombre'
@@ -47,9 +49,9 @@ const ProductosController = {
   },
   async crear(req, res) {
     try {
-      const { nombre, unidad_medida, precio_referencia } = req.body
+      const { nombre, unidad_medida, precio_cantera, precio_viaje } = req.body
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/productos/nuevo') }
-      await ProductosModel.crear({ nombre, unidad_medida, precio_referencia })
+      await ProductosModel.crear({ nombre, unidad_medida, precio_cantera, precio_viaje })
       req.flash('success', 'Producto creado.')
       res.redirect('/productos')
     } catch (err) {
@@ -67,9 +69,9 @@ const ProductosController = {
   },
   async actualizar(req, res) {
     try {
-      const { nombre, unidad_medida, precio_referencia } = req.body
+      const { nombre, unidad_medida, precio_cantera, precio_viaje } = req.body
       if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/productos/${req.params.id}/editar`) }
-      await ProductosModel.actualizar(req.params.id, { nombre, unidad_medida, precio_referencia })
+      await ProductosModel.actualizar(req.params.id, { nombre, unidad_medida, precio_cantera, precio_viaje })
       req.flash('success', 'Producto actualizado.')
       res.redirect('/productos')
     } catch (err) {

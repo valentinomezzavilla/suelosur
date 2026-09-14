@@ -17,7 +17,7 @@ const ProductosModel = {
 
   async listarActivos() {
     return (await query(`
-      SELECT p.id, p.nombre, p.unidad_medida, p.precio_referencia,
+      SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje,
              (COALESCE(s.cantidad_actual,0) - COALESCE(s.cant_pendiente_entregar,0)) AS disponible_real
       FROM productos p LEFT JOIN stock s ON s.id_producto = p.id
       WHERE p.activo = 1 ORDER BY p.nombre
@@ -28,18 +28,18 @@ const ProductosModel = {
     return (await query(`SELECT * FROM productos WHERE id = ?`, [id])).rows[0]
   },
 
-  async crear({ nombre, unidad_medida, precio_referencia }) {
-    const { rows } = await query(`INSERT INTO productos (nombre, unidad_medida, precio_referencia) VALUES (?, ?, ?) RETURNING id`,
-      [nombre, unidad_medida || 'm³', parseFloat(precio_referencia) || 0])
+  async crear({ nombre, unidad_medida, precio_cantera, precio_viaje }) {
+    const { rows } = await query(`INSERT INTO productos (nombre, unidad_medida, precio_cantera, precio_viaje) VALUES (?, ?, ?, ?) RETURNING id`,
+      [nombre, unidad_medida || 'm³', parseFloat(precio_cantera) || 0, parseFloat(precio_viaje) || 0])
     const id = rows[0].id
     // Inicializar stock automáticamente
     await query(`INSERT INTO stock (id_producto) VALUES (?)`, [id])
     return id
   },
 
-  async actualizar(id, { nombre, unidad_medida, precio_referencia }) {
-    await query(`UPDATE productos SET nombre = ?, unidad_medida = ?, precio_referencia = ? WHERE id = ?`,
-      [nombre, unidad_medida || 'm³', parseFloat(precio_referencia) || 0, id])
+  async actualizar(id, { nombre, unidad_medida, precio_cantera, precio_viaje }) {
+    await query(`UPDATE productos SET nombre = ?, unidad_medida = ?, precio_cantera = ?, precio_viaje = ? WHERE id = ?`,
+      [nombre, unidad_medida || 'm³', parseFloat(precio_cantera) || 0, parseFloat(precio_viaje) || 0, id])
   },
 
   async toggleActivo(id) {

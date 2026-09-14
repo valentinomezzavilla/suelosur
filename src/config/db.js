@@ -112,6 +112,8 @@ async function initDB() {
       nombre            TEXT NOT NULL,
       unidad_medida     TEXT NOT NULL DEFAULT 'm³',
       precio_referencia REAL DEFAULT 0,
+      precio_cantera    REAL DEFAULT 0,
+      precio_viaje      REAL DEFAULT 0,
       activo            INTEGER DEFAULT 1,
       created_at        TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
     )
@@ -1212,6 +1214,19 @@ async function initDB() {
 
   // Fletero (persona/empresa que hizo el transporte) de una compra de material
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS fletero TEXT`).catch(() => {})
+
+  // ─────────────────────────────────────────────────────────────────
+  // MIGRACIÓN: precio único → precio distinto por canal de venta (cantera / viaje).
+  // Las columnas se agregan sin default para poder distinguir "recién creada, todavía
+  // sin migrar" (NULL) de "el usuario la dejó en 0 a propósito" — el backfill solo
+  // toca las que siguen en NULL, así no pisa ediciones posteriores en reinicios futuros.
+  // ─────────────────────────────────────────────────────────────────
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS precio_cantera REAL`).catch(() => {})
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS precio_viaje REAL`).catch(() => {})
+  await pool.query(`UPDATE productos SET precio_cantera = COALESCE(precio_referencia, 0) WHERE precio_cantera IS NULL`).catch(() => {})
+  await pool.query(`UPDATE productos SET precio_viaje   = COALESCE(precio_referencia, 0) WHERE precio_viaje   IS NULL`).catch(() => {})
+  await pool.query(`ALTER TABLE productos ALTER COLUMN precio_cantera SET DEFAULT 0`).catch(() => {})
+  await pool.query(`ALTER TABLE productos ALTER COLUMN precio_viaje   SET DEFAULT 0`).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

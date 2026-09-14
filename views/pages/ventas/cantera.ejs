@@ -15,7 +15,7 @@
                 <% productos.forEach(p => { %>
                     <%
                       const stock  = Number(p.disponible_real ?? p.stock ?? 0)
-                      const precio = Number(p.precio_referencia ?? p.precio ?? 0)
+                      const precio = Number(p.precio_cantera ?? p.precio ?? 0)
                       const nombre = p.nombre || p.producto || ''
                     %>
                     <li>

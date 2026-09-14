@@ -11,7 +11,7 @@ const VentasModel = {
 
   async listarProductos() {
     return (await query(`
-      SELECT p.id, p.nombre, p.unidad_medida, p.precio_referencia,
+      SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje,
              (COALESCE(s.cantidad_actual,0) - COALESCE(s.cant_pendiente_entregar,0)) AS disponible_real
       FROM productos p LEFT JOIN stock s ON s.id_producto = p.id
       WHERE p.activo = 1 ORDER BY p.nombre

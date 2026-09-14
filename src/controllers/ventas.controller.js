@@ -17,6 +17,20 @@ function fechaRetroactiva(fecha) {
   return f < hoy ? f : null
 }
 
+// El precio unitario de una venta NUNCA sale de lo que mande el formulario: siempre se
+// relee del catálogo según el canal (cantera / viaje), así no importa qué haya llegado
+// en el POST (un precio viejo en caché, o alguien tocando el request a mano).
+const COLUMNA_PRECIO = { cantera: 'precio_cantera', viaje: 'precio_viaje' }
+async function preciosDeCatalogo(canal, idsProducto) {
+  const columna = COLUMNA_PRECIO[canal]
+  const ids = [...new Set(idsProducto.map(String))].filter(Boolean)
+  if (!ids.length) return {}
+  const rows = (await query(`SELECT id, ${columna} AS precio FROM productos WHERE id = ANY(?)`, [ids])).rows
+  const map = {}
+  rows.forEach(r => { map[String(r.id)] = Number(r.precio) || 0 })
+  return map
+}
+
 const VentasController = {
 
   async index(req, res) {
@@ -70,6 +84,11 @@ const VentasController = {
       let carrito = []
       try { carrito = JSON.parse(items || '[]') } catch (_) {}
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
+
+      // Precio cantera siempre desde el catálogo, nunca el que mandó el formulario.
+      const preciosCantera = await preciosDeCatalogo('cantera', carrito.map(p => p.id))
+      carrito = carrito.map(p => ({ ...p, precio: preciosCantera[String(p.id)] ?? 0 }))
+
       const total  = precioTotal ? Number(precioTotal) : carrito.reduce((a, p) => a + p.precio * p.cantidad, 0)
       const nombre = clienteNombre || 'Particular'
       const obsUser = (req.body.observaciones || '').trim()
@@ -196,7 +215,7 @@ const VentasController = {
     try {
       const {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
-        productoId, cantidad, precioProducto, precioFlete, precioTotal,
+        productoId, cantidad, precioFlete, precioTotal,
         metodoPago, descripcion, finalizarAhora,
         idChofer, idCamion, zona, obra,
       } = req.body
@@ -211,6 +230,10 @@ const VentasController = {
       const esFinalizarAhora = finalizarAhora === 'true'
       const direccion = `${calle || ''} ${numero || ''}`.trim()
       const total     = Number(precioTotal) || 0
+
+      // Precio viaje siempre desde el catálogo, nunca el que mandó el formulario.
+      const preciosViaje = await preciosDeCatalogo('viaje', [productoId])
+      const precioUnitarioProducto = preciosViaje[String(productoId)] ?? 0
 
       // Crear OP tipo M con modalidad flete
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
@@ -230,7 +253,7 @@ const VentasController = {
         detalles: [{
           id_producto:     productoId,
           cantidad_pedida: cantidadNum,
-          precio_unitario: Number(precioProducto) || 0,
+          precio_unitario: precioUnitarioProducto,
         }],
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
