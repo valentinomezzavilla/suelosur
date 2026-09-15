@@ -176,7 +176,10 @@ const TransaccionesModel = {
     if (id)         { wheres.push('id = ?');                  params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?');  params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');          params.push(clienteId) }
-    if (cliente)    { wheres.push('cliente ILIKE ?');          params.push(`%${cliente}%`) }
+    // trim: un espacio de más al final (p.ej. un cliente sin apellido en el autocompletar)
+    // no puede dejar el filtro sin resultados.
+    const clienteTrim = (cliente || '').trim()
+    if (clienteTrim) { wheres.push('cliente ILIKE ?');          params.push(`%${clienteTrim}%`) }
     if (fechaDesde) { wheres.push('LEFT(fecha, 10) >= ?');    params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('LEFT(fecha, 10) <= ?');    params.push(fechaHasta) }
     if (montoMin)   { wheres.push('monto >= ?');              params.push(Number(montoMin)) }

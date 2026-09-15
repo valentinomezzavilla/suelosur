@@ -71,7 +71,7 @@
                         placeholder="Buscar por nombre / apellido / DNI..." autocomplete="off">
                     <datalist id="listaClientesTx">
                         <% (clientesLista || []).forEach(c => { %>
-                            <option value="<%= c.nombre %> <%= c.apellido || '' %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
+                            <option value="<%= [c.nombre, c.apellido].filter(Boolean).join(' ') %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
                         <% }) %>
                     </datalist>
                 </div>
