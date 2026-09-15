@@ -738,6 +738,27 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS hora_planificada TEXT`).catch(() => {})
   // Obra: nombre/referencia del destino cuando no hay una dirección de calle exacta
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS obra TEXT`).catch(() => {})
+  // Ventas: flete y total pactado. El detalle solo guarda productos, así que sin estas
+  // columnas un viaje programado perdía el flete (y cualquier total editado a mano)
+  // hasta que se entregaba.
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS precio_flete REAL`).catch(() => {})
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS monto_total REAL`).catch(() => {})
+  // Backfill: las ventas ya entregadas tienen el total real en su transacción.
+  await pool.query(`
+    UPDATE op_encabezado op SET monto_total = t.monto
+    FROM (SELECT DISTINCT ON (id_op_encabezado) id_op_encabezado, monto FROM transacciones
+          WHERE tipo IN ('Venta Viaje', 'Venta Cantera') AND id_op_encabezado IS NOT NULL
+          ORDER BY id_op_encabezado, id) t
+    WHERE t.id_op_encabezado = op.id AND op.tipo_op = 'M' AND op.monto_total IS NULL
+  `).catch(e => console.error('Backfill monto_total:', e.message))
+  // En los viajes viejos lo que el total supera a los productos es el flete.
+  await pool.query(`
+    UPDATE op_encabezado op SET precio_flete = op.monto_total - s.subtotal
+    FROM (SELECT id_orden_pedido, SUM(cantidad_pedida * precio_unitario) AS subtotal
+          FROM op_detalle_material GROUP BY id_orden_pedido) s
+    WHERE s.id_orden_pedido = op.id AND op.tipo_op = 'M' AND op.modalidad = 'flete'
+      AND op.precio_flete IS NULL AND op.monto_total > s.subtotal + 0.5
+  `).catch(e => console.error('Backfill precio_flete:', e.message))
   // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
   // Cuenta corriente: venta de origen del cargo (para saber, venta por venta, si ya fue saldada)

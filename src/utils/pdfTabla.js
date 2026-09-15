@@ -3,6 +3,7 @@
 // Reporte PDF genérico tipo tabla (pdfkit).
 // generarTablaPDF(res, { titulo, subtitulo, columnas, filas, nombreArchivo })
 //   columnas: [{ header, key, width(0-1 proporción)?, align?, money? }]
+//   filas:    [{ key: valor, ..., _destacar? }]  (_destacar = renglón en negrita, p.ej. totales)
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
 const B = require('./pdfBrand')
@@ -12,7 +13,16 @@ const TINTA = B.TINTA
 
 const money = B.money
 
-function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [], filas = [], nombreArchivo } = {}) {
+// Recorta el texto al ancho de la celda: sin esto un texto largo se pisa con la columna siguiente
+function recortar(doc, texto, ancho) {
+  if (doc.widthOfString(texto) <= ancho) return texto
+  let t = texto
+  while (t.length > 1 && doc.widthOfString(t + '…') > ancho) t = t.slice(0, -1)
+  return t + '…'
+}
+
+// registros: cantidad a mostrar en el pie cuando hay filas que no son registros (totales, subtotales)
+function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [], filas = [], nombreArchivo, registros } = {}) {
   const doc = new PDFDocument({ size: 'A4', margin: 40, layout: 'landscape' })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo || 'reporte'}.pdf"`)
@@ -52,19 +62,21 @@ function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [
   filas.forEach((f, idx) => {
     const rowH = 18
     if (y + rowH > doc.page.height - 40) { doc.addPage(); y = 40; drawHeader(); doc.font('Helvetica').fontSize(8.5) }
-    if (idx % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa')
+    if (f._destacar) doc.rect(left, y, width, rowH).fill(B.FONDO)
+    else if (idx % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa')
+    doc.font(f._destacar ? 'Helvetica-Bold' : 'Helvetica')
     let x = left
     columnas.forEach((c, i) => {
       let v = f[c.key]
-      if (c.money) v = money(v)
+      if (c.money) v = v == null || v === '' ? '' : money(v)
       else if (v == null) v = ''
-      doc.fillColor(TINTA).text(String(v), x + 4, y + 5, { width: anchos[i] - 8, align: c.align || 'left', lineBreak: false })
+      doc.fillColor(TINTA).text(recortar(doc, String(v), anchos[i] - 8), x + 4, y + 5, { width: anchos[i] - 8, align: c.align || 'left', lineBreak: false })
       x += anchos[i]
     })
     y += rowH
   })
 
-  B.drawFooter(doc, { extra: `${filas.length} registro(s)` })
+  B.drawFooter(doc, { extra: `${registros ?? filas.length} registro(s)` })
 
   doc.end()
 }

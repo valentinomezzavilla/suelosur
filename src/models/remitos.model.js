@@ -5,6 +5,8 @@
 // misma forma para PDF / vista / remito firmado.
 // ─────────────────────────────────────────────────────────────────
 const { query, transaction } = require('../config/db')
+const { textoDestino } = require('../utils/destino')
+const { importesVenta } = require('./ventas.model')
 
 const TIPO_LABEL = { M: 'Venta de áridos', C: 'Alquiler de contenedor', MA: 'Alquiler de maquinaria' }
 
@@ -66,9 +68,13 @@ const RemitosModel = {
         precioUnit: d.precio_unitario,
         subtotal: d.cantidad_pedida * d.precio_unitario,
       }))
+      // Flete y ajuste del total pactado: el remito tiene que sumar lo que se cobra
+      const imp = importesVenta(op, r.items.reduce((s, i) => s + i.subtotal, 0))
+      if (imp.flete) r.items.push({ descripcion: 'Flete', unidad: '', cantidad: 1, precioUnit: imp.flete, subtotal: imp.flete })
+      if (imp.ajuste) r.items.push({ descripcion: 'Ajuste de precio', unidad: '', cantidad: 1, precioUnit: imp.ajuste, subtotal: imp.ajuste })
       if (op.modalidad === 'flete') {
-        const calle = [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim()
-        r.entrega = { domicilio: calle || op.domicilio_ppal || '', zona: '', plazo: null }
+        const destino = textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra })
+        r.entrega = { domicilio: destino || op.domicilio_ppal || '', zona: '', plazo: null }
       }
     } else if (op.tipo_op === 'C') {
       const d = (await query(`
@@ -83,7 +89,7 @@ const RemitosModel = {
           subtotal: d.precio_alquiler || 0,
         }]
         r.entrega = {
-          domicilio: d.domicilio_entrega || [d.domicilio_calle, d.domicilio_numero].filter(Boolean).join(' '),
+          domicilio: textoDestino({ domicilio: d.domicilio_entrega, calle: d.domicilio_calle, numero: d.domicilio_numero, obra: op.obra }),
           zona: d.zona_entrega || '', plazo: d.plazo_alquiler,
         }
       }

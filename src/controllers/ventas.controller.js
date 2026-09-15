@@ -6,6 +6,7 @@ const OperacionesModel  = require('../models/operaciones.model')
 const AsignacionesModel = require('../models/asignaciones.model')
 const { query }         = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
+const { textoDestino } = require('../utils/destino')
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
@@ -111,6 +112,7 @@ const VentasController = {
         observaciones:       desc,
         detalles,
         fecha_emision:       fechaRetro,
+        monto_total:         total,
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 
@@ -216,7 +218,7 @@ const VentasController = {
     try {
       const {
         clienteId, clienteNombre, telefono, fecha, hora, calle, numero,
-        productoId, cantidad, precioFlete, precioTotal,
+        productoId, cantidad, precioFlete, precioTotal, editarSubtotal, subtotalManual,
         metodoPago, descripcion, finalizarAhora,
         idChofer, idCamion, zona, obra,
       } = req.body
@@ -229,12 +231,22 @@ const VentasController = {
 
       const cantidadNum = Number(cantidad) || 1
       const esFinalizarAhora = finalizarAhora === 'true'
-      const direccion = `${calle || ''} ${numero || ''}`.trim()
-      const total     = Number(precioTotal) || 0
+      const destino   = textoDestino({ calle, numero, obra })
+      const flete     = Math.max(0, Number(precioFlete) || 0)
 
       // Precio viaje siempre desde el catálogo, nunca el que mandó el formulario.
       const preciosViaje = await preciosDeCatalogo('viaje', [productoId])
-      const precioUnitarioProducto = preciosViaje[String(productoId)] ?? 0
+      let precioUnitarioProducto = preciosViaje[String(productoId)] ?? 0
+      // Salvo que se haya tildado "Editar" en el subtotal: ahí manda lo que se cargó.
+      const subtotalEditado = Number(subtotalManual)
+      if (editarSubtotal === '1' && String(subtotalManual ?? '').trim() !== '' && subtotalEditado >= 0) {
+        precioUnitarioProducto = subtotalEditado / cantidadNum
+      }
+      // Total pactado: el que manda el formulario (puede estar editado a mano);
+      // si no llegó, productos + flete.
+      const total = String(precioTotal ?? '').trim() !== ''
+        ? Math.max(0, Number(precioTotal) || 0)
+        : precioUnitarioProducto * cantidadNum + flete
 
       // Crear OP tipo M con modalidad flete
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
@@ -251,6 +263,8 @@ const VentasController = {
         zona:                zona || null,
         obra:                obra || null,
         domicilio: { calle, altura: numero, sin_numero: !numero },
+        precio_flete:        flete,
+        monto_total:         total,
         detalles: [{
           id_producto:     productoId,
           cantidad_pedida: cantidadNum,
@@ -283,14 +297,14 @@ const VentasController = {
           cliente_id:      clienteId || null,
           cliente:         clienteNombre || 'Sin nombre',
           monto:           total,
-          descripcion:     `Viaje a ${direccion}`,
+          descripcion:     `Viaje a ${destino}`,
           metodo_pago:     metodoPago || 'efectivo',
           fecha:           fechaRetroactiva(fecha),
         })
         if (metodoPago === 'cuenta_corriente' && clienteId) {
           await ClientesModel.agregarMovimiento(clienteId, {
             tipo: 'deuda',
-            descripcion: `Venta Viaje: ${direccion}`,
+            descripcion: `Venta Viaje: ${destino}`,
             monto: -total,
             id_op_encabezado: id_op,
           })
@@ -382,19 +396,40 @@ const VentasController = {
   async entregar(req, res) {
     try {
       const op = await VentasModel.obtener(req.params.id)
-      await VentasModel.entregar(req.params.id)
+      if (!op) { req.flash('error', 'Orden no encontrada.'); return res.redirect('/ventas') }
+      // Un doble envío del formulario no puede generar otra transacción ni otro cargo
+      if (!['pendiente', 'despachado'].includes(op.estado)) {
+        req.flash('warning', 'La orden ya estaba entregada o anulada.')
+        return res.redirect(`/ventas/${op.id}`)
+      }
+      await VentasModel.entregar(op.id)
+      const esViaje = op.modalidad === 'flete'
+      const destino = esViaje ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
       // Registrar transacción al entregar
-      if (op) {
+      if (!await TransaccionesModel.existePorOperacion(op.id)) {
         await TransaccionesModel.crear({
-          tipo:            op.modalidad === 'flete' ? 'Venta Viaje' : 'Venta Cantera',
+          tipo:            esViaje ? 'Venta Viaje' : 'Venta Cantera',
           id_op_encabezado: op.id,
           nro_remito:      op.nro_remito,
           cliente_id:      op.id_cliente,
           cliente:         op.cliente_nombre,
           monto:           op.total,
-          descripcion:     op.observaciones || '',
+          // En los viajes el destino va primero, para que la transacción diga adónde se llevó
+          descripcion:     esViaje
+            ? [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
+            : (op.observaciones || ''),
           metodo_pago:     op.metodo_pago || 'efectivo',
         })
+        // A cuenta corriente: el cargo al cliente (igual que al confirmar desde la hoja de ruta)
+        if (op.metodo_pago === 'cuenta_corriente' && op.id_cliente) {
+          const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
+          await ClientesModel.agregarMovimiento(op.id_cliente, {
+            tipo: 'deuda',
+            descripcion: esViaje ? `Venta Viaje ${nro}${destino ? ': ' + destino : ''}` : `Venta Cantera ${nro}`,
+            monto: -(op.total || 0),
+            id_op_encabezado: op.id,
+          })
+        }
       }
       req.flash('success', 'Entrega confirmada.')
       res.redirect(`/ventas/${req.params.id}/remito`)

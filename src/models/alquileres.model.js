@@ -4,6 +4,7 @@ const FlotaModel = require('./flota.model')
 const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
 const ClientesModel = require('./clientes.model')
+const { textoDestino } = require('../utils/destino')
 
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
@@ -469,8 +470,8 @@ const AlquileresModel = {
   // retirar el contenedor, no al entregarlo.
   async datosCierre(id_op) {
     const op = (await query(`
-      SELECT op.fecha_entrega_planificada, oc.precio_alquiler, oc.plazo_alquiler,
-             oc.domicilio_entrega, cont.numero_contenedor
+      SELECT op.fecha_entrega_planificada, op.obra, oc.precio_alquiler, oc.plazo_alquiler,
+             oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, cont.numero_contenedor
       FROM op_encabezado op
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
@@ -500,6 +501,7 @@ const AlquileresModel = {
     return {
       precioInicial, precioActual, dias, inicio, mesInicio,
       numero_contenedor: op.numero_contenedor, domicilio_entrega: op.domicilio_entrega,
+      destino: textoDestino({ domicilio: op.domicilio_entrega, calle: op.domicilio_calle, numero: op.domicilio_numero, obra: op.obra }),
       // Distinto = conviene mostrar el precio de referencia entre paréntesis
       cambioDePrecio: precioInicial > 0 && Math.round(precioInicial) !== Math.round(precioActual),
     }
@@ -524,7 +526,7 @@ const AlquileresModel = {
     const referencia = (cierre.cambioDePrecio && cierre.mesInicio)
       ? ` (Precio inicial ${cierre.mesInicio}: $${Math.round(cierre.precioInicial).toLocaleString('es-AR')})`
       : ''
-    const detalle = `Alquiler contenedor #${cierre.numero_contenedor || '?'}${cierre.domicilio_entrega ? ' — ' + cierre.domicilio_entrega : ''}`
+    const detalle = `Alquiler contenedor #${cierre.numero_contenedor || '?'}${cierre.destino ? ' — ' + cierre.destino : ''}`
 
     await TransaccionesModel.crear({
       tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: op.nro_remito,

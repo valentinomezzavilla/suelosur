@@ -5,6 +5,7 @@ const ClientesModel          = require('../models/clientes.model')
 const ConfigContenedoresModel = require('../models/config_contenedores.model')
 const OperacionesModel        = require('../models/operaciones.model')
 const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
+const { textoDestino } = require('../utils/destino')
 
 const AlquileresController = {
 
@@ -109,11 +110,12 @@ const AlquileresController = {
           fecha_inicio: fechaInicio || null, fecha_fin: fechaFinReal,
         })
         const monto = parseFloat(precio_alquiler) || 0
+        const destinoTxt = textoDestino({ domicilio: domicilio_entrega, obra })
         await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, monto)
         await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
           cliente_id: clienteIdClean, cliente: result.cliente_nombre, monto,
-          descripcion: `Alquiler contenedor (histórico)${domicilio_entrega ? ' — ' + domicilio_entrega : ''}`,
+          descripcion: `Alquiler contenedor (histórico)${destinoTxt ? ' — ' + destinoTxt : ''}`,
           metodo_pago: metodoPago || 'efectivo',
           fecha: fechaFinReal || fechaInicio || null,
         })

@@ -10,10 +10,18 @@
                     if (filtros.cliente) o.cliente = filtros.cliente
                     return '/transacciones?' + new URLSearchParams(o).toString()
                 }
+                // El reporte usa los mismos filtros que la tabla (sin la página ni el orden)
+                const qsReporte = new URLSearchParams(Object.entries(filtros).filter(([k, v]) => v !== '' && v != null && k !== 'sortBy' && k !== 'sortDir')).toString()
             %>
 
             <div class="page-header">
                 <h1 class="page-title"><%- icon('receipt', { size: 18 }) %> Transacciones</h1>
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="/transacciones/export/pdf?<%= qsReporte %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener"
+                       title="Reporte PDF con los filtros aplicados"><%- icon('fileText', { size: 14 }) %> Reporte PDF</a>
+                    <a href="/transacciones/export/excel?<%= qsReporte %>" class="btn btn-outline-secondary btn-sm"
+                       title="Reporte Excel con los filtros aplicados"><%- icon('download', { size: 14 }) %> Excel</a>
+                </div>
             </div>
 
             <!-- Métricas del período -->

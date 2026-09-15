@@ -65,7 +65,7 @@ function conceptoAfip(ops) {
   return prod && serv ? 3 : serv ? 2 : 1
 }
 
-// Monto: lo cobrado (transacciones) si ya existe; si no, el total cargado al crear;
+// Monto: lo cobrado (transacciones) si ya existe; si no, el total pactado de la venta o el cargado al crear;
 // si no, lo estimado desde el detalle de la operación.
 const selectBase = (where) => `
   SELECT op.id, op.nro_op, op.tipo_op, op.modalidad, op.estado, op.metodo_pago, op.fecha_emision,
@@ -73,7 +73,7 @@ const selectBase = (where) => `
          op.nc_numero, op.nc_fecha, op.nc_cae,
          cli.id AS cliente_id, cli.dni, cli.cuit, cli.razon_social, cli.condicion_iva,
          TRIM(cli.nombre || ' ' || COALESCE(cli.apellido, '')) AS cliente,
-         COALESCE(tx.monto, op.monto_facturar, mat.monto, dc.precio, dm.precio, 0) AS monto,
+         COALESCE(tx.monto, op.monto_total, op.monto_facturar, mat.monto + COALESCE(op.precio_flete, 0), dc.precio, dm.precio, 0) AS monto,
          f.tipo_comprobante, f.alicuota_iva, f.origen AS factura_origen, f.cae, f.cae_vto,
          f.punto_venta, f.nro_cbte, f.fecha AS factura_fecha,
          u.nombre AS facturado_por_nombre

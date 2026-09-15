@@ -3,6 +3,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputCantidad  = document.getElementById('cantidadViaje');
     const subtotalEl     = document.getElementById('subtotalProducto');
     const precioHidden   = document.getElementById('precioProductoHidden');
+    const checkSubtotal  = document.getElementById('checkEditarSubtotal');
+    const subtotalInput  = document.getElementById('subtotalManualInput');
     const inputFlete     = document.getElementById('precioFlete');
     const totalDisplay   = document.getElementById('totalDisplay');
     const checkEditar    = document.getElementById('checkEditarTotal');
@@ -59,10 +61,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const precio   = getPrecioUnitario();
         const cantidad = Number(inputCantidad?.value || 1);
         const flete    = Number(inputFlete?.value || 0);
-        const subtotal = precio * cantidad;
+        // Subtotal editado a mano: pisa al precio de catálogo × cantidad
+        const manual   = checkSubtotal?.checked;
+        const subtotal = manual ? Number(subtotalInput?.value || 0) : precio * cantidad;
         const total    = subtotal + flete;
 
-        if (subtotalEl) subtotalEl.value = '$' + subtotal.toLocaleString('es-AR');
+        if (!manual) {
+            if (subtotalEl)    subtotalEl.value = '$' + subtotal.toLocaleString('es-AR');
+            if (subtotalInput) subtotalInput.value = subtotal;
+        }
         if (precioHidden) precioHidden.value = subtotal;
 
         if (!checkEditar.checked) {
@@ -84,6 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
         calcularPrecios();
     });
     inputFlete?.addEventListener('input', calcularPrecios);
+    subtotalInput?.addEventListener('input', calcularPrecios);
+
+    // toggle para editar el subtotal del producto manualmente
+    checkSubtotal?.addEventListener('change', () => {
+        subtotalInput.style.display = checkSubtotal.checked ? 'block' : 'none';
+        subtotalEl.style.display    = checkSubtotal.checked ? 'none' : 'block';
+        if (checkSubtotal.checked) subtotalInput.focus();
+        calcularPrecios();
+    });
 
     // Zona → autocompleta el precio del flete con la tarifa de la zona
     const selectZona = document.getElementById('zonaViaje');

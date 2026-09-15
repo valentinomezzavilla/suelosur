@@ -25,6 +25,8 @@ const CODIGOS = {
   // Servicios / especiales que aparecen en la planilla
   'viaje retiro material con pala': 'VR',
   'saldo anterior':   'SR',
+  'flete':            'FL',
+  'ajuste de precio': 'AJ',
 }
 
 function normalizar(s) {

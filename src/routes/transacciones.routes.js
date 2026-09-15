@@ -6,6 +6,8 @@ const roles   = require('../middlewares/roles')
 const ctrl    = require('../controllers/transacciones.controller')
 
 router.get('/', auth, roles('admin_ventas','admin_contable','dueno'), ctrl.index)
+// Reporte con los filtros del listado (PDF o Excel)
+router.get('/export/:formato', auth, roles('admin_ventas','admin_contable','dueno'), ctrl.exportar)
 // Corregir método de pago mueve plata entre cuentas: solo para contable y dueño
 router.post('/:id/metodo-pago', auth, roles('admin_contable','dueno'), ctrl.cambiarMetodoPago)
 // Borrar arrastra la operación entera: lo dejamos solo para contable y dueño

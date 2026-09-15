@@ -7,6 +7,7 @@ const ClientesModel = require('../models/clientes.model')
 const RemitosModel = require('../models/remitos.model')
 const FlotaModel = require('../models/flota.model')
 const { generarRemitoPDFBuffer } = require('../utils/pdfRemito')
+const { textoDestino } = require('../utils/destino')
 const { nombreArchivo } = require('../middlewares/upload')
 const storage = require('../config/storage')
 
@@ -498,13 +499,19 @@ const HojaRutaController = {
           await FlotaModel.sumarKilometraje(full.id_camion, req.body.distancia_km, op.id)
             .catch(e => console.error('Kilometraje automático:', e.message))
         }
-        await TransaccionesModel.crear({
-          tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
-          cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,
-          descripcion: full.observaciones || 'Venta con viaje', metodo_pago: full.metodo_pago || 'efectivo',
-        })
-        if (full.metodo_pago === 'cuenta_corriente' && full.id_cliente) {
-          await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}`, monto: -(full.total || 0), id_op_encabezado: op.id })
+        const destino = textoDestino({ calle: full.domicilio_calle, numero: full.domicilio_altura, obra: full.obra })
+        if (!await TransaccionesModel.existePorOperacion(op.id)) {
+          // Un reintento del chofer no puede duplicar la transacción ni el cargo
+          await TransaccionesModel.crear({
+            tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
+            cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,
+            descripcion: [destino ? `Viaje a ${destino}` : 'Venta con viaje', full.observaciones].filter(Boolean).join(' — '),
+            metodo_pago: full.metodo_pago || 'efectivo',
+          })
+          if (full.metodo_pago === 'cuenta_corriente' && full.id_cliente) {
+            const ref = `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}${destino ? ': ' + destino : ''}`
+            await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: ref, monto: -(full.total || 0), id_op_encabezado: op.id })
+          }
         }
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {

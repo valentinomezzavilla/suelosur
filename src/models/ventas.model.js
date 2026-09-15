@@ -3,6 +3,22 @@ const { query, transaction } = require('../config/db')
 const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
 
+// Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
+// Es la misma cuenta en listados, detalle, remito y al generar la transacción.
+const SQL_SUBTOTAL = `(SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
+                       FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)`
+const SQL_TOTAL = `COALESCE(op.monto_total, ${SQL_SUBTOTAL} + COALESCE(op.precio_flete, 0))`
+
+const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
+
+// Productos, flete y la diferencia con el total pactado (si se editó a mano).
+function importesVenta(op, subtotal) {
+  const flete = Number(op.precio_flete) || 0
+  const total = op.monto_total != null ? Number(op.monto_total) : subtotal + flete
+  const ajuste = redondear(total - subtotal - flete)
+  return { subtotal, flete, total, ajuste: Math.abs(ajuste) < 0.01 ? 0 : ajuste }
+}
+
 const VentasModel = {
 
   // ── Auxiliares ────────────────────────────────────────────────
@@ -61,8 +77,7 @@ const VentasModel = {
       SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito, op.metodo_pago,
              COALESCE(c.nombre, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
-             (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
-              FROM op_detalle_material d WHERE d.id_orden_pedido = op.id) AS total
+             ${SQL_TOTAL} AS total
       FROM op_encabezado op
       LEFT JOIN clientes c ON c.id = op.id_cliente
       JOIN users    u ON u.id = op.id_administrativo
@@ -83,8 +98,7 @@ const VentasModel = {
     const { where, params } = this._filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta })
     const row = (await query(`
       SELECT COUNT(*) AS count,
-             COALESCE(SUM((SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
-                           FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)), 0) AS total
+             COALESCE(SUM(${SQL_TOTAL}), 0) AS total
       FROM op_encabezado op
       LEFT JOIN clientes c ON c.id = op.id_cliente
       ${where}
@@ -112,13 +126,17 @@ const VentasModel = {
       FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
       WHERE d.id_orden_pedido = ?
     `, [id])).rows
-    op.total = op.detalles.reduce((s, d) => s + d.subtotal, 0)
+    const imp = importesVenta(op, op.detalles.reduce((s, d) => s + d.subtotal, 0))
+    op.subtotal_productos = imp.subtotal
+    op.precio_flete = imp.flete
+    op.ajuste = imp.ajuste
+    op.total = imp.total
     return op
   },
 
   async crear({ id_cliente, cliente_nombre_libre, id_administrativo, tipo_op = 'M', observaciones = '',
           detalles, fecha_entrega_planificada, hora_planificada, modalidad, domicilio, metodo_pago, zona, obra,
-          fecha_emision }) {
+          fecha_emision, precio_flete = null, monto_total = null }) {
     // Crear cliente automáticamente si viene como texto libre
     if (!id_cliente && cliente_nombre_libre) {
       const cli = await query(`INSERT INTO clientes (nombre, activo) VALUES (?, 1) RETURNING id`,
@@ -134,15 +152,17 @@ const VentasModel = {
         INSERT INTO op_encabezado (
           id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado,
           observaciones, fecha_entrega_planificada, hora_planificada, modalidad, metodo_pago,
-          domicilio_calle, domicilio_altura, domicilio_sin_numero, zona, obra, fecha_emision
+          domicilio_calle, domicilio_altura, domicilio_sin_numero, zona, obra, fecha_emision,
+          precio_flete, monto_total
         ) VALUES (?, ?, ?, ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                  COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')))
+                  COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?)
         RETURNING id
       `, [id_cliente, id_administrativo, tipo_op, nro, nro_rem,
           observaciones, fecha_entrega_planificada || null, hora_planificada || null, modalidad || null,
           metodo_pago || null, dom.calle || null,
           dom.altura ? parseInt(dom.altura) : null,
-          dom.sin_numero ? 1 : 0, zona || null, obra || null, fecha_emision || null])
+          dom.sin_numero ? 1 : 0, zona || null, obra || null, fecha_emision || null,
+          precio_flete, monto_total])
       const id = rows[0].id
 
       for (const d of (detalles || [])) {
@@ -161,34 +181,30 @@ const VentasModel = {
   // Actualiza datos editables de un viaje (estado != entregado/anulado).
   // Ajusta el stock pendiente si cambió la cantidad pedida.
   async actualizarViaje(id, datos) {
-    const op = (await query(`SELECT estado, modalidad FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    const op = (await query(`SELECT estado, modalidad, precio_flete FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op) throw new Error('Orden no encontrada.')
     if (op.estado === 'entregado') throw new Error('No se puede editar una venta ya entregada.')
     if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
 
-    const calle  = datos.calle || null
+    const calle  = (datos.calle || '').trim() || null
     const numero = datos.numero ? parseInt(datos.numero) : null
+    const obra   = (datos.obra || '').trim() || null
+    if (!calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
     const fecha  = datos.fecha || null
     const hora   = datos.hora || null
     const zona   = datos.zona || null
     const metodoPago = datos.metodoPago || null
     const observaciones = datos.descripcion || ''
+    const vacio  = (v) => v == null || String(v).trim() === ''
+    const flete  = vacio(datos.precioFlete) ? (Number(op.precio_flete) || 0) : Math.max(0, Number(datos.precioFlete) || 0)
 
     await transaction(async (q) => {
-      await q(`
-        UPDATE op_encabezado
-        SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
-            domicilio_calle = ?, domicilio_altura = ?,
-            domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
-            observaciones = ?
-        WHERE id = ?
-      `, [fecha, hora, zona, calle, numero, numero ? 0 : 1, metodoPago, observaciones, id])
-
-      // Actualizar único detalle (cantidad/precio) si corresponde
-      const detalle = (await q(`SELECT id, id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`, [id])).rows[0]
+      // Único detalle (cantidad/precio): si no vino un campo, se conserva el valor actual
+      const detalle = (await q(`SELECT id, id_producto, cantidad_pedida, precio_unitario FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`, [id])).rows[0]
+      let subtotal = 0
       if (detalle) {
-        const nuevaCant = Number(datos.cantidad) || detalle.cantidad_pedida
-        const nuevoPrecio = Number(datos.precioProducto) || 0
+        const nuevaCant = Number(datos.cantidad) > 0 ? Number(datos.cantidad) : detalle.cantidad_pedida
+        const nuevoPrecio = vacio(datos.precioProducto) ? detalle.precio_unitario : Math.max(0, Number(datos.precioProducto) || 0)
         const delta = nuevaCant - detalle.cantidad_pedida
         await q(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ? WHERE id = ?`,
           [nuevaCant, nuevoPrecio, detalle.id])
@@ -196,7 +212,20 @@ const VentasModel = {
           await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar + ?) WHERE id_producto = ?`,
             [delta, detalle.id_producto])
         }
+        subtotal = nuevaCant * nuevoPrecio
       }
+      // Total: el editado a mano si se tildó, si no productos + flete
+      const totalManual = String(datos.editarTotal) === '1' && !vacio(datos.precioTotal)
+      const total = totalManual ? Math.max(0, Number(datos.precioTotal) || 0) : subtotal + flete
+
+      await q(`
+        UPDATE op_encabezado
+        SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
+            domicilio_calle = ?, domicilio_altura = ?, obra = ?,
+            domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
+            observaciones = ?, precio_flete = ?, monto_total = ?
+        WHERE id = ?
+      `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, id])
     })
   },
 
@@ -205,7 +234,6 @@ const VentasModel = {
     const op = await this.obtener(id)
     if (!op) return null
     const detalle = (op.detalles && op.detalles[0]) || {}
-    const flete = 0
     const subtotal = (detalle.cantidad_pedida || 0) * (detalle.precio_unitario || 0)
     return {
       id: op.id,
@@ -224,8 +252,10 @@ const VentasModel = {
       productoNombre: detalle.producto_nombre || '',
       cantidad: detalle.cantidad_pedida || 1,
       precioProducto: detalle.precio_unitario || 0,
-      precioFlete: flete,
-      precioTotal: subtotal,
+      subtotal,
+      precioFlete: op.precio_flete,
+      precioTotal: op.total,
+      totalManual: op.ajuste !== 0,
       metodoPago: op.metodo_pago || 'efectivo',
       descripcion: op.observaciones || '',
     }
@@ -277,7 +307,7 @@ const VentasModel = {
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
              c.nombre AS cliente_nombre, c.tel_whatsapp,
-             (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0) FROM op_detalle_material d WHERE d.id_orden_pedido = op.id) AS total,
+             ${SQL_TOTAL} AS total,
              (SELECT STRING_AGG(p.nombre || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ')
               FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
               WHERE d.id_orden_pedido = op.id) AS productos_str
@@ -294,12 +324,14 @@ const VentasModel = {
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
              c.nombre AS cliente_nombre,
-             (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0) FROM op_detalle_material d WHERE d.id_orden_pedido = op.id) AS total
+             ${SQL_TOTAL} AS total
       FROM op_encabezado op JOIN clientes c ON c.id = op.id_cliente
       WHERE op.tipo_op = 'M' AND op.modalidad = 'flete' AND op.estado = 'pendiente'
       ORDER BY op.fecha_entrega_planificada ASC NULLS LAST
     `)).rows
   },
 }
+
+VentasModel.importesVenta = importesVenta
 
 module.exports = VentasModel

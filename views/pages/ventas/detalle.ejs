@@ -178,6 +178,18 @@
                 <td class="text-end fw-bold">$<%= d.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
               </tr>
               <% }) %>
+              <% if (op.precio_flete) { %>
+              <tr>
+                <td class="fw-semibold" colspan="4">Flete</td>
+                <td class="text-end fw-bold">$<%= op.precio_flete.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+              </tr>
+              <% } %>
+              <% if (op.ajuste) { %>
+              <tr>
+                <td class="fw-semibold" colspan="4">Ajuste de precio <small class="text-muted fw-normal">(total editado a mano)</small></td>
+                <td class="text-end fw-bold"><%= op.ajuste < 0 ? '-' : '' %>$<%= Math.abs(op.ajuste).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+              </tr>
+              <% } %>
             </tbody>
             <tfoot>
               <tr class="total-row">

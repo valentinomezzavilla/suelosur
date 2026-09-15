@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const { query } = require('../config/db')
 const { codigoMaterial } = require('../utils/codigosMaterial')
+const { importesVenta } = require('./ventas.model')
 
 // Fecha del renglón: la de entrega planificada; si falta, la de emisión.
 const FECHA = `COALESCE(op.fecha_entrega_planificada, op.fecha_emision)`
@@ -35,6 +36,24 @@ const ReportesModel = {
       WHERE ${where} AND op.tipo_op = 'M'
     `, params)).rows
 
+    // ── Flete y ajuste del total pactado (el detalle solo tiene productos) ──
+    const extras = []
+    const ventas = (await query(`
+      SELECT ${FECHA} AS fecha, op.nro_remito, op.nro_op, op.obra, op.precio_flete, op.monto_total,
+             COALESCE(NULLIF(TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')), ''), 'Particular') AS cliente,
+             (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario), 0)
+              FROM op_detalle_material d WHERE d.id_orden_pedido = op.id) AS subtotal
+      FROM op_encabezado op
+      LEFT JOIN clientes c ON c.id = op.id_cliente
+      WHERE ${where} AND op.tipo_op = 'M' AND (op.precio_flete > 0 OR op.monto_total IS NOT NULL)
+    `, params)).rows
+    ventas.forEach(v => {
+      const { flete, ajuste } = importesVenta(v, Number(v.subtotal) || 0)
+      const base = { fecha: v.fecha, nro_remito: v.nro_remito, nro_op: v.nro_op, obra: v.obra, cliente: v.cliente, unidad: '', cantidad: 1 }
+      if (flete)  extras.push({ ...base, material: 'Flete', precio_unit: flete, importe: flete })
+      if (ajuste) extras.push({ ...base, material: 'Ajuste de precio', precio_unit: ajuste, importe: ajuste })
+    })
+
     // ── Alquileres de contenedor ─────────────────────────────────
     const contenedores = (await query(`
       SELECT ${FECHA} AS fecha, op.nro_remito, op.nro_op, op.obra,
@@ -60,7 +79,7 @@ const ReportesModel = {
       WHERE ${where} AND op.tipo_op = 'MA'
     `, params)).rows
 
-    const filas = [...materiales, ...contenedores, ...maquinaria].map(f => ({
+    const filas = [...materiales, ...extras, ...contenedores, ...maquinaria].map(f => ({
       fecha:       f.fecha,
       nro_remito:  f.nro_remito,
       nro_op:      f.nro_op,

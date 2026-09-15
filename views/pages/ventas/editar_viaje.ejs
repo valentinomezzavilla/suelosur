@@ -7,7 +7,7 @@
             </div>
         </div>
 
-        <form action="/ventas/<%= viaje.id %>/editar" method="POST" class="viaje-form-layout">
+        <form action="/ventas/<%= viaje.id %>/editar" method="POST" class="viaje-form-layout" id="formEditarViaje">
 
             <div class="viaje-form-main">
 
@@ -40,15 +40,20 @@
 
                 <div class="form-section">
                     <h3 class="form-section__title">Direccion de entrega</h3>
+                    <p class="form-hint">Cargá la dirección, la obra, o las dos. Al menos una es obligatoria.</p>
                     <div class="form-row-2">
                         <div class="form-group">
-                            <label for="calle">Calle *</label>
-                            <input type="text" name="calle" id="calle" value="<%= calle %>" required>
+                            <label for="calle">Calle</label>
+                            <input type="text" name="calle" id="calle" value="<%= calle %>">
                         </div>
                         <div class="form-group">
                             <label for="numero">Numero</label>
                             <input type="text" name="numero" id="numero" value="<%= numero %>">
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="obra">Obra</label>
+                        <input type="text" name="obra" id="obra" value="<%= viaje.obra || '' %>" placeholder="Nombre o referencia de la obra">
                     </div>
                     <div class="form-group">
                         <label for="zonaEditar">Zona</label>
@@ -88,15 +93,26 @@
                     <h3 class="form-section__title">Precios</h3>
                     <div class="form-group">
                         <label for="precioProducto">Precio unitario</label>
-                        <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="100">
+                        <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="any">
+                    </div>
+                    <div class="form-group">
+                        <label for="subtotalEditar">Subtotal producto</label>
+                        <input type="text" id="subtotalEditar" readonly class="input-readonly">
                     </div>
                     <div class="form-group">
                         <label for="precioFlete">Precio del flete</label>
-                        <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="100">
+                        <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="any">
                     </div>
                     <div class="form-group">
                         <label for="precioTotal">Total</label>
-                        <input type="number" name="precioTotal" id="precioTotal" value="<%= viaje.precioTotal %>" min="0" step="100">
+                        <div class="precio-total-row">
+                            <input type="number" name="precioTotal" id="precioTotal" value="<%= viaje.precioTotal %>" min="0" step="any"
+                                   <%= viaje.totalManual ? '' : 'readonly' %>>
+                            <label class="toggle-row toggle-sm">
+                                <input type="checkbox" id="checkEditarTotal" name="editarTotal" value="1" <%= viaje.totalManual ? 'checked' : '' %>>
+                                <span>Editar</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 
@@ -121,3 +137,37 @@
         </form>
 
     </main>
+
+<script>
+(function () {
+    const cant = document.getElementById('cantidad')
+    const precio = document.getElementById('precioProducto')
+    const flete = document.getElementById('precioFlete')
+    const total = document.getElementById('precioTotal')
+    const subtotal = document.getElementById('subtotalEditar')
+    const check = document.getElementById('checkEditarTotal')
+
+    // Total = subtotal + flete, salvo que se tilde "Editar" para cargarlo a mano
+    function calcular() {
+        const sub = (Number(cant.value) || 0) * (Number(precio.value) || 0)
+        subtotal.value = '$' + sub.toLocaleString('es-AR')
+        if (!check.checked) total.value = Math.round((sub + (Number(flete.value) || 0)) * 100) / 100
+    }
+    ;[cant, precio, flete].forEach(el => el.addEventListener('input', calcular))
+    check.addEventListener('change', () => {
+        total.readOnly = !check.checked
+        if (check.checked) total.focus()
+        calcular()
+    })
+
+    document.getElementById('formEditarViaje').addEventListener('submit', (e) => {
+        const calle = document.getElementById('calle').value.trim()
+        const obra = document.getElementById('obra').value.trim()
+        if (!calle && !obra) {
+            alert('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
+            e.preventDefault()
+        }
+    })
+    calcular()
+})()
+</script>

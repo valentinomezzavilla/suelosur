@@ -3,7 +3,7 @@
 // Reportes Excel genéricos (exceljs).
 // generarExcel(res, { titulo, columnas, filas, nombreArchivo })
 //   columnas: [{ header, key, width?, money?, ... }]
-//   filas:    [{ key: valor, ... }]
+//   filas:    [{ key: valor, ..., _destacar? }]  (_destacar = renglón en negrita, p.ej. totales)
 // ─────────────────────────────────────────────────────────────────
 const ExcelJS = require('exceljs')
 
@@ -11,7 +11,8 @@ async function generarExcel(res, { titulo = 'Reporte', columnas = [], filas = []
   const wb = new ExcelJS.Workbook()
   wb.creator = 'Suelosur'
   wb.created = new Date()
-  const ws = wb.addWorksheet(titulo.slice(0, 30) || 'Reporte')
+  // Excel no admite * ? : \ / [ ] en el nombre de la hoja (p.ej. un título con fechas)
+  const ws = wb.addWorksheet(titulo.replace(/[*?:\\/\[\]]/g, '-').slice(0, 30).trim() || 'Reporte')
 
   // Título
   if (columnas.length) {
@@ -39,6 +40,7 @@ async function generarExcel(res, { titulo = 'Reporte', columnas = [], filas = []
   // Datos
   filas.forEach(f => {
     const row = ws.addRow(columnas.map(c => f[c.key]))
+    if (f._destacar) row.font = { bold: true }
     columnas.forEach((c, i) => {
       if (c.money) {
         const cell = row.getCell(i + 1)

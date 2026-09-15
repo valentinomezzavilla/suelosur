@@ -143,7 +143,14 @@
                     <h3 class="form-section__title">Precios</h3>
                     <div class="form-group">
                         <label>Subtotal producto</label>
-                        <input type="text" id="subtotalProducto" readonly class="input-readonly">
+                        <div class="precio-total-row">
+                            <input type="text" id="subtotalProducto" readonly class="input-readonly">
+                            <label class="toggle-row toggle-sm">
+                                <input type="checkbox" id="checkEditarSubtotal" name="editarSubtotal" value="1">
+                                <span>Editar</span>
+                            </label>
+                        </div>
+                        <input type="number" name="subtotalManual" id="subtotalManualInput" style="display:none" min="0" step="100">
                         <input type="hidden" name="precioProducto" id="precioProductoHidden">
                     </div>
                     <div class="form-group">

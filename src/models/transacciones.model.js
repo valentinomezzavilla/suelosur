@@ -168,22 +168,42 @@ const TransaccionesModel = {
     return (await query(`SELECT * FROM transacciones ORDER BY created_at DESC`)).rows
   },
 
-  async filtrar({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax, page = 1, limit = 20, sortBy = 'created_at', sortDir = 'DESC' } = {}) {
+  // WHERE compartido por el listado, las métricas y el reporte. La fecha se compara por
+  // día: guardada con hora ("2026-09-14 17:57:21") quedaba afuera del último día del rango.
+  _filtro({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
     const wheres = []
     const params = []
     if (id)         { wheres.push('id = ?');                  params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?');  params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');          params.push(clienteId) }
     if (cliente)    { wheres.push('cliente ILIKE ?');          params.push(`%${cliente}%`) }
-    if (fechaDesde) { wheres.push('fecha >= ?');              params.push(fechaDesde) }
-    if (fechaHasta) { wheres.push('fecha <= ?');              params.push(fechaHasta) }
+    if (fechaDesde) { wheres.push('LEFT(fecha, 10) >= ?');    params.push(fechaDesde) }
+    if (fechaHasta) { wheres.push('LEFT(fecha, 10) <= ?');    params.push(fechaHasta) }
     if (montoMin)   { wheres.push('monto >= ?');              params.push(Number(montoMin)) }
     if (montoMax)   { wheres.push('monto <= ?');              params.push(Number(montoMax)) }
-    const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
+    return { where: wheres.length ? 'WHERE ' + wheres.join(' AND ') : '', params }
+  },
 
+  // Ventas a cuenta corriente: venta por venta, ¿el cliente ya la saldó?
+  // (ver ClientesModel.saldadaPorOperacion — FIFO contra las deudas del cliente)
+  async _marcarSaldadas(rows) {
+    const idsCC = rows
+      .filter(r => r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado)
+      .map(r => r.id_op_encabezado)
+    const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
+    rows.forEach(r => {
+      if (r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado) r.saldada = !!saldadas[r.id_op_encabezado]
+    })
+    return rows
+  },
+
+  _orden(sortBy, sortDir) {
     const validSorts = { created_at: 'created_at', monto: 'monto', fecha: 'fecha', tipo: 'tipo' }
-    const orderCol = validSorts[sortBy] || 'created_at'
-    const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC'
+    return `${validSorts[sortBy] || 'created_at'} ${sortDir === 'ASC' ? 'ASC' : 'DESC'}`
+  },
+
+  async filtrar({ page = 1, limit = 20, sortBy = 'created_at', sortDir = 'DESC', ...filtros } = {}) {
+    const { where, params } = this._filtro(filtros)
     const offset = (page - 1) * limit
 
     const total = (await query(`SELECT COUNT(*) AS n FROM transacciones ${where}`, params)).rows[0]?.n || 0
@@ -193,36 +213,28 @@ const TransaccionesModel = {
              (oe.archivo_remito IS NOT NULL AND oe.archivo_remito <> '') AS tiene_remito_firmado
       FROM (SELECT * FROM transacciones ${where}) sub
       LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
-      ORDER BY sub.${orderCol} ${orderDir} LIMIT ? OFFSET ?
+      ORDER BY sub.${this._orden(sortBy, sortDir)} LIMIT ? OFFSET ?
     `, [...params, limit, offset])).rows
 
-    // Ventas a cuenta corriente: venta por venta, ¿el cliente ya la saldó?
-    // (ver ClientesModel.saldadaPorOperacion — FIFO contra las deudas del cliente)
-    const idsCC = rows
-      .filter(r => r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado)
-      .map(r => r.id_op_encabezado)
-    const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
-    rows.forEach(r => {
-      if (r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado) r.saldada = !!saldadas[r.id_op_encabezado]
-    })
-
+    await this._marcarSaldadas(rows)
     return { rows, total, sumaTotal, page, limit, totalPaginas: Math.ceil(total / limit) }
   },
 
-  // Métricas agregadas del período/filtros (para las cards)
-  async resumen({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
-    const wheres = []
-    const params = []
-    if (id)         { wheres.push('id = ?');                 params.push(id) }
-    if (tipo && tipo !== 'todos') { wheres.push('tipo = ?'); params.push(tipo) }
-    if (clienteId)  { wheres.push('cliente_id = ?');         params.push(clienteId) }
-    if (cliente)    { wheres.push('cliente ILIKE ?');         params.push(`%${cliente}%`) }
-    if (fechaDesde) { wheres.push('fecha >= ?');             params.push(fechaDesde) }
-    if (fechaHasta) { wheres.push('fecha <= ?');             params.push(fechaHasta) }
-    if (montoMin)   { wheres.push('monto >= ?');             params.push(Number(montoMin)) }
-    if (montoMax)   { wheres.push('monto <= ?');             params.push(Number(montoMax)) }
-    const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
+  // Todas las transacciones que coinciden con los filtros (sin paginar), para el reporte.
+  async paraReporte({ sortBy = 'fecha', sortDir = 'ASC', ...filtros } = {}) {
+    const { where, params } = this._filtro(filtros)
+    const rows = (await query(`
+      SELECT sub.*, oe.nro_op, oe.obra
+      FROM (SELECT * FROM transacciones ${where}) sub
+      LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
+      ORDER BY sub.${this._orden(sortBy, sortDir)}, sub.id
+    `, params)).rows
+    return this._marcarSaldadas(rows)
+  },
 
+  // Métricas agregadas del período/filtros (para las cards)
+  async resumen(filtros = {}) {
+    const { where, params } = this._filtro(filtros)
     const rows = (await query(`SELECT tipo, COUNT(*) AS c, COALESCE(SUM(monto),0) AS s FROM transacciones ${where} GROUP BY tipo`, params)).rows
     let total = 0, count = 0
     const porTipo = {}
