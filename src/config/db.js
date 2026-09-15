@@ -759,6 +759,23 @@ async function initDB() {
     WHERE s.id_orden_pedido = op.id AND op.tipo_op = 'M' AND op.modalidad = 'flete'
       AND op.precio_flete IS NULL AND op.monto_total > s.subtotal + 0.5
   `).catch(e => console.error('Backfill precio_flete:', e.message))
+  // Backfill: transacciones de "Venta Viaje" creadas antes de que el destino (obra o
+  // calle/número) se sumara a la descripción quedaron como "Viaje a " sin nada después.
+  // Se recomponen con los datos ya cargados de la operación.
+  ;(async () => {
+    const { textoDestino } = require('../utils/destino')
+    const rotas = (await pool.query(`
+      SELECT t.id, op.domicilio_calle, op.domicilio_altura, op.obra, op.observaciones
+      FROM transacciones t JOIN op_encabezado op ON op.id = t.id_op_encabezado
+      WHERE t.tipo = 'Venta Viaje' AND TRIM(t.descripcion) = 'Viaje a'
+    `)).rows
+    for (const r of rotas) {
+      const destino = textoDestino({ calle: r.domicilio_calle, numero: r.domicilio_altura, obra: r.obra })
+      const nueva = [destino ? `Viaje a ${destino}` : 'Venta con viaje', r.observaciones].filter(Boolean).join(' — ')
+      await query(`UPDATE transacciones SET descripcion = ? WHERE id = ?`, [nueva, r.id])
+    }
+    if (rotas.length) console.log(`✅ Backfill: ${rotas.length} descripción(es) de "Venta Viaje" completadas con el destino.`)
+  })().catch(e => console.error('Backfill descripción Venta Viaje:', e.message))
   // Cuenta corriente: método de pago del movimiento (para pagos / abonos)
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
   // Cuenta corriente: venta de origen del cargo (para saber, venta por venta, si ya fue saldada)
