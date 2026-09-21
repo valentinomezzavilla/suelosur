@@ -61,11 +61,19 @@
 
       <!-- Empleado (sueldo) -->
       <div class="cond mb-3" data-cats="sueldo" style="display:none">
-        <label class="form-label">Empleado *</label>
-        <select name="id_empleado" id="id_empleado" class="form-select">
-          <option value="">Seleccionar…</option>
-          <% empleados.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %> <%= e.apellido || '' %><%= e.legajo ? ' — Legajo ' + e.legajo : '' %></option><% }) %>
-        </select>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Empleado *</label>
+            <select name="id_empleado" id="id_empleado" class="form-select">
+              <option value="">Seleccionar…</option>
+              <% empleados.forEach(e => { %><option value="<%= e.id %>" data-sueldo="<%= Number(e.sueldo_basico || e.salario || 0) %>"><%= e.nombre %> <%= e.apellido || '' %><%= e.legajo ? ' — Legajo ' + e.legajo : '' %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Período</label>
+            <input type="month" name="periodo" id="periodo" class="form-control" value="<%= new Date().toISOString().slice(0,7) %>">
+          </div>
+        </div>
       </div>
 
       <!-- Vehículo (seguro / mantenimiento / combustible / impuesto) -->
@@ -84,9 +92,10 @@
           <input type="date" name="fecha" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
         </div>
         <div class="col-md-4">
-          <label class="form-label">Monto *</label>
+          <label class="form-label" id="lblMonto">Monto *</label>
           <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" placeholder="0" required>
           <small class="text-muted cond" data-cats="material" style="display:none">Se calcula con (cantidad × costo unitario) + flete.</small>
+          <small class="text-muted cond" data-cats="sueldo" id="ayudaSueldo" style="display:none">Se completa con el sueldo establecido del empleado (podés cambiarlo).</small>
           <label class="toggle-row toggle-sm mt-1 cond" data-cats="material" style="display:none">
             <input type="checkbox" id="checkEditarMonto">
             <span>Editar manualmente</span>
@@ -100,6 +109,25 @@
             <option value="transferencia">Transferencia</option>
             <option value="cheque">Cheque</option>
           </select>
+        </div>
+      </div>
+
+      <!-- Sueldo: descuentos, adiciones y neto -->
+      <div class="cond row g-3 mb-3" data-cats="sueldo" style="display:none">
+        <div class="col-md-4">
+          <label class="form-label">Descuentos</label>
+          <input type="number" step="0.01" min="0" name="descuentos" id="descuentos" class="form-control" placeholder="0">
+          <small class="text-muted">Lo que se le descuenta al sueldo.</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Adiciones</label>
+          <input type="number" step="0.01" min="0" name="adiciones" id="adiciones" class="form-control" placeholder="0">
+          <small class="text-muted">Bonificaciones que se le suman.</small>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Neto a pagar</label>
+          <input type="text" id="netoSueldo" class="form-control input-readonly fw-bold" readonly value="$0">
+          <small class="text-muted">Sueldo − descuentos + adiciones.</small>
         </div>
       </div>
 
@@ -132,8 +160,45 @@
         el.style.display = cats.includes(v) ? '' : 'none'
       })
       aplicarBloqueoMonto()
+      const lblMonto = document.getElementById('lblMonto')
+      if (lblMonto) lblMonto.textContent = v === 'sueldo' ? 'Sueldo *' : 'Monto *'
+      if (v === 'sueldo') { traerSueldo(); calcNeto() }
     }
     cat.addEventListener('change', toggle)
+
+    // Sueldo: al elegir el empleado, el monto se completa con el sueldo establecido en su
+    // ficha; con descuentos y adiciones se calcula el neto que se paga.
+    const selEmpleado = document.getElementById('id_empleado')
+    const descuentos = document.getElementById('descuentos')
+    const adiciones = document.getElementById('adiciones')
+    const neto = document.getElementById('netoSueldo')
+    const ayudaSueldo = document.getElementById('ayudaSueldo')
+    const pesos = (n) => '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    function traerSueldo() {
+      const opt = selEmpleado.selectedOptions[0]
+      const sueldo = opt && opt.value ? Number(opt.dataset.sueldo || 0) : 0
+      monto.value = sueldo > 0 ? sueldo : ''
+      if (ayudaSueldo) {
+        ayudaSueldo.textContent = opt && opt.value && !(sueldo > 0)
+          ? 'Este empleado no tiene sueldo establecido: cargalo en su ficha o escribí el monto.'
+          : 'Se completa con el sueldo establecido del empleado (podés cambiarlo).'
+      }
+      calcNeto()
+    }
+    function calcNeto() {
+      if (cat.value !== 'sueldo') return
+      const n = (parseFloat(monto.value) || 0) - (parseFloat(descuentos.value) || 0) + (parseFloat(adiciones.value) || 0)
+      neto.value = pesos(n)
+    }
+    selEmpleado.addEventListener('change', traerSueldo)
+    ;[monto, descuentos, adiciones].forEach(el => el.addEventListener('input', calcNeto))
+
+    document.getElementById('formEgreso').addEventListener('submit', (e) => {
+      if (cat.value !== 'sueldo') return
+      if (!selEmpleado.value) { alert('Elegí el empleado al que se le paga el sueldo.'); e.preventDefault(); return }
+      const n = (parseFloat(monto.value) || 0) - (parseFloat(descuentos.value) || 0) + (parseFloat(adiciones.value) || 0)
+      if (n <= 0) { alert('El neto a pagar tiene que ser mayor a cero: revisá el sueldo y los descuentos.'); e.preventDefault() }
+    })
 
     // El monto arranca bloqueado (se calcula solo) SOLO para material, que es la
     // única categoría con cálculo automático. Para el resto siempre es libre, como

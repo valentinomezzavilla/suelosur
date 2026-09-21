@@ -77,6 +77,12 @@
                 <%- include('../../partials/metodo_pago') %>
 
                 <div class="carrito-seccion">
+                    <label class="form-label" for="remitoCantera">Remito</label>
+                    <input type="text" id="remitoCantera" class="form-control" inputmode="numeric" maxlength="8" placeholder="N° de remito (opcional)" autocomplete="off" data-remito-check>
+                    <small class="text-muted" data-remito-msg>Si lo dejás vacío se asigna el siguiente número.</small>
+                </div>
+
+                <div class="carrito-seccion">
                     <label class="form-label" for="fechaCantera">Fecha de la venta</label>
                     <input type="date" id="fechaCantera" class="form-control">
                     <small class="text-muted">Se puede cargar una venta de un día anterior: impacta en esa fecha.</small>
@@ -108,5 +114,6 @@
         <input type="hidden" name="precioTotal" id="formPrecioTotal">
         <input type="hidden" name="observaciones" id="formObservaciones">
         <input type="hidden" name="fecha" id="formFecha">
+        <input type="hidden" name="remito" id="formRemito">
         <input type="hidden" name="paraFacturar" id="formParaFacturar">
     </form>

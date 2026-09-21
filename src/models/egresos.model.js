@@ -4,7 +4,7 @@
 // Cada fila es un egreso categorizado (material, sueldo, seguro, etc.),
 // vinculado opcionalmente a un proveedor / empleado / vehículo.
 // ═══════════════════════════════════════════════════════════════════
-const { query } = require('../config/db')
+const { query, transaction } = require('../config/db')
 
 const CATEGORIAS = ['material', 'sueldo', 'seguro', 'proveedor', 'mantenimiento', 'combustible', 'impuesto', 'otro']
 
@@ -66,8 +66,16 @@ const EgresosModel = {
     return (await query(`SELECT * FROM egresos WHERE id = ?`, [id])).rows[0]
   },
 
+  // Si el egreso es el pago de un sueldo, también se borra ese pago de la ficha del
+  // empleado (y su recibo), para que las dos listas no queden desalineadas.
   async eliminar(id) {
-    await query(`DELETE FROM egresos WHERE id = ?`, [id])
+    await transaction(async (q) => {
+      const e = (await q(`SELECT id, id_pago_empleado FROM egresos WHERE id = ?`, [id])).rows[0]
+      if (!e) return
+      await q(`DELETE FROM egresos WHERE id = ?`, [id])
+      await q(`DELETE FROM pagos_empleado WHERE id_egreso = ? ${e.id_pago_empleado ? 'OR id = ?' : ''}`,
+        e.id_pago_empleado ? [id, e.id_pago_empleado] : [id])
+    })
   },
 }
 

@@ -32,6 +32,24 @@ async function preciosDeCatalogo(canal, idsProducto) {
   return map
 }
 
+// Remito cargado a mano al crear la venta (el del talonario). Vacío = se asigna el
+// siguiente de la secuencia. Devuelve { nro } o { error }.
+async function leerRemito(valor) {
+  const txt = String(valor ?? '').trim()
+  if (!txt) return { nro: null }
+  if (!/^\d{1,8}$/.test(txt) || Number(txt) < 1) return { error: 'El remito tiene que ser un número (hasta 8 dígitos).' }
+  const nro = Number(txt)
+  const dup = await opConRemito(nro)
+  if (dup) return { error: `El remito ${nro} ya está cargado en OP-${String(dup.nro_op).padStart(4, '0')}.` }
+  return { nro }
+}
+
+// Operación (no anulada) que ya usa ese número de remito
+async function opConRemito(nro) {
+  return (await query(
+    `SELECT nro_op FROM op_encabezado WHERE nro_remito = ? AND estado <> 'anulado' LIMIT 1`, [nro])).rows[0]
+}
+
 const VentasController = {
 
   async index(req, res) {
@@ -68,7 +86,7 @@ const VentasController = {
       res.render('pages/ventas/cantera', {
         titulo: 'Venta en Cantera',
         productos,
-        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/ventasCantera.js'],
+        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/remitoCheck.js', '/js/ventasCantera.js'],
       })
     } catch (err) {
       console.error(err)
@@ -82,6 +100,8 @@ const VentasController = {
       const { clienteId, clienteNombre, items, metodoPago, precioTotal, fecha } = req.body
       const fechaRetro = fechaRetroactiva(fecha)
       const clienteIdClean = (clienteId && clienteId.trim()) || null
+      const remito = await leerRemito(req.body.remito)
+      if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/cantera') }
       let carrito = []
       try { carrito = JSON.parse(items || '[]') } catch (_) {}
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
@@ -113,6 +133,7 @@ const VentasController = {
         detalles,
         fecha_emision:       fechaRetro,
         monto_total:         total,
+        nro_remito:          remito.nro,
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 
@@ -181,13 +202,23 @@ const VentasController = {
       res.render('pages/ventas/viaje', {
         titulo: 'Venta con Viaje',
         productos, viajesHoy, viajesTodos, choferes, camiones, zonas,
-        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/ventasViaje.js'],
+        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/remitoCheck.js', '/js/ventasViaje.js'],
       })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar la página.')
       res.redirect('/ventas')
     }
+  },
+
+  // ── API: ¿ya existe ese remito? (aviso en vivo en los formularios de venta) ──
+  async apiRemitoExiste(req, res) {
+    try {
+      const nro = Number(req.params.nro)
+      if (!Number.isInteger(nro) || nro < 1) return res.json({ existe: false })
+      const dup = await opConRemito(nro)
+      res.json(dup ? { existe: true, op: `OP-${String(dup.nro_op).padStart(4, '0')}` } : { existe: false })
+    } catch (err) { console.error(err); res.status(500).json({ error: 'Error' }) }
   },
 
   // ── API: asignación chofer ↔ camión ────────────────────────────
@@ -228,6 +259,8 @@ const VentasController = {
         req.flash('error', 'Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
         return res.redirect(req.get('Referrer') || '/ventas')
       }
+      const remito = await leerRemito(req.body.remito)
+      if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/viaje') }
 
       const cantidadNum = Number(cantidad) || 1
       const esFinalizarAhora = finalizarAhora === 'true'
@@ -265,6 +298,7 @@ const VentasController = {
         domicilio: { calle, altura: numero, sin_numero: !numero },
         precio_flete:        flete,
         monto_total:         total,
+        nro_remito:          remito.nro,
         detalles: [{
           id_producto:     productoId,
           cantidad_pedida: cantidadNum,

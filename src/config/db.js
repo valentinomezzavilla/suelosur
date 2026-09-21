@@ -915,6 +915,44 @@ async function initDB() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_fecha     ON egresos(fecha)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_categoria ON egresos(categoria)`)
 
+  // Pagos a empleados: cada pago queda en DOS lugares (el libro de compras / pagos y la
+  // pestaña de pagos del chofer) y se vinculan entre sí. `monto` es el NETO pagado;
+  // sueldo_base / descuentos / adiciones guardan cómo se llegó a ese neto (recibo de sueldo).
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS sueldo_base REAL`).catch(() => {})
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS descuentos REAL DEFAULT 0`).catch(() => {})
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS adiciones REAL DEFAULT 0`).catch(() => {})
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS metodo_pago TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS id_usuario BIGINT`).catch(() => {})
+  await pool.query(`ALTER TABLE pagos_empleado ADD COLUMN IF NOT EXISTS id_egreso BIGINT`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_pago_empleado BIGINT`).catch(() => {})
+  // Backfill: los egresos de sueldo cargados antes de este vínculo no figuraban en la
+  // pestaña de pagos del chofer. Se crea (o se reutiliza, si el alta por alerta ya había
+  // creado el pago suelto) el pago correspondiente y se vinculan. Idempotente.
+  ;(async () => {
+    const sueltos = (await pool.query(`
+      SELECT id, fecha, monto, descripcion, metodo_pago, id_empleado, id_usuario
+      FROM egresos WHERE categoria = 'sueldo' AND id_empleado IS NOT NULL AND id_pago_empleado IS NULL
+    `)).rows
+    for (const e of sueltos) {
+      const igual = (await query(`
+        SELECT id FROM pagos_empleado
+        WHERE id_egreso IS NULL AND id_empleado = ? AND ABS(monto - ?) < 0.01 AND fecha = ? LIMIT 1
+      `, [e.id_empleado, e.monto, e.fecha])).rows[0]
+      let idPago = igual && igual.id
+      if (!idPago) {
+        // Un "vale" o adelanto se anota como anticipo; el resto como sueldo
+        const tipo = /vale|adelanto|anticipo/i.test(e.descripcion || '') ? 'anticipo' : 'sueldo'
+        idPago = (await query(`
+          INSERT INTO pagos_empleado (id_empleado, tipo, periodo, monto, sueldo_base, fecha, descripcion, metodo_pago, id_usuario)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        `, [e.id_empleado, tipo, String(e.fecha).slice(0, 7), e.monto, e.monto, e.fecha, e.descripcion || '', e.metodo_pago, e.id_usuario])).rows[0].id
+      }
+      await query(`UPDATE pagos_empleado SET id_egreso = ? WHERE id = ?`, [e.id, idPago])
+      await query(`UPDATE egresos SET id_pago_empleado = ? WHERE id = ?`, [idPago, e.id])
+    }
+    if (sueltos.length) console.log(`✅ Backfill: ${sueltos.length} pago(s) de sueldo vinculados a la pestaña de pagos del empleado.`)
+  })().catch(e => console.error('Backfill pagos de sueldo:', e.message))
+
   // Cheques: cartera de cheques recibidos (de clientes) y emitidos (a proveedores /
   // empleados). Guarda todos los datos del cheque y su estado en la cartera.
   await pool.query(`

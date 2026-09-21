@@ -70,7 +70,13 @@ function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [
       let v = f[c.key]
       if (c.money) v = v == null || v === '' ? '' : money(v)
       else if (v == null) v = ''
-      doc.fillColor(TINTA).text(recortar(doc, String(v), anchos[i] - 8), x + 4, y + 5, { width: anchos[i] - 8, align: c.align || 'left', lineBreak: false })
+      const texto = recortar(doc, String(v), anchos[i] - 8)
+      // width solo cuando hace falta para alinear (derecha/centro): con el texto ya
+      // recortado al ancho exacto de la celda, pdfkit puede igual partirlo en dos líneas
+      // (lineBreak:false no lo evita cuando el width queda justo al límite).
+      const opts = { align: c.align || 'left', lineBreak: false }
+      if (c.align === 'right' || c.align === 'center') opts.width = anchos[i] - 8
+      doc.fillColor(TINTA).text(texto, x + 4, y + 5, opts)
       x += anchos[i]
     })
     y += rowH

@@ -224,12 +224,30 @@ const TransaccionesModel = {
   },
 
   // Todas las transacciones que coinciden con los filtros (sin paginar), para el reporte.
+  // Para el reporte: separa lo que se vendió (productos/contenedor/maquinaria) de la
+  // obra y las observaciones de la operación — la descripción guardada en la transacción
+  // las mezcla todas en un solo texto libre, así que acá se arman aparte.
   async paraReporte({ sortBy = 'fecha', sortDir = 'ASC', ...filtros } = {}) {
     const { where, params } = this._filtro(filtros)
     const rows = (await query(`
-      SELECT sub.*, oe.nro_op, oe.obra
+      SELECT sub.*, oe.nro_op, oe.obra, oe.observaciones AS obs_operacion,
+             mat.productos_str, c.numero_contenedor, m.maquinaria_nombre
       FROM (SELECT * FROM transacciones ${where}) sub
       LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
+      LEFT JOIN (
+        SELECT d.id_orden_pedido,
+               STRING_AGG(p.nombre || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ') AS productos_str
+        FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
+        GROUP BY d.id_orden_pedido
+      ) mat ON mat.id_orden_pedido = oe.id
+      LEFT JOIN (
+        SELECT oc.id_orden_pedido, cont.numero_contenedor
+        FROM op_detalle_contenedor oc LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      ) c ON c.id_orden_pedido = oe.id
+      LEFT JOIN (
+        SELECT dm.id_orden_pedido, maq.nombre AS maquinaria_nombre
+        FROM op_detalle_maquinaria dm LEFT JOIN maquinaria maq ON maq.id = dm.id_maquinaria
+      ) m ON m.id_orden_pedido = oe.id
       ORDER BY sub.${this._orden(sortBy, sortDir)}, sub.id
     `, params)).rows
     return this._marcarSaldadas(rows)

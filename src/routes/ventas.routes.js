@@ -31,6 +31,9 @@ router.post('/:id/anular',         auth, acceso, ctrl.anular)
 router.get('/api/buscar-clientes', auth, acceso, ctrl.buscarClientesApi)
 router.post('/api/crear-cliente',  auth, acceso, ctrl.crearClienteApi)
 
+// API JSON: ¿el remito ya está cargado? (aviso en vivo en los formularios)
+router.get('/api/remito/:nro',     auth, acceso, ctrl.apiRemitoExiste)
+
 // API JSON: asignación chofer ↔ camión (autocomplete recíproco en el form)
 router.get('/api/chofer-de-camion/:idCamion', auth, acceso, ctrl.apiChoferDeCamion)
 router.get('/api/camion-de-chofer/:idChofer', auth, acceso, ctrl.apiCamionDeChofer)

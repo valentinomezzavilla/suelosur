@@ -7,7 +7,6 @@ const DocumentosModel = require('../models/documentos.model')
 const AsignacionesModel = require('../models/asignaciones.model')
 const ControlHorarioModel = require('../models/control_horario.model')
 const PagosModel = require('../models/pagos_empleado.model')
-const EgresosModel = require('../models/egresos.model')
 const AlertasModel = require('../models/alertas.model')
 const { registrarAuditoria, historial } = require('../utils/auditoria')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
@@ -206,17 +205,21 @@ const ChoferesController = {
   async registrarPago(req, res) {
     const back = `/choferes/${req.params.id}?tab=pagos`
     try {
-      const { tipo, monto } = req.body
+      const { tipo, monto, periodo, descuentos, adiciones, fecha, descripcion, metodo_pago } = req.body
       if (!tipo || !(parseFloat(monto) > 0)) { req.flash('error', 'Tipo y monto válidos requeridos.'); return res.redirect(back) }
-      await PagosModel.crear({ id_empleado: req.params.id, ...req.body })
-      registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { pago: tipo, monto } })
-      req.flash('success', 'Pago registrado.')
-    } catch (err) { console.error(err); req.flash('error', 'Error.') }
+      // Queda en la pestaña del chofer y en el libro de compras / pagos, con su recibo
+      const pago = await PagosModel.registrar({
+        id_empleado: req.params.id, tipo, periodo: (periodo || '').trim() || null, monto, descuentos, adiciones,
+        fecha: fecha || null, descripcion, metodo_pago: metodo_pago || null, id_usuario: uid(req), origen: 'manual',
+      })
+      registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'modificar', usuario: uid(req), detalle: { pago: tipo, neto: pago.neto } })
+      req.flash('success', tipo === 'descuento' ? 'Descuento registrado.' : 'Pago registrado en la ficha y en Compras / Pagos.')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error.') }
     res.redirect(back)
   },
 
   async eliminarPago(req, res) {
-    try { await PagosModel.eliminar(req.params.pagoId) } catch (err) { console.error(err) }
+    try { await PagosModel.eliminar(req.params.pagoId, req.params.id) } catch (err) { console.error(err) }
     res.redirect(`/choferes/${req.params.id}?tab=pagos`)
   },
 
@@ -296,17 +299,13 @@ const ChoferesController = {
     try {
       const emp = await EmpleadosModel.obtener(req.params.id)
       if (!emp) { req.flash('error', 'Empleado no encontrado.'); return res.redirect(back) }
-      const montoSueldo = emp.sueldo_basico || emp.salario || 0
-      await PagosModel.crear({
-        id_empleado: emp.id, tipo: 'sueldo',
-        monto: montoSueldo,
-        fecha: new Date().toISOString().slice(0, 10),
+      const hoy = new Date().toISOString().slice(0, 10)
+      // Queda en la ficha del empleado y en el libro de compras / pagos (con recibo)
+      await PagosModel.registrar({
+        id_empleado: emp.id, tipo: 'sueldo', periodo: hoy.slice(0, 7),
+        monto: PagosModel.sueldoEstablecido(emp), fecha: hoy,
         descripcion: 'Pago registrado al resolver alerta de vencimiento',
-      })
-      // Registro automático en el libro de compras / pagos
-      await EgresosModel.crear({
-        categoria: 'sueldo', descripcion: `Sueldo — ${emp.nombre} ${emp.apellido || ''}`.trim(),
-        monto: montoSueldo, id_empleado: emp.id, origen: 'alerta', id_usuario: uid(req),
+        id_usuario: uid(req), origen: 'alerta',
       })
       const base = emp.fecha_vencimiento_pago ? new Date(emp.fecha_vencimiento_pago + 'T00:00:00') : new Date()
       base.setMonth(base.getMonth() + 1)

@@ -225,6 +225,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const remitoV = document.getElementById('remitoViaje');
+        if (remitoV && remitoV.dataset.invalido === '1') {
+            alert(remitoV.dataset.mensaje || 'Revisá el número de remito.');
+            remitoV.focus();
+            e.preventDefault();
+            return;
+        }
+
         // Destino: al menos uno entre dirección (calle) y obra
         const calleV = document.getElementById('calleViaje')?.value.trim();
         const obraV  = document.getElementById('obraViaje')?.value.trim();

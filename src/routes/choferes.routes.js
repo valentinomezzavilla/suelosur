@@ -4,6 +4,7 @@ const router  = express.Router()
 const auth    = require('../middlewares/auth')
 const roles   = require('../middlewares/roles')
 const ctrl    = require('../controllers/choferes.controller')
+const pagosCtrl = require('../controllers/pagosEmpleado.controller')
 const { uploadDocumento } = require('../middlewares/upload')
 
 const acceso = roles('dueno', 'admin_contable')
@@ -38,6 +39,7 @@ router.post('/:id/horario/:jorId/eliminar',  auth, acceso, ctrl.eliminarJornada)
 
 // Pagos
 router.post('/:id/pagos',                 auth, acceso, ctrl.registrarPago)
+router.get('/:id/pagos/:pagoId/recibo',   auth, acceso, pagosCtrl.recibo)
 router.post('/:id/pagos/:pagoId/eliminar', auth, acceso, ctrl.eliminarPago)
 
 module.exports = router

@@ -76,12 +76,35 @@ const TransaccionesController = {
         if (t.metodo_pago !== 'cuenta_corriente' || t.saldada == null) return m
         return `Cta. cte. · ${t.saldada ? 'saldada' : 'sin saldar'}`
       }
+      // La descripción guardada en la transacción mezcla, según el tipo, qué se vendió,
+      // la obra y las observaciones en un solo texto libre. Para el reporte se separan:
+      // "Descripción" = qué se vendió (viene de la operación, no del texto guardado),
+      // "Obra" y "Observaciones" aparte, cada una en su columna.
+      const descripcionVenta = (t) => {
+        if (t.productos_str) return t.productos_str
+        if (t.tipo === 'Alquiler')   return t.numero_contenedor ? `Contenedor N° ${t.numero_contenedor}` : 'Alquiler de contenedor'
+        if (t.tipo === 'Maquinaria') return t.maquinaria_nombre || 'Alquiler de maquinaria'
+        return t.descripcion || ''
+      }
+      // La venta en cantera guarda la observación del usuario ya pegada al listado de
+      // productos en el mismo campo ("Arena Gruesa x3 — anotación"), así que hay que
+      // sacarle el listado de productos (que ya va en su propia columna) para que quede
+      // solo la anotación.
+      const observacionesLimpias = (t) => {
+        let obs = t.obs_operacion || ''
+        if (t.productos_str && obs.startsWith(t.productos_str)) {
+          obs = obs.slice(t.productos_str.length).replace(/^\s*—\s*/, '')
+        }
+        return obs.trim()
+      }
       const filas = lista.map(t => ({
         codigo: TransaccionesModel.codigo(t),
         fecha: fmtFecha(t.fecha),
         tipo: t.tipo,
         cliente: t.cliente,
-        descripcion: t.descripcion || '',
+        descripcion: descripcionVenta(t),
+        obra: t.obra || '',
+        observaciones: observacionesLimpias(t),
         metodo: metodo(t),
         remito: t.nro_remito ? String(t.nro_remito).padStart(8, '0') : '',
         monto: Number(t.monto) || 0,
@@ -105,10 +128,10 @@ const TransaccionesController = {
       if (filas.length) {
         filas.push({ descripcion: 'TOTAL', cliente: `${filas.length} transacción(es)`, monto: total, _destacar: true })
         filas.push({})
-        filas.push({ descripcion: 'SUBTOTALES POR TIPO', _destacar: true })
+        filas.push({ descripcion: 'Por tipo', _destacar: true })
         filas.push(...subtotales('Tipo', t => t.tipo))
         filas.push({})
-        filas.push({ descripcion: 'SUBTOTALES POR MÉTODO DE PAGO', _destacar: true })
+        filas.push({ descripcion: 'Por método de pago', _destacar: true })
         filas.push(...subtotales('Método', t => METODOS[t.metodo_pago] || t.metodo_pago || 'Sin dato'))
       }
 
@@ -130,14 +153,16 @@ const TransaccionesController = {
           titulo,
           subtitulo: detalleFiltros,
           columnas: [
-            { header: 'Código', key: 'codigo', width: 0.09 },
-            { header: 'Fecha', key: 'fecha', width: 0.08 },
-            { header: 'Tipo', key: 'tipo', width: 0.09 },
-            { header: 'Cliente', key: 'cliente', width: 0.15 },
-            { header: 'Descripción', key: 'descripcion' },
-            { header: 'Método de pago', key: 'metodo', width: 0.14 },
-            { header: 'Remito', key: 'remito', width: 0.08 },
-            { header: 'Monto', key: 'monto', width: 0.11, money: true, align: 'right' },
+            { header: 'Código', key: 'codigo', width: 0.080 },
+            { header: 'Fecha', key: 'fecha', width: 0.072 },
+            { header: 'Tipo', key: 'tipo', width: 0.087 },
+            { header: 'Cliente', key: 'cliente', width: 0.130 },
+            { header: 'Descripción', key: 'descripcion', width: 0.125 },
+            { header: 'Obra', key: 'obra', width: 0.095 },
+            { header: 'Observaciones', key: 'observaciones', width: 0.125 },
+            { header: 'Método de pago', key: 'metodo', width: 0.113 },
+            { header: 'Remito', key: 'remito', width: 0.065 },
+            { header: 'Monto', key: 'monto', width: 0.108, money: true, align: 'right' },
           ],
           filas: filas.length ? filas : [{ descripcion: 'No hay transacciones que coincidan con los filtros' }],
           registros: lista.length,
@@ -152,7 +177,9 @@ const TransaccionesController = {
           { header: 'Fecha', key: 'fecha', width: 12 },
           { header: 'Tipo', key: 'tipo', width: 15 },
           { header: 'Cliente', key: 'cliente', width: 28 },
-          { header: 'Descripción', key: 'descripcion', width: 50 },
+          { header: 'Descripción', key: 'descripcion', width: 32 },
+          { header: 'Obra', key: 'obra', width: 24 },
+          { header: 'Observaciones', key: 'observaciones', width: 30 },
           { header: 'Método de pago', key: 'metodo', width: 28 },
           { header: 'Remito', key: 'remito', width: 12 },
           { header: 'Monto', key: 'monto', width: 16, money: true },

@@ -136,7 +136,7 @@ const VentasModel = {
 
   async crear({ id_cliente, cliente_nombre_libre, id_administrativo, tipo_op = 'M', observaciones = '',
           detalles, fecha_entrega_planificada, hora_planificada, modalidad, domicilio, metodo_pago, zona, obra,
-          fecha_emision, precio_flete = null, monto_total = null }) {
+          fecha_emision, precio_flete = null, monto_total = null, nro_remito = null }) {
     // Crear cliente automáticamente si viene como texto libre
     if (!id_cliente && cliente_nombre_libre) {
       const cli = await query(`INSERT INTO clientes (nombre, activo) VALUES (?, 1) RETURNING id`,
@@ -144,7 +144,9 @@ const VentasModel = {
       id_cliente = cli.rows[0].id
     }
     const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
-    const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
+    // Remito: el que se cargó a mano (talonario) o, si no, el siguiente de la secuencia
+    const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
+    const nro_rem = nro_remito || nroSiguiente
     const dom = domicilio || {}
 
     return await transaction(async (q) => {

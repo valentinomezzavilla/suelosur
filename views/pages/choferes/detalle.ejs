@@ -296,27 +296,73 @@
   </div>
   <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Registrar pago</div>
     <div class="card-body">
-      <form action="/choferes/<%= chofer.id %>/pagos" method="POST">
-        <div class="row g-2 align-items-end">
+      <% const sueldoFicha = Number(chofer.sueldo_basico || chofer.salario || 0) %>
+      <form action="/choferes/<%= chofer.id %>/pagos" method="POST" id="formPagoChofer" data-sueldo="<%= sueldoFicha %>">
+        <div class="row g-2 align-items-start">
           <div class="col-md-3"><label class="form-label">Tipo *</label>
-            <select name="tipo" class="form-select form-select-sm" required>
+            <select name="tipo" id="pgTipo" class="form-select form-select-sm" required>
               <% Object.entries(tipoPagoLbl).forEach(([k,l]) => { %><option value="<%= k %>"><%= l %></option><% }) %>
             </select>
           </div>
-          <div class="col-md-2"><label class="form-label">Monto *</label><input type="number" step="0.01" min="0" name="monto" class="form-control form-control-sm" required></div>
-          <div class="col-md-2"><label class="form-label">Período</label><input name="periodo" class="form-control form-control-sm" placeholder="2026-06"></div>
-          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm"></div>
-          <div class="col-md-3"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm"></div>
+          <div class="col-md-3"><label class="form-label" id="pgLblMonto">Sueldo *</label><input type="number" step="0.01" min="0" name="monto" id="pgMonto" class="form-control form-control-sm" required value="<%= sueldoFicha > 0 ? sueldoFicha : '' %>">
+            <small class="text-muted" id="pgAyuda"><%= sueldoFicha > 0 ? 'Sueldo establecido en la ficha.' : 'Sin sueldo establecido en la ficha.' %></small></div>
+          <div class="col-md-2 pg-ajuste"><label class="form-label">Descuentos</label><input type="number" step="0.01" min="0" name="descuentos" id="pgDesc" class="form-control form-control-sm" placeholder="0"></div>
+          <div class="col-md-2 pg-ajuste"><label class="form-label">Adiciones</label><input type="number" step="0.01" min="0" name="adiciones" id="pgAdic" class="form-control form-control-sm" placeholder="0"></div>
+          <div class="col-md-2 pg-ajuste"><label class="form-label">Neto a pagar</label><input type="text" id="pgNeto" class="form-control form-control-sm fw-bold" readonly></div>
+        </div>
+        <div class="row g-2 align-items-end mt-1">
+          <div class="col-md-2"><label class="form-label">Período</label><input type="month" name="periodo" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0,7) %>"></div>
+          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0,10) %>"></div>
+          <div class="col-md-2"><label class="form-label">Método de pago</label>
+            <select name="metodo_pago" class="form-select form-select-sm">
+              <option value="">—</option><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="cheque">Cheque</option>
+            </select></div>
+          <div class="col-md-6"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm" placeholder="Detalle u observaciones (sale en el recibo)"></div>
         </div>
         <button class="btn btn-sm btn-naranja mt-2">Registrar pago</button>
+        <small class="text-muted ms-2">Queda en esta ficha, en Compras / Pagos y genera su recibo.</small>
       </form>
+      <script>
+        (function () {
+          const f = document.getElementById('formPagoChofer'), tipo = document.getElementById('pgTipo'), monto = document.getElementById('pgMonto')
+          const desc = document.getElementById('pgDesc'), adic = document.getElementById('pgAdic'), neto = document.getElementById('pgNeto')
+          const lbl = document.getElementById('pgLblMonto'), ayuda = document.getElementById('pgAyuda')
+          const sueldo = Number(f.dataset.sueldo || 0)
+          const ajustes = Array.from(f.querySelectorAll('.pg-ajuste'))
+          const pesos = (n) => '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+          function calc() {
+            neto.value = pesos((parseFloat(monto.value) || 0) - (parseFloat(desc.value) || 0) + (parseFloat(adic.value) || 0))
+          }
+          // Descuentos y adiciones solo tienen sentido en sueldo y liquidación
+          function alCambiarTipo() {
+            const conAjustes = tipo.value === 'sueldo' || tipo.value === 'liquidacion'
+            ajustes.forEach(el => { el.style.display = conAjustes ? '' : 'none' })
+            if (!conAjustes) { desc.value = ''; adic.value = '' }
+            lbl.textContent = tipo.value === 'sueldo' ? 'Sueldo *' : 'Monto *'
+            // El sueldo establecido se trae solo al pagar un sueldo
+            if (tipo.value === 'sueldo') {
+              monto.value = sueldo > 0 ? sueldo : ''
+              ayuda.textContent = sueldo > 0 ? 'Sueldo establecido en la ficha.' : 'Sin sueldo establecido en la ficha.'
+            } else { ayuda.textContent = '' }
+            calc()
+          }
+          tipo.addEventListener('change', alCambiarTipo)
+          ;[monto, desc, adic].forEach(el => el.addEventListener('input', calc))
+          f.addEventListener('submit', (e) => {
+            if (tipo.value === 'descuento') return
+            const n = (parseFloat(monto.value) || 0) - (parseFloat(desc.value) || 0) + (parseFloat(adic.value) || 0)
+            if (n <= 0) { alert('El neto a pagar tiene que ser mayor a cero: revisá el importe y los descuentos.'); e.preventDefault() }
+          })
+          tipo.value = 'sueldo'; alCambiarTipo()
+        })()
+      </script>
     </div>
   </div>
   <div class="card shadow-sm"><div class="card-body p-0">
     <% if (!pagos.length) { %><div class="p-4 text-center text-muted">Sin pagos en el período.</div>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
-      <thead><tr><th>Fecha</th><th>Tipo</th><th>Período</th><th>Descripción</th><th class="text-end">Monto</th><th></th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Período</th><th>Descripción</th><th>Método</th><th class="text-end">Monto (neto)</th><th></th></tr></thead>
       <tbody>
         <% pagos.forEach(p => { %>
         <tr>
@@ -324,8 +370,18 @@
           <td><span class="badge rounded-pill px-3 <%= p.tipo==='descuento'?'badge-alerta':'badge-activo' %>"><%= tipoPagoLbl[p.tipo] || p.tipo %></span></td>
           <td><small class="text-muted"><%= p.periodo || '—' %></small></td>
           <td><small class="text-muted"><%= p.descripcion || '—' %></small></td>
-          <td class="text-end fw-semibold <%= p.tipo==='descuento'?'text-danger':'' %>"><%= money(p.monto) %></td>
-          <td class="text-end"><form action="/choferes/<%= chofer.id %>/pagos/<%= p.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+          <td><small class="text-muted"><%= ({ efectivo:'Efectivo', transferencia:'Transferencia', cheque:'Cheque' })[p.metodo_pago] || '—' %></small></td>
+          <td class="text-end fw-semibold <%= p.tipo==='descuento'?'text-danger':'' %>"><%= money(p.monto) %>
+            <% if (Number(p.descuentos) > 0 || Number(p.adiciones) > 0) { %>
+              <small class="d-block text-muted fw-normal">Sueldo <%= money(p.sueldo_base) %><% if (Number(p.descuentos) > 0) { %> − <%= money(p.descuentos) %><% } %><% if (Number(p.adiciones) > 0) { %> + <%= money(p.adiciones) %><% } %></small>
+            <% } %>
+          </td>
+          <td class="text-end text-nowrap">
+            <% if (p.tipo !== 'descuento') { %>
+              <a href="/choferes/<%= chofer.id %>/pagos/<%= p.id %>/recibo" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Recibo"><%- icon('fileText',{size:14}) %></a>
+            <% } %>
+            <form action="/choferes/<%= chofer.id %>/pagos/<%= p.id %>/eliminar" method="POST" class="d-inline" onsubmit="return confirm('¿Eliminar este pago? <%= p.id_egreso ? 'También se elimina de Compras / Pagos y su recibo.' : '' %>')"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form>
+          </td>
         </tr>
         <% }) %>
       </tbody>

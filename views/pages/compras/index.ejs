@@ -18,6 +18,13 @@
   <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra / pago</a>
 </div>
 
+<% if (typeof reciboId !== 'undefined' && reciboId) { %>
+<div class="alert alert-success d-flex justify-content-between align-items-center flex-wrap gap-2" role="alert">
+  <span><%- icon('checkCircle', { size: 16 }) %> Sueldo registrado. Ya quedó en la ficha del empleado.</span>
+  <a href="/compras/recibo/<%= reciboId %>" target="_blank" rel="noopener" class="btn btn-sm btn-success"><%- icon('fileText', { size: 14 }) %> Ver recibo de sueldo</a>
+</div>
+<% } %>
+
 <div class="periodo-chips">
   <a href="<%= presetHref('hoy') %>"    class="periodo-chip <%= filtros.preset==='hoy'    ? 'is-active' : '' %>">Hoy</a>
   <a href="<%= presetHref('semana') %>" class="periodo-chip <%= filtros.preset==='semana' ? 'is-active' : '' %>">Esta semana</a>
@@ -87,9 +94,12 @@
           <td><small class="text-muted"><%= e.fletero || '—' %></small></td>
           <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
           <td class="text-end fw-semibold text-danger"><%= money(e.monto) %></td>
-          <td class="text-center">
+          <td class="text-center text-nowrap">
+            <% if (e.id_pago_empleado) { %>
+              <a href="/compras/recibo/<%= e.id_pago_empleado %>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Recibo de sueldo"><%- icon('fileText', { size: 15 }) %></a>
+            <% } %>
             <form action="/compras/<%= e.id %>/eliminar" method="POST" class="d-inline"
-                  onsubmit="return confirm('¿Eliminar este registro de <%= (CAT_LABEL[e.categoria]||e.categoria) %> por <%= money(e.monto) %>?')">
+                  onsubmit="return confirm('¿Eliminar este registro de <%= (CAT_LABEL[e.categoria]||e.categoria) %> por <%= money(e.monto) %>?<%= e.id_pago_empleado ? ' También se elimina de la ficha del empleado y su recibo.' : '' %>')">
               <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
             </form>
           </td>
