@@ -102,7 +102,20 @@ const EmpleadosModel = {
   },
 
   // ── Choferes (es_chofer = 1) ──────────────────────────────────
-  async listarChoferes({ q, soloActivos = false } = {}) {
+  // Columnas por las que se puede ordenar el listado (lista fija: nada de lo que llega por
+  // la URL se arma en el SQL). `vacios`: los que no tienen dato van siempre al final.
+  // `invertir`: el estado se ordena "activos primero" en ascendente.
+  ORDEN_CHOFERES: {
+    legajo:          { expr: 'e.legajo' },
+    chofer:          { expr: `LOWER(e.nombre || ' ' || e.apellido)` },
+    dni:             { expr: `NULLIF(e.dni, '')`, vacios: true },
+    licencia:        { expr: `NULLIF(e.licencia_vencimiento, '')`, vacios: true },
+    especializacion: { expr: `NULLIF(e.tipo_operacion, '')`, vacios: true },
+    camion:          { expr: 'camion_principal', vacios: true },
+    estado:          { expr: 'e.activo', invertir: true },
+  },
+
+  async listarChoferes({ q, soloActivos = false, sort, dir } = {}) {
     const wheres = ['e.es_chofer = 1']
     const params = []
     if (soloActivos) wheres.push('e.activo = 1')
@@ -110,6 +123,14 @@ const EmpleadosModel = {
       const term = `%${String(q).trim()}%`
       wheres.push('(e.nombre ILIKE ? OR e.apellido ILIKE ? OR e.dni ILIKE ? OR CAST(e.legajo AS TEXT) ILIKE ?)')
       params.push(term, term, term, term)
+    }
+    // Sin orden pedido se mantiene el de siempre (apellido, nombre)
+    const col = this.ORDEN_CHOFERES[sort]
+    let orderBy = 'e.apellido, e.nombre'
+    if (col) {
+      const asc = String(dir).toUpperCase() !== 'DESC'
+      const sentido = (asc !== !!col.invertir) ? 'ASC' : 'DESC'
+      orderBy = `${col.expr} ${sentido}${col.vacios ? ' NULLS LAST' : ''}, e.legajo ASC, e.id ASC`
     }
     return (await query(`
       SELECT e.*, u.usuario AS usuario_sistema,
@@ -119,7 +140,7 @@ const EmpleadosModel = {
       FROM empleados e
       LEFT JOIN users u ON u.id = e.id_usuario
       WHERE ${wheres.join(' AND ')}
-      ORDER BY e.apellido, e.nombre
+      ORDER BY ${orderBy}
     `, params)).rows
   },
 

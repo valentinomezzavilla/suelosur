@@ -22,8 +22,11 @@ const ChoferesController = {
   async index(req, res) {
     try {
       const { q } = req.query
-      const choferes = await EmpleadosModel.listarChoferes({ q })
-      res.render('pages/choferes/index', { titulo: 'Choferes', choferes, filtros: { q: q || '' } })
+      // Por defecto, ordenados por número de legajo; cualquier columna se puede ordenar
+      const sort = EmpleadosModel.ORDEN_CHOFERES[req.query.sort] ? req.query.sort : 'legajo'
+      const dir = String(req.query.dir).toUpperCase() === 'DESC' ? 'DESC' : 'ASC'
+      const choferes = await EmpleadosModel.listarChoferes({ q, sort, dir })
+      res.render('pages/choferes/index', { titulo: 'Choferes', choferes, filtros: { q: q || '', sort, dir } })
     } catch (err) { console.error(err); req.flash('error', 'Error al cargar choferes.'); res.redirect('/') }
   },
 
