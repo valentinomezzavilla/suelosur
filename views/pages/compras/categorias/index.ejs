@@ -1,0 +1,66 @@
+<%
+  const camposLabel = (c) => {
+    const fijos = (c.campos || []).map(cl => (camposDisponibles.find(d => d.clave === cl) || {}).etiqueta || cl)
+    const propios = (c.camposCustom || []).map(cf => `${cf.etiqueta} (${(tiposCampoDisponibles.find(t => t.clave === cf.tipo) || {}).etiqueta || cf.tipo})`)
+    const todos = [...fijos, ...propios]
+    return todos.length ? todos.join(', ') : '—'
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('layers', { size: 18 }) %> Administrar categorías</h4>
+  <div class="d-flex gap-2">
+    <a href="/compras" class="btn btn-sm btn-outline-secondary">← Volver a Compras / Pagos</a>
+    <a href="/compras/categorias/nueva" class="btn btn-naranja">+ Nueva categoría</a>
+  </div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Categoría</th>
+          <th>Campos habilitados</th>
+          <th class="text-center">Tipo</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% categorias.forEach(c => { %>
+        <tr class="<%= !c.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold">
+            <span class="badge rounded-pill px-3 <%= c.badge || 'badge-pendiente' %>"><%= c.etiqueta %></span>
+          </td>
+          <td><small class="text-muted"><%= camposLabel(c) %></small></td>
+          <td class="text-center">
+            <% if (c.sistema) { %><small class="text-muted">Sistema</small>
+            <% } else { %><small class="text-muted">Personalizada</small><% } %>
+          </td>
+          <td class="text-center">
+            <% if (c.activo) { %><span class="badge rounded-pill px-3 badge-activo">Activa</span>
+            <% } else { %><span class="badge rounded-pill px-3 badge-alerta">Inactiva</span><% } %>
+          </td>
+          <td class="text-center text-nowrap">
+            <% if (c.sistema) { %>
+              <span class="text-muted" title="Las categorías del sistema no se pueden editar">—</span>
+            <% } else { %>
+              <a href="/compras/categorias/<%= c.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+              <form action="/compras/categorias/<%= c.id %>/toggle" method="POST" class="d-inline">
+                <button class="btn btn-sm <%= c.activo ? 'btn-outline-danger' : 'btn-outline-success' %>" title="<%= c.activo ? 'Desactivar' : 'Activar' %>">
+                  <%- c.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
+                </button>
+              </form>
+              <form action="/compras/categorias/<%= c.id %>?_method=DELETE" method="POST" class="d-inline"
+                    onsubmit="return confirm('¿Eliminar la categoría \'<%= c.etiqueta %>\'? Solo se puede borrar si no tiene compras / pagos registrados.')">
+                <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

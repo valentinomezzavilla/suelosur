@@ -1,19 +1,19 @@
 <%
-  const CAT_LABEL = {
-    material: 'Material (ingresa a stock)',
-    sueldo: 'Sueldo',
-    seguro: 'Seguro',
-    proveedor: 'Pago a proveedor',
-    mantenimiento: 'Mantenimiento / Service',
-    combustible: 'Combustible',
-    impuesto: 'Impuesto / Multa',
-    otro: 'Otro',
-  }
+  // 'material' y 'sueldo' tienen sección propia (mueven stock / generan recibo de sueldo).
+  // El resto de las categorías son dinámicas: cada una declara en categorias_egreso.campos
+  // qué campos opcionales usa, y acá se arma un bloque .cond compartido por campo (no por
+  // categoría) para no repetir un <select> con el mismo name varias veces en el formulario.
+  const genericas = categorias.filter(c => c.clave !== 'material' && c.clave !== 'sueldo')
+  const catsCon = (campo) => genericas.filter(c => c.campos.includes(campo)).map(c => c.clave).join(' ')
+  const catsProveedor = ['material', catsCon('proveedor')].filter(Boolean).join(' ')
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Registrar compra / pago</h4>
-  <a href="/compras" class="btn btn-sm btn-outline-secondary">← Volver</a>
+  <div class="d-flex gap-2">
+    <a href="/compras/categorias" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 14 }) %> Administrar categorías</a>
+    <a href="/compras" class="btn btn-sm btn-outline-secondary">← Volver</a>
+  </div>
 </div>
 
 <div class="card shadow-sm" style="max-width:720px">
@@ -25,7 +25,7 @@
         <label class="form-label">¿Qué es? *</label>
         <select name="categoria" id="categoria" class="form-select" required>
           <option value="">Seleccionar…</option>
-          <% categorias.forEach(c => { %><option value="<%= c %>"><%= CAT_LABEL[c] || c %></option><% }) %>
+          <% categorias.forEach(c => { %><option value="<%= c.clave %>"><%= c.etiqueta %></option><% }) %>
         </select>
       </div>
 
@@ -43,14 +43,34 @@
           <div class="col-md-4"><label class="form-label">Costo unitario</label><input type="number" step="0.01" min="0" name="costo_unitario" id="costo_unitario" class="form-control" placeholder="0"></div>
           <div class="col-md-4"><label class="form-label">Costo flete</label><input type="number" step="0.01" min="0" name="costo_flete" id="costo_flete" class="form-control" placeholder="0"></div>
         </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Subtotal material</label>
+            <input type="number" step="0.01" min="0" name="subtotal_material" id="subtotal_material" class="form-control" placeholder="0">
+            <small class="text-muted">Cantidad × Costo unitario.</small>
+            <label class="toggle-row toggle-sm mt-1">
+              <input type="checkbox" id="checkEditarSubtotal">
+              <span>Editar manualmente</span>
+            </label>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Costo final flete</label>
+            <input type="number" step="0.01" min="0" name="costo_final_flete" id="costo_final_flete" class="form-control" placeholder="0">
+            <small class="text-muted">Cantidad × Costo flete.</small>
+            <label class="toggle-row toggle-sm mt-1">
+              <input type="checkbox" id="checkEditarFlete">
+              <span>Editar manualmente</span>
+            </label>
+          </div>
+        </div>
         <div class="mb-3">
           <label class="form-label">Fletero</label>
           <input type="text" name="fletero" id="fletero" class="form-control" placeholder="Nombre del fletero o empresa de transporte">
         </div>
       </div>
 
-      <!-- Proveedor (material o proveedor) -->
-      <div class="cond mb-3" data-cats="material proveedor" style="display:none">
+      <!-- Proveedor (material o cualquier categoría que lo tenga habilitado) -->
+      <div class="cond mb-3" data-cats="<%= catsProveedor %>" style="display:none">
         <label class="form-label">Proveedor</label>
         <input type="text" id="buscarProv" class="form-control form-control-sm mb-1" placeholder="Buscar por razón social o CUIT…">
         <select name="id_proveedor" id="selProv" class="form-select">
@@ -76,14 +96,74 @@
         </div>
       </div>
 
-      <!-- Vehículo (seguro / mantenimiento / combustible / impuesto) -->
-      <div class="cond mb-3" data-cats="seguro mantenimiento combustible impuesto" style="display:none">
+      <!-- Vehículo (cualquier categoría que lo tenga habilitado) -->
+      <% if (catsCon('vehiculo')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('vehiculo') %>" style="display:none">
         <label class="form-label">Vehículo</label>
-        <select name="id_vehiculo" id="id_vehiculo" class="form-select">
+        <select name="id_vehiculo" class="form-select">
           <option value="">— Sin vehículo —</option>
           <% vehiculos.forEach(v => { %><option value="<%= v.id %>"><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
         </select>
       </div>
+      <% } %>
+
+      <!-- Producto (cualquier categoría que lo tenga habilitado, aparte de material) -->
+      <% if (catsCon('producto')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('producto') %>" style="display:none">
+        <label class="form-label">Producto</label>
+        <select name="id_producto" class="form-select">
+          <option value="">— Sin producto —</option>
+          <% productos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
+        </select>
+      </div>
+      <% } %>
+
+      <!-- Empleado (cualquier categoría que lo tenga habilitado, aparte de sueldo) -->
+      <% if (catsCon('empleado')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('empleado') %>" style="display:none">
+        <label class="form-label">Empleado</label>
+        <select name="id_empleado" class="form-select">
+          <option value="">— Sin empleado —</option>
+          <% empleados.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %> <%= e.apellido || '' %></option><% }) %>
+        </select>
+      </div>
+      <% } %>
+
+      <!-- Fletero (cualquier categoría que lo tenga habilitado, aparte de material) -->
+      <% if (catsCon('fletero')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('fletero') %>" style="display:none">
+        <label class="form-label">Fletero</label>
+        <input type="text" name="fletero" class="form-control" placeholder="Nombre del fletero o empresa de transporte">
+      </div>
+      <% } %>
+
+      <!-- Período (cualquier categoría que lo tenga habilitado, aparte de sueldo) -->
+      <% if (catsCon('periodo')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('periodo') %>" style="display:none">
+        <label class="form-label">Período</label>
+        <input type="month" name="periodo" class="form-control">
+      </div>
+      <% } %>
+
+      <!-- Campos propios de cada categoría (definidos en Administrar categorías) -->
+      <% categorias.filter(c => c.camposCustom && c.camposCustom.length).forEach(c => { %>
+      <div class="cond row g-3 mb-3" data-cats="<%= c.clave %>" style="display:none">
+        <% c.camposCustom.forEach(cf => { %>
+        <div class="col-md-6">
+          <label class="form-label"><%= cf.etiqueta %></label>
+          <% if (cf.tipo === 'lista') { %>
+            <select name="<%= cf.clave %>" class="form-select">
+              <option value="">Seleccionar…</option>
+              <% (cf.opciones || []).forEach(op => { %><option value="<%= op %>"><%= op %></option><% }) %>
+            </select>
+          <% } else { %>
+            <input type="<%= cf.tipo === 'numero' ? 'number' : (cf.tipo === 'fecha' ? 'date' : 'text') %>"
+                   <%= cf.tipo === 'numero' ? 'step="0.01"' : '' %> name="<%= cf.clave %>" class="form-control">
+          <% } %>
+        </div>
+        <% }) %>
+      </div>
+      <% }) %>
 
       <!-- Comunes -->
       <div class="row g-3 mb-3">
@@ -94,12 +174,8 @@
         <div class="col-md-4">
           <label class="form-label" id="lblMonto">Monto *</label>
           <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" placeholder="0" required>
-          <small class="text-muted cond" data-cats="material" style="display:none">Se calcula con (cantidad × costo unitario) + flete.</small>
+          <small class="text-muted cond" data-cats="material" style="display:none">Se calcula como Subtotal material + Costo final flete.</small>
           <small class="text-muted cond" data-cats="sueldo" id="ayudaSueldo" style="display:none">Se completa con el sueldo establecido del empleado (podés cambiarlo).</small>
-          <label class="toggle-row toggle-sm mt-1 cond" data-cats="material" style="display:none">
-            <input type="checkbox" id="checkEditarMonto">
-            <span>Editar manualmente</span>
-          </label>
         </div>
         <div class="col-md-4">
           <label class="form-label">Método de pago</label>
@@ -153,11 +229,16 @@
     const costo = document.getElementById('costo_unitario')
     const flete = document.getElementById('costo_flete')
 
+    // Al ocultar un bloque condicional, se deshabilitan sus campos para que no se
+    // manden en el POST (si no, un <select> oculto pisaría el valor del visible
+    // cuando dos categorías comparten el mismo name, como Proveedor o Vehículo).
     function toggle() {
       const v = cat.value
       conds.forEach(el => {
         const cats = (el.dataset.cats || '').split(' ')
-        el.style.display = cats.includes(v) ? '' : 'none'
+        const visible = !!v && cats.includes(v)
+        el.style.display = visible ? '' : 'none'
+        el.querySelectorAll('input, select, textarea').forEach(f => { f.disabled = !visible })
       })
       aplicarBloqueoMonto()
       const lblMonto = document.getElementById('lblMonto')
@@ -200,32 +281,67 @@
       if (n <= 0) { alert('El neto a pagar tiene que ser mayor a cero: revisá el sueldo y los descuentos.'); e.preventDefault() }
     })
 
-    // El monto arranca bloqueado (se calcula solo) SOLO para material, que es la
-    // única categoría con cálculo automático. Para el resto siempre es libre, como
-    // antes. Tildando "Editar manualmente" se desbloquea sin perder lo ya calculado.
-    const checkEditarMonto = document.getElementById('checkEditarMonto')
+    // El monto (total) siempre está bloqueado para material: se arma solo con
+    // Subtotal material + Costo final flete, que se editan por separado abajo.
+    // Para el resto de las categorías el monto sigue siendo libre, como antes.
     function aplicarBloqueoMonto() {
       const esMaterial = cat.value === 'material'
-      monto.readOnly = esMaterial && !checkEditarMonto?.checked
+      monto.readOnly = esMaterial
     }
-    checkEditarMonto?.addEventListener('change', () => {
-      aplicarBloqueoMonto()
-      if (checkEditarMonto.checked) monto.focus()
-    })
     toggle()
 
-    // Material: monto = (cantidad × costo unitario) + flete (auto, mientras no se
-    // tilde "Editar manualmente")
-    function calcMaterial() {
-      if (cat.value !== 'material' || checkEditarMonto?.checked) return
+    // Material: Subtotal material = cantidad × costo unitario, y Costo final flete =
+    // cantidad × costo flete. Cada uno se calcula solo salvo que se tilde su
+    // "Editar manualmente". El monto final siempre es la suma de ambos, discriminados.
+    const subtotalMaterial = document.getElementById('subtotal_material')
+    const costoFinalFlete = document.getElementById('costo_final_flete')
+    const checkEditarSubtotal = document.getElementById('checkEditarSubtotal')
+    const checkEditarFlete = document.getElementById('checkEditarFlete')
+
+    function aplicarBloqueoDiscriminados() {
+      subtotalMaterial.readOnly = !checkEditarSubtotal.checked
+      costoFinalFlete.readOnly = !checkEditarFlete.checked
+    }
+    checkEditarSubtotal.addEventListener('change', () => {
+      aplicarBloqueoDiscriminados()
+      if (checkEditarSubtotal.checked) subtotalMaterial.focus()
+      else calcSubtotalMaterial()
+    })
+    checkEditarFlete.addEventListener('change', () => {
+      aplicarBloqueoDiscriminados()
+      if (checkEditarFlete.checked) costoFinalFlete.focus()
+      else calcCostoFinalFlete()
+    })
+    aplicarBloqueoDiscriminados()
+
+    function calcMontoTotal() {
+      if (cat.value !== 'material') return
+      const sub = parseFloat(subtotalMaterial.value) || 0
+      const fl = parseFloat(costoFinalFlete.value) || 0
+      monto.value = (sub + fl).toFixed(2)
+    }
+    function calcSubtotalMaterial() {
+      if (cat.value !== 'material' || checkEditarSubtotal.checked) return
       const c = parseFloat(cantidad?.value) || 0
       const u = parseFloat(costo?.value) || 0
+      subtotalMaterial.value = (c * u).toFixed(2)
+    }
+    function calcCostoFinalFlete() {
+      if (cat.value !== 'material' || checkEditarFlete.checked) return
+      const c = parseFloat(cantidad?.value) || 0
       const f = parseFloat(flete?.value) || 0
-      if (c > 0 && (u > 0 || f > 0)) monto.value = (c * u + f).toFixed(2)
+      costoFinalFlete.value = (c * f).toFixed(2)
+    }
+    function calcMaterial() {
+      calcSubtotalMaterial()
+      calcCostoFinalFlete()
+      calcMontoTotal()
     }
     cantidad?.addEventListener('input', calcMaterial)
     costo?.addEventListener('input', calcMaterial)
     flete?.addEventListener('input', calcMaterial)
+    subtotalMaterial.addEventListener('input', calcMontoTotal)
+    costoFinalFlete.addEventListener('input', calcMontoTotal)
 
     // Buscador de proveedor
     const b = document.getElementById('buscarProv'), s = document.getElementById('selProv')

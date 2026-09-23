@@ -889,24 +889,60 @@ async function initDB() {
   `)
   await pool.query(`INSERT INTO config_facturacion (id) VALUES (1) ON CONFLICT (id) DO NOTHING`)
 
+  // Categorías de egreso: 'material' y 'sueldo' son categorías del sistema (mueven stock /
+  // generan recibo de sueldo) y no se pueden editar ni borrar. El resto se administra
+  // libremente desde Compras / Pagos → Administrar categorías: cada una declara qué campos
+  // opcionales usa (proveedor, producto, vehiculo, empleado, fletero, periodo).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categorias_egreso (
+      id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      clave      TEXT NOT NULL UNIQUE,
+      etiqueta   TEXT NOT NULL,
+      campos     TEXT NOT NULL DEFAULT '[]',
+      campos_custom TEXT NOT NULL DEFAULT '[]',
+      badge      TEXT NOT NULL DEFAULT 'badge-pendiente',
+      sistema    INTEGER NOT NULL DEFAULT 0,
+      activo     INTEGER NOT NULL DEFAULT 1,
+      orden      INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+    )
+  `)
+  const categoriasSemilla = [
+    ['material',     'Material (ingresa a stock)', [],            'badge-en-transito', 1, 1],
+    ['sueldo',       'Sueldo',                     [],            'badge-activo',      1, 2],
+    ['proveedor',    'Pago a proveedor',           ['proveedor'], 'badge-pendiente',   0, 3],
+    ['seguro',       'Seguro',                     ['vehiculo'],  'badge-alerta',      0, 4],
+    ['mantenimiento','Mantenimiento / Service',    ['vehiculo'],  'badge-pendiente',   0, 5],
+    ['combustible',  'Combustible',                ['vehiculo'],  'badge-en-transito', 0, 6],
+    ['impuesto',     'Impuesto / Multa',           ['vehiculo'],  'badge-alerta',      0, 7],
+    ['otro',         'Otro',                       [],            'badge-pendiente',   0, 8],
+  ]
+  for (const [clave, etiqueta, campos, badge, sistema, orden] of categoriasSemilla) {
+    await pool.query(`
+      INSERT INTO categorias_egreso (clave, etiqueta, campos, badge, sistema, orden)
+      VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (clave) DO NOTHING
+    `, [clave, etiqueta, JSON.stringify(campos), badge, sistema, orden])
+  }
+
   // Egresos: libro único de salidas de dinero (compras / pagos). Categoriza cada
-  // salida (material, sueldo, seguro, proveedor, etc.) y la vincula opcionalmente
-  // a proveedor / empleado / vehículo. Alimentado a mano o automático desde alertas.
+  // salida (material, sueldo, seguro, proveedor, etc. — ver categorias_egreso) y la
+  // vincula opcionalmente a proveedor / producto / empleado / vehículo. Alimentado a
+  // mano o automático desde alertas.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS egresos (
       id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       fecha        TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
-      categoria    TEXT NOT NULL CHECK (categoria IN (
-                     'material','sueldo','seguro','proveedor',
-                     'mantenimiento','combustible','impuesto','otro'
-                   )),
+      categoria    TEXT NOT NULL,
       descripcion  TEXT NOT NULL DEFAULT '',
       monto        REAL NOT NULL DEFAULT 0,
       metodo_pago  TEXT,
       fletero      TEXT,
+      periodo      TEXT,
       id_proveedor BIGINT REFERENCES proveedores(id),
+      id_producto  BIGINT REFERENCES productos(id),
       id_empleado  BIGINT REFERENCES empleados(id),
       id_vehiculo  BIGINT REFERENCES flota_vehiculos(id),
+      datos_extra  TEXT DEFAULT '{}',
       origen       TEXT DEFAULT 'manual',
       id_usuario   BIGINT,
       created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
@@ -914,6 +950,15 @@ async function initDB() {
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_fecha     ON egresos(fecha)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_categoria ON egresos(categoria)`)
+  // Categorías ahora son dinámicas (tabla categorias_egreso): la restricción fija de
+  // valores posibles se sacó de la definición de la tabla de arriba (nuevas instalaciones);
+  // esto la saca también en bases ya existentes.
+  await pool.query(`ALTER TABLE egresos DROP CONSTRAINT IF EXISTS egresos_categoria_check`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS periodo TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS datos_extra TEXT DEFAULT '{}'`).catch(() => {})
+  // Campos personalizados por categoría (tipo texto/número/fecha/lista + etiqueta propia),
+  // además de los campos fijos (proveedor, producto, vehiculo, empleado, fletero, periodo).
+  await pool.query(`ALTER TABLE categorias_egreso ADD COLUMN IF NOT EXISTS campos_custom TEXT NOT NULL DEFAULT '[]'`).catch(() => {})
 
   // Pagos a empleados: cada pago queda en DOS lugares (el libro de compras / pagos y la
   // pestaña de pagos del chofer) y se vinculan entre sí. `monto` es el NETO pagado;
@@ -1326,6 +1371,10 @@ async function initDB() {
 
   // Fletero (persona/empresa que hizo el transporte) de una compra de material
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS fletero TEXT`).catch(() => {})
+
+  // Producto comprado (categoría material), para poder filtrar el libro de compras / pagos por producto
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_producto BIGINT REFERENCES productos(id)`).catch(() => {})
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_producto ON egresos(id_producto)`).catch(() => {})
 
   // ─────────────────────────────────────────────────────────────────
   // MIGRACIÓN: precio único → precio distinto por canal de venta (cantera / viaje).

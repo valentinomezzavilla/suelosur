@@ -1,21 +1,44 @@
 <%
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
   const presetHref = (p) => '/compras?preset=' + p
-  const CAT_LABEL = {
-    material: 'Material', sueldo: 'Sueldo', seguro: 'Seguro', proveedor: 'Proveedor',
-    mantenimiento: 'Mantenimiento', combustible: 'Combustible', impuesto: 'Impuesto / Multa', otro: 'Otro',
-  }
-  const CAT_BADGE = {
-    material: 'badge-en-transito', sueldo: 'badge-activo', seguro: 'badge-alerta', proveedor: 'badge-pendiente',
-    mantenimiento: 'badge-pendiente', combustible: 'badge-en-transito', impuesto: 'badge-alerta', otro: 'badge-pendiente',
-  }
+  const catMap = {}
+  categorias.forEach(c => { catMap[c.clave] = c })
+  const catLabel = (clave) => (catMap[clave] && catMap[clave].etiqueta) || clave
+  const catBadge = (clave) => (catMap[clave] && catMap[clave].badge) || 'badge-pendiente'
   const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque' }
-  const detalleDe = (e) => e.proveedor_nombre || e.empleado_nombre || e.vehiculo_nombre || '—'
+  const detalleDe = (e) => e.categoria === 'material'
+    ? ([e.producto_nombre, e.proveedor_nombre].filter(Boolean).join(' — ') || '—')
+    : (e.proveedor_nombre || e.empleado_nombre || e.vehiculo_nombre || '—')
+  // Valores de los campos propios de la categoría (ver Administrar categorías), guardados
+  // en egresos.datos_extra por su clave. Se muestran con la etiqueta vigente de cada uno.
+  const datosExtraDe = (e) => {
+    const def = catMap[e.categoria]
+    if (!def || !def.camposCustom || !def.camposCustom.length) return []
+    let extra = {}
+    try { extra = JSON.parse(e.datos_extra || '{}') } catch { extra = {} }
+    return def.camposCustom.map(cf => extra[cf.clave] ? `${cf.etiqueta}: ${extra[cf.clave]}` : null).filter(Boolean)
+  }
+
+  // 'material' y 'sueldo' son categorías del sistema (no están en categorias_egreso.campos,
+  // así que se agregan a mano a los bloques que corresponden). El resto de las categorías
+  // declaran sus campos de forma dinámica.
+  const genericas = categorias.filter(c => c.clave !== 'material' && c.clave !== 'sueldo')
+  const catsCon = (campo) => genericas.filter(c => c.campos.includes(campo)).map(c => c.clave).join(' ')
+  const dedupe = (str) => [...new Set(str.split(' ').filter(Boolean))].join(' ')
+  const catsProveedor = dedupe(['material', catsCon('proveedor')].filter(Boolean).join(' '))
+  const catsProducto  = dedupe(['material', catsCon('producto')].filter(Boolean).join(' '))
+  const catsFletero   = dedupe(['material', catsCon('fletero')].filter(Boolean).join(' '))
+  const catsEmpleado  = dedupe(['sueldo', catsCon('empleado')].filter(Boolean).join(' '))
+  const catsPeriodo   = dedupe(['sueldo', catsCon('periodo')].filter(Boolean).join(' '))
+  const catsVehiculo  = catsCon('vehiculo')
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Compras / Pagos</h4>
-  <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra / pago</a>
+  <div class="d-flex gap-2">
+    <a href="/compras/categorias" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 14 }) %> Administrar categorías</a>
+    <a href="/compras/nueva" class="btn btn-naranja">+ Registrar compra / pago</a>
+  </div>
 </div>
 
 <% if (typeof reciboId !== 'undefined' && reciboId) { %>
@@ -43,35 +66,102 @@
 <div class="d-flex flex-wrap gap-2 mb-3">
   <% cats.sort((a,b) => resumen.porCategoria[b].monto - resumen.porCategoria[a].monto).forEach(c => { %>
     <a href="/compras?categoria=<%= c %><%= filtros.preset ? '&preset=' + filtros.preset : '' %>" class="text-decoration-none">
-      <span class="badge rounded-pill px-3 py-2 <%= CAT_BADGE[c] || 'badge-pendiente' %>">
-        <%= CAT_LABEL[c] || c %>: <%= money(resumen.porCategoria[c].monto) %>
+      <span class="badge rounded-pill px-3 py-2 <%= catBadge(c) %>">
+        <%= catLabel(c) %>: <%= money(resumen.porCategoria[c].monto) %>
       </span>
     </a>
   <% }) %>
 </div>
 <% } %>
 
-<form method="GET" action="/compras" class="card shadow-sm mb-3">
+<form method="GET" action="/compras" class="card shadow-sm mb-3" id="formFiltros">
   <div class="card-body py-2">
     <input type="hidden" name="preset" value="rango">
-    <div class="row g-2 align-items-end">
+
+    <!-- Comunes a todas las categorías -->
+    <div class="row g-2 align-items-end mb-2">
       <div class="col-md-3"><label class="form-label">Categoría</label>
-        <select name="categoria" class="form-select form-select-sm">
+        <select name="categoria" id="fCategoria" class="form-select form-select-sm">
           <option value="">Todas</option>
-          <% categorias.forEach(c => { %><option value="<%= c %>" <%= filtros.categoria===c?'selected':'' %>><%= CAT_LABEL[c] || c %></option><% }) %>
+          <% categorias.forEach(c => { %><option value="<%= c.clave %>" <%= filtros.categoria===c.clave?'selected':'' %>><%= c.etiqueta %><%= c.activo ? '' : ' (inactiva)' %></option><% }) %>
         </select></div>
+      <div class="col-md-3"><label class="form-label">Método de pago</label>
+        <select name="metodoPago" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% Object.keys(METODO).forEach(m => { %><option value="<%= m %>" <%= filtros.metodoPago===m?'selected':'' %>><%= METODO[m] %></option><% }) %>
+        </select></div>
+      <div class="col-md-2"><label class="form-label">Desde</label><input type="date" name="fechaDesde" value="<%= filtros.fechaDesde||'' %>" class="form-control form-control-sm"></div>
+      <div class="col-md-2"><label class="form-label">Hasta</label><input type="date" name="fechaHasta" value="<%= filtros.fechaHasta||'' %>" class="form-control form-control-sm"></div>
+      <div class="col-md-2"><label class="form-label">Descripción</label><input type="text" name="descripcion" value="<%= filtros.descripcion||'' %>" class="form-control form-control-sm" placeholder="Buscar…"></div>
+    </div>
+
+    <!-- Proveedor -->
+    <div class="row g-2 align-items-end mb-2 cond" data-cats="<%= catsProveedor %>" style="display:none">
       <div class="col-md-3"><label class="form-label">Proveedor</label>
         <select name="proveedor" class="form-select form-select-sm">
           <option value="">Todos</option>
           <% proveedores.forEach(p => { %><option value="<%= p.id %>" <%= String(filtros.proveedor)===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %>
         </select></div>
-      <div class="col-md-2"><label class="form-label">Desde</label><input type="date" name="fechaDesde" value="<%= filtros.fechaDesde||'' %>" class="form-control form-control-sm"></div>
-      <div class="col-md-2"><label class="form-label">Hasta</label><input type="date" name="fechaHasta" value="<%= filtros.fechaHasta||'' %>" class="form-control form-control-sm"></div>
-      <div class="col-auto"><button class="btn btn-sm btn-naranja">Filtrar</button>
-        <a href="/compras" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a></div>
     </div>
+
+    <!-- Producto / Fletero -->
+    <div class="row g-2 align-items-end mb-2 cond" data-cats="<%= dedupe([catsProducto, catsFletero].join(' ')) %>" style="display:none">
+      <div class="col-md-3"><label class="form-label">Producto</label>
+        <select name="producto" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% productos.forEach(p => { %><option value="<%= p.id %>" <%= String(filtros.producto)===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %>
+        </select></div>
+      <div class="col-md-3"><label class="form-label">Fletero</label>
+        <select name="fletero" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% fleteros.forEach(f => { %><option value="<%= f %>" <%= filtros.fletero===f?'selected':'' %>><%= f %></option><% }) %>
+        </select></div>
+    </div>
+
+    <!-- Empleado / Período -->
+    <div class="row g-2 align-items-end mb-2 cond" data-cats="<%= dedupe([catsEmpleado, catsPeriodo].join(' ')) %>" style="display:none">
+      <div class="col-md-4"><label class="form-label">Empleado</label>
+        <select name="empleado" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% empleados.forEach(e => { %><option value="<%= e.id %>" <%= String(filtros.empleado)===String(e.id)?'selected':'' %>><%= e.nombre %> <%= e.apellido||'' %></option><% }) %>
+        </select></div>
+      <div class="col-md-3"><label class="form-label">Período</label>
+        <input type="month" name="periodo" value="<%= filtros.periodo||'' %>" class="form-control form-control-sm"></div>
+    </div>
+
+    <!-- Vehículo -->
+    <% if (catsVehiculo) { %>
+    <div class="row g-2 align-items-end mb-2 cond" data-cats="<%= catsVehiculo %>" style="display:none">
+      <div class="col-md-4"><label class="form-label">Vehículo</label>
+        <select name="vehiculo" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <% vehiculos.forEach(v => { %><option value="<%= v.id %>" <%= String(filtros.vehiculo)===String(v.id)?'selected':'' %>><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
+        </select></div>
+    </div>
+    <% } %>
+
+    <div class="col-auto"><button class="btn btn-sm btn-naranja">Filtrar</button>
+      <a href="/compras" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a></div>
   </div>
 </form>
+
+<script>
+  (function () {
+    const cat = document.getElementById('fCategoria')
+    const conds = Array.from(document.querySelectorAll('#formFiltros .cond'))
+    function toggle() {
+      const v = cat.value
+      conds.forEach(el => {
+        const cats = (el.dataset.cats || '').split(' ')
+        const visible = !!v && cats.includes(v)
+        el.style.display = visible ? '' : 'none'
+        el.querySelectorAll('input, select, textarea').forEach(f => { f.disabled = !visible })
+      })
+    }
+    cat.addEventListener('change', toggle)
+    toggle()
+  })()
+</script>
 
 <div class="card shadow-sm">
   <div class="card-body p-0">
@@ -87,9 +177,11 @@
         <% egresos.forEach(e => { %>
         <tr>
           <td><small class="text-muted"><%= formatFecha(e.fecha) %></small></td>
-          <td><span class="badge rounded-pill px-3 <%= CAT_BADGE[e.categoria] || 'badge-pendiente' %>"><%= CAT_LABEL[e.categoria] || e.categoria %></span>
+          <td><span class="badge rounded-pill px-3 <%= catBadge(e.categoria) %>"><%= catLabel(e.categoria) %></span>
             <% if (e.origen === 'alerta') { %><small class="text-muted d-block">auto · alerta</small><% } %></td>
-          <td><%= e.descripcion || '—' %></td>
+          <td><%= e.descripcion || '—' %>
+            <% const extras = datosExtraDe(e); if (extras.length) { %><small class="text-muted d-block"><%= extras.join(' · ') %></small><% } %>
+          </td>
           <td><small><%= detalleDe(e) %></small></td>
           <td><small class="text-muted"><%= e.fletero || '—' %></small></td>
           <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
@@ -99,7 +191,7 @@
               <a href="/compras/recibo/<%= e.id_pago_empleado %>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Recibo de sueldo"><%- icon('fileText', { size: 15 }) %></a>
             <% } %>
             <form action="/compras/<%= e.id %>/eliminar" method="POST" class="d-inline"
-                  onsubmit="return confirm('¿Eliminar este registro de <%= (CAT_LABEL[e.categoria]||e.categoria) %> por <%= money(e.monto) %>?<%= e.id_pago_empleado ? ' También se elimina de la ficha del empleado y su recibo.' : '' %>')">
+                  onsubmit="return confirm('¿Eliminar este registro de <%= catLabel(e.categoria) %> por <%= money(e.monto) %>?<%= e.id_pago_empleado ? ' También se elimina de la ficha del empleado y su recibo.' : '' %>')">
               <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
             </form>
           </td>

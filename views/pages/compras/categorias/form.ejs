@@ -1,0 +1,112 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('layers', { size: 18 }) %> <%= titulo %></h4>
+  <a href="/compras/categorias" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="<%= categoria ? `/compras/categorias/${categoria.id}?_method=PUT` : '/compras/categorias' %>" method="POST">
+
+      <div class="mb-3">
+        <label class="form-label">Nombre de la categoría *</label>
+        <input type="text" name="etiqueta" class="form-control" value="<%= categoria?.etiqueta || '' %>" placeholder="Ej: Alquiler de equipos" required autofocus>
+        <small class="text-muted">Así va a aparecer en el desplegable "¿Qué es?" al registrar una compra / pago.</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Color de la etiqueta</label>
+        <select name="badge" class="form-select">
+          <% badgesDisponibles.forEach(b => { %>
+            <option value="<%= b %>" <%= (categoria?.badge || 'badge-pendiente') === b ? 'selected' : '' %>><%= b.replace('badge-', '') %></option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Campos que usa esta categoría</label>
+        <div class="row g-2">
+          <% camposDisponibles.forEach(campo => { %>
+            <div class="col-md-6">
+              <label class="toggle-row">
+                <input type="checkbox" name="campos" value="<%= campo.clave %>" <%= (categoria?.campos || []).includes(campo.clave) ? 'checked' : '' %>>
+                <span><%= campo.etiqueta %></span>
+              </label>
+            </div>
+          <% }) %>
+        </div>
+        <small class="text-muted">Se van a mostrar como desplegables adicionales al registrar una compra / pago de esta categoría.</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Campos propios de esta categoría</label>
+        <div id="camposCustomList"></div>
+        <button type="button" id="btnAgregarCampo" class="btn btn-sm btn-outline-secondary mt-1">+ Agregar campo</button>
+        <small class="text-muted d-block mt-1">Para algo que no está en la lista de arriba: elegí el tipo de dato y ponele un nombre. Si es "Lista desplegable", cargá las opciones separadas por coma.</small>
+      </div>
+
+      <template id="filaCustomTpl">
+        <div class="row g-2 mb-2 campo-custom-row align-items-start">
+          <div class="col-md-4">
+            <select name="campo_custom_tipo" class="form-select form-select-sm">
+              <% tiposCampoDisponibles.forEach(t => { %><option value="<%= t.clave %>"><%= t.etiqueta %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <input type="text" name="campo_custom_etiqueta" class="form-control form-control-sm" placeholder="Nombre del campo">
+          </div>
+          <div class="col-md-3 campo-custom-opciones-wrap" style="display:none">
+            <input type="text" name="campo_custom_opciones" class="form-control form-control-sm" placeholder="Opciones separadas por coma">
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-sm btn-outline-danger btn-quitar-campo" title="Quitar">✕</button>
+          </div>
+        </div>
+      </template>
+
+      <% if (categoria) { %>
+      <div class="mb-4">
+        <label class="toggle-row">
+          <input type="checkbox" name="activo" <%= categoria.activo ? 'checked' : '' %>>
+          <span>Categoría activa (disponible para registrar compras / pagos nuevos)</span>
+        </label>
+      </div>
+      <% } %>
+
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4"><%= categoria ? 'Guardar cambios' : 'Crear categoría' %></button>
+        <a href="/compras/categorias" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const tpl = document.getElementById('filaCustomTpl')
+    const lista = document.getElementById('camposCustomList')
+
+    function crearFila(datos) {
+      const frag = tpl.content.cloneNode(true)
+      const row = frag.querySelector('.campo-custom-row')
+      const selTipo = row.querySelector('[name="campo_custom_tipo"]')
+      const inpEtiqueta = row.querySelector('[name="campo_custom_etiqueta"]')
+      const wrapOpciones = row.querySelector('.campo-custom-opciones-wrap')
+      const inpOpciones = row.querySelector('[name="campo_custom_opciones"]')
+      if (datos) {
+        if (datos.tipo) selTipo.value = datos.tipo
+        if (datos.etiqueta) inpEtiqueta.value = datos.etiqueta
+        if (datos.opciones) inpOpciones.value = datos.opciones
+      }
+      wrapOpciones.style.display = selTipo.value === 'lista' ? '' : 'none'
+      selTipo.addEventListener('change', () => { wrapOpciones.style.display = selTipo.value === 'lista' ? '' : 'none' })
+      row.querySelector('.btn-quitar-campo').addEventListener('click', () => row.remove())
+      lista.appendChild(row)
+    }
+
+    document.getElementById('btnAgregarCampo').addEventListener('click', () => crearFila())
+
+    <% (categoria?.camposCustom || []).forEach(cf => { %>
+      crearFila({ tipo: <%- JSON.stringify(cf.tipo) %>, etiqueta: <%- JSON.stringify(cf.etiqueta) %>, opciones: <%- JSON.stringify((cf.opciones || []).join(', ')) %> })
+    <% }) %>
+  })()
+</script>
