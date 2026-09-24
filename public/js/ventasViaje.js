@@ -5,6 +5,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const precioHidden   = document.getElementById('precioProductoHidden');
     const checkSubtotal  = document.getElementById('checkEditarSubtotal');
     const subtotalInput  = document.getElementById('subtotalManualInput');
+    const inputPrecio    = document.getElementById('precioUnitarioInput');
+    const checkPrecio    = document.getElementById('checkEditarPrecio');
+    const labelPrecio    = document.getElementById('labelPrecioUnitario');
+    const hintPrecio     = document.getElementById('hintPrecioUnitario');
+    const HINT_PRECIO    = hintPrecio?.textContent || '';
     const inputFlete     = document.getElementById('precioFlete');
     const totalDisplay   = document.getElementById('totalDisplay');
     const checkEditar    = document.getElementById('checkEditarTotal');
@@ -86,11 +91,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cont && inputCantidad) inputCantidad.value = 1;
     }
 
+    const redondear = (n) => Math.round(n * 100) / 100;
+
     function calcularPrecios() {
         const cont     = esContenedor();
         const cot      = cont ? cotizarContenedor() : null;
-        const precio   = cont ? (cot ? cot.subtotal : 0) : getPrecioUnitario();
-        const cantidad = cont ? 1 : Number(inputCantidad?.value || 1);
+        // Precio unitario de lista: el de catálogo, o para el contenedor el precio por día
+        // del rango. Se multiplica por la cantidad (contenedor: por los días).
+        const precioLista = cont ? (cot ? cot.precioDia : 0) : getPrecioUnitario();
+        const cantidad = cont ? Number(inputDias?.value || 0) : Number(inputCantidad?.value || 1);
         if (cont && hintDias) {
             hintDias.textContent = cot
                 ? `${inputDias.value} día(s) × $${cot.precioDia.toLocaleString('es-AR')}/día. Va un solo contenedor por operación.`
@@ -98,13 +107,34 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (hintDias) {
             hintDias.textContent = HINT_DIAS;
         }
+        if (labelPrecio) labelPrecio.textContent = cont ? 'Precio por día' : 'Precio unitario';
+
         const flete    = Number(inputFlete?.value || 0);
-        // Subtotal editado a mano: pisa al precio de catálogo × cantidad
-        const manual   = checkSubtotal?.checked;
-        const subtotal = manual ? Number(subtotalInput?.value || 0) : precio * cantidad;
+        const subtotalManual = checkSubtotal?.checked;
+        const precioManual   = !subtotalManual && checkPrecio?.checked;
+        let precioUnit, subtotal;
+        if (subtotalManual) {
+            // Subtotal a mano: el precio unitario muestra el resultante
+            subtotal   = Number(subtotalInput?.value || 0);
+            precioUnit = cantidad > 0 ? redondear(subtotal / cantidad) : 0;
+            if (inputPrecio) inputPrecio.value = precioUnit;
+        } else {
+            // Precio unitario (de lista o editado) × cantidad
+            precioUnit = precioManual ? Number(inputPrecio?.value || 0) : precioLista;
+            if (!precioManual && inputPrecio) inputPrecio.value = precioLista;
+            subtotal   = redondear(precioUnit * cantidad);
+        }
         const total    = subtotal + flete;
 
-        if (!manual) {
+        if (hintPrecio) {
+            hintPrecio.textContent = subtotalManual
+                ? `Resulta del subtotal editado ÷ ${cantidad || 0}.`
+                : (precioManual && precioUnit !== precioLista
+                    ? `Editado (lista: $${precioLista.toLocaleString('es-AR')}). Subtotal = $${precioUnit.toLocaleString('es-AR')} × ${cantidad}.`
+                    : HINT_PRECIO);
+        }
+
+        if (!subtotalManual) {
             if (subtotalEl)    subtotalEl.value = '$' + subtotal.toLocaleString('es-AR');
             if (subtotalInput) subtotalInput.value = subtotal;
         }
@@ -120,6 +150,8 @@ document.addEventListener('DOMContentLoaded', () => {
         actualizarMaxCantidad();
         if (inputCantidad) inputCantidad.value = 1;
         aplicarModoContenedor();
+        // Otro producto: vuelve a su precio de lista (no arrastra lo editado del anterior)
+        setEditarPrecio(false);
         calcularPrecios();
     });
     inputDias?.addEventListener('input', calcularPrecios);
@@ -133,11 +165,36 @@ document.addEventListener('DOMContentLoaded', () => {
     inputFlete?.addEventListener('input', calcularPrecios);
     subtotalInput?.addEventListener('input', calcularPrecios);
 
+    // Precio unitario y subtotal se editan de a uno: el otro se calcula solo
+    function setEditarPrecio(on) {
+        if (!inputPrecio || !checkPrecio) return;
+        checkPrecio.checked = on;
+        inputPrecio.readOnly = !on;
+        inputPrecio.classList.toggle('input-readonly', !on);
+    }
+    function setEditarSubtotal(on) {
+        if (!checkSubtotal) return;
+        checkSubtotal.checked = on;
+        subtotalInput.style.display = on ? 'block' : 'none';
+        subtotalEl.style.display    = on ? 'none' : 'block';
+    }
+
+    // toggle para editar el precio unitario: el subtotal = precio × cantidad
+    inputPrecio?.addEventListener('input', calcularPrecios);
+    checkPrecio?.addEventListener('change', () => {
+        const on = checkPrecio.checked;
+        if (on) setEditarSubtotal(false);
+        setEditarPrecio(on);
+        if (on) { inputPrecio.focus(); inputPrecio.select(); }
+        calcularPrecios();
+    });
+
     // toggle para editar el subtotal del producto manualmente
     checkSubtotal?.addEventListener('change', () => {
-        subtotalInput.style.display = checkSubtotal.checked ? 'block' : 'none';
-        subtotalEl.style.display    = checkSubtotal.checked ? 'none' : 'block';
-        if (checkSubtotal.checked) subtotalInput.focus();
+        const on = checkSubtotal.checked;
+        if (on) setEditarPrecio(false);
+        setEditarSubtotal(on);
+        if (on) subtotalInput.focus();
         calcularPrecios();
     });
 
