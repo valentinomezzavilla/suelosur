@@ -781,6 +781,19 @@ async function initDB() {
     `).catch(e => console.error('Backfill producto_precios_dias:', e.message))
   }
 
+  // Número de operación (OP-0001…): secuencia que solo avanza. Antes era MAX(nro_op)+1,
+  // y al borrar la última operación su número se volvía a usar (dos OP distintas con el
+  // mismo número en el historial). Al arrancar se alinea con el máximo existente, sin
+  // retroceder nunca.
+  await pool.query(`CREATE SEQUENCE IF NOT EXISTS op_nro_seq`)
+  await pool.query(`
+    SELECT setval('op_nro_seq', x.m, true)
+    FROM (SELECT GREATEST(COALESCE((SELECT MAX(nro_op) FROM op_encabezado), 0),
+                          CASE WHEN s.is_called THEN s.last_value ELSE 0 END) AS m
+          FROM op_nro_seq s) x
+    WHERE x.m > 0
+  `)
+
   // Backfill: las ventas ya entregadas tienen el total real en su transacción.
   await pool.query(`
     UPDATE op_encabezado op SET monto_total = t.monto

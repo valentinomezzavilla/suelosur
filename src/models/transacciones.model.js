@@ -61,11 +61,23 @@ const TransaccionesModel = {
     if (nuevoMetodo === 'cuenta_corriente' && (!tx.cliente_id || !tx.id_op_encabezado)) {
       throw new Error('No se puede pasar a cuenta corriente: la transacción no tiene cliente y operación asociados.')
     }
+    if (nuevoMetodo === 'cuenta_corriente') {
+      const errCC = await require('./clientes.model').errorCuentaCorriente(tx.cliente_id)
+      if (errCC) throw new Error(errCC)
+    }
+    // Las ventas (tipo M) llevan el cargo con la regla única de VentasModel
+    const esVenta = tx.id_op_encabezado
+      ? (await query(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [tx.id_op_encabezado])).rows[0]?.tipo_op === 'M'
+      : false
 
     await transaction(async (q) => {
       await q(`UPDATE transacciones SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, id])
       if (tx.id_op_encabezado) {
         await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
+      }
+      if (esVenta) {
+        await require('./ventas.model').sincronizarCargoCC(tx.id_op_encabezado, q)
+        return
       }
 
       // Salía de cta. corriente: revertir el cargo (si seguía en pie) en el saldo del cliente.

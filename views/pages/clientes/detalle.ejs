@@ -126,7 +126,7 @@
         <% } %>
 
         <!-- Movimientos en cuenta corriente (consumos en CC) -->
-        <% if (cliente.cuentaCorriente && deudasCC && deudasCC.length > 0) { %>
+        <% if (deudasCC && deudasCC.length > 0) { %>
         <div class="clientes-historial">
             <div class="d-flex justify-content-between align-items-center mb-2">
                 <h2 class="clientes-historial__title mb-0">Consumos en cuenta corriente</h2>
@@ -136,21 +136,25 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Código</th>
-                            <th>Tipo</th>
-                            <th>Descripcion</th>
                             <th>Fecha</th>
+                            <th>Descripción</th>
                             <th>Monto</th>
+                            <th>Estado</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <% deudasCC.forEach(t => { %>
+                        <% deudasCC.forEach(m => { %>
                             <tr>
-                                <td class="fw-semibold text-orange"><%= codigoTx(t) %></td>
-                                <td><span class="badge badge--alquilado"><%= t.tipo %></span></td>
-                                <td><%= t.descripcion %></td>
-                                <td><%= formatFecha(t.fecha) %></td>
-                                <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %></td>
+                                <td><%= formatFecha(m.created_at) %></td>
+                                <td><%= m.descripcion %></td>
+                                <td class="transaccion-monto">$<%= Math.abs(Number(m.monto)).toLocaleString('es-AR') %></td>
+                                <td>
+                                    <% if (m.resta > 0.005) { %>
+                                        <span class="badge rounded-pill badge-alerta">Debe $<%= Number(m.resta).toLocaleString('es-AR') %></span>
+                                    <% } else { %>
+                                        <span class="badge rounded-pill badge-activo">Saldado</span>
+                                    <% } %>
+                                </td>
                             </tr>
                         <% }) %>
                     </tbody>

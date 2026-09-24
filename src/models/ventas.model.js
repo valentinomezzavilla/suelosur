@@ -1,9 +1,11 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
 const ProductosModel = require('./productos.model')
 const { cotizarContenedor, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
+const { textoDestino } = require('../utils/destino')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
 // Es la misma cuenta en listados, detalle, remito y al generar la transacción.
@@ -86,9 +88,9 @@ const VentasModel = {
       ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?
     `, [...params, limit, offset])).rows
 
-    // Ventas a cuenta corriente ya entregadas (con cargo generado): venta por venta,
+    // Ventas a cuenta corriente no anuladas (tienen su cargo desde que se registran): venta por venta,
     // ¿el cliente ya la saldó? (ver ClientesModel.saldadaPorOperacion)
-    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado === 'entregado').map(o => o.id)
+    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado !== 'anulado').map(o => o.id)
     const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
     ops.forEach(o => { if (idsCC.includes(o.id)) o.saldada = !!saldadas[o.id] })
 
@@ -146,7 +148,7 @@ const VentasModel = {
         [cliente_nombre_libre.trim()])
       id_cliente = cli.rows[0].id
     }
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     // Remito: el que se cargó a mano (talonario) o, si no, el siguiente de la secuencia
     const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     const nro_rem = nro_remito || nroSiguiente
@@ -189,8 +191,12 @@ const VentasModel = {
   // Actualiza datos editables de un viaje (estado != entregado/anulado).
   // Ajusta el stock pendiente si cambió la cantidad pedida.
   async actualizarViaje(id, datos) {
-    const op = (await query(`SELECT estado, modalidad, precio_flete FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    const op = (await query(`SELECT estado, modalidad, precio_flete, id_cliente FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op) throw new Error('Orden no encontrada.')
+    if (datos.metodoPago === 'cuenta_corriente') {
+      const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
+      if (errCC) throw new Error(errCC)
+    }
     if (op.estado === 'entregado') throw new Error('No se puede editar una venta ya entregada.')
     if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
 
@@ -251,6 +257,8 @@ const VentasModel = {
             observaciones = ?, precio_flete = ?, monto_total = ?
         WHERE id = ?
       `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, id])
+      // Cambió el total o el método: el cargo en cuenta corriente acompaña
+      await VentasModel.sincronizarCargoCC(id, q)
     })
   },
 
@@ -325,6 +333,8 @@ const VentasModel = {
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), false)
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'anulado' WHERE id = ?`, [id])
+      // Anulada: si era a cuenta corriente, el cargo se revierte
+      await VentasModel.sincronizarCargoCC(id, q)
       // Los renglones de contenedor (dias no nulo) no mueven stock
       const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [id])).rows
       for (const d of detalles) {
@@ -364,6 +374,85 @@ const VentasModel = {
       ORDER BY op.fecha_entrega_planificada ASC NULLS LAST
     `)).rows
   },
+}
+
+// ── Cuenta corriente ────────────────────────────────────────────
+// Regla única: una venta a cuenta corriente que no está anulada tiene EXACTAMENTE UN
+// cargo en la cuenta del cliente, por su total, desde el momento en que se registra.
+// Cualquier otra venta no tiene ninguno. Se llama después de crear, editar, entregar,
+// anular o cambiar el método de pago: deja el cargo como corresponde (lo crea, ajusta
+// el importe o el cliente, o lo borra) y mantiene clientes.saldo en línea.
+// `q` permite correrlo dentro de una transacción abierta.
+VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
+  const op = (await q(`
+    SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.metodo_pago, op.id_cliente, op.modalidad,
+           op.obra, op.domicilio_calle, op.domicilio_altura, op.fecha_emision, op.observaciones,
+           ${SQL_TOTAL} AS total
+    FROM op_encabezado op WHERE op.id = ?
+  `, [idOp])).rows[0]
+  if (!op || op.tipo_op !== 'M') return null
+
+  const corresponde = op.metodo_pago === 'cuenta_corriente' && !!op.id_cliente && op.estado !== 'anulado'
+  const cargos = (await q(
+    `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda' ORDER BY id`, [idOp]
+  )).rows
+  // Se conserva a lo sumo uno (el más viejo); el resto son duplicados
+  const actual = corresponde ? cargos[0] : null
+  let cambio = null
+  for (const c of cargos) {
+    if (c === actual) continue
+    await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [c.id])
+    await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(c.monto), c.cliente_id])
+    cambio = corresponde ? 'duplicado borrado' : 'cargo borrado'
+  }
+  if (!corresponde) return cambio
+
+  const monto = -redondear(op.total)
+  const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
+  const destino = op.modalidad === 'flete'
+    ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
+  const descripcion = op.modalidad === 'flete'
+    ? `Venta Viaje ${nro}${destino ? ': ' + destino : ''}`
+    : `Venta Cantera ${nro}${op.observaciones ? ': ' + String(op.observaciones).slice(0, 140) : ''}`
+
+  if (actual) {
+    const cambioCliente = String(actual.cliente_id) !== String(op.id_cliente)
+    if (cambioCliente || Math.abs(Number(actual.monto) - monto) > 0.005) {
+      await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(actual.monto), actual.cliente_id])
+      await q(`UPDATE movimientos_cuenta SET cliente_id = ?, monto = ?, descripcion = ? WHERE id = ?`,
+        [op.id_cliente, monto, descripcion, actual.id])
+      await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
+      return `cargo ajustado a ${-monto}`
+    }
+    return cambio
+  }
+  // Venta cargada con fecha pasada: el cargo va en esa fecha (igual que su transacción)
+  const hoy = new Date().toISOString().slice(0, 10)
+  const fecha = String(op.fecha_emision || '').slice(0, 10)
+  const createdAt = fecha && fecha < hoy ? `${fecha} 12:00:00` : null
+  await q(`
+    INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado, created_at)
+    VALUES (?, 'deuda', ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
+  `, [op.id_cliente, descripcion, monto, op.id, createdAt])
+  await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
+  return `cargo creado por ${-monto}`
+}
+
+// Pone en regla todas las ventas a cuenta corriente (idempotente). Corre al arrancar:
+// completa cargos que faltaban, corrige importes y quita los de ventas anuladas.
+VentasModel.sincronizarTodosLosCargosCC = async function () {
+  const ops = (await query(`
+    SELECT DISTINCT op.id, op.nro_op FROM op_encabezado op
+    WHERE op.tipo_op = 'M' AND (op.metodo_pago = 'cuenta_corriente'
+       OR EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo = 'deuda'))
+    ORDER BY op.id
+  `)).rows
+  const cambios = []
+  for (const o of ops) {
+    const cambio = await transaction(q => VentasModel.sincronizarCargoCC(o.id, q))
+    if (cambio) cambios.push(`OP-${String(o.nro_op).padStart(4, '0')}: ${cambio}`)
+  }
+  return cambios
 }
 
 VentasModel.importesVenta = importesVenta

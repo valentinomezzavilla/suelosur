@@ -22,13 +22,13 @@
   </div>
   <div class="stat-card stat-card--info">
     <div class="stat-card__icon"><%- icon('users', { size: 20 }) %></div>
-    <div class="stat-card__body"><span class="stat-card__value"><%= conCuenta.length %></span><span class="stat-card__label">Cuentas habilitadas</span></div>
+    <div class="stat-card__body"><span class="stat-card__value"><%= conCuenta.filter(c => c.cuenta_corriente).length %></span><span class="stat-card__label">Cuentas habilitadas</span></div>
   </div>
 </div>
 
-<!-- Cuentas habilitadas -->
+<!-- Cuentas: habilitadas + cualquiera con saldo u operaciones a cta. cte. abiertas -->
 <div class="card shadow-sm mb-4">
-  <div class="card-header bg-white fw-semibold">Cuentas habilitadas</div>
+  <div class="card-header bg-white fw-semibold">Cuentas corrientes</div>
   <div class="card-body p-0">
     <% if (!conCuenta.length) { %>
       <%- include('../../partials/empty_state', { icono: '💳', mensaje: 'No hay cuentas corrientes habilitadas aún.', accionHref: '/clientes', accionLabel: 'Ir a clientes' }) %>
@@ -48,7 +48,15 @@
         <% conCuenta.forEach(c => { %>
         <tr>
           <td class="fw-semibold text-orange">#<%= c.numero %></td>
-          <td class="fw-semibold"><%= c.nombre %> <%= c.apellido %></td>
+          <td class="fw-semibold">
+            <%= c.nombre %> <%= c.apellido %>
+            <% if (!c.cuenta_corriente) { %>
+              <span class="badge rounded-pill badge-alerta ms-1" title="Tiene saldo u operaciones a cuenta corriente, pero la cuenta está deshabilitada">Deshabilitada</span>
+            <% } %>
+            <% if (c.cant_pendientes) { %>
+              <span class="badge rounded-pill badge-pendiente ms-1" title="Alquileres a cuenta corriente en curso: el cargo se genera al cerrar"><%= c.cant_pendientes %> en curso</span>
+            <% } %>
+          </td>
           <td><small class="text-muted"><%= c.telefono || '—' %></small></td>
           <td class="text-end">
             <% if (c.saldo < 0) { %>
@@ -59,7 +67,7 @@
               <span class="badge rounded-pill px-3 badge-activo">Al día</span>
             <% } %>
           </td>
-          <td class="text-center"><small class="text-muted"><%= c.movimientos.length %></small></td>
+          <td class="text-center"><small class="text-muted"><%= c.cant_movimientos %></small></td>
           <td class="text-center">
             <a href="/clientes/cuentas/<%= c.id %>" class="btn btn-sm btn-outline-secondary">Estado de cuenta</a>
             <% if (c.saldo < 0) { %>

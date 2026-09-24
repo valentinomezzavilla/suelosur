@@ -2,6 +2,11 @@
 const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
+// Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado)
+const SQL_OP_SIN_CARGO = `op.metodo_pago = 'cuenta_corriente' AND op.estado <> 'anulado'
+  AND NOT EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo = 'deuda')`
+const SQL_PENDIENTES_CC = `SELECT COUNT(*) FROM op_encabezado op WHERE op.id_cliente = c.id AND ${SQL_OP_SIN_CARGO}`
+
 const ClientesModel = {
 
   async listar() {
@@ -130,6 +135,17 @@ const ClientesModel = {
     await query(`UPDATE clientes SET activo = 0 WHERE id = ?`, [id])
   },
 
+  // Una operación a cuenta corriente necesita un cliente real con la cuenta habilitada
+  // (la UI solo ofrece la opción en ese caso, pero el servidor no puede confiar en eso).
+  // Devuelve null si está todo bien, o el mensaje de error.
+  async errorCuentaCorriente(clienteId) {
+    if (!clienteId) return 'Para vender a cuenta corriente hay que elegir un cliente (no puede ser "particular").'
+    const c = (await query(`SELECT nombre, cuenta_corriente, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+    if (!c) return 'El cliente no existe.'
+    if (!c.cuenta_corriente) return `${c.nombre} no tiene la cuenta corriente habilitada. Habilitala en Clientes → Cuentas corrientes o elegí otro método de pago.`
+    return null
+  },
+
   async habilitarCuenta(id) {
     await query(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`, [id])
   },
@@ -214,13 +230,83 @@ const ClientesModel = {
     return resultado
   },
 
+  // Cuánto falta pagar de cada cargo del cliente: { [movimiento_id]: restante }.
+  // Los pagos y ajustes a favor se aplican FIFO contra los cargos más viejos (misma
+  // regla que saldadaPorOperacion y que el saldo corrido del estado de cuenta).
+  async pendientePorCargo(clienteId) {
+    const movs = (await query(
+      `SELECT id, monto FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at ASC, id ASC`, [clienteId]
+    )).rows
+    const restante = {}
+    const cola = []
+    let aFavor = 0 // pagos adelantados: cubren los cargos que vengan después
+    for (const m of movs) {
+      const monto = Number(m.monto)
+      if (monto < 0) {
+        const entrada = { id: m.id, resta: -monto }
+        const usado = Math.min(aFavor, entrada.resta)
+        entrada.resta -= usado
+        aFavor -= usado
+        restante[m.id] = entrada.resta
+        if (entrada.resta > 1e-6) cola.push(entrada)
+      } else if (monto > 0) {
+        let disponible = monto
+        while (disponible > 1e-6 && cola.length) {
+          const cabeza = cola[0]
+          const usado = Math.min(disponible, cabeza.resta)
+          cabeza.resta -= usado
+          disponible -= usado
+          restante[cabeza.id] = cabeza.resta
+          if (cabeza.resta <= 1e-6) cola.shift()
+        }
+        aFavor += disponible
+      }
+    }
+    Object.keys(restante).forEach(k => { restante[k] = Math.round(restante[k] * 100) / 100 })
+    return restante
+  },
+
   // ── Submódulo Cuenta Corriente ────────────────────────────────
+  // Aparece en el módulo todo cliente que tenga la cuenta habilitada, O que tenga saldo,
+  // O que tenga operaciones a cuenta corriente todavía sin cargo (alquileres en curso).
+  // Así una deuda nunca queda escondida porque se deshabilitó la cuenta.
   async listarCuentas() {
-    return (await query(`SELECT * FROM clientes WHERE activo = 1 AND cuenta_corriente = 1 ORDER BY apellido, nombre`)).rows
+    return (await query(`
+      SELECT c.*,
+             (SELECT COUNT(*) FROM movimientos_cuenta m WHERE m.cliente_id = c.id)::int AS cant_movimientos,
+             (${SQL_PENDIENTES_CC})::int AS cant_pendientes
+      FROM clientes c
+      WHERE c.activo = 1
+        AND (c.cuenta_corriente = 1 OR ABS(COALESCE(c.saldo, 0)) > 0.005 OR (${SQL_PENDIENTES_CC}) > 0)
+      ORDER BY c.apellido, c.nombre
+    `)).rows
   },
 
   async sinCuenta() {
-    return (await query(`SELECT * FROM clientes WHERE activo = 1 AND (cuenta_corriente = 0 OR cuenta_corriente IS NULL) ORDER BY apellido, nombre`)).rows
+    return (await query(`
+      SELECT c.* FROM clientes c
+      WHERE c.activo = 1 AND (c.cuenta_corriente = 0 OR c.cuenta_corriente IS NULL)
+        AND ABS(COALESCE(c.saldo, 0)) <= 0.005 AND (${SQL_PENDIENTES_CC}) = 0
+      ORDER BY c.apellido, c.nombre
+    `)).rows
+  },
+
+  // Operaciones a cuenta corriente que todavía no generaron su cargo: alquileres de
+  // contenedor en curso (el importe se conoce al cerrar) y de maquinaria antes de
+  // iniciar el trabajo. Las ventas generan el cargo apenas se registran.
+  async operacionesSinCargo(clienteId) {
+    return (await query(`
+      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
+             oc.precio_alquiler, dm.precio_total AS precio_maquinaria, maq.nombre AS maquinaria_nombre,
+             cont.numero_contenedor
+      FROM op_encabezado op
+      LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      LEFT JOIN contenedores cont        ON cont.id = oc.id_contenedor
+      LEFT JOIN op_detalle_maquinaria dm ON dm.id_orden_pedido = op.id
+      LEFT JOIN maquinaria maq           ON maq.id = dm.id_maquinaria
+      WHERE op.id_cliente = ? AND ${SQL_OP_SIN_CARGO}
+      ORDER BY op.fecha_emision, op.id
+    `, [clienteId])).rows
   },
 
   async deshabilitarCuenta(id) {

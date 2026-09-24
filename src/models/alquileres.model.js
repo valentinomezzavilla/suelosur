@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
 const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
@@ -192,7 +193,7 @@ const AlquileresModel = {
     if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
       throw new Error('Ese contenedor ya está alquilado o reservado en otra operación. Para programar el próximo alquiler, usá "próximos a finalizar".')
     }
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, id_chofer, id_camion, obra) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?) RETURNING id`,
@@ -405,7 +406,7 @@ const AlquileresModel = {
     `, [id_contenedor])).rows[0]
     if (tieneProximoAlquiler) throw new Error('Este contenedor ya tiene un alquiler programado.')
 
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`
@@ -441,7 +442,7 @@ const AlquileresModel = {
     if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
       throw new Error('Ese contenedor ya está alquilado o reservado en otra operación.')
     }
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`
@@ -567,7 +568,7 @@ const AlquileresModel = {
   // 'entregado' con las fechas pasadas y SIN contenedor físico (no genera
   // movimientos ni tareas de chofer). El ingreso lo registra el controller.
   async crearFinalizado({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_inicio, fecha_fin, obra }) {
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     const cli = (await query(`SELECT nombre FROM clientes WHERE id = ?`, [id_cliente])).rows[0]
     return await transaction(async (q) => {

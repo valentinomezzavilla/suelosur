@@ -129,6 +129,10 @@ const VentasController = {
       const { clienteId, clienteNombre, items, metodoPago, precioTotal, fecha } = req.body
       const fechaRetro = fechaRetroactiva(fecha)
       const clienteIdClean = (clienteId && clienteId.trim()) || null
+      if (metodoPago === 'cuenta_corriente') {
+        const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
+        if (errCC) { req.flash('error', errCC); return res.redirect('/ventas/cantera') }
+      }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/cantera') }
       let carrito = []
@@ -193,14 +197,8 @@ const VentasController = {
         fecha:           fechaRetro,
       })
 
-      if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
-        await ClientesModel.agregarMovimiento(clienteIdClean, {
-          tipo: 'deuda',
-          descripcion: `Venta Cantera: ${desc}`,
-          monto: -total,
-          id_op_encabezado: id_op,
-        })
-      }
+      // A cuenta corriente: el cargo en la cuenta del cliente
+      await VentasModel.sincronizarCargoCC(id_op)
 
       res.redirect(`/ventas/cantera/confirmacion?tipo=cantera&cliente=${encodeURIComponent(nombre)}&total=${total}&remito=${nro_remito}`)
     } catch (err) {
@@ -301,6 +299,10 @@ const VentasController = {
         req.flash('error', 'Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
         return res.redirect(req.get('Referrer') || '/ventas')
       }
+      if (metodoPago === 'cuenta_corriente') {
+        const errCC = await ClientesModel.errorCuentaCorriente(clienteId || null)
+        if (errCC) { req.flash('error', errCC); return res.redirect('/ventas/viaje') }
+      }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/viaje') }
 
@@ -353,6 +355,9 @@ const VentasController = {
         detalles: [detalle],
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      // A cuenta corriente: el cargo aparece en la cuenta del cliente desde que se registra
+      // la venta, aunque el viaje quede programado.
+      await VentasModel.sincronizarCargoCC(id_op)
 
       // Asignar chofer y camión si se seleccionaron
       if (idChofer || idCamion) {
@@ -382,14 +387,6 @@ const VentasController = {
           metodo_pago:     metodoPago || 'efectivo',
           fecha:           fechaRetroactiva(fecha),
         })
-        if (metodoPago === 'cuenta_corriente' && clienteId) {
-          await ClientesModel.agregarMovimiento(clienteId, {
-            tipo: 'deuda',
-            descripcion: `Venta Viaje: ${destino}`,
-            monto: -total,
-            id_op_encabezado: id_op,
-          })
-        }
       }
 
       req.flash('success', `Viaje OP-${String(nro_op).padStart(4,'0')} ${esFinalizarAhora ? 'finalizado' : 'programado'} correctamente.`)
@@ -501,17 +498,9 @@ const VentasController = {
             : (op.observaciones || ''),
           metodo_pago:     op.metodo_pago || 'efectivo',
         })
-        // A cuenta corriente: el cargo al cliente (igual que al confirmar desde la hoja de ruta)
-        if (op.metodo_pago === 'cuenta_corriente' && op.id_cliente) {
-          const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
-          await ClientesModel.agregarMovimiento(op.id_cliente, {
-            tipo: 'deuda',
-            descripcion: esViaje ? `Venta Viaje ${nro}${destino ? ': ' + destino : ''}` : `Venta Cantera ${nro}`,
-            monto: -(op.total || 0),
-            id_op_encabezado: op.id,
-          })
-        }
       }
+      // A cuenta corriente: el cargo ya existe desde el alta; esto lo confirma (no duplica)
+      await VentasModel.sincronizarCargoCC(op.id)
       req.flash('success', 'Entrega confirmada.')
       res.redirect(`/ventas/${req.params.id}/remito`)
     } catch (err) {

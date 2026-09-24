@@ -3,7 +3,6 @@ const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
-const ClientesModel = require('../models/clientes.model')
 const RemitosModel = require('../models/remitos.model')
 const FlotaModel = require('../models/flota.model')
 const { generarRemitoPDFBuffer } = require('../utils/pdfRemito')
@@ -508,11 +507,9 @@ const HojaRutaController = {
             descripcion: [destino ? `Viaje a ${destino}` : 'Venta con viaje', full.observaciones].filter(Boolean).join(' — '),
             metodo_pago: full.metodo_pago || 'efectivo',
           })
-          if (full.metodo_pago === 'cuenta_corriente' && full.id_cliente) {
-            const ref = `Venta Viaje OP-${String(full.nro_op).padStart(4,'0')}${destino ? ': ' + destino : ''}`
-            await ClientesModel.agregarMovimiento(full.id_cliente, { tipo: 'deuda', descripcion: ref, monto: -(full.total || 0), id_op_encabezado: op.id })
-          }
         }
+        // A cuenta corriente: el cargo ya existe desde el alta; esto lo confirma (no duplica)
+        await VentasModel.sincronizarCargoCC(op.id)
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {
         // La entrega solo arranca el período; el cobro se genera al retirar.

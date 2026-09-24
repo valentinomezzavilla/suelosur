@@ -54,12 +54,11 @@ const ClientesController = {
   async cuentas(req, res) {
     try {
       const cuentasRaw = await ClientesModel.listarCuentas()
-      const conCuenta = await Promise.all(cuentasRaw.map(async c => ({
+      const conCuenta = cuentasRaw.map(c => ({
         ...c,
         telefono: c.telefono || c.tel_whatsapp,
         saldo: c.saldo ?? 0,
-        movimientos: await ClientesModel.movimientos(c.id),
-      })))
+      }))
       const sinCuentaRaw = await ClientesModel.sinCuenta()
       const sinCuenta = sinCuentaRaw.map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
       res.render('pages/clientes/cuentas', {
@@ -79,9 +78,20 @@ const ClientesController = {
       })
       const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
+      // Cuánto falta de cada cargo: "Saldar" solo en los que todavía deben algo
+      const pendientes = await ClientesModel.pendientePorCargo(cli.id)
+      // Operaciones a cta. cte. que todavía no generaron cargo (alquileres en curso),
+      // con el importe estimado a hoy
+      const AlquileresModel = require('../models/alquileres.model')
+      const sinCargo = await Promise.all((await ClientesModel.operacionesSinCargo(cli.id)).map(async o => {
+        let estimado = null
+        if (o.tipo_op === 'C') estimado = (await AlquileresModel.datosCierre(o.id))?.precioActual ?? (Number(o.precio_alquiler) || null)
+        else if (o.tipo_op === 'MA') estimado = Number(o.precio_maquinaria) || null
+        return { ...o, estimado }
+      }))
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado,
+        cliente, estado, pendientes, sinCargo,
         periodoLabel: etiquetaPeriodo(periodo),
         filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
         scripts: ['/js/modalAbonar.js'],
@@ -164,9 +174,12 @@ const ClientesController = {
       const movimientos   = await ClientesModel.movimientos(cliente.id)
       const transacciones = (await TransaccionesModel.filtrar({ clienteId: cliente.id, limit: 1000 })).rows
       const alquileres    = []
-      const deudasCC      = transacciones
-        .filter(t => t.metodo_pago === 'cuenta_corriente')
-        .map(t => ({ ...t, saldada: false }))
+      // Consumos en cta. cte. = los cargos de la cuenta (existen desde que se registra la
+      // venta, entregada o no), con lo que falta pagar de cada uno
+      const pendientes    = await ClientesModel.pendientePorCargo(cliente.id)
+      const deudasCC      = movimientos
+        .filter(m => m.tipo === 'deuda' && Math.abs(Number(m.monto)) > 0.005)
+        .map(m => ({ ...m, resta: pendientes[m.id] ?? Math.abs(Number(m.monto)) }))
       res.render('pages/clientes/detalle', { titulo: `${cliente.nombre} ${cliente.apellido || ''}`.trim(), cliente, movimientos, transacciones, alquileres, deudasCC, filtros: req.query, scripts: ['/js/modalAbonar.js'] })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes')
@@ -230,7 +243,7 @@ const ClientesController = {
     } catch (err) {
       console.error(err); req.flash('error', 'Error.')
     }
-    res.redirect('/clientes')
+    res.redirect('back')
   },
 
   async abonar(req, res) {

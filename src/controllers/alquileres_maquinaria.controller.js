@@ -45,6 +45,10 @@ const AlquileresMaquinariaController = {
         req.flash('error', 'Seleccioná un cliente.')
         return res.redirect('/alquileres/maquinaria/nuevo')
       }
+      if (metodoPago === 'cuenta_corriente') {
+        const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
+        if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/maquinaria/nuevo') }
+      }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
       const { id: id_op, nro_op } = await AlquileresMaquinariaModel.crear({
@@ -142,8 +146,13 @@ const AlquileresMaquinariaController = {
   async entregar(req, res) {
     try {
       const alquiler = await AlquileresMaquinariaModel.obtener(req.params.id)
+      // Un doble envío no puede generar otra transacción ni otro cargo
+      if (alquiler && !['pendiente', 'despachado'].includes(alquiler.estado)) {
+        req.flash('warning', 'El trabajo ya estaba iniciado o el alquiler está anulado.')
+        return res.redirect(`/alquileres/maquinaria/${req.params.id}`)
+      }
       await AlquileresMaquinariaModel.entregar(req.params.id)
-      if (alquiler) {
+      if (alquiler && !await TransaccionesModel.existePorOperacion(alquiler.id)) {
         await TransaccionesModel.crear({
           tipo: 'Maquinaria',
           id_op_encabezado: alquiler.id,
@@ -155,10 +164,12 @@ const AlquileresMaquinariaController = {
           metodo_pago: alquiler.metodo_pago || 'efectivo',
         })
         if (alquiler.metodo_pago === 'cuenta_corriente' && alquiler.id_cliente) {
+          // Vinculado a la operación: si se borra o cambia la transacción, el cargo se revierte
           await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'deuda',
-            descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'}`,
+            descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')}`,
             monto: -(alquiler.detalle?.precio_total || 0),
+            id_op_encabezado: alquiler.id,
           })
         }
       }

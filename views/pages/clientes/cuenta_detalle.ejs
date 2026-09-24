@@ -29,10 +29,16 @@
               data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
               data-deuda="<%= Math.abs(cliente.saldo) %>">Saldar deuda total</button>
     <% } %>
+    <% if (cliente.cuenta_corriente) { %>
     <form action="/clientes/<%= cliente.id %>/deshabilitar-cuenta" method="POST" class="d-inline"
-          onsubmit="return confirm('¿Deshabilitar la cuenta corriente de <%= nombre %>? El historial se conserva.')">
+          onsubmit="return confirm('¿Deshabilitar la cuenta corriente de <%= nombre %>? No va a poder comprar a cuenta corriente. El historial y el saldo se conservan.')">
       <button type="submit" class="btn btn-sm btn-outline-danger">Deshabilitar cuenta</button>
     </form>
+    <% } else { %>
+    <form action="/clientes/<%= cliente.id %>/habilitar-cuenta" method="POST" class="d-inline">
+      <button type="submit" class="btn btn-sm btn-success">+ Habilitar cuenta</button>
+    </form>
+    <% } %>
   </div>
 </div>
 
@@ -44,10 +50,55 @@
       <div class="fs-4 fw-bold <%= saldoCls(cliente.saldo) %>"><%= saldoTxt(cliente.saldo) %></div>
     </div>
     <div class="text-end">
-      <span class="badge rounded-pill px-3 badge-activo">Cuenta habilitada</span>
+      <% if (cliente.cuenta_corriente) { %>
+        <span class="badge rounded-pill px-3 badge-activo">Cuenta habilitada</span>
+      <% } else { %>
+        <span class="badge rounded-pill px-3 badge-alerta">Cuenta deshabilitada</span>
+      <% } %>
     </div>
   </div>
 </div>
+
+<% if (sinCargo.length) { %>
+<!-- Operaciones a cta. cte. que todavía no generaron cargo -->
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span>Operaciones a cuenta corriente en curso</span>
+    <small class="text-muted">Todavía no suman al saldo: el cargo se genera al cerrarse</small>
+  </div>
+  <div class="card-body p-0">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Operación</th>
+          <th>Detalle</th>
+          <th>Estado</th>
+          <th>Desde</th>
+          <th class="text-end">Importe estimado a hoy</th>
+          <th class="text-center">Cuándo se carga</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sinCargo.forEach(o => { %>
+        <tr>
+          <td class="fw-semibold text-orange">OP-<%= String(o.nro_op).padStart(4, '0') %></td>
+          <td>
+            <% if (o.tipo_op === 'C') { %>Alquiler contenedor<%= o.numero_contenedor ? ' #' + o.numero_contenedor : '' %>
+            <% } else if (o.tipo_op === 'MA') { %>Alquiler <%= o.maquinaria_nombre || 'maquinaria' %>
+            <% } else { %>Venta<% } %>
+            <% if (o.obra) { %><small class="text-muted"> — <%= o.obra %></small><% } %>
+          </td>
+          <td><small class="text-muted"><%= { pendiente: 'Pendiente', despachado: 'Despachado', entregado: 'En curso' }[o.estado] || o.estado %></small></td>
+          <td><small class="text-muted"><%= formatFecha(o.fecha_entrega_planificada || o.fecha_emision) %></small></td>
+          <td class="text-end"><%= o.estimado != null ? money(o.estimado) : '—' %></td>
+          <td class="text-center"><small class="text-muted"><%= o.tipo_op === 'MA' ? 'Al iniciar el trabajo' : 'Al cerrar el alquiler' %></small></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>
 
 <!-- Período -->
 <div class="periodo-chips">
@@ -174,11 +225,18 @@
           <td class="text-end fw-semibold <%= saldoCls(m.saldo) %>"><%= money(m.saldo) %></td>
           <td class="text-center">
             <% if (m.tipo === 'deuda') { %>
-              <button type="button" class="btn btn-sm btn-outline-success btn-abonar"
-                      data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
-                      data-deuda="<%= Math.abs(m.monto) %>" data-descripcion="<%= m.descripcion %>">
-                Saldar
-              </button>
+              <%# Pagos aplicados FIFO: "Saldar" solo si a este cargo le falta algo,
+                  y por lo que le falta (evita pagar dos veces lo mismo) %>
+              <% const resta = pendientes[m.id] ?? Math.abs(m.monto) %>
+              <% if (resta > 0.005) { %>
+                <button type="button" class="btn btn-sm btn-outline-success btn-abonar"
+                        data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
+                        data-deuda="<%= resta %>" data-descripcion="<%= m.descripcion %>">
+                  Saldar<%= resta < Math.abs(m.monto) - 0.005 ? ' ' + money(resta) : '' %>
+                </button>
+              <% } else if (Math.abs(m.monto) > 0.005) { %>
+                <span class="badge rounded-pill px-3 badge-activo">Saldado</span>
+              <% } %>
             <% } %>
           </td>
         </tr>
