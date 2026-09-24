@@ -2,7 +2,7 @@
 @use '../abstracts/mixins'    as *;
 
 // ── Colores ────────────────────────────────────────────────────
-.text-orange      { color: $orange      !important; }
+.text-orange      { color: $orange-text !important; } // texto: el naranja de marca no llega a 4.5:1
 .text-orange-dark { color: $orange-dark !important; }
 .text-accent      { color: $accent      !important; }
 .text-dark-title  { color: $dark        !important; }

@@ -44,9 +44,21 @@
   font-weight: 600;
 }
 
-.card-accent-orange { border-left: 3px solid $orange; }
-.card-accent-green  { border-left: 3px solid $success; }
-.card-accent-blue   { border-left: 3px solid $info; }
+.card-accent-orange,
+.card-accent-green,
+.card-accent-blue {
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+  }
+}
+.card-accent-orange::before { background: $orange; }
+.card-accent-green::before  { background: $success; }
+.card-accent-blue::before   { background: $info; }
 
 .card-modern {
   background: $bg-card;
@@ -64,9 +76,9 @@
 
 .card-modern-title {
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   color: $ink-soft;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -96,6 +108,7 @@
 .stat-card {
   --stat-color: #{$muted};
   --stat-soft:  #{$bg-app};
+  --stat-text:  #{$ink-soft};
 
   position: relative;
   display: flex;
@@ -110,16 +123,15 @@
   box-shadow: $shadow-xs;
   transition: transform $dur $ease, box-shadow $dur $ease, border-color $dur $ease;
 
-  // Barra de acento superior
+  // Capa de acento a la izquierda (como un estrato visto de costado)
   &::before {
     content: '';
     position: absolute;
     left: 0;
-    right: 0;
     top: 0;
-    height: 3px;
+    bottom: 0;
+    width: 3px;
     background: var(--stat-color);
-    opacity: 0.85;
   }
 
   &:hover {
@@ -136,7 +148,7 @@
     align-items: center;
     justify-content: center;
     font-size: 1.35rem;
-    border-radius: $radius-lg;
+    border-radius: $radius-md;
     background: var(--stat-soft);
     color: var(--stat-color);
     line-height: 1;
@@ -150,27 +162,37 @@
   }
 
   &__value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    line-height: 1;
-    letter-spacing: -0.02em;
+    font-size: 1.55rem;
+    font-weight: 600;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
     color: $ink;
   }
 
   &__label {
-    font-size: $fs-xs;
+    font-size: 0.68rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--stat-color);
+    letter-spacing: 0.07em;
+    color: var(--stat-text);
   }
 
-  // Tonos por estado
-  &--neutral { --stat-color: #{$accent};  --stat-soft: #{$accent-soft}; }
-  &--warning { --stat-color: #{$warning}; --stat-soft: #{$warning-soft}; }
-  &--info    { --stat-color: #{$info};    --stat-soft: #{$info-soft}; }
-  &--success { --stat-color: #{$success}; --stat-soft: #{$success-soft}; }
-  &--danger  { --stat-color: #{$danger};  --stat-soft: #{$danger-soft}; }
+  // Tonos por estado (color = acento/ícono; text = etiqueta con contraste AA)
+  &--neutral { --stat-color: #{$accent};  --stat-soft: #{$accent-soft};  --stat-text: #{$accent-dark}; }
+  &--warning { --stat-color: #{$warning}; --stat-soft: #{$warning-soft}; --stat-text: #{$warning-text}; }
+  &--info    { --stat-color: #{$info};    --stat-soft: #{$info-soft};    --stat-text: #{$info-text}; }
+  &--success { --stat-color: #{$success}; --stat-soft: #{$success-soft}; --stat-text: #{$success-text}; }
+  &--danger  { --stat-color: #{$danger};  --stat-soft: #{$danger-soft};  --stat-text: #{$danger-text}; }
+
+  // Mobile (2 columnas): sin ícono y cifra más chica, para que los montos no se corten
+  @include sm-down {
+    padding: 0.8rem 0.85rem;
+    gap: 0.6rem;
+
+    &__icon { display: none; }
+    &__value { font-size: 1.15rem; overflow-wrap: anywhere; }
+    &__label { font-size: 0.62rem; }
+  }
 
   // Pestaña activa
   &--active {
@@ -178,11 +200,33 @@
     background: var(--stat-soft);
     box-shadow: inset 0 0 0 1px var(--stat-color), $shadow-xs;
 
-    .stat-card__value { color: var(--stat-color); }
+    .stat-card__value { color: var(--stat-text); }
   }
 }
 
-.kpi-card        { border-radius: $radius-lg; }
+// KPIs del tablero: etiqueta chica en mayúscula + cifra grande en mono
+.kpi-card {
+  border-radius: $radius-lg;
+
+  .card-body > p.small {
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin-bottom: 0.45rem !important;
+  }
+  h3 {
+    font-family: $font-mono;
+    font-weight: 600 !important;
+    font-size: 1.7rem;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.35rem;
+  }
+  // Mismas cifras, colores con contraste AA sobre blanco
+  h3.text-orange { color: $orange-text !important; }
+  h3.text-green  { color: $success-text !important; }
+  h3.text-blue   { color: $accent-dark !important; }
+}
 .placeholder-card{ border-radius: $radius-lg; }
 .resumen-card    { border: 1px solid $border; }
 .box-credenciales{ background: $bg-app; border: 1px dashed $border-input; border-radius: $radius-md; }
@@ -202,4 +246,12 @@
   color: $ink;
   margin: 0;
   letter-spacing: -0.02em;
+}
+
+// Formularios angostos (card maxw-*): el encabezado de la página (título + Volver)
+// toma el mismo ancho que la tarjeta, para que "Volver" no quede suelto a la derecha.
+@each $w in (480, 500, 600) {
+  .main-content > .d-flex.justify-content-between:has(+ .card.maxw-#{$w}) {
+    max-width: #{$w}px;
+  }
 }

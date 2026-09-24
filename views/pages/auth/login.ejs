@@ -9,7 +9,7 @@
   <p class="login-desc">Áridos, contenedores y <span class="login-desc-accent">movimientos de suelo</span></p>
 
   <% if (error && error.length > 0) { %>
-    <div class="alert alert-danger py-2 small mb-3 text-start">❌ <%= error[0] %></div>
+    <div class="alert alert-danger py-2 small mb-3 text-start"><%= error[0] %></div>
   <% } %>
 
   <form action="/auth/login" method="POST" class="login-form" id="loginForm" data-loading-text="Ingresando…">
