@@ -14,7 +14,14 @@ process.on('unhandledRejection', (reason) => {
 })
 
 initDB()
-  .then(() => {
+  .then(async () => {
+    // Cuenta corriente: cada venta a cta. cte. no anulada con exactamente un cargo por su
+    // total (completa los que faltan, corrige importes, quita los de anuladas). Idempotente.
+    try {
+      const cambios = await require('./src/models/ventas.model').sincronizarTodosLosCargosCC()
+      if (cambios.length) console.log(`💳 Cuenta corriente: ${cambios.length} cargo(s) corregido(s)\n   ` + cambios.join('\n   '))
+    } catch (e) { console.error('Sincronizar cargos de cuenta corriente:', e.message) }
+
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Suelosur corriendo en puerto ${PORT}`)
     })

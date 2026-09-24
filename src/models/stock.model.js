@@ -3,6 +3,7 @@ const { query, transaction } = require('../config/db')
 
 const StockModel = {
 
+  // Los contenedores no llevan stock (se alquilan y vuelven): no aparecen acá
   async listar() {
     return (await query(`
       SELECT p.id, p.nombre, p.unidad_medida, p.precio_referencia,
@@ -11,7 +12,7 @@ const StockModel = {
              COALESCE(s.stock_minimo, 0)             AS stock_minimo,
              (COALESCE(s.cantidad_actual, 0) - COALESCE(s.cant_pendiente_entregar, 0)) AS disponible_real
       FROM productos p LEFT JOIN stock s ON s.id_producto = p.id
-      WHERE p.activo = 1 ORDER BY p.nombre
+      WHERE p.activo = 1 AND COALESCE(p.es_contenedor, 0) = 0 ORDER BY p.nombre
     `)).rows
   },
 

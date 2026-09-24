@@ -10,7 +10,12 @@ $accent-soft:   #eaf1fb;
 // Naranja del logo (acento de marca: indicadores, detalles)
 $orange:      #e8912a;
 $orange-dark: #c97520;
-$orange-soft: #fff4e8;
+$orange-soft: #fdf2e4;
+// Naranja "óxido" para TEXTO: el naranja de marca no llega a 4.5:1 sobre blanco
+$orange-text: #a3540b;
+
+// Arena: la capa intermedia de la franja "estratos" (firma visual de Suelosur)
+$sand:        #d9b98a;
 
 // Amarillo / dorado (compat — preferir $orange en código nuevo)
 $brand-yellow:      #f5b301;
@@ -22,27 +27,28 @@ $dark:          #1e293b;
 $dark-2:        #2e3a52;
 $ink:           #0f172a;
 $ink-soft:      #334155;
-$muted:         #64748b;
+$muted:         #5b6577;
 $muted-soft:    #748196;
 $muted-light:   #b4bfcd;
 
-$border:        #e2e8f0;
-$border-soft:   #edf1f6;
-$border-line:   #f1f4f8;
+// Neutros cálidos tipo piedra para superficies y bordes (el texto sigue en slate)
+$border:        #e3ded5;
+$border-soft:   #ece8e1;
+$border-line:   #f0ede7;
 // Bordes de controles de formulario: más marcados para que se distingan del fondo
-$border-input:       #cbd5e1;
-$border-input-hover: #a9b6c7;
+$border-input:       #cfc8bc;
+$border-input-hover: #b0a797;
 
-$bg-app:        #f4f6fa;
+$bg-app:        #f3f1ec;
 $bg-card:       #ffffff;
-$bg-card-alt:   #f8fafc;
-$bg-hover:      #f5f8fd;
+$bg-card-alt:   #faf8f4;
+$bg-hover:      #f7f4ee;
 
 $sidebar-bg:     #0b1a33;  // azul marino corporativo (logo login)
 $sidebar-bg-2:   #0f2242;
 $sidebar-border: rgba(255, 255, 255, 0.07);
 $sidebar-text:   rgba(255, 255, 255, 0.74);
-$sidebar-muted:  rgba(255, 255, 255, 0.4);
+$sidebar-muted:  rgba(255, 255, 255, 0.52);
 $sidebar-hover:  rgba(255, 255, 255, 0.06);
 $sidebar-active: rgba(255, 255, 255, 0.1);
 
@@ -68,20 +74,22 @@ $info-border:   #bcd8f0;
 $info-text:     #174e7d;
 
 // ── Espaciado / radios ─────────────────────────────────────────
-$radius-sm: 6px;
-$radius-md: 8px;
-$radius-lg: 12px;
-$radius-xl: 16px;
+// Radios contenidos: más "industrial" que redondeado
+$radius-sm: 5px;
+$radius-md: 7px;
+$radius-lg: 10px;
+$radius-xl: 14px;
 
 // ── Altura uniforme de controles (inputs, selects, botones) ────
 $control-h:    40px;
 $control-h-sm: 32px;
 
 // ── Sombras (sistema de elevación) ─────────────────────────────
-$shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
-$shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.07), 0 1px 2px rgba(15, 23, 42, 0.04);
-$shadow-md: 0 6px 16px -4px rgba(15, 23, 42, 0.1), 0 2px 4px rgba(15, 23, 42, 0.04);
-$shadow-lg: 0 18px 40px -10px rgba(15, 23, 42, 0.2);
+// Sombras con tinte cálido (sobre fondo piedra, el negro-azulado se ve sucio)
+$shadow-xs: 0 1px 2px rgba(41, 33, 20, 0.05);
+$shadow-sm: 0 1px 3px rgba(41, 33, 20, 0.07), 0 1px 2px rgba(41, 33, 20, 0.04);
+$shadow-md: 0 8px 20px -6px rgba(41, 33, 20, 0.14), 0 2px 4px rgba(41, 33, 20, 0.04);
+$shadow-lg: 0 20px 44px -12px rgba(41, 33, 20, 0.24);
 
 // ── Focus ring ─────────────────────────────────────────────────
 $focus-ring: 0 0 0 3px rgba(28, 91, 173, 0.22);
@@ -99,7 +107,9 @@ $content-pad:      1.75rem;
 $content-pad-mob:  1rem;
 
 // ── Tipografía ─────────────────────────────────────────────────
-$font-base:   "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+$font-base:   "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+// Códigos (OP, remitos, transacciones), montos y KPIs
+$font-mono:   "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
 $fs-base:     0.9375rem;
 $fs-sm:       0.85rem;
 $fs-xs:       0.75rem;
@@ -110,3 +120,7 @@ $bp-sm:  576px;
 $bp-md:  768px;
 $bp-lg:  992px;
 $bp-xl:  1200px;
+
+// ── Firma visual: franja "estratos" (capas del suelo) ──────────
+// Tres capas cortas — naranja, arena, azul — que aparecen en navbar, sidebar y login.
+$strata: linear-gradient(90deg, $orange 0 33.33%, $sand 33.33% 66.66%, $accent 66.66% 100%);

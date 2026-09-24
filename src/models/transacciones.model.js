@@ -1,6 +1,7 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const ClientesModel = require('./clientes.model')
+const { SQL_DESCRIPCION_DETALLE } = require('../utils/contenedor')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -60,11 +61,23 @@ const TransaccionesModel = {
     if (nuevoMetodo === 'cuenta_corriente' && (!tx.cliente_id || !tx.id_op_encabezado)) {
       throw new Error('No se puede pasar a cuenta corriente: la transacción no tiene cliente y operación asociados.')
     }
+    if (nuevoMetodo === 'cuenta_corriente') {
+      const errCC = await require('./clientes.model').errorCuentaCorriente(tx.cliente_id)
+      if (errCC) throw new Error(errCC)
+    }
+    // Las ventas (tipo M) llevan el cargo con la regla única de VentasModel
+    const esVenta = tx.id_op_encabezado
+      ? (await query(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [tx.id_op_encabezado])).rows[0]?.tipo_op === 'M'
+      : false
 
     await transaction(async (q) => {
       await q(`UPDATE transacciones SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, id])
       if (tx.id_op_encabezado) {
         await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
+      }
+      if (esVenta) {
+        await require('./ventas.model').sincronizarCargoCC(tx.id_op_encabezado, q)
+        return
       }
 
       // Salía de cta. corriente: revertir el cargo (si seguía en pie) en el saldo del cliente.
@@ -115,9 +128,10 @@ const TransaccionesModel = {
       //  · entregada  → ya salió de planta: vuelve a cantidad_actual
       //  · en curso   → estaba reservado: se libera lo pendiente de entregar
       //  · anulada    → el stock ya se había liberado al anularla
+      //  · contenedor (dias no nulo) → no movió stock
       if (op && op.estado !== 'anulado') {
         const detalles = (await q(
-          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [idOp])).rows
+          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [idOp])).rows
         for (const d of detalles) {
           if (op.estado === 'entregado') {
             await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`,
@@ -236,7 +250,7 @@ const TransaccionesModel = {
       LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
       LEFT JOIN (
         SELECT d.id_orden_pedido,
-               STRING_AGG(p.nombre || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ') AS productos_str
+               STRING_AGG(${SQL_DESCRIPCION_DETALLE} || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ') AS productos_str
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         GROUP BY d.id_orden_pedido
       ) mat ON mat.id_orden_pedido = oe.id

@@ -51,6 +51,10 @@ const AlquileresController = {
         req.flash('error', 'Seleccioná un cliente.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
+      if (metodoPago === 'cuenta_corriente') {
+        const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
+        if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/contenedores/nuevo') }
+      }
 
       // Destino: se exige dirección (calle) u obra, al menos uno.
       if (!(calle || '').trim() && !(obra || '').trim()) {

@@ -16,8 +16,21 @@
   gap: 1rem;
   min-height: $navbar-h;
 
+  // Firma "estratos": tres capas cortas sobre el borde inferior
+  &::after {
+    content: '';
+    position: absolute;
+    left: 2rem;
+    bottom: -1px;
+    width: 72px;
+    height: 3px;
+    border-radius: 0 0 2px 2px;
+    background: $strata;
+  }
+
   @include md-down {
     padding: 0.6rem 1rem;
+    &::after { left: 1rem; }
   }
 
   .nav-title {
@@ -32,26 +45,19 @@
     min-width: 0;
     @include truncate;
 
-    // Detalle de marca: barra naranja junto al título
-    &::before {
-      content: '';
-      flex-shrink: 0;
-      width: 4px;
-      height: 18px;
-      border-radius: 4px;
-      background: linear-gradient(180deg, $orange 0%, $orange-dark 100%);
-    }
   }
 
   .nav-date {
     color: $ink-soft;
     font-size: 0.76rem;
     font-weight: 500;
-    text-transform: capitalize;
+    display: inline-block;
+    &::first-letter { text-transform: uppercase; }
     background: $bg-app;
     border: 1px solid $border;
-    border-radius: 999px;
-    padding: 0.3rem 0.8rem;
+    border-radius: $radius-sm;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.76rem;
     white-space: nowrap;
 
     @include sm-down { display: none; }

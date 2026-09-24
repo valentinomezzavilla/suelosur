@@ -22,16 +22,16 @@
     <% } }) %>
     <div class="tabla-toolbar__search">
       <input type="text" name="q" value="<%= _q %>" class="form-control" placeholder="<%= _placeholder %>" autocomplete="off">
-      <button type="submit" class="btn btn-naranja btn-sm" title="Buscar"><%- icon('eye',{size:14}) %></button>
+      <button type="submit" class="btn btn-naranja tabla-toolbar__btn-icon" title="Buscar" aria-label="Buscar"><%- icon('search',{size:16}) %></button>
       <% if (_q || hayFiltrosUsados) { %>
-        <a href="<%= _action %>" class="btn btn-outline-secondary btn-sm" title="Limpiar">✕</a>
+        <a href="<%= _action %>" class="btn btn-outline-secondary tabla-toolbar__btn-icon" title="Limpiar búsqueda" aria-label="Limpiar búsqueda"><%- icon('x',{size:16}) %></a>
       <% } %>
     </div>
 
     <% if (_filtros.length) { %>
       <button type="button" class="btn btn-outline-secondary btn-sm tabla-toolbar__filtros-btn"
               data-bs-toggle="collapse" data-bs-target="#<%= _idCollapse %>">
-        🔽 Filtros<% if (hayFiltrosUsados) { %> <span class="badge bg-warning text-dark ms-1"><%= _filtros.filter(f => f.selected && f.selected !== '').length %></span><% } %>
+        <%- icon('filter',{size:14}) %> Filtros<% if (hayFiltrosUsados) { %> <span class="badge bg-warning text-dark ms-1"><%= _filtros.filter(f => f.selected && f.selected !== '').length %></span><% } %>
       </button>
     <% } %>
 

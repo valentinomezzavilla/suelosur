@@ -1,6 +1,29 @@
 'use strict'
 const ProductosModel = require('../models/productos.model')
 const paginar        = require('../utils/paginar')
+const { normalizarRangos } = require('../utils/contenedor')
+
+// Datos del formulario de producto. Si es contenedor, los rangos de precio por día
+// son obligatorios. Devuelve { datos } o { error, datos }.
+function leerFormulario(body) {
+  const { nombre, unidad_medida, precio_cantera, precio_viaje } = body
+  const es_contenedor = body.es_contenedor === '1'
+  const datos = { nombre: (nombre || '').trim(), unidad_medida, precio_cantera, precio_viaje, es_contenedor, rangos: [] }
+  if (!datos.nombre) return { error: 'El nombre es obligatorio.', datos }
+  if (es_contenedor) {
+    const { rangos, error } = normalizarRangos(body.rango_hasta, body.rango_precio)
+    if (error) return { error, datos: { ...datos, rangos: filasCargadas(body) } }
+    datos.rangos = rangos
+  }
+  return { datos }
+}
+
+// Lo que se cargó en la tabla de rangos, tal cual (para volver a mostrarlo si hubo error)
+function filasCargadas(body) {
+  const lista = (v) => (v == null ? [] : Array.isArray(v) ? v : [v])
+  const hs = lista(body.rango_hasta), ps = lista(body.rango_precio)
+  return hs.map((h, i) => ({ dias_hasta: h === '' ? null : h, precio_dia: ps[i] ?? '' }))
+}
 
 const ProductosController = {
   async index(req, res) {
@@ -49,9 +72,13 @@ const ProductosController = {
   },
   async crear(req, res) {
     try {
-      const { nombre, unidad_medida, precio_cantera, precio_viaje } = req.body
-      if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect('/productos/nuevo') }
-      await ProductosModel.crear({ nombre, unidad_medida, precio_cantera, precio_viaje })
+      const { datos, error } = leerFormulario(req.body)
+      if (error) {
+        // Se re-renderiza (no redirect) para no perder lo que se cargó
+        res.locals.error = [error]
+        return res.render('pages/productos/form', { titulo: 'Nuevo Producto', producto: datos })
+      }
+      await ProductosModel.crear(datos)
       req.flash('success', 'Producto creado.')
       res.redirect('/productos')
     } catch (err) {
@@ -69,9 +96,12 @@ const ProductosController = {
   },
   async actualizar(req, res) {
     try {
-      const { nombre, unidad_medida, precio_cantera, precio_viaje } = req.body
-      if (!nombre) { req.flash('error', 'El nombre es obligatorio.'); return res.redirect(`/productos/${req.params.id}/editar`) }
-      await ProductosModel.actualizar(req.params.id, { nombre, unidad_medida, precio_cantera, precio_viaje })
+      const { datos, error } = leerFormulario(req.body)
+      if (error) {
+        res.locals.error = [error]
+        return res.render('pages/productos/form', { titulo: 'Editar Producto', producto: { ...datos, id: req.params.id } })
+      }
+      await ProductosModel.actualizar(req.params.id, datos)
       req.flash('success', 'Producto actualizado.')
       res.redirect('/productos')
     } catch (err) {

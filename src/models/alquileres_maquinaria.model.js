@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 
 const SQL_ULTIMO_MOV_MAQ = `
   SELECT m.* FROM (
@@ -76,7 +77,7 @@ const AlquileresMaquinariaModel = {
   },
 
   async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, id_maquinaria, id_chofer, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada }) {
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, hora_planificada) VALUES (?, ?, 'MA', ?, ?, 'pendiente', ?, ?, ?, ?) RETURNING id`,

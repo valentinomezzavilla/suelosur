@@ -5,7 +5,9 @@
   width: $sidebar-w;
   min-width: $sidebar-w;
   height: 100vh;
-  background: linear-gradient(180deg, $sidebar-bg 0%, $sidebar-bg-2 100%);
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 7px),
+    linear-gradient(180deg, $sidebar-bg 0%, $sidebar-bg-2 100%);
   border-right: 1px solid rgba(0, 0, 0, 0.35);
   position: sticky;
   top: 0;
@@ -64,7 +66,20 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 1.15rem 1.25rem 1rem;
+  padding: 1.15rem 1.25rem 1.1rem;
+  position: relative;
+
+  // Firma "estratos" bajo la marca
+  &::after {
+    content: '';
+    position: absolute;
+    left: 1.25rem;
+    bottom: 0.35rem;
+    width: 38px;
+    height: 3px;
+    border-radius: 2px;
+    background: $strata;
+  }
 
   .brand-logo-link {
     display: flex;
@@ -163,8 +178,12 @@
 
 .sidebar-nav {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.35rem 0 0.75rem;
+  // Los ítems se desvanecen al llegar al pie, en vez de quedar cortados contra "Cerrar sesión"
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
   @include scrollbar(4px, rgba(255,255,255,0.08), transparent, rgba(255,255,255,0.16));
 }
 
@@ -244,7 +263,7 @@
       bottom: 22%;
       width: 3px;
       border-radius: 0 3px 3px 0;
-      background: $orange;
+      background: linear-gradient(180deg, $orange 0 50%, $sand 50% 100%);
     }
 
     .nav-icon { color: $orange; opacity: 1; }
@@ -268,8 +287,9 @@
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  margin: 0.5rem 0.6rem 0.75rem;
+  margin: 0.25rem 0.6rem 0.75rem;
   padding: 0.6rem 0.75rem;
+  box-shadow: 0 -12px 0 -11px $sidebar-border;
   border-radius: $radius-md;
   color: rgba(255, 255, 255, 0.7);
   text-decoration: none;

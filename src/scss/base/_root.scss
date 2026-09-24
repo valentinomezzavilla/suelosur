@@ -45,17 +45,28 @@ body {
 
 h1, h2, h3, h4, h5, h6 {
   color: $ink;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.01em;
 }
 
-// Títulos de página (h4 al inicio de cada vista)
+// Títulos de página: el h4 al inicio de cada vista, y los .page-title de las
+// pantallas de venta. Mismo tamaño y peso en todo el sistema.
 .main-content h4.fw-bold,
-.main-content h4.fw-semibold {
-  font-size: 1.35rem;
+.main-content h4.fw-semibold,
+.page-title,
+.ventas-productos__title {
+  font-size: 1.4rem;
   font-weight: 700 !important;
   letter-spacing: -0.02em;
+  color: $ink;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
 
-  .ic { color: $accent; }
+  .ic {
+    color: $accent;
+    width: 20px;
+    height: 20px;
+  }
 }
 
 // Números alineados en columnas de dinero / métricas
@@ -68,6 +79,28 @@ h1, h2, h3, h4, h5, h6 {
 .rs-total-value,
 .input-total {
   font-variant-numeric: tabular-nums;
+}
+
+// ── Mono: códigos y cifras protagonistas ───────────────────────
+// Los códigos de las tablas (OP-0041, VIA-000014, N° de cliente…) se marcan en
+// todas las vistas como <td class="fw-semibold text-orange">.
+.mono,
+td.fw-semibold.text-orange,
+.stat-card__value,
+.total-display,
+.rs-total-value,
+.transaccion-monto,
+.cart-total-bar #cartTotalValor,
+.input-total,
+.ventas-card__precio {
+  font-family: $font-mono;
+  letter-spacing: -0.01em;
+}
+// Código en tabla: naranja óxido (el de marca no se lee sobre blanco)
+td.fw-semibold.text-orange {
+  font-weight: 600 !important;
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 // Foco accesible y consistente en controles Bootstrap (filtros, modales)
@@ -87,7 +120,13 @@ button:focus-visible,
   box-shadow: none;
 }
 
-::selection { background: rgba(28, 91, 173, 0.18); }
+::selection { background: rgba(232, 145, 42, 0.28); }
+
+// Controles Bootstrap a la misma altura que los del resto del sistema
+.form-control:not(textarea):not(.form-control-sm):not([type="file"]),
+.form-select:not(.form-select-sm):not([multiple]) {
+  min-height: $control-h;
+}
 
 // Botones Bootstrap usados en cabeceras: misma altura/peso que el resto
 .btn {

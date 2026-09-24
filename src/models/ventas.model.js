@@ -1,7 +1,11 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
+const ProductosModel = require('./productos.model')
+const { cotizarContenedor, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
+const { textoDestino } = require('../utils/destino')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
 // Es la misma cuenta en listados, detalle, remito y al generar la transacción.
@@ -27,12 +31,12 @@ const VentasModel = {
   },
 
   async listarProductos() {
-    return (await query(`
-      SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje,
+    return ProductosModel.conRangos((await query(`
+      SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje, p.es_contenedor,
              (COALESCE(s.cantidad_actual,0) - COALESCE(s.cant_pendiente_entregar,0)) AS disponible_real
       FROM productos p LEFT JOIN stock s ON s.id_producto = p.id
       WHERE p.activo = 1 ORDER BY p.nombre
-    `)).rows
+    `)).rows)
   },
 
   async contarPorEstado() {
@@ -84,9 +88,9 @@ const VentasModel = {
       ${where} ORDER BY ${orderCol} ${orderDir} LIMIT ? OFFSET ?
     `, [...params, limit, offset])).rows
 
-    // Ventas a cuenta corriente ya entregadas (con cargo generado): venta por venta,
+    // Ventas a cuenta corriente no anuladas (tienen su cargo desde que se registran): venta por venta,
     // ¿el cliente ya la saldó? (ver ClientesModel.saldadaPorOperacion)
-    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado === 'entregado').map(o => o.id)
+    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado !== 'anulado').map(o => o.id)
     const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
     ops.forEach(o => { if (idsCC.includes(o.id)) o.saldada = !!saldadas[o.id] })
 
@@ -121,7 +125,8 @@ const VentasModel = {
     `, [id])).rows[0]
     if (!op) return null
     op.detalles = (await query(`
-      SELECT d.*, p.nombre AS producto_nombre, p.unidad_medida,
+      SELECT d.*, ${SQL_DESCRIPCION_DETALLE} AS producto_nombre, ${SQL_UNIDAD_DETALLE} AS unidad_medida,
+             p.nombre AS producto, p.es_contenedor,
              (d.cantidad_pedida * d.precio_unitario) AS subtotal
       FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
       WHERE d.id_orden_pedido = ?
@@ -143,7 +148,7 @@ const VentasModel = {
         [cliente_nombre_libre.trim()])
       id_cliente = cli.rows[0].id
     }
-    const { nro }     = (await query(`SELECT COALESCE(MAX(nro_op), 0) + 1 AS nro FROM op_encabezado`)).rows[0]
+    const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     // Remito: el que se cargó a mano (talonario) o, si no, el siguiente de la secuencia
     const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     const nro_rem = nro_remito || nroSiguiente
@@ -168,10 +173,13 @@ const VentasModel = {
       const id = rows[0].id
 
       for (const d of (detalles || [])) {
+        // Renglón de contenedor: lleva días y precio por día, y no reserva stock
+        const dias = d.dias != null ? d.dias : null
         await q(`
-          INSERT INTO op_detalle_material (id_orden_pedido, id_producto, cantidad_pedida, precio_unitario)
-          VALUES (?, ?, ?, ?)
-        `, [id, d.id_producto, d.cantidad_pedida, d.precio_unitario])
+          INSERT INTO op_detalle_material (id_orden_pedido, id_producto, cantidad_pedida, precio_unitario, dias, precio_dia)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [id, d.id_producto, d.cantidad_pedida, d.precio_unitario, dias, dias != null ? d.precio_dia : null])
+        if (dias != null) continue
         await q(`UPDATE stock SET cant_pendiente_entregar = cant_pendiente_entregar + ? WHERE id_producto = ?`,
           [d.cantidad_pedida, d.id_producto])
       }
@@ -183,8 +191,12 @@ const VentasModel = {
   // Actualiza datos editables de un viaje (estado != entregado/anulado).
   // Ajusta el stock pendiente si cambió la cantidad pedida.
   async actualizarViaje(id, datos) {
-    const op = (await query(`SELECT estado, modalidad, precio_flete FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    const op = (await query(`SELECT estado, modalidad, precio_flete, id_cliente FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op) throw new Error('Orden no encontrada.')
+    if (datos.metodoPago === 'cuenta_corriente') {
+      const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
+      if (errCC) throw new Error(errCC)
+    }
     if (op.estado === 'entregado') throw new Error('No se puede editar una venta ya entregada.')
     if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
 
@@ -202,9 +214,26 @@ const VentasModel = {
 
     await transaction(async (q) => {
       // Único detalle (cantidad/precio): si no vino un campo, se conserva el valor actual
-      const detalle = (await q(`SELECT id, id_producto, cantidad_pedida, precio_unitario FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`, [id])).rows[0]
+      const detalle = (await q(`SELECT id, id_producto, cantidad_pedida, precio_unitario, dias, precio_dia FROM op_detalle_material WHERE id_orden_pedido = ? LIMIT 1`, [id])).rows[0]
       let subtotal = 0
-      if (detalle) {
+      if (detalle && detalle.dias != null) {
+        // Contenedor: siempre 1. Se editan los días; el precio por día es el que se cargó
+        // o, si no vino, el del rango que corresponde a esos días.
+        const dias = vacio(datos.dias) ? detalle.dias : Number(datos.dias)
+        if (!Number.isInteger(dias) || dias < 1) throw new Error('Los días del contenedor tienen que ser un número entero, mínimo 1.')
+        let precioDia
+        if (!vacio(datos.precioDia)) {
+          precioDia = Math.max(0, Number(datos.precioDia) || 0)
+        } else {
+          const rangos = (await ProductosModel.rangosDe([detalle.id_producto]))[String(detalle.id_producto)] || []
+          const cot = cotizarContenedor(rangos, dias)
+          if (cot.error) throw new Error(cot.error)
+          precioDia = cot.precio_dia
+        }
+        subtotal = dias * precioDia
+        await q(`UPDATE op_detalle_material SET cantidad_pedida = 1, dias = ?, precio_dia = ?, precio_unitario = ? WHERE id = ?`,
+          [dias, precioDia, subtotal, detalle.id])
+      } else if (detalle) {
         const nuevaCant = Number(datos.cantidad) > 0 ? Number(datos.cantidad) : detalle.cantidad_pedida
         const nuevoPrecio = vacio(datos.precioProducto) ? detalle.precio_unitario : Math.max(0, Number(datos.precioProducto) || 0)
         const delta = nuevaCant - detalle.cantidad_pedida
@@ -228,6 +257,8 @@ const VentasModel = {
             observaciones = ?, precio_flete = ?, monto_total = ?
         WHERE id = ?
       `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, id])
+      // Cambió el total o el método: el cargo en cuenta corriente acompaña
+      await VentasModel.sincronizarCargoCC(id, q)
     })
   },
 
@@ -251,7 +282,14 @@ const VentasModel = {
       numero: op.domicilio_altura || '',
       obra: op.obra || '',
       direccion: [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim(),
-      productoNombre: detalle.producto_nombre || '',
+      productoNombre: detalle.producto || detalle.producto_nombre || '',
+      idProducto: detalle.id_producto,
+      esContenedor: detalle.dias != null,
+      dias: detalle.dias,
+      precioDia: detalle.precio_dia,
+      rangos: detalle.dias != null
+        ? ((await ProductosModel.rangosDe([detalle.id_producto]))[String(detalle.id_producto)] || [])
+        : [],
       cantidad: detalle.cantidad_pedida || 1,
       precioProducto: detalle.precio_unitario || 0,
       subtotal,
@@ -274,7 +312,8 @@ const VentasModel = {
     if (!op) return
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id])
-      const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [id])).rows
+      // Los renglones de contenedor (dias no nulo) no mueven stock
+      const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [id])).rows
       for (const d of detalles) {
         await q(`
           UPDATE stock SET cantidad_actual = GREATEST(0, cantidad_actual - ?),
@@ -294,7 +333,10 @@ const VentasModel = {
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), false)
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'anulado' WHERE id = ?`, [id])
-      const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [id])).rows
+      // Anulada: si era a cuenta corriente, el cargo se revierte
+      await VentasModel.sincronizarCargoCC(id, q)
+      // Los renglones de contenedor (dias no nulo) no mueven stock
+      const detalles = (await q(`SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [id])).rows
       for (const d of detalles) {
         await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar - ?) WHERE id_producto = ?`,
           [d.cantidad_pedida, d.id_producto])
@@ -310,7 +352,7 @@ const VentasModel = {
              op.domicilio_calle, op.metodo_pago, op.observaciones,
              c.nombre AS cliente_nombre, c.tel_whatsapp,
              ${SQL_TOTAL} AS total,
-             (SELECT STRING_AGG(p.nombre || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ')
+             (SELECT STRING_AGG(${SQL_DESCRIPCION_DETALLE} || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ')
               FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
               WHERE d.id_orden_pedido = op.id) AS productos_str
       FROM op_encabezado op
@@ -332,6 +374,85 @@ const VentasModel = {
       ORDER BY op.fecha_entrega_planificada ASC NULLS LAST
     `)).rows
   },
+}
+
+// ── Cuenta corriente ────────────────────────────────────────────
+// Regla única: una venta a cuenta corriente que no está anulada tiene EXACTAMENTE UN
+// cargo en la cuenta del cliente, por su total, desde el momento en que se registra.
+// Cualquier otra venta no tiene ninguno. Se llama después de crear, editar, entregar,
+// anular o cambiar el método de pago: deja el cargo como corresponde (lo crea, ajusta
+// el importe o el cliente, o lo borra) y mantiene clientes.saldo en línea.
+// `q` permite correrlo dentro de una transacción abierta.
+VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
+  const op = (await q(`
+    SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.metodo_pago, op.id_cliente, op.modalidad,
+           op.obra, op.domicilio_calle, op.domicilio_altura, op.fecha_emision, op.observaciones,
+           ${SQL_TOTAL} AS total
+    FROM op_encabezado op WHERE op.id = ?
+  `, [idOp])).rows[0]
+  if (!op || op.tipo_op !== 'M') return null
+
+  const corresponde = op.metodo_pago === 'cuenta_corriente' && !!op.id_cliente && op.estado !== 'anulado'
+  const cargos = (await q(
+    `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda' ORDER BY id`, [idOp]
+  )).rows
+  // Se conserva a lo sumo uno (el más viejo); el resto son duplicados
+  const actual = corresponde ? cargos[0] : null
+  let cambio = null
+  for (const c of cargos) {
+    if (c === actual) continue
+    await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [c.id])
+    await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(c.monto), c.cliente_id])
+    cambio = corresponde ? 'duplicado borrado' : 'cargo borrado'
+  }
+  if (!corresponde) return cambio
+
+  const monto = -redondear(op.total)
+  const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
+  const destino = op.modalidad === 'flete'
+    ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
+  const descripcion = op.modalidad === 'flete'
+    ? `Venta Viaje ${nro}${destino ? ': ' + destino : ''}`
+    : `Venta Cantera ${nro}${op.observaciones ? ': ' + String(op.observaciones).slice(0, 140) : ''}`
+
+  if (actual) {
+    const cambioCliente = String(actual.cliente_id) !== String(op.id_cliente)
+    if (cambioCliente || Math.abs(Number(actual.monto) - monto) > 0.005) {
+      await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(actual.monto), actual.cliente_id])
+      await q(`UPDATE movimientos_cuenta SET cliente_id = ?, monto = ?, descripcion = ? WHERE id = ?`,
+        [op.id_cliente, monto, descripcion, actual.id])
+      await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
+      return `cargo ajustado a ${-monto}`
+    }
+    return cambio
+  }
+  // Venta cargada con fecha pasada: el cargo va en esa fecha (igual que su transacción)
+  const hoy = new Date().toISOString().slice(0, 10)
+  const fecha = String(op.fecha_emision || '').slice(0, 10)
+  const createdAt = fecha && fecha < hoy ? `${fecha} 12:00:00` : null
+  await q(`
+    INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado, created_at)
+    VALUES (?, 'deuda', ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
+  `, [op.id_cliente, descripcion, monto, op.id, createdAt])
+  await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
+  return `cargo creado por ${-monto}`
+}
+
+// Pone en regla todas las ventas a cuenta corriente (idempotente). Corre al arrancar:
+// completa cargos que faltaban, corrige importes y quita los de ventas anuladas.
+VentasModel.sincronizarTodosLosCargosCC = async function () {
+  const ops = (await query(`
+    SELECT DISTINCT op.id, op.nro_op FROM op_encabezado op
+    WHERE op.tipo_op = 'M' AND (op.metodo_pago = 'cuenta_corriente'
+       OR EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo = 'deuda'))
+    ORDER BY op.id
+  `)).rows
+  const cambios = []
+  for (const o of ops) {
+    const cambio = await transaction(q => VentasModel.sincronizarCargoCC(o.id, q))
+    if (cambio) cambios.push(`OP-${String(o.nro_op).padStart(4, '0')}: ${cambio}`)
+  }
+  return cambios
 }
 
 VentasModel.importesVenta = importesVenta

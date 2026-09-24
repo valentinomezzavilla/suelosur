@@ -43,7 +43,10 @@
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 0.85rem;
 
-  @include sm-down { grid-template-columns: 1fr 1fr; }
+  @include sm-down { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+
+  // Lo que se puede vender va primero; lo que no tiene stock/precio, al final
+  > li:has(.ventas-card--sin-stock) { order: 1; }
 }
 
 .ventas-card {
@@ -56,7 +59,10 @@
   gap: 0.55rem;
   transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
 
-  &:hover { border-color: $accent; box-shadow: 0 2px 6px rgba(28, 91, 173, 0.12); }
+  height: 100%;
+  box-shadow: $shadow-xs;
+
+  &:hover { border-color: $accent; box-shadow: $shadow-md; }
 
   &__top {
     display: flex;
@@ -72,17 +78,39 @@
   }
 
   &__precio {
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: $accent;
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: $accent-dark;
     line-height: 1.1;
+    letter-spacing: -0.03em;
   }
 
-  &--sin-stock {
-    opacity: 0.65;
-    background: $bg-app;
+  @include sm-down {
+    padding: 0.75rem;
+    min-width: 0;
 
-    .ventas-card__precio { color: $muted; }
+    &__top { flex-wrap: wrap; }
+    &__precio { font-size: 1.05rem; overflow-wrap: anywhere; }
+  }
+
+  // Sin stock: se lee como "no disponible", no como un botón roto
+  &--sin-stock {
+    background: transparent;
+    border-style: dashed;
+    box-shadow: none;
+
+    &:hover { border-color: $border-input; box-shadow: none; }
+    .ventas-card__nombre { color: $muted; }
+    .ventas-card__precio { color: $muted-light; }
+
+    .addToCart,
+    .addToCart:disabled {
+      background: transparent !important;
+      border: 1px solid $border !important;
+      color: $muted !important;
+      box-shadow: none !important;
+      cursor: not-allowed;
+    }
   }
 
   .addToCart {
@@ -104,6 +132,10 @@
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+
+  // Ninguna sección se achica: si no entra, scrollea el panel. Sin esto, con varios
+  // productos la lista se comprimía a su min-height y los ítems pisaban Total/Cliente.
+  > * { flex-shrink: 0; }
 
   // Mobile: panel deslizable desde la derecha (off-canvas)
   @include md-down {

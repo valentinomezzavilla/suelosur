@@ -22,7 +22,24 @@
     }
   }
 
-  &__filtros-btn { flex-shrink: 0; }
+  // Botón cuadrado de ícono, a la altura del input del buscador
+  &__btn-icon {
+    flex-shrink: 0;
+    width: $control-h;
+    height: $control-h;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__filtros-btn {
+    flex-shrink: 0;
+    height: $control-h;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+  }
 
   &__extras {
     margin-left: auto;
