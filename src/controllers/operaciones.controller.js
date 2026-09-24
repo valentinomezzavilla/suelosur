@@ -3,6 +3,7 @@ const { query } = require('../config/db')
 const OperacionesModel = require('../models/operaciones.model')
 const { linkWhatsApp } = require('../utils/whatsapp')
 const { fmtFecha } = require('../utils/fecha')
+const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 
 const TIPO_OP_LABEL = { M: 'Material', C: 'Contenedor', MA: 'Maquinaria' }
 const MODALIDAD_LABEL = { deposito: 'Retira en depósito', flete: 'Con flete (entrega)' }
@@ -97,7 +98,7 @@ const OperacionesController = {
       }
 
       const materiales = (await query(`
-        SELECT d.cantidad_pedida, p.nombre AS producto, p.unidad_medida
+        SELECT d.cantidad_pedida, ${SQL_DESCRIPCION_DETALLE} AS producto, ${SQL_UNIDAD_DETALLE} AS unidad_medida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         WHERE d.id_orden_pedido = ?
       `, [opId])).rows

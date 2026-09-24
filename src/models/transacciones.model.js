@@ -1,6 +1,7 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const ClientesModel = require('./clientes.model')
+const { SQL_DESCRIPCION_DETALLE } = require('../utils/contenedor')
 
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
@@ -115,9 +116,10 @@ const TransaccionesModel = {
       //  · entregada  → ya salió de planta: vuelve a cantidad_actual
       //  · en curso   → estaba reservado: se libera lo pendiente de entregar
       //  · anulada    → el stock ya se había liberado al anularla
+      //  · contenedor (dias no nulo) → no movió stock
       if (op && op.estado !== 'anulado') {
         const detalles = (await q(
-          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ?`, [idOp])).rows
+          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [idOp])).rows
         for (const d of detalles) {
           if (op.estado === 'entregado') {
             await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`,
@@ -236,7 +238,7 @@ const TransaccionesModel = {
       LEFT JOIN op_encabezado oe ON oe.id = sub.id_op_encabezado
       LEFT JOIN (
         SELECT d.id_orden_pedido,
-               STRING_AGG(p.nombre || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ') AS productos_str
+               STRING_AGG(${SQL_DESCRIPCION_DETALLE} || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ') AS productos_str
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         GROUP BY d.id_orden_pedido
       ) mat ON mat.id_orden_pedido = oe.id

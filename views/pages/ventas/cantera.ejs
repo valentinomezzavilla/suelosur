@@ -18,6 +18,29 @@
                       const precio = Number(p.precio_cantera ?? p.precio ?? 0)
                       const nombre = p.nombre || p.producto || ''
                     %>
+                    <% if (p.es_contenedor) { %>
+                    <%# Contenedor: no mueve stock, va de a uno y se cobra por días según el rango %>
+                    <% const rs = p.rangos || []; const desdeDia = rs.length ? Math.min(...rs.map(r => Number(r.precio_dia))) : 0 %>
+                    <li>
+                        <div class="ventas-card <%= !rs.length ? 'ventas-card--sin-stock' : '' %>">
+                            <div class="ventas-card__top">
+                                <span class="ventas-card__nombre"><%= nombre %></span>
+                                <span class="badge badge--con-stock">Por días</span>
+                            </div>
+                            <div class="ventas-card__precio"><%= rs.length ? `desde $${desdeDia.toLocaleString('es-AR')}/día` : 'Sin precio' %></div>
+                            <button
+                                class="addToCart btn-primary"
+                                data-id="<%= p.id %>"
+                                data-nombre="<%= nombre %>"
+                                data-contenedor="1"
+                                data-rangos="<%= JSON.stringify(rs) %>"
+                                <%= !rs.length ? 'disabled' : '' %>
+                            >
+                                <%= !rs.length ? 'Sin precio' : '+ Agregar' %>
+                            </button>
+                        </div>
+                    </li>
+                    <% return } %>
                     <li>
                         <div class="ventas-card <%= stock <= 0 ? 'ventas-card--sin-stock' : '' %>">
                             <div class="ventas-card__top">

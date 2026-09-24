@@ -8,6 +8,7 @@
 const { query } = require('../config/db')
 const { codigoMaterial } = require('../utils/codigosMaterial')
 const { importesVenta } = require('./ventas.model')
+const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 
 // Fecha del renglón: la de entrega planificada; si falta, la de emisión.
 const FECHA = `COALESCE(op.fecha_entrega_planificada, op.fecha_emision)`
@@ -26,7 +27,7 @@ const ReportesModel = {
     const materiales = (await query(`
       SELECT ${FECHA} AS fecha, op.nro_remito, op.nro_op, op.obra,
              COALESCE(NULLIF(TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')), ''), 'Particular') AS cliente,
-             p.nombre AS material, p.unidad_medida AS unidad,
+             ${SQL_DESCRIPCION_DETALLE} AS material, ${SQL_UNIDAD_DETALLE} AS unidad,
              d.cantidad_pedida AS cantidad, d.precio_unitario AS precio_unit,
              (d.cantidad_pedida * d.precio_unitario) AS importe
       FROM op_detalle_material d

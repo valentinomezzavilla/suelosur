@@ -7,6 +7,7 @@
 const { query, transaction } = require('../config/db')
 const { textoDestino } = require('../utils/destino')
 const { importesVenta } = require('./ventas.model')
+const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 
 const TIPO_LABEL = { M: 'Venta de áridos', C: 'Alquiler de contenedor', MA: 'Alquiler de maquinaria' }
 
@@ -57,7 +58,8 @@ const RemitosModel = {
 
     if (op.tipo_op === 'M') {
       const dets = (await query(`
-        SELECT d.cantidad_pedida, d.precio_unitario, p.nombre AS producto, p.unidad_medida
+        SELECT d.cantidad_pedida, d.precio_unitario,
+               ${SQL_DESCRIPCION_DETALLE} AS producto, ${SQL_UNIDAD_DETALLE} AS unidad_medida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         WHERE d.id_orden_pedido = ?
       `, [opId])).rows

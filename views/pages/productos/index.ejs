@@ -36,8 +36,27 @@
       <tbody>
         <% productos.forEach(p => { %>
         <tr class="<%= !p.activo ? 'text-muted' : '' %>">
-          <td class="fw-semibold"><%= p.nombre %></td>
+          <td class="fw-semibold">
+            <%= p.nombre %>
+            <% if (p.es_contenedor) { %><span class="badge rounded-pill badge-en-transito ms-1">Contenedor</span><% } %>
+          </td>
           <td><small class="text-muted"><%= p.unidad_medida %></small></td>
+          <% if (p.es_contenedor) { %>
+            <%# El contenedor no usa precio cantera/viaje: el precio por día sale del rango
+                (el mismo en los dos canales). %>
+            <% const rs = p.rangos || [] %>
+            <td class="text-end" colspan="2">
+              <% if (!rs.length) { %>
+                <small class="text-danger">Sin rangos de precio</small>
+              <% } else { rs.forEach(r => { %>
+                <div class="small text-nowrap">
+                  <span class="text-muted"><%= r.dias_hasta == null ? `${r.dias_desde}+ días` : `${r.dias_desde}–${r.dias_hasta} días` %>:</span>
+                  $<%= Number(r.precio_dia).toLocaleString('es-AR') %>/día
+                </div>
+              <% }) } %>
+            </td>
+            <td class="text-end text-muted col-w-100" title="El contenedor no mueve stock">—</td>
+          <% } else { %>
           <td class="text-end col-w-140">$<%= Number(p.precio_cantera || 0).toLocaleString('es-AR') %></td>
           <td class="text-end col-w-140">$<%= Number(p.precio_viaje || 0).toLocaleString('es-AR') %></td>
           <%# Disponible = en planta menos lo comprometido. En cero va apagado para
@@ -46,6 +65,7 @@
           <td class="text-end fw-semibold col-w-100 <%= disp > 0 ? 'text-orange' : 'text-muted' %>">
             <%= disp.toFixed(2) %>
           </td>
+          <% } %>
           <td class="text-center">
             <% if (p.activo) { %>
               <span class="badge rounded-pill px-3 badge-activo">Activo</span>

@@ -743,6 +743,44 @@ async function initDB() {
   // hasta que se entregaba.
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS precio_flete REAL`).catch(() => {})
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS monto_total REAL`).catch(() => {})
+
+  // Contenedor como producto: se vende de a UNO por operación, su unidad es "Días" y el
+  // precio por día depende del rango en que cae el alquiler (producto_precios_dias).
+  // No mueve stock: se alquila y vuelve.
+  const tieneFlagContenedor = (await pool.query(`
+    SELECT 1 FROM information_schema.columns WHERE table_name = 'productos' AND column_name = 'es_contenedor'
+  `)).rowCount > 0
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS es_contenedor INTEGER NOT NULL DEFAULT 0`).catch(() => {})
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS producto_precios_dias (
+      id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_producto BIGINT NOT NULL REFERENCES productos(id) ON DELETE CASCADE,
+      dias_desde  INTEGER NOT NULL,
+      dias_hasta  INTEGER,
+      precio_dia  REAL NOT NULL
+    )
+  `)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_producto_precios_dias_prod ON producto_precios_dias(id_producto)`)
+  // Renglón de venta de un contenedor: cantidad 1, cuántos días y a qué precio por día.
+  // dias IS NOT NULL es lo que marca al renglón como contenedor (no mueve stock).
+  await pool.query(`ALTER TABLE op_detalle_material ADD COLUMN IF NOT EXISTS dias INTEGER`).catch(() => {})
+  await pool.query(`ALTER TABLE op_detalle_material ADD COLUMN IF NOT EXISTS precio_dia REAL`).catch(() => {})
+  // Una sola vez (al crear la columna): los productos "contenedor" que ya estaban
+  // cargados pasan a ser contenedor, con un único rango (1 día en adelante) a su precio.
+  if (!tieneFlagContenedor) {
+    await pool.query(`
+      UPDATE productos SET es_contenedor = 1, unidad_medida = 'Días'
+      WHERE nombre ILIKE '%contenedor%'
+    `).catch(e => console.error('Backfill es_contenedor:', e.message))
+    await pool.query(`
+      INSERT INTO producto_precios_dias (id_producto, dias_desde, dias_hasta, precio_dia)
+      SELECT p.id, 1, NULL, GREATEST(COALESCE(p.precio_viaje, 0), COALESCE(p.precio_cantera, 0))
+      FROM productos p
+      WHERE p.es_contenedor = 1
+        AND NOT EXISTS (SELECT 1 FROM producto_precios_dias r WHERE r.id_producto = p.id)
+    `).catch(e => console.error('Backfill producto_precios_dias:', e.message))
+  }
+
   // Backfill: las ventas ya entregadas tienen el total real en su transacción.
   await pool.query(`
     UPDATE op_encabezado op SET monto_total = t.monto

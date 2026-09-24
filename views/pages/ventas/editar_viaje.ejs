@@ -82,19 +82,37 @@
                         <label>Producto</label>
                         <input type="text" value="<%= viaje.productoNombre %>" readonly class="input-readonly">
                     </div>
+                    <% if (viaje.esContenedor) { %>
+                    <%# Contenedor: siempre 1 por operación; se editan los días %>
+                    <div class="form-group">
+                        <label for="dias">Días *</label>
+                        <input type="number" name="dias" id="dias" value="<%= viaje.dias %>" min="1" step="1" required>
+                        <p class="form-hint">Contenedor: va uno solo por operación y no mueve stock. Al cambiar los días se aplica el precio por día del rango.</p>
+                    </div>
+                    <% } else { %>
                     <div class="form-group">
                         <label for="cantidad">Cantidad *</label>
                         <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="1" required>
                         <p class="form-hint">Cambiar la cantidad ajusta el stock del producto.</p>
                     </div>
+                    <% } %>
                 </div>
 
                 <div class="form-section">
                     <h3 class="form-section__title">Precios</h3>
+                    <% if (viaje.esContenedor) { %>
+                    <div class="form-group">
+                        <label for="precioDia">Precio por día</label>
+                        <input type="number" name="precioDia" id="precioDia" value="<%= viaje.precioDia %>" min="0" step="any"
+                               data-rangos="<%= JSON.stringify(viaje.rangos || []) %>">
+                        <p class="form-hint" id="hintPrecioDia"></p>
+                    </div>
+                    <% } else { %>
                     <div class="form-group">
                         <label for="precioProducto">Precio unitario</label>
                         <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="any">
                     </div>
+                    <% } %>
                     <div class="form-group">
                         <label for="subtotalEditar">Subtotal producto</label>
                         <input type="text" id="subtotalEditar" readonly class="input-readonly">
@@ -140,8 +158,10 @@
 
 <script>
 (function () {
-    const cant = document.getElementById('cantidad')
-    const precio = document.getElementById('precioProducto')
+    // Contenedor: "cantidad" son los días y "precio" el precio por día
+    const cant = document.getElementById('cantidad') || document.getElementById('dias')
+    const precio = document.getElementById('precioProducto') || document.getElementById('precioDia')
+    const esContenedor = precio.id === 'precioDia'
     const flete = document.getElementById('precioFlete')
     const total = document.getElementById('precioTotal')
     const subtotal = document.getElementById('subtotalEditar')
@@ -154,6 +174,22 @@
         if (!check.checked) total.value = Math.round((sub + (Number(flete.value) || 0)) * 100) / 100
     }
     ;[cant, precio, flete].forEach(el => el.addEventListener('input', calcular))
+
+    // Al cambiar los días del contenedor se aplica el precio por día del rango que corresponde
+    if (esContenedor) {
+        let rangos = []
+        try { rangos = JSON.parse(precio.dataset.rangos || '[]') } catch (_) {}
+        const hint = document.getElementById('hintPrecioDia')
+        cant.addEventListener('input', () => {
+            const n = Number(cant.value)
+            const r = Number.isInteger(n) && n >= 1
+                ? rangos.find(x => n >= Number(x.dias_desde) && (x.dias_hasta == null || n <= Number(x.dias_hasta)))
+                : null
+            if (r) precio.value = Number(r.precio_dia)
+            if (hint) hint.textContent = r ? `Rango aplicado: $${Number(r.precio_dia).toLocaleString('es-AR')}/día` : 'No hay rango de precio para esos días: cargá el precio por día a mano.'
+            calcular()
+        })
+    }
     check.addEventListener('change', () => {
         total.readOnly = !check.checked
         if (check.checked) total.focus()

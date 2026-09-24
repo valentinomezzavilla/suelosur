@@ -7,6 +7,8 @@ const AsignacionesModel = require('../models/asignaciones.model')
 const { query }         = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 const { textoDestino } = require('../utils/destino')
+const ProductosModel    = require('../models/productos.model')
+const { cotizarContenedor, MAX_CONTENEDORES_POR_OP } = require('../utils/contenedor')
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
@@ -21,16 +23,43 @@ function fechaRetroactiva(fecha) {
 // El precio unitario de una venta NUNCA sale de lo que mande el formulario: siempre se
 // relee del catálogo según el canal (cantera / viaje), así no importa qué haya llegado
 // en el POST (un precio viejo en caché, o alguien tocando el request a mano).
+// Los contenedores traen además sus rangos de precio por día (iguales en los dos canales).
 const COLUMNA_PRECIO = { cantera: 'precio_cantera', viaje: 'precio_viaje' }
-async function preciosDeCatalogo(canal, idsProducto) {
+async function catalogo(canal, idsProducto) {
   const columna = COLUMNA_PRECIO[canal]
   const ids = [...new Set(idsProducto.map(String))].filter(Boolean)
   if (!ids.length) return {}
-  const rows = (await query(`SELECT id, ${columna} AS precio FROM productos WHERE id = ANY(?)`, [ids])).rows
+  const rows = (await query(`SELECT id, nombre, es_contenedor, ${columna} AS precio FROM productos WHERE id = ANY(?)`, [ids])).rows
+  const rangos = await ProductosModel.rangosDe(rows.filter(r => r.es_contenedor).map(r => r.id))
   const map = {}
-  rows.forEach(r => { map[String(r.id)] = Number(r.precio) || 0 })
+  rows.forEach(r => {
+    map[String(r.id)] = {
+      nombre: r.nombre,
+      precio: Number(r.precio) || 0,
+      esContenedor: !!r.es_contenedor,
+      rangos: rangos[String(r.id)] || [],
+    }
+  })
   return map
 }
+
+// Renglón de venta de un contenedor: siempre 1, con los días y el precio del rango.
+// Devuelve { detalle } o { error }.
+function detalleContenedor(idProducto, prod, dias) {
+  const cot = cotizarContenedor(prod.rangos, dias)
+  if (cot.error) return { error: `${prod.nombre}: ${cot.error}` }
+  return {
+    detalle: {
+      id_producto:     idProducto,
+      cantidad_pedida: 1,
+      precio_unitario: cot.subtotal,
+      dias:            cot.dias,
+      precio_dia:      cot.precio_dia,
+    },
+  }
+}
+
+const MSG_UN_CONTENEDOR = `Solo se puede cargar ${MAX_CONTENEDORES_POR_OP} contenedor por operación.`
 
 // Remito cargado a mano al crear la venta (el del talonario). Vacío = se asigna el
 // siguiente de la secuencia. Devuelve { nro } o { error }.
@@ -107,20 +136,33 @@ const VentasController = {
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
 
       // Precio cantera siempre desde el catálogo, nunca el que mandó el formulario.
-      const preciosCantera = await preciosDeCatalogo('cantera', carrito.map(p => p.id))
-      carrito = carrito.map(p => ({ ...p, precio: preciosCantera[String(p.id)] ?? 0 }))
+      const cat = await catalogo('cantera', carrito.map(p => p.id))
+      if (carrito.some(p => !cat[String(p.id)])) {
+        req.flash('error', 'Hay un producto del carrito que ya no existe.'); return res.redirect('/ventas/cantera')
+      }
+      // Contenedor: uno solo por operación, cantidad 1, precio por días según el rango
+      if (carrito.filter(p => cat[String(p.id)].esContenedor).length > MAX_CONTENEDORES_POR_OP) {
+        req.flash('error', MSG_UN_CONTENEDOR); return res.redirect('/ventas/cantera')
+      }
+      const detalles = []
+      for (const p of carrito) {
+        const prod = cat[String(p.id)]
+        if (prod.esContenedor) {
+          const r = detalleContenedor(p.id, prod, Number(p.dias))
+          if (r.error) { req.flash('error', r.error); return res.redirect('/ventas/cantera') }
+          detalles.push({ ...r.detalle, nombre: prod.nombre })
+        } else {
+          const cantidad = Number(p.cantidad)
+          if (!(cantidad > 0)) { req.flash('error', `Cantidad inválida para ${prod.nombre}.`); return res.redirect('/ventas/cantera') }
+          detalles.push({ id_producto: p.id, cantidad_pedida: cantidad, precio_unitario: prod.precio, nombre: prod.nombre })
+        }
+      }
 
-      const total  = precioTotal ? Number(precioTotal) : carrito.reduce((a, p) => a + p.precio * p.cantidad, 0)
+      const total  = precioTotal ? Number(precioTotal) : detalles.reduce((a, d) => a + d.precio_unitario * d.cantidad_pedida, 0)
       const nombre = clienteNombre || 'Particular'
       const obsUser = (req.body.observaciones || '').trim()
-      const detalleCarrito = carrito.map(p => `${p.nombre} x${p.cantidad}`).join(', ')
+      const detalleCarrito = detalles.map(d => d.dias != null ? `${d.nombre} (${d.dias} días) x1` : `${d.nombre} x${d.cantidad_pedida}`).join(', ')
       const desc   = obsUser ? `${detalleCarrito} — ${obsUser}` : detalleCarrito
-
-      const detalles = carrito.map(p => ({
-        id_producto:     p.id,
-        cantidad_pedida: p.cantidad,
-        precio_unitario: p.precio,
-      }))
 
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
         id_cliente:          clienteIdClean,
@@ -262,24 +304,33 @@ const VentasController = {
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/viaje') }
 
-      const cantidadNum = Number(cantidad) || 1
       const esFinalizarAhora = finalizarAhora === 'true'
       const destino   = textoDestino({ calle, numero, obra })
       const flete     = Math.max(0, Number(precioFlete) || 0)
 
       // Precio viaje siempre desde el catálogo, nunca el que mandó el formulario.
-      const preciosViaje = await preciosDeCatalogo('viaje', [productoId])
-      let precioUnitarioProducto = preciosViaje[String(productoId)] ?? 0
+      const prod = (await catalogo('viaje', [productoId]))[String(productoId)]
+      if (!prod) { req.flash('error', 'Elegí un producto.'); return res.redirect('/ventas/viaje') }
+      let detalle
+      if (prod.esContenedor) {
+        // Contenedor: cantidad 1 siempre; lo que se carga son los días
+        const r = detalleContenedor(productoId, prod, Number(req.body.dias))
+        if (r.error) { req.flash('error', r.error); return res.redirect('/ventas/viaje') }
+        detalle = r.detalle
+      } else {
+        detalle = { id_producto: productoId, cantidad_pedida: Number(cantidad) || 1, precio_unitario: prod.precio }
+      }
       // Salvo que se haya tildado "Editar" en el subtotal: ahí manda lo que se cargó.
       const subtotalEditado = Number(subtotalManual)
       if (editarSubtotal === '1' && String(subtotalManual ?? '').trim() !== '' && subtotalEditado >= 0) {
-        precioUnitarioProducto = subtotalEditado / cantidadNum
+        detalle.precio_unitario = subtotalEditado / detalle.cantidad_pedida
+        if (detalle.dias) detalle.precio_dia = subtotalEditado / detalle.dias
       }
       // Total pactado: el que manda el formulario (puede estar editado a mano);
       // si no llegó, productos + flete.
       const total = String(precioTotal ?? '').trim() !== ''
         ? Math.max(0, Number(precioTotal) || 0)
-        : precioUnitarioProducto * cantidadNum + flete
+        : detalle.precio_unitario * detalle.cantidad_pedida + flete
 
       // Crear OP tipo M con modalidad flete
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
@@ -299,11 +350,7 @@ const VentasController = {
         precio_flete:        flete,
         monto_total:         total,
         nro_remito:          remito.nro,
-        detalles: [{
-          id_producto:     productoId,
-          cantidad_pedida: cantidadNum,
-          precio_unitario: precioUnitarioProducto,
-        }],
+        detalles: [detalle],
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 

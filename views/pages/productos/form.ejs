@@ -1,3 +1,11 @@
+<%
+  const esCont = !!producto?.es_contenedor
+  const unidades = ['Tonelada','m³','Camión','Hora','Día','Otro']
+  const unidadActual = producto?.unidad_medida || 'Tonelada'
+  if (!esCont && !unidades.includes(unidadActual)) unidades.push(unidadActual)
+  // Rangos a mostrar: los guardados, o uno vacío para arrancar
+  const rangos = (producto?.rangos && producto.rangos.length) ? producto.rangos : [{ dias_hasta: null, precio_dia: '' }]
+%>
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> <%= titulo %></h4>
   <a href="/productos" class="btn btn-sm btn-outline-secondary">← Volver</a>
@@ -5,7 +13,7 @@
 
 <div class="card shadow-sm maxw-480">
   <div class="card-body">
-    <form action="<%= producto ? `/productos/${producto.id}?_method=PUT` : '/productos' %>" method="POST">
+    <form action="<%= producto?.id ? `/productos/${producto.id}?_method=PUT` : '/productos' %>" method="POST" id="formProducto">
 
       <div class="mb-3">
         <label class="form-label">Nombre del producto *</label>
@@ -15,15 +23,23 @@
       </div>
 
       <div class="mb-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="es_contenedor" value="1" id="esContenedor" <%= esCont ? 'checked' : '' %>>
+          <label class="form-check-label fw-semibold" for="esContenedor">Es contenedor</label>
+        </div>
+        <small class="text-muted">Se vende de a <strong>uno</strong> por operación, se cobra por días según el rango y no mueve stock.</small>
+      </div>
+
+      <div class="mb-3" id="bloqueUnidad" <%- esCont ? 'style="display:none"' : '' %>>
         <label class="form-label">Unidad de medida</label>
         <select name="unidad_medida" class="form-select">
-          <% ['Tonelada','m³','Camión','Hora','Día','Otro'].forEach(u => { %>
-            <option value="<%= u %>" <%= (producto?.unidad_medida || 'Tonelada') === u ? 'selected' : '' %>><%= u %></option>
+          <% unidades.forEach(u => { %>
+            <option value="<%= u %>" <%= unidadActual === u ? 'selected' : '' %>><%= u %></option>
           <% }) %>
         </select>
       </div>
 
-      <div class="row g-3 mb-4">
+      <div class="row g-3 mb-4" id="bloquePrecios" <%- esCont ? 'style="display:none"' : '' %>>
         <div class="col-sm-6">
           <label class="form-label">Precio Cantera ($)</label>
           <input type="number" name="precio_cantera" class="form-control text-end"
@@ -40,9 +56,41 @@
         </div>
       </div>
 
+      <div class="mb-4" id="bloqueRangos" <%- esCont ? '' : 'style="display:none"' %>>
+        <label class="form-label mb-1">Precio por día según rango</label>
+        <p class="small text-muted mb-2">Unidad de medida: <strong>Días</strong>. El total es días × precio por día del rango en que cae el alquiler. Dejá vacío el "hasta" del último rango para que valga "en adelante". Se usa igual en cantera y en viaje.</p>
+        <table class="table table-sm align-middle mb-2">
+          <thead>
+            <tr>
+              <th class="col-w-100">Desde (días)</th>
+              <th class="col-w-100">Hasta (días)</th>
+              <th class="text-end">Precio / día ($)</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="rangosBody">
+            <% rangos.forEach(r => { %>
+            <tr class="rango-fila">
+              <td><span class="rango-desde text-muted">1</span></td>
+              <td><input type="number" name="rango_hasta" class="form-control form-control-sm" min="1" step="1" placeholder="∞" value="<%= r.dias_hasta ?? '' %>"></td>
+              <td><input type="number" name="rango_precio" class="form-control form-control-sm text-end" min="0" step="0.01" value="<%= r.precio_dia ?? '' %>"></td>
+              <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger rango-quitar" title="Quitar rango">✕</button></td>
+            </tr>
+            <% }) %>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnAgregarRango">+ Agregar rango</button>
+        <div class="d-flex align-items-center gap-2 mt-3">
+          <label class="small text-muted mb-0" for="simDias">Probar:</label>
+          <input type="number" id="simDias" class="form-control form-control-sm maxw-80" min="1" step="1" value="7">
+          <span class="small text-muted">días →</span>
+          <span class="small fw-semibold" id="simResultado"></span>
+        </div>
+      </div>
+
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-naranja px-4">
-          <%= producto ? 'Guardar cambios' : 'Crear producto' %>
+          <%= producto?.id ? 'Guardar cambios' : 'Crear producto' %>
         </button>
         <a href="/productos" class="btn btn-outline-secondary">Cancelar</a>
       </div>
@@ -50,3 +98,63 @@
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  const check   = document.getElementById('esContenedor')
+  const unidad  = document.getElementById('bloqueUnidad')
+  const precios = document.getElementById('bloquePrecios')
+  const bloque  = document.getElementById('bloqueRangos')
+  const body    = document.getElementById('rangosBody')
+  const simDias = document.getElementById('simDias')
+  const simRes  = document.getElementById('simResultado')
+  const plata   = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+
+  function toggle() {
+    const c = check.checked
+    unidad.style.display  = c ? 'none' : ''
+    precios.style.display = c ? 'none' : ''
+    bloque.style.display  = c ? '' : 'none'
+  }
+
+  // Cada rango arranca donde termina el anterior (+1). El primero arranca en 1.
+  function leerRangos() {
+    let desde = 1
+    return Array.from(body.querySelectorAll('.rango-fila')).map(tr => {
+      const hasta = tr.querySelector('[name=rango_hasta]').value.trim()
+      const precio = Number(tr.querySelector('[name=rango_precio]').value) || 0
+      tr.querySelector('.rango-desde').textContent = desde
+      const r = { desde, hasta: hasta === '' ? null : Number(hasta), precio }
+      desde = (r.hasta == null ? desde : r.hasta) + 1
+      return r
+    })
+  }
+
+  function refrescar() {
+    const rangos = leerRangos()
+    const n = Number(simDias.value)
+    const r = rangos.find(x => n >= x.desde && (x.hasta == null || n <= x.hasta))
+    simRes.textContent = !Number.isInteger(n) || n < 1 ? '' : (r ? `${n} × ${plata(r.precio)} = ${plata(n * r.precio)}` : 'sin rango para esos días')
+  }
+
+  document.getElementById('btnAgregarRango').addEventListener('click', () => {
+    const tr = body.querySelector('.rango-fila').cloneNode(true)
+    tr.querySelectorAll('input').forEach(i => { i.value = '' })
+    body.appendChild(tr)
+    refrescar()
+  })
+  body.addEventListener('click', (e) => {
+    const btn = e.target.closest('.rango-quitar')
+    if (!btn) return
+    const filas = body.querySelectorAll('.rango-fila')
+    if (filas.length === 1) { filas[0].querySelectorAll('input').forEach(i => { i.value = '' }) }
+    else btn.closest('tr').remove()
+    refrescar()
+  })
+  body.addEventListener('input', refrescar)
+  simDias.addEventListener('input', refrescar)
+  check.addEventListener('change', toggle)
+  toggle()
+  refrescar()
+})()
+</script>
