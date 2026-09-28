@@ -1,6 +1,7 @@
 'use strict'
 const ContenedoresModel = require('../models/contenedores.model')
 const AlquileresModel   = require('../models/alquileres.model')
+const ClientesModel     = require('../models/clientes.model')
 const paginar           = require('../utils/paginar')
 
 const ContenedoresController = {
@@ -140,6 +141,11 @@ const ContenedoresController = {
       if (!metodo_pago_final) {
         req.flash('error', 'Elegí un método de pago para cerrar el cobro.')
         return res.redirect(back)
+      }
+      if (metodo_pago_final === 'saldo_a_favor') {
+        const alquiler = await AlquileresModel.obtener(req.params.id)
+        const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
       }
       const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
       if (monto == null) {

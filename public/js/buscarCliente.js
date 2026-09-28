@@ -11,6 +11,8 @@
     const hiddenId        = document.getElementById('inputClienteId');
     const hiddenNombre    = document.getElementById('inputClienteNombre');
     const opcionCC        = document.getElementById('opcionCuentaCorriente');
+    const opcionSaldoFavor = document.getElementById('opcionSaldoFavor');
+    const hintSaldoFavor   = document.getElementById('hintSaldoFavor');
 
     if (!input) return;
 
@@ -34,10 +36,21 @@
         if (divCrear)  divCrear.style.display = 'none';
         divSeleccionado.style.display = 'flex';
 
+        const select = document.getElementById('metodoPago');
         if (opcionCC) {
             opcionCC.style.display = c.cuentaCorriente ? '' : 'none';
-            const select = document.getElementById('metodoPago');
             if (select && select.value === 'cuenta_corriente' && !c.cuentaCorriente) select.value = 'efectivo';
+        }
+        if (opcionSaldoFavor) {
+            const tieneSaldoFavor = Number(c.saldoFavor) > 0;
+            opcionSaldoFavor.style.display = tieneSaldoFavor ? '' : 'none';
+            if (select && select.value === 'saldo_a_favor' && !tieneSaldoFavor) select.value = 'efectivo';
+            if (hintSaldoFavor) {
+                hintSaldoFavor.style.display = tieneSaldoFavor ? '' : 'none';
+                if (tieneSaldoFavor) {
+                    hintSaldoFavor.textContent = `${c.nombreCompleto} tiene $${Number(c.saldoFavor).toLocaleString('es-AR')} de saldo a favor.`;
+                }
+            }
         }
         document.dispatchEvent(new CustomEvent('clienteSeleccionado', { detail: c }));
     }
@@ -51,6 +64,8 @@
         ocultarDropdown();
         input.value = '';
         if (opcionCC) opcionCC.style.display = 'none';
+        if (opcionSaldoFavor) opcionSaldoFavor.style.display = 'none';
+        if (hintSaldoFavor) hintSaldoFavor.style.display = 'none';
         document.dispatchEvent(new CustomEvent('clienteDeseleccionado'));
     }
 

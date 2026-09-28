@@ -563,6 +563,14 @@ const AlquileresModel = {
         id_op_encabezado: op.id,
       })
     }
+    if (metodoPago === 'saldo_a_favor' && op.id_cliente) {
+      await ClientesModel.agregarMovimiento(op.id_cliente, {
+        tipo: 'uso_saldo_favor',
+        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
+        monto: -monto,
+        id_op_encabezado: op.id,
+      })
+    }
     return monto
   },
 
@@ -571,7 +579,8 @@ const AlquileresModel = {
   // de pago real: pendientes de cobro. Alimenta el submódulo de Cobranzas.
   async pendientesDeCobro() {
     return (await query(`
-      SELECT op.id, op.nro_op, op.nro_remito, ${nombreCompleto('cli')} AS cliente_nombre,
+      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, ${nombreCompleto('cli')} AS cliente_nombre,
+             GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,
              oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
              (SELECT MIN(m.fecha_movimiento) FROM movimiento_contenedor m
                 WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible') AS fecha_retiro

@@ -56,6 +56,10 @@ const AlquileresController = {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
         if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/contenedores/nuevo') }
       }
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteIdClean)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/alquileres/contenedores/nuevo') }
+      }
 
       // Destino: se exige dirección (calle) u obra, al menos uno.
       if (!(calle || '').trim() && !(obra || '').trim()) {
@@ -222,6 +226,7 @@ const AlquileresController = {
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),
         recursosEditable: alquiler.estado !== 'anulado',
         diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),
+        saldoFavorCliente: Math.max(0, Number(clienteAlq?.saldo) || 0),
         cierre: alquiler.detalle ? await AlquileresModel.datosCierre(alquiler.id) : null,
       })
     } catch (err) {

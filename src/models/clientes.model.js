@@ -150,6 +150,15 @@ const ClientesModel = {
     await query(`UPDATE clientes SET cuenta_corriente = 1 WHERE id = ?`, [id])
   },
 
+  // Devuelve null si el cliente puede pagar usando su saldo a favor, o el mensaje de error.
+  async errorSaldoFavor(clienteId) {
+    if (!clienteId) return 'Para usar saldo a favor hay que elegir un cliente (no puede ser "particular").'
+    const c = (await query(`SELECT nombre, saldo, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+    if (!c) return 'El cliente no existe.'
+    if (!(Number(c.saldo) > 0)) return `${c.nombre} no tiene saldo a favor. Elegí otro método de pago.`
+    return null
+  },
+
   async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }) {
     const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null])
@@ -193,7 +202,7 @@ const ClientesModel = {
     if (!clientesIds.length) return {}
 
     const movs = (await query(
-      `SELECT cliente_id, id_op_encabezado, monto FROM movimientos_cuenta
+      `SELECT cliente_id, id_op_encabezado, monto, tipo FROM movimientos_cuenta
        WHERE cliente_id IN (${clientesIds.map(() => '?').join(',')})
        ORDER BY cliente_id, created_at ASC, id ASC`,
       clientesIds
@@ -205,7 +214,10 @@ const ClientesModel = {
     for (const m of movs) {
       if (m.cliente_id !== clienteActual) { clienteActual = m.cliente_id; cola = [] }
       const monto = Number(m.monto)
-      if (monto < 0) {
+      // 'uso_saldo_favor' se paga en el momento con crédito ya acumulado: no es una
+      // deuda pendiente, así que no entra en la cola (si entrara, quedaría esperando
+      // para siempre un pago futuro que no va a llegar).
+      if (monto < 0 && m.tipo !== 'uso_saldo_favor') {
         const entrada = { idOp: m.id_op_encabezado, restante: -monto }
         cola.push(entrada)
         if (m.id_op_encabezado) deudas[m.id_op_encabezado] = { total: entrada.restante, pagado: 0 }
@@ -235,14 +247,19 @@ const ClientesModel = {
   // regla que saldadaPorOperacion y que el saldo corrido del estado de cuenta).
   async pendientePorCargo(clienteId) {
     const movs = (await query(
-      `SELECT id, monto FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at ASC, id ASC`, [clienteId]
+      `SELECT id, monto, tipo FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at ASC, id ASC`, [clienteId]
     )).rows
     const restante = {}
     const cola = []
     let aFavor = 0 // pagos adelantados: cubren los cargos que vengan después
     for (const m of movs) {
       const monto = Number(m.monto)
-      if (monto < 0) {
+      // 'uso_saldo_favor' se paga en el momento con crédito ya acumulado: no es un
+      // cargo pendiente, así que no entra en la cola de FIFO (y no le come pagos
+      // futuros a los cargos reales que sí están esperando uno).
+      if (monto < 0 && m.tipo === 'uso_saldo_favor') {
+        restante[m.id] = 0
+      } else if (monto < 0) {
         const entrada = { id: m.id, resta: -monto }
         const usado = Math.min(aFavor, entrada.resta)
         entrada.resta -= usado

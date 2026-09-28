@@ -134,6 +134,10 @@ const VentasController = {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
         if (errCC) { req.flash('error', errCC); return res.redirect('/ventas/cantera') }
       }
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteIdClean)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/ventas/cantera') }
+      }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/cantera') }
       let carrito = []
@@ -304,6 +308,10 @@ const VentasController = {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteId || null)
         if (errCC) { req.flash('error', errCC); return res.redirect('/ventas/viaje') }
       }
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteId || null)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/ventas/viaje') }
+      }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/viaje') }
 
@@ -445,12 +453,14 @@ const VentasController = {
         req.flash('error', 'Solo se pueden editar viajes pendientes o despachados.')
         return res.redirect(`/ventas/${req.params.id}`)
       }
+      const clienteViaje = viaje.id_cliente ? await ClientesModel.obtener(viaje.id_cliente) : null
       res.render('pages/ventas/editar_viaje', {
         titulo: `Editar OP-${String(viaje.nro_op).padStart(4,'0')}`,
         viaje,
         calle: viaje.calle,
         numero: viaje.numero,
         zonas: await require('../models/zonas.model').listarActivas(),
+        saldoFavorCliente: Math.max(0, Number(clienteViaje?.saldo) || 0),
       })
     } catch (err) {
       console.error(err)

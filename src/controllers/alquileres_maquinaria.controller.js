@@ -49,6 +49,10 @@ const AlquileresMaquinariaController = {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
         if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/maquinaria/nuevo') }
       }
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteIdClean)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/alquileres/maquinaria/nuevo') }
+      }
 
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
       const { id: id_op, nro_op } = await AlquileresMaquinariaModel.crear({
@@ -168,6 +172,14 @@ const AlquileresMaquinariaController = {
           await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'deuda',
             descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')}`,
+            monto: -(alquiler.detalle?.precio_total || 0),
+            id_op_encabezado: alquiler.id,
+          })
+        }
+        if (alquiler.metodo_pago === 'saldo_a_favor' && alquiler.id_cliente) {
+          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
+            tipo: 'uso_saldo_favor',
+            descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
             monto: -(alquiler.detalle?.precio_total || 0),
             id_op_encabezado: alquiler.id,
           })

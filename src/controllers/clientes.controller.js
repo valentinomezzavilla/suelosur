@@ -276,6 +276,7 @@ const ClientesController = {
         dni: c.dni, telefono: c.telefono || c.tel_whatsapp,
         email: c.email, zona: c.zona || '', domicilio: c.domicilio_ppal || '',
         cuentaCorriente: !!c.cuenta_corriente,
+        saldoFavor: Math.max(0, Number(c.saldo) || 0),
       })))
     } catch (err) {
       console.error(err); res.status(500).json({ error: 'Error.' })

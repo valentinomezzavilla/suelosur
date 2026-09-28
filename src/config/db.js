@@ -99,7 +99,7 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS movimientos_cuenta (
       id          BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       cliente_id  BIGINT NOT NULL REFERENCES clientes(id),
-      tipo        TEXT NOT NULL CHECK (tipo IN ('deuda','pago','ajuste')),
+      tipo        TEXT NOT NULL CHECK (tipo IN ('deuda','pago','ajuste','uso_saldo_favor')),
       descripcion TEXT NOT NULL DEFAULT '',
       monto       REAL NOT NULL,
       created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
@@ -1467,10 +1467,27 @@ async function initDB() {
 
   // "A convenir una vez finalizado": el método de pago del alquiler se resuelve
   // recién al retirar el contenedor (una tarifa real o "pendiente de cobro").
+  // "saldo_a_favor": se paga con crédito que el cliente ya tiene acumulado en su cuenta.
   await pool.query(`ALTER TABLE op_encabezado DROP CONSTRAINT IF EXISTS op_encabezado_metodo_pago_check`).catch(() => {})
   await pool.query(`
     ALTER TABLE op_encabezado ADD CONSTRAINT op_encabezado_metodo_pago_check
-    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','a_convenir') OR metodo_pago IS NULL)
+    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','a_convenir','saldo_a_favor') OR metodo_pago IS NULL)
+  `).catch(() => {})
+
+  // Movimiento de cuenta por pagar con saldo a favor (consume crédito ya acumulado,
+  // en vez de generar deuda nueva como 'deuda').
+  await pool.query(`ALTER TABLE movimientos_cuenta DROP CONSTRAINT IF EXISTS movimientos_cuenta_tipo_check`).catch(() => {})
+  await pool.query(`
+    ALTER TABLE movimientos_cuenta ADD CONSTRAINT movimientos_cuenta_tipo_check
+    CHECK (tipo IN ('deuda','pago','ajuste','uso_saldo_favor'))
+  `).catch(() => {})
+
+  // Las transacciones (ingresos) registran el método de pago ya resuelto — nunca
+  // 'a_convenir' (se resuelve antes), pero sí puede quedar 'saldo_a_favor'.
+  await pool.query(`ALTER TABLE transacciones DROP CONSTRAINT IF EXISTS transacciones_metodo_pago_check`).catch(() => {})
+  await pool.query(`
+    ALTER TABLE transacciones ADD CONSTRAINT transacciones_metodo_pago_check
+    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','saldo_a_favor'))
   `).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')

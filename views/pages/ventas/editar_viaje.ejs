@@ -142,6 +142,9 @@
                             <option value="transferencia"    <%= viaje.metodoPago === 'transferencia' ? 'selected' : '' %>>Transferencia</option>
                             <option value="cheque"           <%= viaje.metodoPago === 'cheque' ? 'selected' : '' %>>Cheque</option>
                             <option value="cuenta_corriente" <%= viaje.metodoPago === 'cuenta_corriente' ? 'selected' : '' %>>Cuenta corriente</option>
+                            <% if (saldoFavorCliente > 0) { %>
+                              <option value="saldo_a_favor" <%= viaje.metodoPago === 'saldo_a_favor' ? 'selected' : '' %>>Usar saldo a favor del cliente ($<%= Math.round(saldoFavorCliente).toLocaleString('es-AR') %>)</option>
+                            <% } %>
                         </select>
                     </div>
                 </div>
