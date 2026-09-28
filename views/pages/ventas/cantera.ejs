@@ -14,7 +14,8 @@
             <ul class="ventas-lista-productos">
                 <% productos.forEach(p => { %>
                     <%
-                      const stock  = Number(p.disponible_real ?? p.stock ?? 0)
+                      const sinControlStock = p.depende_stock === 0 || p.depende_stock === false
+                      const stock  = sinControlStock ? 999999 : Number(p.disponible_real ?? p.stock ?? 0)
                       const precio = Number(p.precio_cantera ?? p.precio ?? 0)
                       const nombre = p.nombre || p.producto || ''
                     %>
@@ -42,12 +43,16 @@
                     </li>
                     <% return } %>
                     <li>
-                        <div class="ventas-card <%= stock <= 0 ? 'ventas-card--sin-stock' : '' %>">
+                        <div class="ventas-card <%= !sinControlStock && stock <= 0 ? 'ventas-card--sin-stock' : '' %>">
                             <div class="ventas-card__top">
                                 <span class="ventas-card__nombre"><%= nombre %></span>
+                                <% if (sinControlStock) { %>
+                                <span class="badge badge--con-stock">Servicio</span>
+                                <% } else { %>
                                 <span class="badge badge--<%= stock > 0 ? 'con-stock' : 'sin-stock' %>">
                                     <%= stock > 0 ? stock + ' ' + (p.unidad_medida || 'unid.') : 'Sin stock' %>
                                 </span>
+                                <% } %>
                             </div>
                             <div class="ventas-card__precio">$<%= precio.toLocaleString('es-AR') %></div>
                             <button
@@ -56,9 +61,9 @@
                                 data-nombre="<%= nombre %>"
                                 data-precio="<%= precio %>"
                                 data-stock="<%= stock %>"
-                                <%= stock <= 0 ? 'disabled' : '' %>
+                                <%= !sinControlStock && stock <= 0 ? 'disabled' : '' %>
                             >
-                                <%= stock <= 0 ? 'Sin stock' : '+ Agregar' %>
+                                <%= !sinControlStock && stock <= 0 ? 'Sin stock' : '+ Agregar' %>
                             </button>
                         </div>
                     </li>

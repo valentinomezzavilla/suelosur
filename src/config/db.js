@@ -781,6 +781,10 @@ async function initDB() {
     `).catch(e => console.error('Backfill producto_precios_dias:', e.message))
   }
 
+  // Productos "servicio disfrazado de producto" (igual que el contenedor, pero genérico):
+  // si depende_stock = 0, no llevan stock ni se controla disponibilidad al vender.
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS depende_stock INTEGER NOT NULL DEFAULT 1`).catch(() => {})
+
   // Número de operación (OP-0001…): secuencia que solo avanza. Antes era MAX(nro_op)+1,
   // y al borrar la última operación su número se volvía a usar (dos OP distintas con el
   // mismo número en el historial). Al arrancar se alinea con el máximo existente, sin

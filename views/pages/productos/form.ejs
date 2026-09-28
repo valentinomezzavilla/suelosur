@@ -1,5 +1,6 @@
 <%
   const esCont = !!producto?.es_contenedor
+  const dependeStock = producto ? !!producto.depende_stock : true
   const unidades = ['Tonelada','m³','Camión','Hora','Día','Otro']
   const unidadActual = producto?.unidad_medida || 'Tonelada'
   if (!esCont && !unidades.includes(unidadActual)) unidades.push(unidadActual)
@@ -28,6 +29,14 @@
           <label class="form-check-label fw-semibold" for="esContenedor">Es contenedor</label>
         </div>
         <small class="text-muted">Se vende de a <strong>uno</strong> por operación, se cobra por días según el rango y no mueve stock.</small>
+      </div>
+
+      <div class="mb-3" id="bloqueDependeStock" <%- esCont ? 'style="display:none"' : '' %>>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="depende_stock" value="1" id="dependeStock" <%= dependeStock ? 'checked' : '' %>>
+          <label class="form-check-label fw-semibold" for="dependeStock">Depende de stock disponible</label>
+        </div>
+        <small class="text-muted">Destildá esto para servicios cargados como producto (no necesitan stock ni aparecen en el módulo de Stock, y se pueden vender sin límite).</small>
       </div>
 
       <div class="mb-3" id="bloqueUnidad" <%- esCont ? 'style="display:none"' : '' %>>
@@ -104,6 +113,7 @@
   const check   = document.getElementById('esContenedor')
   const unidad  = document.getElementById('bloqueUnidad')
   const precios = document.getElementById('bloquePrecios')
+  const dependeStock = document.getElementById('bloqueDependeStock')
   const bloque  = document.getElementById('bloqueRangos')
   const body    = document.getElementById('rangosBody')
   const simDias = document.getElementById('simDias')
@@ -114,6 +124,7 @@
     const c = check.checked
     unidad.style.display  = c ? 'none' : ''
     precios.style.display = c ? 'none' : ''
+    dependeStock.style.display = c ? 'none' : ''
     bloque.style.display  = c ? '' : 'none'
   }
 

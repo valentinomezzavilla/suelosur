@@ -38,7 +38,7 @@ async function guardarRangos(q, id, esContenedor, rangos) {
   }
 }
 
-function valoresProducto({ nombre, unidad_medida, precio_cantera, precio_viaje, es_contenedor }) {
+function valoresProducto({ nombre, unidad_medida, precio_cantera, precio_viaje, es_contenedor, depende_stock }) {
   const esCont = !!es_contenedor
   return {
     esCont,
@@ -48,6 +48,7 @@ function valoresProducto({ nombre, unidad_medida, precio_cantera, precio_viaje, 
       esCont ? 0 : (parseFloat(precio_cantera) || 0),
       esCont ? 0 : (parseFloat(precio_viaje) || 0),
       esCont ? 1 : 0,
+      depende_stock === false ? 0 : 1,
     ],
   }
 }
@@ -88,8 +89,8 @@ const ProductosModel = {
   async crear(datos) {
     const { esCont, valores } = valoresProducto(datos)
     return await transaction(async (q) => {
-      const { rows } = await q(`INSERT INTO productos (nombre, unidad_medida, precio_cantera, precio_viaje, es_contenedor)
-                                VALUES (?, ?, ?, ?, ?) RETURNING id`, valores)
+      const { rows } = await q(`INSERT INTO productos (nombre, unidad_medida, precio_cantera, precio_viaje, es_contenedor, depende_stock)
+                                VALUES (?, ?, ?, ?, ?, ?) RETURNING id`, valores)
       const id = rows[0].id
       // Inicializar stock automáticamente
       await q(`INSERT INTO stock (id_producto) VALUES (?)`, [id])
@@ -101,7 +102,7 @@ const ProductosModel = {
   async actualizar(id, datos) {
     const { esCont, valores } = valoresProducto(datos)
     await transaction(async (q) => {
-      await q(`UPDATE productos SET nombre = ?, unidad_medida = ?, precio_cantera = ?, precio_viaje = ?, es_contenedor = ? WHERE id = ?`,
+      await q(`UPDATE productos SET nombre = ?, unidad_medida = ?, precio_cantera = ?, precio_viaje = ?, es_contenedor = ?, depende_stock = ? WHERE id = ?`,
         [...valores, id])
       await guardarRangos(q, id, esCont, datos.rangos)
     })

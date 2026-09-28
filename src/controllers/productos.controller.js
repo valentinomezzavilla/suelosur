@@ -8,7 +8,8 @@ const { normalizarRangos } = require('../utils/contenedor')
 function leerFormulario(body) {
   const { nombre, unidad_medida, precio_cantera, precio_viaje } = body
   const es_contenedor = body.es_contenedor === '1'
-  const datos = { nombre: (nombre || '').trim(), unidad_medida, precio_cantera, precio_viaje, es_contenedor, rangos: [] }
+  const depende_stock = body.depende_stock === '1'
+  const datos = { nombre: (nombre || '').trim(), unidad_medida, precio_cantera, precio_viaje, es_contenedor, depende_stock, rangos: [] }
   if (!datos.nombre) return { error: 'El nombre es obligatorio.', datos }
   if (es_contenedor) {
     const { rangos, error } = normalizarRangos(body.rango_hasta, body.rango_precio)
