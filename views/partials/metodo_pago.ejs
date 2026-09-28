@@ -8,7 +8,13 @@
             <option value="transferencia">Transferencia bancaria</option>
             <option value="cheque">Cheque</option>
             <option value="cuenta_corriente" id="opcionCuentaCorriente" style="display:none">Cuenta corriente</option>
+            <% if (typeof conAConvenir !== 'undefined' && conAConvenir) { %>
+                <option value="a_convenir">A convenir una vez finalizado</option>
+            <% } %>
         </select>
+        <% if (typeof conAConvenir !== 'undefined' && conAConvenir) { %>
+            <p class="form-hint">Con "A convenir" el método se define al retirar el contenedor: ahí hay que elegir uno o marcarlo pendiente de pago.</p>
+        <% } %>
     </div>
     <label class="toggle-row mt-2" for="paraFacturar">
         <input type="checkbox" name="paraFacturar" id="paraFacturar" value="1">

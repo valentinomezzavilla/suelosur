@@ -6,6 +6,7 @@ const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
 const ClientesModel = require('./clientes.model')
 const { textoDestino } = require('../utils/destino')
+const { sumarDiasHabiles } = require('../utils/diasHabiles')
 
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
@@ -41,9 +42,10 @@ function normalizarPlazo(plazo, porDefecto) {
 
 const AlquileresModel = {
 
-  // Auto-vence alquileres: los que llegaron a su fecha fin y siguen 'en_alquiler'
-  // pasan automáticamente a 'pendiente_retiro'. Idempotente (una vez marcado, ya no
-  // vuelve a matchear). Se llama al abrir el listado/detalle.
+  // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
+  // HÁBILES desde la entrega) y siguen 'en_alquiler' pasan automáticamente a
+  // 'pendiente_retiro' ("Para retirar"). Idempotente (una vez marcado, ya no vuelve a
+  // matchear). Se llama al abrir el listado/detalle de Alquileres y de Contenedores.
   async autoVencerAlquileres() {
     await query(`
       INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones)
@@ -54,7 +56,8 @@ const AlquileresModel = {
       JOIN (${SQL_MOV_ALQUILER}) ma ON ma.id_contenedor = lm.id_contenedor
       WHERE op.tipo_op = 'C' AND op.estado = 'entregado'
         AND lm.estado_paso = 'en_alquiler'
-        AND (COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) <= CURRENT_DATE
+        AND oc.plazo_alquiler IS NOT NULL
+        AND sumar_dias_habiles(COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) <= CURRENT_DATE
     `)
   },
 
@@ -68,8 +71,8 @@ const AlquileresModel = {
              cont.numero_contenedor,
              um.estado_paso AS contenedor_estado, um.fecha_movimiento AS fecha_ultimo_mov,
              ma.fecha_alquiler AS fecha_entrega_real,
-             (COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) AS fecha_fin_estimada,
-             ((COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date) + oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             sumar_dias_habiles(COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) AS fecha_fin_estimada,
+             (sumar_dias_habiles(COALESCE(LEFT(op.fecha_entrega_planificada, 10)::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
@@ -158,11 +161,10 @@ const AlquileresModel = {
       // Sin plazo definido no hay fecha de fin: el alquiler sigue por tiempo indeterminado.
       const sinPlazo = op.detalle.plazo_alquiler == null
       if (baseInicio && !sinPlazo) {
-        const ini = new Date(baseInicio + 'T00:00:00')
-        ini.setDate(ini.getDate() + op.detalle.plazo_alquiler)
-        op.fechaFinAlquiler = ini.toISOString().slice(0, 10)
+        op.fechaFinAlquiler = sumarDiasHabiles(baseInicio, op.detalle.plazo_alquiler)
         const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-        op.diasRestantes = Math.round((ini - hoy) / 86400000)
+        const fin = new Date(op.fechaFinAlquiler + 'T00:00:00')
+        op.diasRestantes = Math.round((fin - hoy) / 86400000)
       } else {
         op.fechaFinAlquiler = null; op.diasRestantes = null
       }
@@ -374,8 +376,8 @@ const AlquileresModel = {
              op.id AS alquiler_actual_id, op.nro_op,
              cli.nombre AS cliente_actual,
              oc.plazo_alquiler,
-             to_char(LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler, 'YYYY-MM-DD') AS fecha_liberacion,
-             ((LEFT(ma.fecha_alquiler, 10)::date + oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
+             to_char(sumar_dias_habiles(LEFT(ma.fecha_alquiler, 10)::date, oc.plazo_alquiler), 'YYYY-MM-DD') AS fecha_liberacion,
+             (sumar_dias_habiles(LEFT(ma.fecha_alquiler, 10)::date, oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
       FROM contenedores c
       JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
       JOIN op_detalle_contenedor oc ON oc.id_contenedor = c.id AND oc.id = um.id_op_contenedor
@@ -511,7 +513,14 @@ const AlquileresModel = {
   // Genera el ingreso del alquiler al cerrarlo (cuando se retira el contenedor).
   // `montoManual` permite ajustar el precio en el momento del cierre; si no viene,
   // usa la tarifa vigente. Si la operación ya tenía un ingreso, no hace nada.
-  async cobrarAlCerrar(id_op, montoManual) {
+  //
+  // `metodoPagoFinal` resuelve los alquileres cargados "a convenir una vez
+  // finalizado": si el método de pago pactado es 'a_convenir' y no viene uno acá,
+  // NO se genera el ingreso (el alquiler queda pendiente de cobro — aparece en el
+  // submódulo de Cobranzas hasta que se resuelva). El chofer (hoja de ruta) nunca
+  // manda este parámetro, así que un alquiler "a convenir" que él cierra queda
+  // pendiente automáticamente, sin bloquear su tarea.
+  async cobrarAlCerrar(id_op, montoManual, metodoPagoFinal) {
     if (await TransaccionesModel.existePorOperacion(id_op)) return null
     const op = (await query(`
       SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, cli.nombre AS cliente_nombre
@@ -519,6 +528,13 @@ const AlquileresModel = {
     `, [id_op])).rows[0]
     const cierre = await this.datosCierre(id_op)
     if (!op || !cierre) return null
+
+    let metodoPago = op.metodo_pago
+    if (metodoPago === 'a_convenir') {
+      if (!metodoPagoFinal) return null
+      metodoPago = metodoPagoFinal
+      await query(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodoPago, id_op])
+    }
 
     const manual = montoManual != null && String(montoManual).trim() !== ''
     const monto = manual ? (parseFloat(montoManual) || 0) : cierre.precioActual
@@ -533,9 +549,9 @@ const AlquileresModel = {
       tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: op.nro_remito,
       cliente_id: op.id_cliente, cliente: op.cliente_nombre, monto,
       descripcion: detalle + referencia,
-      metodo_pago: op.metodo_pago || 'efectivo',
+      metodo_pago: metodoPago || 'efectivo',
     })
-    if (op.metodo_pago === 'cuenta_corriente' && op.id_cliente) {
+    if (metodoPago === 'cuenta_corriente' && op.id_cliente) {
       await ClientesModel.agregarMovimiento(op.id_cliente, {
         tipo: 'deuda',
         descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
@@ -544,6 +560,26 @@ const AlquileresModel = {
       })
     }
     return monto
+  },
+
+  // Alquileres de contenedor "a convenir una vez finalizado" que ya se retiraron
+  // (el contenedor está de nuevo disponible) pero todavía no se les cargó el método
+  // de pago real: pendientes de cobro. Alimenta el submódulo de Cobranzas.
+  async pendientesDeCobro() {
+    return (await query(`
+      SELECT op.id, op.nro_op, op.nro_remito, cli.nombre AS cliente_nombre,
+             oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
+             (SELECT MIN(m.fecha_movimiento) FROM movimiento_contenedor m
+                WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible') AS fecha_retiro
+      FROM op_encabezado op
+      JOIN clientes cli ON cli.id = op.id_cliente
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      WHERE op.tipo_op = 'C' AND op.estado = 'entregado' AND op.metodo_pago = 'a_convenir'
+        AND EXISTS (SELECT 1 FROM movimiento_contenedor m WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible')
+        AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
+      ORDER BY fecha_retiro ASC NULLS LAST
+    `)).rows
   },
 
   // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor

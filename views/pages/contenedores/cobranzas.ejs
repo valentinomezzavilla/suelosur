@@ -1,0 +1,65 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Cobranzas de Contenedores</h4>
+    <small class="text-muted">Alquileres "a convenir una vez finalizado", ya retirados, sin método de pago cerrado.</small>
+  </div>
+  <a href="/contenedores" class="btn btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!pendientes.length) { %>
+      <%- include('../../partials/empty_state', { icono: '✅', mensaje: 'No hay cobros pendientes. Todo lo "a convenir" está cerrado.' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Contenedor</th>
+          <th>Cliente / OP</th>
+          <th>Domicilio</th>
+          <th>Retirado el</th>
+          <th class="text-end">Monto estimado</th>
+          <th>Cerrar cobro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% pendientes.forEach(p => { %>
+        <tr>
+          <td class="fw-semibold text-orange"><%= p.numero_contenedor ? 'N° ' + p.numero_contenedor : '—' %></td>
+          <td>
+            <small class="fw-semibold"><%= p.cliente_nombre %></small><br>
+            <small class="text-muted">OP-<%= String(p.nro_op).padStart(4,'0') %></small>
+          </td>
+          <td><small class="text-muted"><%= p.domicilio_entrega || '—' %></small></td>
+          <td><small class="text-muted"><%= p.fecha_retiro ? formatFecha(p.fecha_retiro) : '—' %></small></td>
+          <td class="text-end fw-semibold"><%= money(p.montoEstimado) %></td>
+          <td>
+            <form action="/contenedores/cobranzas/<%= p.id %>/resolver" method="POST"
+                  class="d-flex flex-wrap gap-2 align-items-end"
+                  onsubmit="return confirm('¿Registrar el cobro de OP-<%= String(p.nro_op).padStart(4,'0') %>?')">
+              <div>
+                <select name="metodo_pago_final" class="form-select form-select-sm" required style="min-width:160px">
+                  <option value="">Método de pago…</option>
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="cheque">Cheque</option>
+                  <option value="cuenta_corriente">Cuenta corriente</option>
+                </select>
+              </div>
+              <input type="number" step="0.01" min="0" name="precio_final" class="form-control form-control-sm"
+                     style="max-width:130px" value="<%= Math.round(p.montoEstimado) %>" title="Monto a cobrar">
+              <button type="submit" class="btn btn-sm btn-outline-success">Cobrar</button>
+              <a href="/alquileres/contenedores/<%= p.id %>" class="btn btn-sm btn-outline-secondary" title="Ver alquiler"><%- icon('eye', { size: 14 }) %></a>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>

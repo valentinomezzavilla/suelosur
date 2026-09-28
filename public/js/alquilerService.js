@@ -19,6 +19,19 @@ function formatFechaLocal(val) {
     return `${d}/${m}/${y}`;
 }
 
+// Suma N días hábiles (lun-vie) a una fecha. Espejo de sumar_dias_habiles (SQL) y de
+// src/utils/diasHabiles.js (Node) — mismo resultado en el navegador, el servidor y la base.
+function sumarDiasHabilesJS(fecha, dias) {
+    const d = new Date(fecha.getTime());
+    let restantes = dias;
+    while (restantes > 0) {
+        d.setDate(d.getDate() + 1);
+        const dow = d.getDay(); // 0 = domingo, 6 = sábado
+        if (dow !== 0 && dow !== 6) restantes--;
+    }
+    return d;
+}
+
 // ── Mapa (Leaflet / OSM via MapService) ───────────────────────
 const btnBuscar = document.getElementById('btnBuscarDireccion');
 const mapaDiv   = document.getElementById('mapaEntrega');
@@ -83,24 +96,27 @@ function permiteSinFechaFin() {
     return modoFinalizado() || clienteTieneCuentaCorriente() || inicioEsPasado();
 }
 
+// Recalcula la fecha de fin a partir del inicio y del plazo que le toca al cliente
+// (en días hábiles). Con cuenta corriente el plazo lo elige el botón que se haya
+// tocado (rowPlazoCC); por defecto arranca en el de cuenta corriente (el más largo).
+let plazoElegidoCC = null;
 function plazoDelCliente() {
-    return clienteTieneCuentaCorriente() ? plazosCfg.cuenta_corriente : plazosCfg.estandar;
+    if (clienteTieneCuentaCorriente()) return plazoElegidoCC || plazosCfg.cuenta_corriente;
+    return plazosCfg.estandar;
 }
 
-// Recalcula la fecha de fin a partir del inicio y del plazo que le toca al cliente.
 function aplicarFechaFinAutomatica() {
     if (!fechaInicio || !fechaFin) return;
     if (modoFinalizado() || fechaFinManual()) { fechaFin.readOnly = false; return; }
     fechaFin.readOnly = true;
     fechaFin.min = ''; fechaFin.max = '';
     if (!fechaInicio.value) { fechaFin.value = ''; return; }
-    const fin = new Date(fechaInicio.value + 'T00:00:00');
-    fin.setDate(fin.getDate() + plazoDelCliente());
+    const fin = sumarDiasHabilesJS(new Date(fechaInicio.value + 'T00:00:00'), plazoDelCliente());
     fechaFin.value = toInputDate(fin);
     if (plazoActual) {
         plazoActual.textContent = clienteTieneCuentaCorriente()
-            ? `Cliente con cuenta corriente: ${plazosCfg.cuenta_corriente} días.`
-            : `Cliente sin cuenta corriente: ${plazosCfg.estandar} días.`;
+            ? `Cliente con cuenta corriente: ${plazoDelCliente()} días hábiles.`
+            : `Cliente sin cuenta corriente: ${plazosCfg.estandar} días hábiles.`;
     }
 }
 
@@ -125,7 +141,29 @@ function sincronizarOpcionesDeFin() {
     if (avisoEnCurso) {
         avisoEnCurso.style.display = (inicioEsPasado() && !modoFinalizado()) ? '' : 'none';
     }
+    // Cuenta corriente: se puede elegir entre el plazo estándar (4) o el largo (10)
+    const rowPlazoCC = document.getElementById('rowPlazoCC');
+    const muestraCC = clienteTieneCuentaCorriente() && !modoFinalizado();
+    if (rowPlazoCC) rowPlazoCC.style.display = muestraCC ? '' : 'none';
+    if (!muestraCC) plazoElegidoCC = null;
 }
+
+// Botones de plazo (cuenta corriente): eligen 4 o 10 días hábiles con un clic. Fuerzan
+// el modo "editar fecha de fin manualmente" para que el servidor calcule el plazo a
+// partir de la fecha que se ve acá (si no, ignoraría el botón y usaría el default).
+function elegirPlazoCC(dias) {
+    if (!fechaInicio?.value) return;
+    plazoElegidoCC = dias;
+    if (checkEditarFechaFin) checkEditarFechaFin.checked = true;
+    if (fechaFin) {
+        fechaFin.readOnly = false;
+        fechaFin.value = toInputDate(sumarDiasHabilesJS(new Date(fechaInicio.value + 'T00:00:00'), dias));
+    }
+    if (plazoActual) plazoActual.textContent = `Elegido: ${dias} días hábiles.`;
+    actualizarResumen();
+}
+document.getElementById('btnPlazo4')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.estandar));
+document.getElementById('btnPlazo10')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.cuenta_corriente));
 
 // ── Precio editable (toggle) ──────────────────────────────────
 const checkEditarPrecio = document.getElementById('checkEditarPrecio');
@@ -201,7 +239,7 @@ function actualizarResumen() {
     if (elDir) elDir.textContent = calle && numero ? `${calle} ${numero}` : calle || '—';
 
     // método de pago
-    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' };
+    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', a_convenir: 'A convenir una vez finalizado' };
     const elPago  = document.getElementById('res-pago');
     if (elPago) elPago.textContent = pagoMap[metodoPagoEl?.value] || '—';
 }

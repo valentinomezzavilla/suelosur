@@ -1,6 +1,10 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 
+// Nombre completo del cliente (nombre + apellido) — antes se mostraba solo el nombre,
+// que para clientes particulares suele ser nada más que el nombre de pila.
+const nombreCompleto = (alias) => `NULLIF(TRIM(COALESCE(${alias}.nombre,'') || ' ' || COALESCE(${alias}.apellido,'')), '')`
+
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
     SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_contenedor ORDER BY fecha_movimiento DESC, id DESC) AS rn
@@ -29,7 +33,7 @@ const SQL_INICIO_ALQUILER = `
 const SQL_PROXIMA_OP = `
   SELECT op2.id AS op_id, op2.nro_op, op2.fecha_entrega_planificada,
          oc2.domicilio_entrega, oc2.zona_entrega, oc2.plazo_alquiler,
-         cli2.nombre AS cliente_nombre
+         ${nombreCompleto('cli2')} AS cliente_nombre
   FROM op_detalle_contenedor oc2
   JOIN op_encabezado op2 ON op2.id = oc2.id_orden_pedido
   LEFT JOIN clientes cli2 ON cli2.id = op2.id_cliente
@@ -48,15 +52,16 @@ const SQL_ESTADO_PASO = `CASE WHEN ${SQL_PEND_INICIO} THEN 'pendiente_inicio' EL
 // entrega real y, si todavía no se entregó, la fecha programada. (El módulo de alquileres
 // prioriza al revés: usa la planificada aunque la entrega real haya sido posterior, y
 // entonces el fin puede caer antes del inicio.)
+// El plazo se cuenta en DÍAS HÁBILES desde la entrega (ver sumar_dias_habiles en db.js).
 const SQL_FIN_ALQUILER = `
   CASE
     WHEN ${SQL_PEND_INICIO}
-      THEN NULLIF(LEFT(prox.fecha_entrega_planificada, 10), '')::date + prox.plazo_alquiler
+      THEN sumar_dias_habiles(NULLIF(LEFT(prox.fecha_entrega_planificada, 10), '')::date, prox.plazo_alquiler)
     WHEN um.estado_paso <> 'disponible'
-      THEN COALESCE(
+      THEN sumar_dias_habiles(COALESCE(
              NULLIF(LEFT((${SQL_INICIO_ALQUILER}), 10), '')::date,
              NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date
-           ) + oc.plazo_alquiler
+           ), oc.plazo_alquiler)
   END
 `
 
@@ -97,13 +102,14 @@ const ContenedoresModel = {
           OR COALESCE(c.estado_general, '')  ILIKE ?
           OR COALESCE(um.estado_paso, '')    ILIKE ?
           OR COALESCE(cli.nombre, '')        ILIKE ?
+          OR COALESCE(cli.apellido, '')      ILIKE ?
           OR COALESCE(oc.domicilio_entrega, '') ILIKE ?
           OR COALESCE(oc.zona_entrega, '')   ILIKE ?
           OR COALESCE(prox.cliente_nombre, '')     ILIKE ?
           OR COALESCE(prox.domicilio_entrega, '')  ILIKE ?
           OR COALESCE(prox.zona_entrega, '')       ILIKE ?
         )`)
-        for (let i = 0; i < 9; i++) params.push(like)
+        for (let i = 0; i < 10; i++) params.push(like)
       }
     }
     return (await query(`
@@ -113,7 +119,7 @@ const ContenedoresModel = {
              ${datoDeLaOp('domicilio_entrega', 'oc.domicilio_entrega')} AS domicilio_entrega,
              ${datoDeLaOp('zona_entrega',      'oc.zona_entrega')}      AS zona_entrega,
              ${datoDeLaOp('plazo_alquiler',    'oc.plazo_alquiler')}    AS plazo_alquiler,
-             ${datoDeLaOp('cliente_nombre',    'cli.nombre')}           AS cliente_nombre,
+             ${datoDeLaOp('cliente_nombre',    nombreCompleto('cli'))}  AS cliente_nombre,
              ${datoDeLaOp('nro_op',            'op.nro_op')}            AS nro_op,
              prox.fecha_entrega_planificada AS fecha_inicio_programada,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado,
@@ -134,7 +140,7 @@ const ContenedoresModel = {
     if (!c) return null
     c.movimientos = (await query(`
       SELECT m.*, u.nombre AS chofer_nombre, f.patente AS camion_patente, f.nombre AS camion_nombre,
-             op.nro_op, cli.nombre AS cliente_nombre, oc.domicilio_entrega, oc.zona_entrega
+             op.nro_op, ${nombreCompleto('cli')} AS cliente_nombre, oc.domicilio_entrega, oc.zona_entrega
       FROM movimiento_contenedor m
       LEFT JOIN users u ON u.id = m.id_chofer
       LEFT JOIN flota_vehiculos f ON f.id = m.id_camion
@@ -146,7 +152,7 @@ const ContenedoresModel = {
 
     // Historial de ALQUILERES: un renglón por operación (OP) que usó este contenedor.
     const alq = (await query(`
-      SELECT op.nro_op, op.estado AS op_estado, cli.nombre AS cliente_nombre,
+      SELECT op.nro_op, op.estado AS op_estado, ${nombreCompleto('cli')} AS cliente_nombre,
              oc.domicilio_entrega, oc.zona_entrega, oc.precio_alquiler, oc.plazo_alquiler,
              op.fecha_entrega_planificada,
              (SELECT MIN(fecha_movimiento) FROM movimiento_contenedor mm
@@ -166,7 +172,7 @@ const ContenedoresModel = {
     // libre aunque su último movimiento diga 'disponible'.
     c.proximoAlquiler = (await query(`
       SELECT op.id, op.nro_op, op.fecha_entrega_planificada,
-             oc.domicilio_entrega, oc.zona_entrega, cli.nombre AS cliente_nombre
+             oc.domicilio_entrega, oc.zona_entrega, ${nombreCompleto('cli')} AS cliente_nombre
       FROM op_detalle_contenedor oc
       JOIN op_encabezado op ON op.id = oc.id_orden_pedido
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
@@ -244,7 +250,7 @@ const ContenedoresModel = {
     return (await query(`
       SELECT c.id, c.numero_contenedor, um.estado_paso, ma.fecha_alquiler AS fecha_movimiento,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega, oc.plazo_alquiler,
-             cli.nombre AS cliente_nombre, cli.tel_whatsapp, op.nro_op,
+             ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp, op.nro_op,
              (CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) AS dias_en_domicilio,
              ((CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) - oc.plazo_alquiler) AS dias_excedidos
       FROM contenedores c
@@ -258,7 +264,7 @@ const ContenedoresModel = {
         ORDER BY id_contenedor, fecha_movimiento ASC
       ) ma ON ma.id_contenedor = c.id
       WHERE c.activo = 1 AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
-        AND (CURRENT_DATE - LEFT(ma.fecha_alquiler, 10)::date) >= oc.plazo_alquiler
+        AND sumar_dias_habiles(LEFT(ma.fecha_alquiler, 10)::date, oc.plazo_alquiler) <= CURRENT_DATE
       ORDER BY oc.zona_entrega, dias_excedidos DESC
     `)).rows
   },

@@ -1440,6 +1440,35 @@ async function initDB() {
   await pool.query(`ALTER TABLE productos ALTER COLUMN precio_cantera SET DEFAULT 0`).catch(() => {})
   await pool.query(`ALTER TABLE productos ALTER COLUMN precio_viaje   SET DEFAULT 0`).catch(() => {})
 
+  // ─────────────────────────────────────────────────────────────────
+  // MIGRACIÓN: ciclo de vida de contenedores — "Para retirar" automático a los N
+  // días HÁBILES de entregado (antes eran días corridos), y método de pago "a
+  // convenir una vez finalizado" para poder cerrar el alquiler más tarde.
+  // ─────────────────────────────────────────────────────────────────
+  // Suma N días hábiles (lun-vie) a una fecha. Usa generate_series en vez de una
+  // fórmula cerrada: es más lento pero imposible de tener mal (fácil de auditar a
+  // ojo), y acá se llama sobre pocas filas (contenedores/alquileres), no en bulk.
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION sumar_dias_habiles(fecha_inicio DATE, dias INTEGER)
+    RETURNS DATE AS $$
+      SELECT CASE WHEN dias IS NULL THEN NULL WHEN dias <= 0 THEN fecha_inicio ELSE (
+        SELECT d::date FROM (
+          SELECT d, ROW_NUMBER() OVER (ORDER BY d) AS rn
+          FROM generate_series(fecha_inicio + 1, fecha_inicio + dias * 2 + 14, '1 day') AS d
+          WHERE EXTRACT(ISODOW FROM d) < 6
+        ) x WHERE rn = dias
+      ) END
+    $$ LANGUAGE sql IMMUTABLE
+  `).catch(e => console.error('Función sumar_dias_habiles:', e.message))
+
+  // "A convenir una vez finalizado": el método de pago del alquiler se resuelve
+  // recién al retirar el contenedor (una tarifa real o "pendiente de cobro").
+  await pool.query(`ALTER TABLE op_encabezado DROP CONSTRAINT IF EXISTS op_encabezado_metodo_pago_check`).catch(() => {})
+  await pool.query(`
+    ALTER TABLE op_encabezado ADD CONSTRAINT op_encabezado_metodo_pago_check
+    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','a_convenir') OR metodo_pago IS NULL)
+  `).catch(() => {})
+
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 

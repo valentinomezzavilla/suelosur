@@ -1,11 +1,13 @@
 'use strict'
 const ContenedoresModel = require('../models/contenedores.model')
+const AlquileresModel   = require('../models/alquileres.model')
 const paginar           = require('../utils/paginar')
 
 const ContenedoresController = {
 
   async index(req, res) {
     try {
+      await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const { estado_paso, estado_general, q, registro, page } = req.query
       const todos   = await ContenedoresModel.listar({ estado_paso, estado_general, q, registro })
       const resumen = await ContenedoresModel.resumenPorEstado()
@@ -77,6 +79,7 @@ const ContenedoresController = {
 
   async detalle(req, res) {
     try {
+      await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const contenedor = await ContenedoresModel.obtener(req.params.id)
       if (!contenedor) { req.flash('error', 'No encontrado.'); return res.redirect('/contenedores') }
       const choferes = await ContenedoresModel.choferes()
@@ -111,6 +114,44 @@ const ContenedoresController = {
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/contenedores')
     }
+  },
+
+  // ── Cobranzas: alquileres "a convenir" ya retirados y sin cobrar ──────────────
+  async cobranzas(req, res) {
+    try {
+      const pendientes = await AlquileresModel.pendientesDeCobro()
+      // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
+      // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
+      for (const p of pendientes) {
+        const cierre = await AlquileresModel.datosCierre(p.id)
+        p.montoEstimado = cierre ? cierre.precioActual : (p.precio_alquiler || 0)
+      }
+      res.render('pages/contenedores/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
+    } catch (err) {
+      console.error(err); req.flash('error', 'Error al cargar las cobranzas.'); res.redirect('/contenedores')
+    }
+  },
+
+  // Resuelve un "a convenir" pendiente: cobra con el método elegido ahora.
+  async resolverCobranza(req, res) {
+    const back = '/contenedores/cobranzas'
+    try {
+      const { metodo_pago_final, precio_final } = req.body
+      if (!metodo_pago_final) {
+        req.flash('error', 'Elegí un método de pago para cerrar el cobro.')
+        return res.redirect(back)
+      }
+      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
+      if (monto == null) {
+        req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
+      } else {
+        req.flash('success', `Cobro registrado por $${Math.round(monto).toLocaleString('es-AR')}.`)
+      }
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al registrar el cobro.')
+    }
+    res.redirect(back)
   },
 }
 
