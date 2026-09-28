@@ -7,11 +7,11 @@
   // Plazo nulo = alquiler sin fecha de fin, así que no hay fin que mostrar.
   const fechaInicioVal = alquiler.fecha_entrega_planificada || ''
   const sinFechaFinVal = d.plazo_alquiler == null
+  // El plazo se guarda en DÍAS HÁBILES: hay que sumarlos como tales (sumarDiasHabiles),
+  // no como días corridos, o la fecha de fin mostrada acá queda antes de la real.
   let fechaFinVal = ''
   if (fechaInicioVal && !sinFechaFinVal) {
-    const _fin = new Date(fechaInicioVal)
-    _fin.setDate(_fin.getDate() + parseInt(d.plazo_alquiler))
-    fechaFinVal = _fin.toISOString().slice(0, 10)
+    fechaFinVal = sumarDiasHabiles(fechaInicioVal, parseInt(d.plazo_alquiler))
   }
 %>
 

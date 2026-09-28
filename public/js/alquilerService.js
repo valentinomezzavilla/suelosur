@@ -32,6 +32,23 @@ function sumarDiasHabilesJS(fecha, dias) {
     return d;
 }
 
+// Inverso de sumarDiasHabilesJS: cuántos días hábiles hay entre dos fechas. Espejo de
+// diasHabilesEntre (src/utils/diasHabiles.js) — el plazo se guarda y cobra en días
+// hábiles, así que el resumen tiene que mostrar esto y no la diferencia en días corridos
+// (que da de más cuando el período cruza un fin de semana: p. ej. 10 días hábiles caen
+// 14 días corridos después si arrancan un lunes).
+function diasHabilesEntreJS(inicio, fin) {
+    if (fin <= inicio) return Math.round((fin - inicio) / 86400000);
+    let dias = 0;
+    const d = new Date(inicio.getTime());
+    while (d < fin) {
+        d.setDate(d.getDate() + 1);
+        const dow = d.getDay();
+        if (dow !== 0 && dow !== 6) dias++;
+    }
+    return dias;
+}
+
 // ── Mapa (Leaflet / OSM via MapService) ───────────────────────
 const btnBuscar = document.getElementById('btnBuscarDireccion');
 const mapaDiv   = document.getElementById('mapaEntrega');
@@ -224,7 +241,9 @@ function actualizarResumen() {
     if (elFin)    elFin.textContent    = (sinFechaFin() || historicoEnCurso()) ? 'Sin informar' : formatFechaLocal(finVal);
 
     if (inicioVal && finVal) {
-        const dias = Math.round((new Date(finVal) - new Date(inicioVal)) / 86400000);
+        // Días hábiles (lo que se guarda y se cobra), no la diferencia en días corridos:
+        // si el período cruza un fin de semana, los corridos dan de más (ver diasHabilesEntreJS).
+        const dias = diasHabilesEntreJS(new Date(inicioVal + 'T00:00:00'), new Date(finVal + 'T00:00:00'));
         if (elDias) elDias.textContent = dias > 0 ? `${dias} días` : '—';
         const precio = calcularPrecioAlquiler(dias);
         const perDia = dias > 0 ? Math.round(precio / dias) : 0;
