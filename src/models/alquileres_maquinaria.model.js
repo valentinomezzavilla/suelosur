@@ -2,6 +2,10 @@
 const { query, transaction } = require('../config/db')
 const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 
+// Nombre completo del cliente (nombre + apellido) — mismo criterio que en
+// contenedores.model.js / alquileres.model.js: antes se mostraba solo el nombre de pila.
+const nombreCompleto = (alias) => `NULLIF(TRIM(COALESCE(${alias}.nombre,'') || ' ' || COALESCE(${alias}.apellido,'')), '')`
+
 const SQL_ULTIMO_MOV_MAQ = `
   SELECT m.* FROM (
     SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_maquinaria ORDER BY fecha_movimiento DESC, id DESC) AS rn
@@ -14,7 +18,7 @@ const AlquileresMaquinariaModel = {
   async listarPorEstado() {
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
-             cli.nombre AS cliente_nombre, cli.tel_whatsapp,
+             ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              opm.id AS id_op_maquinaria, opm.domicilio_entrega, opm.zona_entrega,
              opm.plazo_alquiler, opm.precio_total, opm.horas_pactadas, opm.id_maquinaria,
              maq.nombre AS maquinaria_nombre, maq.tipo AS maquinaria_tipo,
@@ -41,7 +45,7 @@ const AlquileresMaquinariaModel = {
 
   async obtener(id) {
     const op = (await query(`
-      SELECT op.*, cli.nombre AS cliente_nombre, cli.tel_whatsapp,
+      SELECT op.*, ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              u.nombre AS administrativo_nombre
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente

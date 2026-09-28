@@ -102,6 +102,11 @@ const AlquileresController = {
           return res.redirect('/alquileres/contenedores/nuevo')
         }
       }
+      // Sin cuenta corriente el plazo es SIEMPRE el estándar (hoy 4 días hábiles): pase lo
+      // que pase en el formulario (fecha de fin editada a mano, manipulada, etc.) nunca se
+      // guarda un plazo mayor. No aplica a carga histórica: ahí se registra la duración real
+      // de un alquiler que ya terminó, no una fecha de vencimiento futura.
+      if (!tieneCC && !esHistorico && plazo_alquiler != null) plazo_alquiler = PLAZO_ESTANDAR
 
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
       if (esHistorico && !historicoEnCurso) {
@@ -248,6 +253,13 @@ const AlquileresController = {
       let plazo_alquiler = null
       if (!sinFechaFin && fechaInicio && fechaFin) {
         plazo_alquiler = Math.max(1, diasHabilesEntre(fechaInicio, fechaFin) || 0)
+      }
+      // Sin cuenta corriente el plazo es SIEMPRE el estándar: no se puede editar a un valor
+      // mayor, sea cual sea la fecha de fin cargada acá.
+      if (plazo_alquiler != null) {
+        const actual = await AlquileresModel.obtener(req.params.id)
+        const cliente = actual?.id_cliente ? await ClientesModel.obtener(actual.id_cliente) : null
+        if (!cliente?.cuenta_corriente) plazo_alquiler = PLAZO_ESTANDAR
       }
       await AlquileresModel.actualizar(req.params.id, {
         ...req.body,

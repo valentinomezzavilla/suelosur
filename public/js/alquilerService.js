@@ -107,7 +107,18 @@ function plazoDelCliente() {
 
 function aplicarFechaFinAutomatica() {
     if (!fechaInicio || !fechaFin) return;
-    if (modoFinalizado() || fechaFinManual()) { fechaFin.readOnly = false; return; }
+    if (modoFinalizado() || fechaFinManual()) {
+        fechaFin.readOnly = false;
+        // Sin cuenta corriente el plazo es siempre el estándar: aunque se tilde "editar a
+        // mano", no se puede elegir una fecha más lejana (el servidor igual lo recorta,
+        // pero acá directamente no se puede seleccionar).
+        if (!modoFinalizado() && !clienteTieneCuentaCorriente() && fechaInicio.value) {
+            fechaFin.max = toInputDate(sumarDiasHabilesJS(new Date(fechaInicio.value + 'T00:00:00'), plazosCfg.estandar));
+        } else {
+            fechaFin.max = '';
+        }
+        return;
+    }
     fechaFin.readOnly = true;
     fechaFin.min = ''; fechaFin.max = '';
     if (!fechaInicio.value) { fechaFin.value = ''; return; }

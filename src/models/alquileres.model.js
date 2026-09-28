@@ -8,6 +8,10 @@ const ClientesModel = require('./clientes.model')
 const { textoDestino } = require('../utils/destino')
 const { sumarDiasHabiles } = require('../utils/diasHabiles')
 
+// Nombre completo del cliente (nombre + apellido) — mismo criterio que en
+// contenedores.model.js: antes se mostraba solo el nombre de pila.
+const nombreCompleto = (alias) => `NULLIF(TRIM(COALESCE(${alias}.nombre,'') || ' ' || COALESCE(${alias}.apellido,'')), '')`
+
 const SQL_ULTIMO_MOV = `
   SELECT m.* FROM (
     SELECT m.*, ROW_NUMBER() OVER (PARTITION BY id_contenedor ORDER BY fecha_movimiento DESC, id DESC) AS rn
@@ -65,7 +69,7 @@ const AlquileresModel = {
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
-             cli.nombre AS cliente_nombre, cli.tel_whatsapp,
+             ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega,
              oc.plazo_alquiler, oc.precio_alquiler, oc.id_contenedor,
              cont.numero_contenedor,
@@ -116,7 +120,7 @@ const AlquileresModel = {
 
   async obtener(id) {
     const op = (await query(`
-      SELECT op.*, cli.nombre AS cliente_nombre, cli.tel_whatsapp, cli.domicilio_ppal,
+      SELECT op.*, ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp, cli.domicilio_ppal,
              u.nombre AS administrativo_nombre
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
@@ -298,7 +302,7 @@ const AlquileresModel = {
     const oc = (await query(`SELECT alquiler_siguiente_id FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.alquiler_siguiente_id) return null
     return (await query(`
-      SELECT op.id, op.nro_op, cli.nombre AS cliente_nombre, oc.domicilio_entrega
+      SELECT op.id, op.nro_op, ${nombreCompleto('cli')} AS cliente_nombre, oc.domicilio_entrega
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
@@ -374,7 +378,7 @@ const AlquileresModel = {
     const porLiberar = (await query(`
       SELECT c.id, c.numero_contenedor,
              op.id AS alquiler_actual_id, op.nro_op,
-             cli.nombre AS cliente_actual,
+             ${nombreCompleto('cli')} AS cliente_actual,
              oc.plazo_alquiler,
              to_char(sumar_dias_habiles(LEFT(ma.fecha_alquiler, 10)::date, oc.plazo_alquiler), 'YYYY-MM-DD') AS fecha_liberacion,
              (sumar_dias_habiles(LEFT(ma.fecha_alquiler, 10)::date, oc.plazo_alquiler) - CURRENT_DATE) * 24 AS horas_restantes
@@ -523,7 +527,7 @@ const AlquileresModel = {
   async cobrarAlCerrar(id_op, montoManual, metodoPagoFinal) {
     if (await TransaccionesModel.existePorOperacion(id_op)) return null
     const op = (await query(`
-      SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, cli.nombre AS cliente_nombre
+      SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, ${nombreCompleto('cli')} AS cliente_nombre
       FROM op_encabezado op JOIN clientes cli ON cli.id = op.id_cliente WHERE op.id = ?
     `, [id_op])).rows[0]
     const cierre = await this.datosCierre(id_op)
@@ -567,7 +571,7 @@ const AlquileresModel = {
   // de pago real: pendientes de cobro. Alimenta el submódulo de Cobranzas.
   async pendientesDeCobro() {
     return (await query(`
-      SELECT op.id, op.nro_op, op.nro_remito, cli.nombre AS cliente_nombre,
+      SELECT op.id, op.nro_op, op.nro_remito, ${nombreCompleto('cli')} AS cliente_nombre,
              oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
              (SELECT MIN(m.fecha_movimiento) FROM movimiento_contenedor m
                 WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible') AS fecha_retiro
@@ -606,7 +610,7 @@ const AlquileresModel = {
   async crearFinalizado({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_inicio, fecha_fin, obra }) {
     const { nro }     = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const cli = (await query(`SELECT nombre FROM clientes WHERE id = ?`, [id_cliente])).rows[0]
+    const cli = (await query(`SELECT NULLIF(TRIM(COALESCE(nombre,'') || ' ' || COALESCE(apellido,'')), '') AS nombre FROM clientes WHERE id = ?`, [id_cliente])).rows[0]
     return await transaction(async (q) => {
       const { rows } = await q(`
         INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_emision, fecha_entrega_planificada, obra)
