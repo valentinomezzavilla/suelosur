@@ -164,6 +164,17 @@
                 <div class="form-section">
                     <h3 class="form-section__title">Precios</h3>
                     <div class="form-group">
+                        <label for="precioUnitarioInput" id="labelPrecioUnitario">Precio unitario</label>
+                        <div class="precio-total-row">
+                            <input type="number" name="precioUnitarioManual" id="precioUnitarioInput" readonly class="input-readonly" min="0" step="any" inputmode="decimal">
+                            <label class="toggle-row toggle-sm">
+                                <input type="checkbox" id="checkEditarPrecio" name="editarPrecio" value="1">
+                                <span>Editar</span>
+                            </label>
+                        </div>
+                        <p class="form-hint" id="hintPrecioUnitario">Precio de lista. Tildá "Editar" para cambiarlo: el subtotal se recalcula solo.</p>
+                    </div>
+                    <div class="form-group">
                         <label>Subtotal producto</label>
                         <div class="precio-total-row">
                             <input type="text" id="subtotalProducto" readonly class="input-readonly">

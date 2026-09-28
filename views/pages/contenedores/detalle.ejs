@@ -1,10 +1,10 @@
 <%
   const labelEstado = {
     disponible:        'Disponible',
-    pendiente_despacho:'Pendiente despacho',
+    pendiente_despacho:'Pendiente',
     despachado:        'En camino',
-    en_alquiler:       'En alquiler',
-    pendiente_retiro:  'Pendiente retiro',
+    en_alquiler:       'Entregado',
+    pendiente_retiro:  'Para retirar',
   }
   const badgeEstado = {
     disponible:        'badge-activo',
@@ -18,6 +18,10 @@
   // Volvió a planta pero ya tiene el próximo alquiler cargado: no está libre todavía.
   const pendInicio = libre && !!contenedor.proximoAlquiler
   const proximo = contenedor.proximoAlquiler
+  // "Disponible" recién retirado de un alquiler puntual: se muestra como "Retirado"
+  // (misma disponibilidad, pero deja registrado que cerró un alquiler concreto). El
+  // alta inicial de un contenedor nuevo (sin id_op_contenedor) sigue diciendo "Disponible".
+  const estadoLabel = (m) => (m.estado_paso === 'disponible' && m.id_op_contenedor) ? 'Retirado' : (labelEstado[m.estado_paso] || m.estado_paso)
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
@@ -41,7 +45,7 @@
         <% if (ultimo) { %>
           <h4>
             <span class="badge rounded-pill px-3 py-2 <%= pendInicio ? 'badge-pendiente' : (badgeEstado[ultimo.estado_paso] || 'badge-pendiente') %>">
-              <%= pendInicio ? 'Pendiente inicio' : (labelEstado[ultimo.estado_paso] || ultimo.estado_paso) %>
+              <%= pendInicio ? 'Pendiente inicio' : estadoLabel(ultimo) %>
             </span>
           </h4>
           <small class="text-muted">desde el <%= formatFechaHora(ultimo.fecha_movimiento) %></small>

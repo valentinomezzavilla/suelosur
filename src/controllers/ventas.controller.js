@@ -20,9 +20,10 @@ function fechaRetroactiva(fecha) {
   return f < hoy ? f : null
 }
 
-// El precio unitario de una venta NUNCA sale de lo que mande el formulario: siempre se
+// El precio de lista de una venta NUNCA sale de lo que mande el formulario: siempre se
 // relee del catálogo según el canal (cantera / viaje), así no importa qué haya llegado
-// en el POST (un precio viejo en caché, o alguien tocando el request a mano).
+// en el POST (un precio viejo en caché, o alguien tocando el request a mano). Solo se
+// aparta de la lista cuando el usuario tildó "Editar" (precio unitario o subtotal).
 // Los contenedores traen además sus rangos de precio por día (iguales en los dos canales).
 const COLUMNA_PRECIO = { cantera: 'precio_cantera', viaje: 'precio_viaje' }
 async function catalogo(canal, idsProducto) {
@@ -322,11 +323,21 @@ const VentasController = {
       } else {
         detalle = { id_producto: productoId, cantidad_pedida: Number(cantidad) || 1, precio_unitario: prod.precio }
       }
-      // Salvo que se haya tildado "Editar" en el subtotal: ahí manda lo que se cargó.
+      // Salvo que se haya tildado "Editar" en el subtotal o en el precio unitario: ahí
+      // manda lo que se cargó (se edita uno u otro; si llegaran los dos, gana el subtotal).
       const subtotalEditado = Number(subtotalManual)
+      const precioEditado   = Number(req.body.precioUnitarioManual)
       if (editarSubtotal === '1' && String(subtotalManual ?? '').trim() !== '' && subtotalEditado >= 0) {
         detalle.precio_unitario = subtotalEditado / detalle.cantidad_pedida
         if (detalle.dias) detalle.precio_dia = subtotalEditado / detalle.dias
+      } else if (req.body.editarPrecio === '1' && String(req.body.precioUnitarioManual ?? '').trim() !== '' && precioEditado >= 0) {
+        // Precio unitario editado: subtotal = precio × cantidad (contenedor: precio por día × días)
+        if (detalle.dias) {
+          detalle.precio_dia      = precioEditado
+          detalle.precio_unitario = precioEditado * detalle.dias
+        } else {
+          detalle.precio_unitario = precioEditado
+        }
       }
       // Total pactado: el que manda el formulario (puede estar editado a mano);
       // si no llegó, productos + flete.

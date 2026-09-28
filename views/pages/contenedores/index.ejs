@@ -13,10 +13,10 @@
   const labelEstado = {
     disponible:        'Disponible',
     pendiente_inicio:  'Pend. inicio',
-    pendiente_despacho:'Pend. despacho',
+    pendiente_despacho:'Pendiente',
     despachado:        'En camino',
-    en_alquiler:       'En alquiler',
-    pendiente_retiro:  'Pend. retiro',
+    en_alquiler:       'Entregado',
+    pendiente_retiro:  'Para retirar',
   }
   function semaforoDias(dias, plazo) {
     if (!plazo || plazo <= 0) return ''
@@ -30,6 +30,7 @@
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Contenedores</h4>
   <div class="d-flex gap-2">
     <a href="/contenedores/circuito" class="btn btn-outline-secondary"><%- icon('map', { size: 15 }) %> Circuito del día</a>
+    <a href="/contenedores/cobranzas" class="btn btn-outline-secondary"><%- icon('receipt', { size: 15 }) %> Cobranzas</a>
     <% if (user?.rol === 'dueno') { %>
       <a href="/contenedores/configuracion" class="btn btn-outline-secondary"><%- icon('settings', { size: 15 }) %> Configuración</a>
     <% } %>
@@ -42,10 +43,10 @@
   <% [
     { key:'disponible',        label:'Disponibles',       icono:'home' },
     { key:'pendiente_inicio',  label:'Pend. inicio',      icono:'clipboard' },
-    { key:'pendiente_despacho',label:'Pend. despacho',    icono:'checkCircle' },
+    { key:'pendiente_despacho',label:'Pendiente',         icono:'checkCircle' },
     { key:'despachado',        label:'En camino',         icono:'truck' },
-    { key:'en_alquiler',       label:'En alquiler',       icono:'clock' },
-    { key:'pendiente_retiro',  label:'Pend. retiro',      icono:'alert' },
+    { key:'en_alquiler',       label:'Entregado',         icono:'clock' },
+    { key:'pendiente_retiro',  label:'Para retirar',      icono:'alert' },
   ].forEach(s => { %>
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
       <div class="card shadow-sm h-100 text-center py-2">

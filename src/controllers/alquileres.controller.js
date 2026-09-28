@@ -6,6 +6,7 @@ const ConfigContenedoresModel = require('../models/config_contenedores.model')
 const OperacionesModel        = require('../models/operaciones.model')
 const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
 const { textoDestino } = require('../utils/destino')
+const { diasHabilesEntre } = require('../utils/diasHabiles')
 
 const AlquileresController = {
 
@@ -93,7 +94,9 @@ const AlquileresController = {
         ? null
         : plazoPorCuentaCorriente(tieneCC)
       if (!sinFechaFin && (esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
-        plazo_alquiler = Math.round((new Date(fechaFinReal) - new Date(fechaInicio)) / 86400000)
+        // El plazo se guarda en DÍAS HÁBILES (ver sumar_dias_habiles): si la fecha de fin
+        // se editó a mano, hay que contar los hábiles entre las dos fechas, no los corridos.
+        plazo_alquiler = diasHabilesEntre(fechaInicio, fechaFinReal)
         if (plazo_alquiler < 0) {
           req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
           return res.redirect('/alquileres/contenedores/nuevo')
@@ -244,7 +247,7 @@ const AlquileresController = {
       const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       let plazo_alquiler = null
       if (!sinFechaFin && fechaInicio && fechaFin) {
-        plazo_alquiler = Math.max(1, Math.round((new Date(fechaFin) - new Date(fechaInicio)) / 86400000))
+        plazo_alquiler = Math.max(1, diasHabilesEntre(fechaInicio, fechaFin) || 0)
       }
       await AlquileresModel.actualizar(req.params.id, {
         ...req.body,
@@ -325,15 +328,27 @@ const AlquileresController = {
   async devolverAPlanta(req, res) {
     try {
       const alquiler = await AlquileresModel.obtener(req.params.id)
+      // "A convenir una vez finalizado": al marcar Retirado hay que resolverlo sí o sí
+      // — un método de pago real, o el check de "pendiente de pago" (queda en Cobranzas).
+      const pendientePago = req.body.pendiente_pago === '1' || req.body.pendiente_pago === 'on'
+      const metodoPagoFinal = (req.body.metodo_pago_final || '').trim() || null
+      if (alquiler?.metodo_pago === 'a_convenir' && !pendientePago && !metodoPagoFinal) {
+        req.flash('error', 'Este alquiler quedó "a convenir": indicá un método de pago o marcá "Pendiente de pago".')
+        return res.redirect(`/alquileres/contenedores/${req.params.id}`)
+      }
       await AlquileresModel.devolverAPlanta(req.params.id)
-      // El alquiler termina acá: es el momento en que se cobra.
-      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, req.body.precio_final)
+      // El alquiler termina acá: es el momento en que se cobra (salvo que haya
+      // quedado explícitamente pendiente de pago).
+      const monto = pendientePago ? null
+        : await AlquileresModel.cobrarAlCerrar(req.params.id, req.body.precio_final, metodoPagoFinal)
       if (alquiler?.detalle?.alquiler_siguiente_id) {
         await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
       req.flash('success', monto != null
         ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}.`
-        : 'Contenedor retirado — ciclo completado.')
+        : pendientePago
+          ? 'Contenedor retirado — pago pendiente, quedó en Cobranzas.'
+          : 'Contenedor retirado — ciclo completado.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar devolución.')

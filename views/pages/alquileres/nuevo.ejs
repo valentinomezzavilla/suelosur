@@ -162,11 +162,16 @@
           </div>
         </div>
         <p class="form-hint" id="hintPlazo">
-          La fecha de fin se calcula sola: los clientes con <strong>cuenta corriente habilitada</strong>
-          tienen <strong><%= configPlazos.cuenta_corriente %> días</strong> desde el inicio;
-          el resto, <strong><%= configPlazos.estandar %> días</strong>.
+          La fecha de fin se calcula sola, en <strong>días hábiles</strong> desde el inicio:
+          <strong><%= configPlazos.estandar %> días</strong> para clientes sin cuenta corriente.
+          Con <strong>cuenta corriente habilitada</strong> se puede elegir entre
+          <strong><%= configPlazos.estandar %></strong> o <strong><%= configPlazos.cuenta_corriente %> días</strong>.
           <span id="plazoActual" class="fw-semibold"></span>
         </p>
+        <div class="d-flex gap-2 mb-2" id="rowPlazoCC" style="display:none">
+          <button type="button" class="btn-secondary btn-sm" id="btnPlazo4">4 días hábiles</button>
+          <button type="button" class="btn-secondary btn-sm" id="btnPlazo10">10 días hábiles</button>
+        </div>
         <label class="toggle-row" id="rowEditarFechaFin">
           <input type="checkbox" id="checkEditarFechaFin" name="editar_fecha_fin" value="1">
           <span>Editar fecha de fin manualmente</span>
@@ -198,7 +203,7 @@
       </div>
 
       <!-- Método de pago -->
-      <%- include('../../partials/metodo_pago') %>
+      <%- include('../../partials/metodo_pago', { conAConvenir: true }) %>
 
       <!-- Chofer / Camión -->
       <div class="form-section" id="seccionChoferCamion">
