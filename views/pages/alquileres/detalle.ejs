@@ -6,15 +6,15 @@
     anulado:    'badge-alerta',
   }
   const labelCont = {
-    disponible:        'Disponible',
+    disponible:        'Retirado',
     pendiente_despacho:'Pendiente',
     despachado:        'En camino',
     en_alquiler:       'Entregado',
-    pendiente_retiro:  'Para retirar',
+    pendiente_retiro:  'Pendiente Retiro',
   }
   const METODO_PAGO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', a_convenir: 'A convenir una vez finalizado' }
   const iconCont = {
-    disponible: '🏠', pendiente_despacho: '📋', despachado: '🚛',
+    disponible: '✅', pendiente_despacho: '📋', despachado: '🚛',
     en_alquiler: '⏳', pendiente_retiro: '⚠️',
   }
   const estadoCont = alquiler.estadoContenedor?.estado_paso
@@ -125,8 +125,8 @@
           <% if (!estaAnulado) { %>
             <div class="d-flex flex-wrap gap-2 mt-3">
               <% if (alquiler.estado === 'pendiente' && estadoCont === 'pendiente_despacho') { %>
-                <form action="/alquileres/contenedores/<%= alquiler.id %>/despachar" method="POST">
-                  <button class="btn btn-sm btn-naranja">🚛 Registrar salida</button>
+                <form action="/alquileres/contenedores/<%= alquiler.id %>/entregar" method="POST">
+                  <button class="btn btn-sm btn-naranja">📦 Confirmar entrega</button>
                 </form>
               <% } %>
               <% if (alquiler.estado === 'despachado' && estadoCont === 'despachado') { %>

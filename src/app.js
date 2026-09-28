@@ -51,6 +51,7 @@ app.use((req, res, next) => {
   // Formato único de fechas: DD/MM/AAAA (acepta ISO, datetime y dd-mm-aaaa)
   res.locals.formatFecha = fmtFecha
   res.locals.formatFechaHora = fmtFechaHora
+  res.locals.sumarDiasHabiles = require('./utils/diasHabiles').sumarDiasHabiles
   res.locals.codigoTx = require('./models/transacciones.model').codigo
   // Notificaciones in-app: conteo de alertas para el badge del sidebar
   res.locals.alertasResumen = null

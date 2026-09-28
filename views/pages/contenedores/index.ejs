@@ -16,7 +16,7 @@
     pendiente_despacho:'Pendiente',
     despachado:        'En camino',
     en_alquiler:       'Entregado',
-    pendiente_retiro:  'Para retirar',
+    pendiente_retiro:  'Pendiente Retiro',
   }
   function semaforoDias(dias, plazo) {
     if (!plazo || plazo <= 0) return ''
@@ -46,7 +46,7 @@
     { key:'pendiente_despacho',label:'Pendiente',         icono:'checkCircle' },
     { key:'despachado',        label:'En camino',         icono:'truck' },
     { key:'en_alquiler',       label:'Entregado',         icono:'clock' },
-    { key:'pendiente_retiro',  label:'Para retirar',      icono:'alert' },
+    { key:'pendiente_retiro',  label:'Pendiente Retiro',  icono:'alert' },
   ].forEach(s => { %>
     <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
       <div class="card shadow-sm h-100 text-center py-2">

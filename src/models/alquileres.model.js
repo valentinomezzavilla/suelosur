@@ -48,7 +48,7 @@ const AlquileresModel = {
 
   // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
   // HÁBILES desde la entrega) y siguen 'en_alquiler' pasan automáticamente a
-  // 'pendiente_retiro' ("Para retirar"). Idempotente (una vez marcado, ya no vuelve a
+  // 'pendiente_retiro' ("Pendiente Retiro"). Idempotente (una vez marcado, ya no vuelve a
   // matchear). Se llama al abrir el listado/detalle de Alquileres y de Contenedores.
   async autoVencerAlquileres() {
     await query(`
