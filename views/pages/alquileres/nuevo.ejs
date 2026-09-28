@@ -168,9 +168,15 @@
           <strong><%= configPlazos.estandar %></strong> o <strong><%= configPlazos.cuenta_corriente %> días</strong>.
           <span id="plazoActual" class="fw-semibold"></span>
         </p>
-        <div class="d-flex gap-2 mb-2" id="rowPlazoCC" style="display:none">
+        <!-- OJO: "d-flex" va en el hijo, no en #rowPlazoCC — esa clase de Bootstrap trae
+             !important, y le gana al display:none/'' que le pone el JS al toggle de este
+             div (el toggle quedaba sin efecto visual: el botón de 10 días se veía siempre,
+             aunque el cliente no tuviera cuenta corriente). -->
+        <div id="rowPlazoCC" style="display:none">
+          <div class="d-flex gap-2 mb-2">
           <button type="button" class="btn-secondary btn-sm" id="btnPlazo4">4 días hábiles</button>
           <button type="button" class="btn-secondary btn-sm" id="btnPlazo10">10 días hábiles</button>
+          </div>
         </div>
         <label class="toggle-row" id="rowEditarFechaFin">
           <input type="checkbox" id="checkEditarFechaFin" name="editar_fecha_fin" value="1">
