@@ -1449,18 +1449,21 @@ async function initDB() {
   // días HÁBILES de entregado (antes eran días corridos), y método de pago "a
   // convenir una vez finalizado" para poder cerrar el alquiler más tarde.
   // ─────────────────────────────────────────────────────────────────
-  // Suma N días hábiles (lun-vie) a una fecha. Usa generate_series en vez de una
-  // fórmula cerrada: es más lento pero imposible de tener mal (fácil de auditar a
-  // ojo), y acá se llama sobre pocas filas (contenedores/alquileres), no en bulk.
+  // Suma N días hábiles (lun-vie) a una fecha. El día de inicio CUENTA como día 1 del
+  // plazo (un alquiler de 4 días que arranca jueves cubre jueves-viernes-lunes-martes),
+  // así que para llegar al día N hay que avanzar N-1 días hábiles desde el inicio — por
+  // eso "rn = dias - 1" más abajo. Usa generate_series en vez de una fórmula cerrada: es
+  // más lento pero imposible de tener mal (fácil de auditar a ojo), y acá se llama sobre
+  // pocas filas (contenedores/alquileres), no en bulk.
   await pool.query(`
     CREATE OR REPLACE FUNCTION sumar_dias_habiles(fecha_inicio DATE, dias INTEGER)
     RETURNS DATE AS $$
-      SELECT CASE WHEN dias IS NULL THEN NULL WHEN dias <= 0 THEN fecha_inicio ELSE (
+      SELECT CASE WHEN dias IS NULL THEN NULL WHEN dias <= 1 THEN fecha_inicio ELSE (
         SELECT d::date FROM (
           SELECT d, ROW_NUMBER() OVER (ORDER BY d) AS rn
           FROM generate_series(fecha_inicio + 1, fecha_inicio + dias * 2 + 14, '1 day') AS d
           WHERE EXTRACT(ISODOW FROM d) < 6
-        ) x WHERE rn = dias
+        ) x WHERE rn = dias - 1
       ) END
     $$ LANGUAGE sql IMMUTABLE
   `).catch(e => console.error('Función sumar_dias_habiles:', e.message))

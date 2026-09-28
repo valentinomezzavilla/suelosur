@@ -19,11 +19,14 @@ function formatFechaLocal(val) {
     return `${d}/${m}/${y}`;
 }
 
-// Suma N días hábiles (lun-vie) a una fecha. Espejo de sumar_dias_habiles (SQL) y de
-// src/utils/diasHabiles.js (Node) — mismo resultado en el navegador, el servidor y la base.
+// Suma N días hábiles (lun-vie) a una fecha. El día de inicio CUENTA como día 1 del
+// plazo (un alquiler de 4 días que arranca jueves cubre jueves-viernes-lunes-martes),
+// así que para llegar al día N hay que avanzar N-1 días hábiles desde el inicio. Espejo
+// de sumar_dias_habiles (SQL) y de src/utils/diasHabiles.js (Node) — mismo resultado en
+// el navegador, el servidor y la base.
 function sumarDiasHabilesJS(fecha, dias) {
     const d = new Date(fecha.getTime());
-    let restantes = dias;
+    let restantes = dias - 1;
     while (restantes > 0) {
         d.setDate(d.getDate() + 1);
         const dow = d.getDay(); // 0 = domingo, 6 = sábado
@@ -32,13 +35,13 @@ function sumarDiasHabilesJS(fecha, dias) {
     return d;
 }
 
-// Inverso de sumarDiasHabilesJS: cuántos días hábiles hay entre dos fechas. Espejo de
-// diasHabilesEntre (src/utils/diasHabiles.js) — el plazo se guarda y cobra en días
-// hábiles, así que el resumen tiene que mostrar esto y no la diferencia en días corridos
-// (que da de más cuando el período cruza un fin de semana: p. ej. 10 días hábiles caen
-// 14 días corridos después si arrancan un lunes).
+// Inverso de sumarDiasHabilesJS: el plazo (en días, contando el de inicio como día 1)
+// que hay entre dos fechas. Espejo de diasHabilesEntre (src/utils/diasHabiles.js) — el
+// plazo se guarda y cobra en días hábiles, así que el resumen tiene que mostrar esto y
+// no la diferencia en días corridos (que da de más cuando el período cruza un fin de
+// semana: p. ej. 10 días hábiles caen más de 10 días corridos después si arrancan un lunes).
 function diasHabilesEntreJS(inicio, fin) {
-    if (fin <= inicio) return Math.round((fin - inicio) / 86400000);
+    if (fin < inicio) return Math.round((fin - inicio) / 86400000);
     let dias = 0;
     const d = new Date(inicio.getTime());
     while (d < fin) {
@@ -46,7 +49,7 @@ function diasHabilesEntreJS(inicio, fin) {
         const dow = d.getDay();
         if (dow !== 0 && dow !== 6) dias++;
     }
-    return dias;
+    return dias + 1;
 }
 
 // ── Mapa (Leaflet / OSM via MapService) ───────────────────────

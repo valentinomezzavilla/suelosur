@@ -49,8 +49,13 @@
           <p class="text-muted small mb-2">📱 <%= alquiler.tel_whatsapp %></p>
         <% } %>
         <hr class="my-2">
-        <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
+        <% if (alquiler.detalle?.domicilio_entrega) { %>
+          <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle.domicilio_entrega %></p>
+        <% } %>
         <% if (alquiler.obra) { %><p class="mb-1"><strong>Obra:</strong> <%= alquiler.obra %></p><% } %>
+        <% if (!alquiler.detalle?.domicilio_entrega && !alquiler.obra) { %>
+          <p class="mb-1"><strong>Domicilio:</strong> —</p>
+        <% } %>
         <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
         <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler != null ? alquiler.detalle.plazo_alquiler + ' días hábiles' : 'Sin fecha de fin' %></p>
         <p class="mb-1"><strong>Precio:</strong>

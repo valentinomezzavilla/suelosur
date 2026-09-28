@@ -68,7 +68,7 @@ const AlquileresModel = {
   async listarPorEstado() {
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `
-      SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
+      SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
              ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega,
              oc.plazo_alquiler, oc.precio_alquiler, oc.id_contenedor,
@@ -227,11 +227,11 @@ const AlquileresModel = {
   },
 
   // Edición de los datos comerciales / de entrega del alquiler
-  async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada }) {
+  async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
     const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
     await transaction(async (q) => {
-      await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ? WHERE id = ?`,
-        [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, id_op])
+      await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
+        [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])
       await q(`
         UPDATE op_detalle_contenedor
         SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,

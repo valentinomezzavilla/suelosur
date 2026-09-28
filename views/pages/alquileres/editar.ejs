@@ -25,8 +25,10 @@
     <p class="text-muted small mb-3">Cliente: <strong><%= alquiler.cliente_nombre %></strong> · El cliente y el contenedor asignado no se cambian acá (usá anular + recrear o "Asignar contenedor").</p>
     <form action="/alquileres/contenedores/<%= alquiler.id %>?_method=PUT" method="POST">
       <div class="row g-3">
-        <div class="col-md-6"><label class="form-label">Calle</label><input name="calle" class="form-control" value="<%= calle %>"></div>
+        <div class="col-md-6"><label class="form-label">Calle</label><input name="calle" id="calle" class="form-control" value="<%= calle %>"></div>
         <div class="col-md-3"><label class="form-label">Número</label><input name="numero" class="form-control" value="<%= numero %>"></div>
+        <div class="col-md-3"><label class="form-label">Obra</label><input name="obra" id="obraAlquiler" class="form-control" value="<%= alquiler.obra || '' %>"></div>
+        <p class="form-hint col-12 mt-n2">Cargá la <strong>dirección</strong> (calle) o la <strong>obra</strong> — al menos uno.</p>
         <div class="col-md-3"><label class="form-label">Zona</label>
           <select name="zona_entrega" class="form-select">
             <option value="">— Sin zona —</option>
@@ -72,4 +74,13 @@
       if (chk.checked) fin.value = ''
     })
   })()
+  // Destino: al menos uno entre dirección (calle) y obra
+  document.querySelector('form[action*="_method=PUT"]')?.addEventListener('submit', function (e) {
+    var calleV = document.getElementById('calle')?.value.trim()
+    var obraV  = document.getElementById('obraAlquiler')?.value.trim()
+    if (!calleV && !obraV) {
+      alert('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
+      e.preventDefault()
+    }
+  })
 </script>

@@ -32,7 +32,7 @@
           <span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span>
         </div>
         <div class="finalizar-card__cliente">${a.cliente_nombre}</div>
-        <div class="finalizar-card__dom">${a.domicilio_entrega || '—'}</div>
+        <div class="finalizar-card__dom">${a.domicilio_entrega || (a.obra ? 'Obra: ' + a.obra : '—')}</div>
         <div class="finalizar-card__fecha">
           <span class="finalizar-card__fecha-val">${a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—'}</span>
           <span class="finalizar-card__dr ${semaforoDias(dr)}">${drTxt}</span>
@@ -71,7 +71,7 @@
             </td>
             <td class="fw-semibold">${a.cliente_nombre}</td>
             <td class="text-center">${a.numero_contenedor ? 'N° ' + a.numero_contenedor : '<span class="text-muted fst-italic">Sin asignar</span>'}</td>
-            <td><small class="text-muted">${a.domicilio_entrega || '—'}</small></td>
+            <td><small class="text-muted">${a.domicilio_entrega || (a.obra ? 'Obra: ' + a.obra : '—')}</small></td>
             <td class="text-center"><small>${a.plazo_alquiler != null ? a.plazo_alquiler + 'd' : '—'}</small></td>
             <td class="text-center">${a.fecha_entrega_real
               ? formatFecha(a.fecha_entrega_real)

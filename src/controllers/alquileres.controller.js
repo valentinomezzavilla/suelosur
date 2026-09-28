@@ -252,7 +252,12 @@ const AlquileresController = {
 
   async actualizar(req, res) {
     try {
-      const { fechaInicio, fechaFin } = req.body
+      const { fechaInicio, fechaFin, calle, obra } = req.body
+      // Destino: se exige dirección (calle) u obra, al menos uno — igual que al crear.
+      if (!(calle || '').trim() && !(obra || '').trim()) {
+        req.flash('error', 'Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
+        return res.redirect(`/alquileres/contenedores/${req.params.id}/editar`)
+      }
       // Sin el check y sin fecha de fin no hay forma de saber el plazo: queda sin fin.
       const sinFechaFin = req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       let plazo_alquiler = null
