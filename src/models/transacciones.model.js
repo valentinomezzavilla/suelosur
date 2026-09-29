@@ -190,12 +190,13 @@ const TransaccionesModel = {
 
   // WHERE compartido por el listado, las métricas y el reporte. La fecha se compara por
   // día: guardada con hora ("2026-09-14 17:57:21") quedaba afuera del último día del rango.
-  _filtro({ id, tipo, clienteId, cliente, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
+  _filtro({ id, tipo, clienteId, cliente, remito, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
     const wheres = []
     const params = []
     if (id)         { wheres.push('id = ?');                  params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?');  params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');          params.push(clienteId) }
+    if (remito && String(remito).trim()) { wheres.push('nro_remito = ?'); params.push(Number(remito)) }
     // trim: un espacio de más al final (p.ej. un cliente sin apellido en el autocompletar)
     // no puede dejar el filtro sin resultados.
     const clienteTrim = (cliente || '').trim()
