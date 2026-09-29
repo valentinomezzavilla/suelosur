@@ -599,13 +599,15 @@ const VentasController = {
       const { fmtFecha } = require('../utils/fecha')
       const { desde, hasta, clienteId } = req.query
       const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
+      // La columna Cliente solo tiene sentido si el libro mezcla varios clientes — si ya
+      // está filtrado a uno, se repite igual en las 28 filas y no aporta nada.
       const columnas = [
         { header: 'Fecha', key: 'fecha', width: 12 },
         { header: 'Remito', key: 'nro_remito', width: 10 },
         { header: 'Cant.', key: 'cantidad', width: 8 },
         { header: 'Cód', key: 'cod', width: 8 },
         { header: 'Material', key: 'material', width: 24 },
-        { header: 'Cliente', key: 'cliente', width: 28 },
+        ...(clienteId ? [] : [{ header: 'Cliente', key: 'cliente', width: 28 }]),
         { header: 'Obra', key: 'obra', width: 28 },
         { header: 'Precio unit.', key: 'precio_unit', width: 14, money: true },
         { header: 'Importe', key: 'importe', width: 14, money: true },
