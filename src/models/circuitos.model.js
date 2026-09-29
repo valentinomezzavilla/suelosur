@@ -2,6 +2,7 @@
 // Circuitos logísticos — agrupan paradas (operaciones) para un chofer + camión en una fecha.
 const { query, transaction } = require('../config/db')
 const { nombreClienteSQL } = require('../utils/nombreCliente')
+const { textoDestino } = require('../utils/destino')
 
 const TIPO_PARADA = { M: 'entrega_material', C: 'entrega_contenedor', MA: 'entrega_maquinaria' }
 
@@ -66,28 +67,26 @@ const CircuitosModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.tipo_op, op.estado,
              COALESCE(${nombreClienteSQL('cli')},'Particular') AS cliente_nombre,
-             COALESCE(op.domicilio_calle,'') || ' ' || COALESCE(op.domicilio_altura,'') AS domicilio_m,
-             dc.domicilio_entrega AS domicilio_c, dm.domicilio_entrega AS domicilio_ma
+             COALESCE(op.domicilio_calle,'') || ' ' || COALESCE(op.domicilio_altura::text,'') AS domicilio_m, op.obra,
+             (SELECT dc.domicilio_entrega FROM op_detalle_contenedor dc WHERE dc.id_orden_pedido = op.id LIMIT 1) AS domicilio_c,
+             (SELECT dm.domicilio_entrega FROM op_detalle_maquinaria dm WHERE dm.id_orden_pedido = op.id LIMIT 1) AS domicilio_ma
       FROM op_encabezado op
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
-      LEFT JOIN op_detalle_contenedor dc ON dc.id_orden_pedido = op.id
-      LEFT JOIN op_detalle_maquinaria dm ON dm.id_orden_pedido = op.id
       WHERE op.estado IN ('pendiente','despachado')
         AND NOT EXISTS (SELECT 1 FROM circuito_paradas p WHERE p.id_op_encabezado = op.id)
-      GROUP BY op.id
       ORDER BY op.fecha_entrega_planificada, op.created_at
     `)).rows.map(o => ({
       ...o,
-      domicilio: (o.domicilio_m || '').trim() || o.domicilio_c || o.domicilio_ma || '',
+      domicilio: textoDestino({ domicilio: (o.domicilio_m || '').trim(), obra: o.obra }) || o.domicilio_c || o.domicilio_ma || '',
     }))
   },
 
   async agregarParada({ id_circuito, id_op_encabezado }) {
-    const op = (await query(`SELECT tipo_op, domicilio_calle, domicilio_altura FROM op_encabezado WHERE id = ?`, [id_op_encabezado])).rows[0]
+    const op = (await query(`SELECT tipo_op, domicilio_calle, domicilio_altura, obra FROM op_encabezado WHERE id = ?`, [id_op_encabezado])).rows[0]
     if (!op) throw new Error('Operación no encontrada.')
     const ya = (await query(`SELECT 1 FROM circuito_paradas WHERE id_op_encabezado = ?`, [id_op_encabezado])).rows[0]
     if (ya) throw new Error('La operación ya está en un circuito.')
-    let domicilio = [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim()
+    let domicilio = textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra })
     if (!domicilio) {
       const d = op.tipo_op === 'C'
         ? (await query(`SELECT domicilio_entrega FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op_encabezado])).rows[0]
