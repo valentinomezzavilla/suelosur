@@ -65,7 +65,15 @@ const AlquileresModel = {
     `)
   },
 
-  async listarPorEstado() {
+  async listarPorEstado({ q } = {}) {
+    // Búsqueda libre por N° de OP, remito o cliente — mismo criterio que ventas/transacciones.
+    let filtroWhere = ''
+    const filtroParams = []
+    if (q && String(q).trim()) {
+      const term = `%${String(q).trim()}%`
+      filtroWhere = ` AND (CAST(op.nro_op AS TEXT) ILIKE ? OR CAST(op.nro_remito AS TEXT) ILIKE ? OR cli.nombre ILIKE ? OR cli.apellido ILIKE ?)`
+      filtroParams.push(term, term, term, term)
+    }
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
@@ -87,11 +95,11 @@ const AlquileresModel = {
       LEFT JOIN (${SQL_ULTIMO_MOV}) um
              ON um.id_contenedor = oc.id_contenedor AND um.id_op_contenedor = oc.id
       LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
-      WHERE op.tipo_op = 'C'
+      WHERE op.tipo_op = 'C'${filtroWhere}
     `
     const todosEnCurso = (await query(`${baseSelect}
       AND op.estado = 'entregado' AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
-      ORDER BY fecha_fin_estimada ASC`)).rows
+      ORDER BY fecha_fin_estimada ASC`, filtroParams)).rows
     // "Por finalizar" son los que vencen hoy/mañana (o ya están en pendiente_retiro).
     const esPorFinalizar = a => a.contenedor_estado === 'pendiente_retiro'
       || (a.dias_restantes != null && a.dias_restantes <= 1)
@@ -114,7 +122,7 @@ const AlquileresModel = {
     const actuales     = unicos.filter(a => !esPorFinalizar(a))
     const programados  = (await query(`${baseSelect}
       AND op.estado IN ('pendiente','despachado')
-      ORDER BY op.fecha_entrega_planificada ASC NULLS LAST, op.created_at ASC`)).rows
+      ORDER BY op.fecha_entrega_planificada ASC NULLS LAST, op.created_at ASC`, filtroParams)).rows
     return { actuales, porFinalizar, programados }
   },
 

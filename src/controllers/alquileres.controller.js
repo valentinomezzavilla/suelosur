@@ -13,8 +13,9 @@ const AlquileresController = {
   async index(req, res) {
     try {
       await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
-      const grupos = await AlquileresModel.listarPorEstado()
-      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos })
+      const q = req.query.q || ''
+      const grupos = await AlquileresModel.listarPorEstado({ q })
+      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q } })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los alquileres.')
