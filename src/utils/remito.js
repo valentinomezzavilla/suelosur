@@ -11,14 +11,15 @@ async function opConRemito(nro) {
 
 // Remito cargado a mano al crear una operación (el del talonario). Vacío = se asigna
 // el siguiente de la secuencia. Devuelve { nro } (nro null = auto) o { error }.
+// Un mismo número de remito puede repetirse a propósito entre operaciones (un solo
+// papel puede cubrir varias ventas/alquileres cargados por separado): no se bloquea
+// acá, solo se avisa en vivo en el formulario (ver remitoCheck.js) para detectar un
+// typo. Solo se valida el formato.
 async function leerRemito(valor) {
   const txt = String(valor ?? '').trim()
   if (!txt) return { nro: null }
   if (!/^\d{1,8}$/.test(txt) || Number(txt) < 1) return { error: 'El remito tiene que ser un número (hasta 8 dígitos).' }
-  const nro = Number(txt)
-  const dup = await opConRemito(nro)
-  if (dup) return { error: `El remito ${nro} ya está cargado en OP-${String(dup.nro_op).padStart(4, '0')}.` }
-  return { nro }
+  return { nro: Number(txt) }
 }
 
 module.exports = { leerRemito, opConRemito }

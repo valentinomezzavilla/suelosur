@@ -296,11 +296,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const formFecha = document.getElementById('formFecha');
         if (formFecha) formFecha.value = document.getElementById('fechaCantera')?.value || '';
         const remitoInput = document.getElementById('remitoCantera');
-        if (remitoInput && remitoInput.dataset.invalido === '1') {
-            alert(remitoInput.dataset.mensaje || 'Revisá el número de remito.');
-            remitoInput.focus();
-            return;
-        }
         const formRemito = document.getElementById('formRemito');
         if (formRemito) formRemito.value = remitoInput?.value?.trim() || '';
 
