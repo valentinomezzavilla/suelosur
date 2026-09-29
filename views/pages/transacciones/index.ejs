@@ -8,6 +8,7 @@
                     const o = { preset: p }
                     if (filtros.tipo && filtros.tipo !== 'todos') o.tipo = filtros.tipo
                     if (filtros.cliente) o.cliente = filtros.cliente
+                    if (filtros.remito) o.remito = filtros.remito
                     return '/transacciones?' + new URLSearchParams(o).toString()
                 }
                 // El reporte usa los mismos filtros que la tabla (sin la página ni el orden)
@@ -74,6 +75,11 @@
                             <option value="<%= [c.nombre, c.apellido].filter(Boolean).join(' ') %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
                         <% }) %>
                     </datalist>
+                </div>
+                <div class="filtro-group">
+                    <label>Remito</label>
+                    <input type="text" name="remito" value="<%= filtros.remito %>" inputmode="numeric"
+                        maxlength="8" placeholder="N° de remito..." autocomplete="off">
                 </div>
                 <div class="filtro-group">
                     <label>Desde</label>
