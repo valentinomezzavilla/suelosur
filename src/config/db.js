@@ -1290,7 +1290,7 @@ async function initDB() {
   await pool.query(`
     CREATE OR REPLACE VIEW v_operaciones AS
     SELECT op.nro_op, op.fecha_emision, op.tipo_op, op.estado, op.modalidad, op.metodo_pago,
-           COALESCE(c.nombre, 'Particular') AS cliente, c.numero AS nro_cliente,
+           COALESCE(NULLIF(TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')), ''), 'Particular') AS cliente, c.numero AS nro_cliente,
            NULLIF(TRIM(COALESCE(e.nombre, '') || ' ' || COALESCE(e.apellido, '')), '') AS chofer,
            fv.nombre AS camion, u.nombre AS administrativo, op.id
     FROM op_encabezado op
@@ -1318,13 +1318,13 @@ async function initDB() {
   `)
   await pool.query(`
     CREATE OR REPLACE VIEW v_movimientos_cuenta AS
-    SELECT m.created_at AS fecha, cl.numero AS nro_cliente, cl.nombre AS cliente,
+    SELECT m.created_at AS fecha, cl.numero AS nro_cliente, TRIM(COALESCE(cl.nombre, '') || ' ' || COALESCE(cl.apellido, '')) AS cliente,
            m.tipo, m.descripcion, m.monto, m.id
     FROM movimientos_cuenta m JOIN clientes cl ON cl.id = m.cliente_id
   `)
   await pool.query(`
     CREATE OR REPLACE VIEW v_transacciones AS
-    SELECT t.numero, t.tipo, t.fecha, COALESCE(cl.nombre, t.cliente) AS cliente,
+    SELECT t.numero, t.tipo, t.fecha, COALESCE(NULLIF(TRIM(COALESCE(cl.nombre, '') || ' ' || COALESCE(cl.apellido, '')), ''), t.cliente) AS cliente,
            t.monto, t.metodo_pago, t.nro_remito, t.descripcion, t.id
     FROM transacciones t LEFT JOIN clientes cl ON cl.id = t.cliente_id
   `)
@@ -1492,6 +1492,17 @@ async function initDB() {
     ALTER TABLE transacciones ADD CONSTRAINT transacciones_metodo_pago_check
     CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','saldo_a_favor'))
   `).catch(() => {})
+
+  // transacciones.cliente es una foto de texto del nombre tomada al crear la transacción, y
+  // algunos caminos guardaban solo el nombre de pila ("FEHUSA" en vez de "FEHUSA FEHUSA").
+  // Se recalcula con el nombre completo actual de la ficha para todas las que tienen cliente_id
+  // (también deja al día las de clientes que después cambiaron de nombre). Idempotente.
+  await pool.query(`
+    UPDATE transacciones t SET cliente = TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellido,''))
+    FROM clientes c
+    WHERE c.id = t.cliente_id
+      AND t.cliente IS DISTINCT FROM TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellido,''))
+  `).catch(e => console.error('Normalizar nombre de cliente en transacciones:', e.message))
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

@@ -1,5 +1,6 @@
 'use strict'
 const { query } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
 const TransaccionesModel = require('../models/transacciones.model')
@@ -61,7 +62,7 @@ async function construirTareas(empId) {
   const viajes = (await query(`
     SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada, op.observaciones, op.obra,
            op.domicilio_calle, op.domicilio_altura,
-           COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+           COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
            v.nombre AS camion, v.patente
     FROM op_encabezado op
     LEFT JOIN clientes c ON c.id = op.id_cliente
@@ -89,7 +90,7 @@ async function construirTareas(empId) {
   const contenedores = (await query(`
     SELECT op.id, op.nro_op, op.estado, op.fecha_entrega_planificada, op.retiro_iniciado_en,
            oc.id AS id_oc, oc.id_contenedor, oc.domicilio_entrega, oc.plazo_alquiler,
-           cont.numero_contenedor, COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+           cont.numero_contenedor, COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
            v.nombre AS camion, v.patente
     FROM op_encabezado op
     JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
@@ -214,7 +215,7 @@ const HojaRutaController = {
       const info = (await query(`
         SELECT op.nro_op, op.tipo_op, op.modalidad, op.observaciones, op.obra,
                op.fecha_entrega_planificada, op.domicilio_calle, op.domicilio_altura,
-               COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+               COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
                v.nombre AS camion, v.patente
         FROM op_encabezado op
         LEFT JOIN clientes c        ON c.id = op.id_cliente
@@ -275,7 +276,7 @@ const HojaRutaController = {
       const opData = (await query(`
         SELECT op.id, op.nro_op, op.estado, op.tipo_op, op.domicilio_calle, op.domicilio_altura,
                op.domicilio_lat, op.domicilio_lng, op.observaciones,
-               c.nombre AS cliente, c.tel_whatsapp,
+               ${nombreClienteSQL('c')} AS cliente, c.tel_whatsapp,
                v.nombre AS camion, v.patente
         FROM op_encabezado op
         LEFT JOIN clientes c ON c.id = op.id_cliente
