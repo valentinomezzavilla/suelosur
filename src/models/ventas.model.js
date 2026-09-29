@@ -13,6 +13,12 @@ const SQL_SUBTOTAL = `(SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario
                        FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)`
 const SQL_TOTAL = `COALESCE(op.monto_total, ${SQL_SUBTOTAL} + COALESCE(op.precio_flete, 0))`
 
+// Nombre completo del cliente (nombre + apellido) — mismo criterio que en
+// alquileres.model.js y contenedores.model.js: antes acá se mostraba solo el nombre
+// de pila, así que un cliente cargado como "FEHUSA" / "FEHUSA" (nombre y apellido
+// iguales, típico de una razón social) aparecía distinto según la consulta.
+const nombreCompletoSQL = (alias) => `NULLIF(TRIM(COALESCE(${alias}.nombre,'') || ' ' || COALESCE(${alias}.apellido,'')), '')`
+
 const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 // Productos, flete y la diferencia con el total pactado (si se editó a mano).
@@ -54,8 +60,8 @@ const VentasModel = {
     if (fechaHasta) { wheres.push('op.fecha_emision <= ?'); params.push(fechaHasta) }
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      wheres.push(`(c.nombre ILIKE ? OR op.observaciones ILIKE ? OR CAST(op.nro_op AS TEXT) ILIKE ?)`)
-      params.push(term, term, term)
+      wheres.push(`(c.nombre ILIKE ? OR c.apellido ILIKE ? OR op.observaciones ILIKE ? OR CAST(op.nro_op AS TEXT) ILIKE ?)`)
+      params.push(term, term, term, term)
     }
     return { where: 'WHERE ' + wheres.join(' AND '), params }
   },
@@ -80,7 +86,7 @@ const VentasModel = {
     `, params)).rows[0]?.n || 0
     const ops = (await query(`
       SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito, op.metodo_pago,
-             COALESCE(c.nombre, op.observaciones, 'Particular') AS cliente_nombre,
+             COALESCE(${nombreCompletoSQL('c')}, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
              ${SQL_TOTAL} AS total
       FROM op_encabezado op
@@ -113,7 +119,7 @@ const VentasModel = {
 
   async obtener(id) {
     const op = (await query(`
-      SELECT op.*, COALESCE(c.nombre, 'Particular') AS cliente_nombre,
+      SELECT op.*, COALESCE(${nombreCompletoSQL('c')}, 'Particular') AS cliente_nombre,
              c.apellido AS cliente_apellido, c.tel_whatsapp, c.telefono AS cliente_telefono,
              c.domicilio_ppal, c.dni AS cliente_dni, c.email AS cliente_email,
              c.zona AS cliente_zona, c.tipo_cliente AS cliente_tipo,
@@ -402,7 +408,7 @@ const VentasModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
-             c.nombre AS cliente_nombre, c.tel_whatsapp,
+             ${nombreCompletoSQL('c')} AS cliente_nombre, c.tel_whatsapp,
              ${SQL_TOTAL} AS total,
              (SELECT STRING_AGG(${SQL_DESCRIPCION_DETALLE} || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ')
               FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
@@ -419,7 +425,7 @@ const VentasModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
-             c.nombre AS cliente_nombre,
+             ${nombreCompletoSQL('c')} AS cliente_nombre,
              ${SQL_TOTAL} AS total
       FROM op_encabezado op JOIN clientes c ON c.id = op.id_cliente
       WHERE op.tipo_op = 'M' AND op.modalidad = 'flete' AND op.estado = 'pendiente'
