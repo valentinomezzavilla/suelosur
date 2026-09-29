@@ -354,6 +354,28 @@
   &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
 }
 
+// Precio unitario editable, inline dentro del renglón de texto del carrito (no en la
+// fila de acciones): más bajo que ancho, para no romper el interlineado del texto.
+.precio-cantera {
+  width: 4.4rem;
+  min-height: 20px;
+  height: 20px;
+  padding: 0 0.3rem;
+  text-align: right;
+  font-weight: 700;
+  font-size: $fs-xs;
+  border: 1px solid $border-input;
+  border-radius: $radius-sm;
+  box-shadow: none;
+  background: #fff;
+  color: $dark;
+  vertical-align: middle;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  &:hover:not(:focus) { border-color: $border-input-hover; }
+  &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
+}
+
 .cart_empty {
   color: $muted;
   font-size: $fs-sm;
