@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 
 // Sub-query reutilizable — último movimiento por máquina
 const SQL_ULTIMO_MOV = `
@@ -21,7 +22,7 @@ const MaquinariaModel = {
       SELECT m.id, m.nombre, m.tipo, m.patente, m.modelo, m.anio, m.estado_general, m.actividad,
              m.km_actuales, m.ultimo_service, m.proximo_service, m.observaciones, m.activo,
              um.estado_paso, um.fecha_movimiento,
-             op.nro_op, cli.nombre AS cliente_nombre,
+             op.nro_op, ${nombreClienteSQL('cli')} AS cliente_nombre,
              opm.domicilio_entrega, opm.zona_entrega, opm.plazo_alquiler,
              (CURRENT_DATE - LEFT(um.fecha_movimiento, 10)::date) AS dias_en_estado
       FROM maquinaria m
@@ -45,7 +46,7 @@ const MaquinariaModel = {
     m.chofer_asignado = m.asignaciones.find(a => a.activo) || null
     m.movimientos = (await query(`
       SELECT mv.*, u.nombre AS operario_nombre, f.patente AS camion_patente, f.nombre AS camion_nombre,
-             op.nro_op, cli.nombre AS cliente_nombre, opm.domicilio_entrega, opm.zona_entrega
+             op.nro_op, ${nombreClienteSQL('cli')} AS cliente_nombre, opm.domicilio_entrega, opm.zona_entrega
       FROM movimiento_maquinaria mv
       LEFT JOIN users u ON u.id = mv.id_operario
       LEFT JOIN flota_vehiculos f ON f.id = mv.id_camion

@@ -1,6 +1,7 @@
 'use strict'
 // Circuitos logísticos — agrupan paradas (operaciones) para un chofer + camión en una fecha.
 const { query, transaction } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 
 const TIPO_PARADA = { M: 'entrega_material', C: 'entrega_contenedor', MA: 'entrega_maquinaria' }
 
@@ -32,7 +33,7 @@ const CircuitosModel = {
     if (!c) return null
     c.paradas = (await query(`
       SELECT p.*, op.nro_op, op.tipo_op, op.estado AS op_estado,
-             COALESCE(cli.nombre,'Particular') AS cliente_nombre
+             COALESCE(${nombreClienteSQL('cli')},'Particular') AS cliente_nombre
       FROM circuito_paradas p
       JOIN op_encabezado op ON op.id = p.id_op_encabezado
       LEFT JOIN clientes cli ON cli.id = op.id_cliente
@@ -64,7 +65,7 @@ const CircuitosModel = {
   async operacionesDisponibles() {
     return (await query(`
       SELECT op.id, op.nro_op, op.tipo_op, op.estado,
-             COALESCE(cli.nombre,'Particular') AS cliente_nombre,
+             COALESCE(${nombreClienteSQL('cli')},'Particular') AS cliente_nombre,
              COALESCE(op.domicilio_calle,'') || ' ' || COALESCE(op.domicilio_altura,'') AS domicilio_m,
              dc.domicilio_entrega AS domicilio_c, dm.domicilio_entrega AS domicilio_ma
       FROM op_encabezado op

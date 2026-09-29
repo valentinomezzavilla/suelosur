@@ -5,6 +5,7 @@
 // cheque y su estado (habilitado / deshabilitado / en_espera).
 // ═══════════════════════════════════════════════════════════════════
 const { query } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 
 const ESTADOS = ['habilitado', 'deshabilitado', 'en_espera']
 const TIPOS_CARTERA = ['recibido', 'emitido']
@@ -84,7 +85,7 @@ const ChequesModel = {
     const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
     return (await query(`
       SELECT c.*,
-             cli.nombre AS cliente_nombre,
+             ${nombreClienteSQL('cli')} AS cliente_nombre,
              p.nombre   AS proveedor_nombre,
              NULLIF(TRIM(COALESCE(e.nombre,'') || ' ' || COALESCE(e.apellido,'')), '') AS empleado_nombre
       FROM cheques c

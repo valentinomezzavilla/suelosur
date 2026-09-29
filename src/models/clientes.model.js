@@ -140,9 +140,9 @@ const ClientesModel = {
   // Devuelve null si está todo bien, o el mensaje de error.
   async errorCuentaCorriente(clienteId) {
     if (!clienteId) return 'Para vender a cuenta corriente hay que elegir un cliente (no puede ser "particular").'
-    const c = (await query(`SELECT nombre, cuenta_corriente, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+    const c = (await query(`SELECT nombre, apellido, cuenta_corriente, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
     if (!c) return 'El cliente no existe.'
-    if (!c.cuenta_corriente) return `${c.nombre} no tiene la cuenta corriente habilitada. Habilitala en Clientes → Cuentas corrientes o elegí otro método de pago.`
+    if (!c.cuenta_corriente) return `${ClientesModel.nombreCompleto(c)} no tiene la cuenta corriente habilitada. Habilitala en Clientes → Cuentas corrientes o elegí otro método de pago.`
     return null
   },
 
@@ -153,9 +153,9 @@ const ClientesModel = {
   // Devuelve null si el cliente puede pagar usando su saldo a favor, o el mensaje de error.
   async errorSaldoFavor(clienteId) {
     if (!clienteId) return 'Para usar saldo a favor hay que elegir un cliente (no puede ser "particular").'
-    const c = (await query(`SELECT nombre, saldo, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+    const c = (await query(`SELECT nombre, apellido, saldo, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
     if (!c) return 'El cliente no existe.'
-    if (!(Number(c.saldo) > 0)) return `${c.nombre} no tiene saldo a favor. Elegí otro método de pago.`
+    if (!(Number(c.saldo) > 0)) return `${ClientesModel.nombreCompleto(c)} no tiene saldo a favor. Elegí otro método de pago.`
     return null
   },
 

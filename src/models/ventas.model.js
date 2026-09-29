@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
@@ -54,8 +55,8 @@ const VentasModel = {
     if (fechaHasta) { wheres.push('op.fecha_emision <= ?'); params.push(fechaHasta) }
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      wheres.push(`(c.nombre ILIKE ? OR op.observaciones ILIKE ? OR CAST(op.nro_op AS TEXT) ILIKE ?)`)
-      params.push(term, term, term)
+      wheres.push(`(c.nombre ILIKE ? OR c.apellido ILIKE ? OR op.observaciones ILIKE ? OR CAST(op.nro_op AS TEXT) ILIKE ?)`)
+      params.push(term, term, term, term)
     }
     return { where: 'WHERE ' + wheres.join(' AND '), params }
   },
@@ -80,7 +81,7 @@ const VentasModel = {
     `, params)).rows[0]?.n || 0
     const ops = (await query(`
       SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito, op.metodo_pago,
-             COALESCE(c.nombre, op.observaciones, 'Particular') AS cliente_nombre,
+             COALESCE(${nombreClienteSQL('c')}, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
              ${SQL_TOTAL} AS total
       FROM op_encabezado op
@@ -113,7 +114,7 @@ const VentasModel = {
 
   async obtener(id) {
     const op = (await query(`
-      SELECT op.*, COALESCE(c.nombre, 'Particular') AS cliente_nombre,
+      SELECT op.*, COALESCE(${nombreClienteSQL('c')}, 'Particular') AS cliente_nombre,
              c.apellido AS cliente_apellido, c.tel_whatsapp, c.telefono AS cliente_telefono,
              c.domicilio_ppal, c.dni AS cliente_dni, c.email AS cliente_email,
              c.zona AS cliente_zona, c.tipo_cliente AS cliente_tipo,
@@ -374,7 +375,7 @@ const VentasModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
-             c.nombre AS cliente_nombre, c.tel_whatsapp,
+             ${nombreClienteSQL('c')} AS cliente_nombre, c.tel_whatsapp,
              ${SQL_TOTAL} AS total,
              (SELECT STRING_AGG(${SQL_DESCRIPCION_DETALLE} || ' x' || CAST(d.cantidad_pedida AS TEXT), ', ')
               FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
@@ -391,7 +392,7 @@ const VentasModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
-             c.nombre AS cliente_nombre,
+             ${nombreClienteSQL('c')} AS cliente_nombre,
              ${SQL_TOTAL} AS total
       FROM op_encabezado op JOIN clientes c ON c.id = op.id_cliente
       WHERE op.tipo_op = 'M' AND op.modalidad = 'flete' AND op.estado = 'pendiente'

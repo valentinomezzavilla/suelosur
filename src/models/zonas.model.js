@@ -1,6 +1,7 @@
 'use strict'
 // Catálogo de zonas logísticas (ABM completo) con tarifa de flete.
 const { query, transaction } = require('../config/db')
+const { nombreClienteSQL } = require('../utils/nombreCliente')
 
 // Las operaciones guardan el nombre de la zona como texto libre, no el id: al renombrar
 // una zona hay que arrastrar el cambio a todas estas columnas para no partir el catálogo.
@@ -92,7 +93,7 @@ const ZonasModel = {
   async operacionesPendientes() {
     const viajes = (await query(`
       SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(op.zona,''),'Sin zona') AS zona,
-             COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+             COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
              TRIM(COALESCE(op.domicilio_calle,'') || ' ' || COALESCE(op.domicilio_altura::text,'')) AS domicilio,
              'Viaje' AS tipo, '/ventas/' || op.id AS link
       FROM op_encabezado op LEFT JOIN clientes c ON c.id = op.id_cliente
@@ -100,7 +101,7 @@ const ZonasModel = {
     `)).rows
     const contEntrega = (await query(`
       SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(oc.zona_entrega,''),'Sin zona') AS zona,
-             COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+             COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
              oc.domicilio_entrega AS domicilio, 'Contenedor (entrega)' AS tipo,
              '/alquileres/contenedores/' || op.id AS link
       FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
@@ -109,7 +110,7 @@ const ZonasModel = {
     `)).rows
     const maquinaria = (await query(`
       SELECT op.id, op.nro_op, op.estado, op.hora_planificada, COALESCE(NULLIF(om.zona_entrega,''),'Sin zona') AS zona,
-             COALESCE(c.nombre,'Particular') AS cliente, c.tel_whatsapp,
+             COALESCE(${nombreClienteSQL('c')},'Particular') AS cliente, c.tel_whatsapp,
              om.domicilio_entrega AS domicilio, 'Maquinaria' AS tipo,
              '/alquileres/maquinaria/' || op.id AS link
       FROM op_encabezado op JOIN op_detalle_maquinaria om ON om.id_orden_pedido = op.id

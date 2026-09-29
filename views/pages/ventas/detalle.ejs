@@ -35,7 +35,7 @@
       </div>
       <div class="card-body">
         <p class="fw-bold mb-1 fs-6">
-          <%= op.cliente_nombre %><%= op.cliente_apellido ? ' ' + op.cliente_apellido : '' %>
+          <%= op.cliente_nombre %>
           <% if (op.cliente_numero != null) { %><span class="text-muted fw-normal small">· N° <%= op.cliente_numero %></span><% } %>
         </p>
         <% if (op.cliente_tipo) { %>
