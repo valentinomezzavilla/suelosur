@@ -2,7 +2,6 @@
 const { query } = require('../config/db')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
-const TransaccionesModel = require('../models/transacciones.model')
 const RemitosModel = require('../models/remitos.model')
 const FlotaModel = require('../models/flota.model')
 const { generarRemitoPDFBuffer } = require('../utils/pdfRemito')
@@ -492,24 +491,20 @@ const HojaRutaController = {
 
       if (op.tipo_op === 'M' && op.modalidad === 'flete' && op.estado === 'despachado') {
         const full = await VentasModel.obtener(op.id)
-        await VentasModel.entregar(op.id)
         // Kilometraje automático del camión (ida + vuelta) según la ruta navegada
         if (full.id_camion && req.body.distancia_km) {
           await FlotaModel.sumarKilometraje(full.id_camion, req.body.distancia_km, op.id)
             .catch(e => console.error('Kilometraje automático:', e.message))
         }
         const destino = textoDestino({ calle: full.domicilio_calle, numero: full.domicilio_altura, obra: full.obra })
-        if (!await TransaccionesModel.existePorOperacion(op.id)) {
-          // Un reintento del chofer no puede duplicar la transacción ni el cargo
-          await TransaccionesModel.crear({
-            tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
-            cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,
-            descripcion: [destino ? `Viaje a ${destino}` : 'Venta con viaje', full.observaciones].filter(Boolean).join(' — '),
-            metodo_pago: full.metodo_pago || 'efectivo',
-          })
-        }
-        // A cuenta corriente: el cargo ya existe desde el alta; esto lo confirma (no duplica)
-        await VentasModel.sincronizarCargoCC(op.id)
+        // Entrega + transacción + cargo a cuenta corriente: una sola operación atómica
+        // (un reintento del chofer no puede duplicar la transacción ni el cargo).
+        await VentasModel.entregarYRegistrar(op.id, () => ({
+          tipo: 'Venta Viaje', id_op_encabezado: op.id, nro_remito: full.nro_remito,
+          cliente_id: full.id_cliente, cliente: full.cliente_nombre, monto: full.total,
+          descripcion: [destino ? `Viaje a ${destino}` : 'Venta con viaje', full.observaciones].filter(Boolean).join(' — '),
+          metodo_pago: full.metodo_pago || 'efectivo',
+        }))
         req.flash('success', 'Entrega confirmada. ¡Tarea completada!')
       } else if (op.tipo_op === 'C' && op.estado === 'despachado') {
         // La entrega solo arranca el período; el cobro se genera al retirar.
