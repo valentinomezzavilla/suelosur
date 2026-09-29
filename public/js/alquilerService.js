@@ -468,11 +468,6 @@ formAlquiler?.addEventListener('submit', (e) => {
         e.preventDefault(); alert('Ingresá el precio del alquiler.'); precioInput?.focus(); return;
     }
 
-    const remitoV = document.getElementById('remitoAlquiler');
-    if (remitoV && remitoV.dataset.invalido === '1') {
-        e.preventDefault(); alert(remitoV.dataset.mensaje || 'Revisá el número de remito.'); remitoV.focus(); return;
-    }
-
     // Validar campos obligatorios manualmente
     const campos = [
         { id: 'fechaInicio', nombre: 'Fecha de inicio' },
