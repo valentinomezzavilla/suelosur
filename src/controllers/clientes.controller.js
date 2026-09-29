@@ -285,9 +285,9 @@ const ClientesController = {
 
   async crearApi(req, res) {
     try {
-      const { nombre, apellido, dni, telefono, email } = req.body
+      const { nombre, apellido, dni, telefono, email, cuenta_corriente } = req.body
       if (!nombre || !String(nombre).trim()) return res.status(400).json({ error: 'El nombre es obligatorio.' })
-      const id    = await ClientesModel.crear({ nombre, apellido, dni, telefono, email })
+      const id    = await ClientesModel.crear({ nombre, apellido, dni, telefono, email, cuenta_corriente: !!cuenta_corriente })
       const nuevo = await ClientesModel.obtener(id)
       res.json({
         id: nuevo.id, numero: nuevo.numero, nombre: nuevo.nombre, apellido: nuevo.apellido || '',

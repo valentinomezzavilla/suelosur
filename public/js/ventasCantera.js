@@ -86,7 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="cart-item__meta" data-meta-contenedor>${textoContenedor(producto)}</span>
                 </div>
                 <div class="cart-item__actions">
-                    <input type="number" class="input-sm dias-contenedor" data-id="${producto.id}" value="${producto.dias}" min="1" step="1" style="width:4.5rem" aria-label="Días">
+                    <input type="number" class="dias-contenedor" data-id="${producto.id}" value="${producto.dias}" min="1" step="1" aria-label="Días de alquiler del contenedor">
                     <span class="cart-item__meta">días</span>
                     <button type="button" class="qty-btn qty-remove" data-id="${producto.id}">✕</button>
                 </div>
@@ -97,11 +97,13 @@ document.addEventListener('DOMContentLoaded', () => {
             div.innerHTML = `
                 <div class="cart-item__info">
                     <span class="cart-item__nombre">${producto.nombre}</span>
-                    <span class="cart-item__meta">$${producto.precio.toLocaleString('es-AR')} x ${producto.cantidad} = <b>$${(producto.precio * producto.cantidad).toLocaleString('es-AR')}</b></span>
+                    <span class="cart-item__meta" data-meta-cantidad>$${producto.precio.toLocaleString('es-AR')} x ${producto.cantidad} = <b>$${(producto.precio * producto.cantidad).toLocaleString('es-AR')}</b></span>
                 </div>
                 <div class="cart-item__actions">
                     <button type="button" class="qty-btn qty-minus" data-id="${producto.id}">−</button>
-                    <span class="qty-display">${producto.cantidad}</span>
+                    <input type="number" class="cantidad-cantera" data-id="${producto.id}" value="${producto.cantidad}"
+                        min="0.01" max="${producto.stock}" step="any" aria-label="Cantidad de ${producto.nombre}"
+                        title="Cantidad — admite decimales (ej: 2.5)">
                     <button type="button" class="qty-btn qty-plus" data-id="${producto.id}">+</button>
                     <button type="button" class="qty-btn qty-remove" data-id="${producto.id}">✕</button>
                 </div>
@@ -119,13 +121,31 @@ document.addEventListener('DOMContentLoaded', () => {
         container.querySelectorAll('.qty-plus').forEach(btn => {
             btn.addEventListener('click', () => {
                 const p = carrito.find(x => x.id === btn.dataset.id);
-                if (p && p.cantidad < p.stock) { p.cantidad++; renderCarrito(); }
+                if (p && p.cantidad + 1 <= p.stock) { p.cantidad++; renderCarrito(); }
             });
         });
         container.querySelectorAll('.qty-remove').forEach(btn => {
             btn.addEventListener('click', () => {
                 carrito = carrito.filter(x => x.id !== btn.dataset.id);
                 renderCarrito();
+            });
+        });
+        // Cantidad de producto: se actualiza en el lugar (sin re-render) para no perder el foco
+        container.querySelectorAll('.cantidad-cantera').forEach(input => {
+            input.addEventListener('input', () => {
+                const p = carrito.find(x => x.id === input.dataset.id);
+                if (!p) return;
+                let val = Number(input.value);
+                if (!(val > 0)) val = 0;
+                if (val > p.stock) val = p.stock;
+                p.cantidad = val;
+                const meta = input.closest('.cart-item').querySelector('[data-meta-cantidad]');
+                if (meta) meta.innerHTML = `$${p.precio.toLocaleString('es-AR')} x ${p.cantidad} = <b>$${(p.precio * p.cantidad).toLocaleString('es-AR')}</b>`;
+                actualizarTotal();
+            });
+            input.addEventListener('change', () => {
+                const p = carrito.find(x => x.id === input.dataset.id);
+                if (p && p.cantidad <= 0) { carrito = carrito.filter(x => x.id !== p.id); renderCarrito(); }
             });
         });
         // Días del contenedor: se actualiza en el lugar (sin re-render) para no perder el foco

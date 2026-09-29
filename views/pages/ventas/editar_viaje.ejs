@@ -92,8 +92,8 @@
                     <% } else { %>
                     <div class="form-group">
                         <label for="cantidad">Cantidad *</label>
-                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="1" required>
-                        <p class="form-hint">Cambiar la cantidad ajusta el stock del producto.</p>
+                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="0.01" step="any" required>
+                        <p class="form-hint">Cambiar la cantidad ajusta el stock del producto. Admite decimales (ej: 2.5).</p>
                     </div>
                     <% } %>
                 </div>
