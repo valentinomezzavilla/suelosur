@@ -125,6 +125,23 @@
   </div>
 </div>
 
+<!-- Buscador -->
+<form method="GET" action="/alquileres/contenedores" class="card-modern mb-3">
+  <div class="card-modern-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="N° de OP, remito, cliente...">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Filtrar</button>
+        <a href="/alquileres/contenedores" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
+      </div>
+    </div>
+  </div>
+</form>
+
 <!-- 1. Alquileres por finalizar (mañana) -->
 <div class="card-modern mb-3">
   <div class="card-modern-header d-flex justify-content-between align-items-center" style="background:#fef9e7;">
