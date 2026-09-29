@@ -97,7 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
             div.innerHTML = `
                 <div class="cart-item__info">
                     <span class="cart-item__nombre">${producto.nombre}</span>
-                    <span class="cart-item__meta" data-meta-cantidad>$${producto.precio.toLocaleString('es-AR')} x ${producto.cantidad} = <b>$${(producto.precio * producto.cantidad).toLocaleString('es-AR')}</b></span>
+                    <span class="cart-item__meta">
+                        $<input type="number" class="precio-cantera" data-id="${producto.id}" value="${producto.precio}"
+                            min="0" step="any" aria-label="Precio unitario de ${producto.nombre}" title="Precio unitario — editable">
+                        <span data-meta-xqty>x ${producto.cantidad}</span> = <b data-meta-subtotal>$${(producto.precio * producto.cantidad).toLocaleString('es-AR')}</b>
+                    </span>
                 </div>
                 <div class="cart-item__actions">
                     <button type="button" class="qty-btn qty-minus" data-id="${producto.id}">−</button>
@@ -130,6 +134,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 renderCarrito();
             });
         });
+        // Actualiza "x N = $subtotal" de un renglón sin tocar el input de precio (así no
+        // se pierde el foco si se está editando cantidad y precio casi al mismo tiempo).
+        function actualizarMetaProducto(p, cartItemEl) {
+            const xqty = cartItemEl.querySelector('[data-meta-xqty]');
+            if (xqty) xqty.textContent = `x ${p.cantidad}`;
+            const subtotal = cartItemEl.querySelector('[data-meta-subtotal]');
+            if (subtotal) subtotal.textContent = `$${(p.precio * p.cantidad).toLocaleString('es-AR')}`;
+        }
+
         // Cantidad de producto: se actualiza en el lugar (sin re-render) para no perder el foco
         container.querySelectorAll('.cantidad-cantera').forEach(input => {
             input.addEventListener('input', () => {
@@ -139,13 +152,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!(val > 0)) val = 0;
                 if (val > p.stock) val = p.stock;
                 p.cantidad = val;
-                const meta = input.closest('.cart-item').querySelector('[data-meta-cantidad]');
-                if (meta) meta.innerHTML = `$${p.precio.toLocaleString('es-AR')} x ${p.cantidad} = <b>$${(p.precio * p.cantidad).toLocaleString('es-AR')}</b>`;
+                actualizarMetaProducto(p, input.closest('.cart-item'));
                 actualizarTotal();
             });
             input.addEventListener('change', () => {
                 const p = carrito.find(x => x.id === input.dataset.id);
                 if (p && p.cantidad <= 0) { carrito = carrito.filter(x => x.id !== p.id); renderCarrito(); }
+            });
+        });
+        // Precio unitario de producto: editable a mano, por defecto el de lista. Igual que
+        // la cantidad, se actualiza en el lugar para no perder el foco mientras se escribe.
+        container.querySelectorAll('.precio-cantera').forEach(input => {
+            input.addEventListener('input', () => {
+                const p = carrito.find(x => x.id === input.dataset.id);
+                if (!p) return;
+                const val = Number(input.value);
+                p.precio = val >= 0 ? val : 0;
+                p.precioManual = true;
+                actualizarMetaProducto(p, input.closest('.cart-item'));
+                actualizarTotal();
             });
         });
         // Días del contenedor: se actualiza en el lugar (sin re-render) para no perder el foco

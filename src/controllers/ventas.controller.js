@@ -127,7 +127,10 @@ const VentasController = {
       try { carrito = JSON.parse(items || '[]') } catch (_) {}
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
 
-      // Precio cantera siempre desde el catálogo, nunca el que mandó el formulario.
+      // Precio cantera siempre desde el catálogo, salvo que el renglón haya venido con
+      // precioManual (el usuario editó el precio unitario de ese producto en el carrito) —
+      // mismo criterio que en la venta por viaje: por defecto manda la lista, y se aparta
+      // solo cuando hubo una edición explícita, no por lo que mande el formulario solo.
       const cat = await catalogo('cantera', carrito.map(p => p.id))
       if (carrito.some(p => !cat[String(p.id)])) {
         req.flash('error', 'Hay un producto del carrito que ya no existe.'); return res.redirect('/ventas/cantera')
@@ -146,7 +149,9 @@ const VentasController = {
         } else {
           const cantidad = Number(p.cantidad)
           if (!(cantidad > 0)) { req.flash('error', `Cantidad inválida para ${prod.nombre}.`); return res.redirect('/ventas/cantera') }
-          detalles.push({ id_producto: p.id, cantidad_pedida: cantidad, precio_unitario: prod.precio, nombre: prod.nombre })
+          const precioManual = p.precioManual === true && Number(p.precio) >= 0
+          const precio_unitario = precioManual ? Number(p.precio) : prod.precio
+          detalles.push({ id_producto: p.id, cantidad_pedida: cantidad, precio_unitario, nombre: prod.nombre })
         }
       }
 
