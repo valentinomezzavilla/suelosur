@@ -5,7 +5,6 @@
   </div>
 </div>
 
-<script id="precios-config" type="application/json"><%- JSON.stringify(configPrecios) %></script>
 <script id="plazos-config" type="application/json"><%- JSON.stringify(configPlazos) %></script>
 
 <!-- ── Paso 1: seleccionar contenedor ─────────────────────────── -->
@@ -112,6 +111,17 @@
         <%- include('../../partials/buscar_cliente') %>
       </div>
 
+      <!-- Remito -->
+      <div class="form-section">
+        <h3 class="form-section__title">Remito</h3>
+        <div class="form-group">
+          <label for="remitoAlquiler">N° de remito</label>
+          <input type="text" name="remito" id="remitoAlquiler" inputmode="numeric" maxlength="8"
+            placeholder="Opcional" autocomplete="off" data-remito-check>
+          <p class="form-hint" data-remito-msg>Si lo dejás vacío se asigna el siguiente número.</p>
+        </div>
+      </div>
+
       <!-- Dirección -->
       <div class="form-section">
         <h3 class="form-section__title">Dirección de entrega</h3>
@@ -199,13 +209,11 @@
       <!-- Precio -->
       <div class="form-section">
         <h3 class="form-section__title">Precio</h3>
-        <div id="precioAlquilerDisplay" class="resumen-valor">—</div>
-        <label class="toggle-row">
-          <input type="checkbox" id="checkEditarPrecio">
-          <span>Editar precio manualmente</span>
-        </label>
-        <input type="number" name="precio_alquiler" id="precioAlquilerInput" class="input-sm" style="display:none"
-          min="0" step="100">
+        <div class="form-group">
+          <label for="precioAlquilerInput">Precio ($) *</label>
+          <input type="number" name="precio_alquiler" id="precioAlquilerInput" class="input-sm"
+            min="0.01" step="100" required placeholder="Ingresá el precio del alquiler">
+        </div>
       </div>
 
       <!-- Método de pago -->

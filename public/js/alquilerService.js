@@ -3,24 +3,14 @@ function toInputDate(date) {
     return date.toISOString().split('T')[0];
 }
 
-// tarifa: 9+ dias = precioAlquiler, menos = dias * precioDia (del config)
-const preciosCfgEl = document.getElementById('precios-config');
-const preciosCfg = preciosCfgEl ? JSON.parse(preciosCfgEl.textContent) : { precioDia: 30000, precioAlquiler: 250000 };
-
-function calcularPrecioAlquiler(dias) {
-    if (!dias || dias <= 0) return 0;
-    if (dias >= 9) return preciosCfg.precioAlquiler;
-    return dias * preciosCfg.precioDia;
-}
-
 function formatFechaLocal(val) {
     if (!val) return '—';
     const [y, m, d] = val.split('-');
     return `${d}/${m}/${y}`;
 }
 
-// Suma N días hábiles (lun-vie) a una fecha. El día de inicio CUENTA como día 1 del
-// plazo (un alquiler de 4 días que arranca jueves cubre jueves-viernes-lunes-martes),
+// Suma N días hábiles (lun-sáb) a una fecha. El día de inicio CUENTA como día 1 del
+// plazo (un alquiler de 4 días que arranca jueves cubre jueves-viernes-sábado-lunes),
 // así que para llegar al día N hay que avanzar N-1 días hábiles desde el inicio. Espejo
 // de sumar_dias_habiles (SQL) y de src/utils/diasHabiles.js (Node) — mismo resultado en
 // el navegador, el servidor y la base.
@@ -29,8 +19,8 @@ function sumarDiasHabilesJS(fecha, dias) {
     let restantes = dias - 1;
     while (restantes > 0) {
         d.setDate(d.getDate() + 1);
-        const dow = d.getDay(); // 0 = domingo, 6 = sábado
-        if (dow !== 0 && dow !== 6) restantes--;
+        const dow = d.getDay(); // 0 = domingo
+        if (dow !== 0) restantes--;
     }
     return d;
 }
@@ -47,7 +37,7 @@ function diasHabilesEntreJS(inicio, fin) {
     while (d < fin) {
         d.setDate(d.getDate() + 1);
         const dow = d.getDay();
-        if (dow !== 0 && dow !== 6) dias++;
+        if (dow !== 0) dias++;
     }
     return dias + 1;
 }
@@ -196,18 +186,8 @@ function elegirPlazoCC(dias) {
 document.getElementById('btnPlazo4')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.estandar));
 document.getElementById('btnPlazo10')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.cuenta_corriente));
 
-// ── Precio editable (toggle) ──────────────────────────────────
-const checkEditarPrecio = document.getElementById('checkEditarPrecio');
-const precioDisplay     = document.getElementById('precioAlquilerDisplay');
-const precioInput       = document.getElementById('precioAlquilerInput');
-
-if (checkEditarPrecio) {
-    checkEditarPrecio.addEventListener('change', () => {
-        if (precioInput)   precioInput.style.display   = checkEditarPrecio.checked ? 'block' : 'none';
-        if (precioDisplay) precioDisplay.style.display = checkEditarPrecio.checked ? 'none' : '';
-        if (!checkEditarPrecio.checked) actualizarResumen();
-    });
-}
+// ── Precio (siempre manual, sin tarifa automática) ─────────────
+const precioInput = document.getElementById('precioAlquilerInput');
 
 // ── Estado de la selección ────────────────────────────────────
 let contenedorSeleccionado = null; // { id, numero, fin, alquilerActualId }
@@ -248,22 +228,14 @@ function actualizarResumen() {
         // si el período cruza un fin de semana, los corridos dan de más (ver diasHabilesEntreJS).
         const dias = diasHabilesEntreJS(new Date(inicioVal + 'T00:00:00'), new Date(finVal + 'T00:00:00'));
         if (elDias) elDias.textContent = dias > 0 ? `${dias} días` : '—';
-        const precio = calcularPrecioAlquiler(dias);
-        const perDia = dias > 0 ? Math.round(precio / dias) : 0;
-
-        if (elTotalV) elTotalV.textContent = dias > 0 ? `$${precio.toLocaleString('es-AR')}` : '—';
-        if (elTotal)  elTotal.style.display = dias > 0 ? 'flex' : 'none';
-
-        if (precioDisplay && !checkEditarPrecio?.checked) {
-            precioDisplay.textContent = dias > 0
-                ? `$${perDia.toLocaleString('es-AR')} x ${dias} día${dias === 1 ? '' : 's'} = $${precio.toLocaleString('es-AR')}`
-                : '$' + precio.toLocaleString('es-AR');
-        }
-        if (precioInput && !checkEditarPrecio?.checked) precioInput.value = precio;
     } else {
-        if (elDias)  elDias.textContent    = '—';
-        if (elTotal) elTotal.style.display = 'none';
+        if (elDias) elDias.textContent = '—';
     }
+
+    // Precio: siempre el que se cargó a mano.
+    const precio = Number(precioInput?.value) || 0;
+    if (elTotalV) elTotalV.textContent = precio > 0 ? `$${precio.toLocaleString('es-AR')}` : '—';
+    if (elTotal)  elTotal.style.display = precio > 0 ? 'flex' : 'none';
 
     // dirección
     const calle  = document.getElementById('calle')?.value.trim();
@@ -277,7 +249,7 @@ function actualizarResumen() {
     if (elPago) elPago.textContent = pagoMap[metodoPagoEl?.value] || '—';
 }
 
-['fechaInicio', 'fechaFin', 'calle', 'numero', 'metodoPago'].forEach(id => {
+['fechaInicio', 'fechaFin', 'calle', 'numero', 'metodoPago', 'precioAlquilerInput'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', actualizarResumen);
     document.getElementById(id)?.addEventListener('input',  actualizarResumen);
 });
@@ -490,6 +462,16 @@ formAlquiler?.addEventListener('submit', (e) => {
     }
     const clienteId = document.getElementById('inputClienteId')?.value;
     if (!clienteId) { e.preventDefault(); alert('Buscá y seleccioná un cliente antes de confirmar.'); return; }
+
+    // El precio siempre se carga a mano.
+    if (!(Number(precioInput?.value) > 0)) {
+        e.preventDefault(); alert('Ingresá el precio del alquiler.'); precioInput?.focus(); return;
+    }
+
+    const remitoV = document.getElementById('remitoAlquiler');
+    if (remitoV && remitoV.dataset.invalido === '1') {
+        e.preventDefault(); alert(remitoV.dataset.mensaje || 'Revisá el número de remito.'); remitoV.focus(); return;
+    }
 
     // Validar campos obligatorios manualmente
     const campos = [

@@ -124,6 +124,8 @@
         const a = document.getElementById('nuevoClienteApellido');
         if (n && parts[0] && !/^\d+$/.test(parts[0])) n.value = parts[0];
         if (a && parts.length > 1) a.value = parts.slice(1).join(' ');
+        const cc = document.getElementById('nuevoClienteCC');
+        if (cc) cc.checked = false;
     }
 
     if (btnMostrarCrear) btnMostrarCrear.addEventListener('click', () => abrirCrear(input.value.trim()));
@@ -134,12 +136,13 @@
         const apellido = document.getElementById('nuevoClienteApellido').value.trim();
         const telefono = document.getElementById('nuevoClienteTelefono').value.trim();
         const dni      = document.getElementById('nuevoClienteDni').value.trim();
+        const cuentaCorriente = !!document.getElementById('nuevoClienteCC')?.checked;
         if (!nombre) { alert('El nombre es obligatorio.'); return; }
         try {
             const resp = await fetch('/clientes/api/crear', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nombre, apellido, dni, telefono })
+                body: JSON.stringify({ nombre, apellido, dni, telefono, cuenta_corriente: cuentaCorriente })
             });
             const data = await resp.json();
             if (data.error) { alert(data.error); return; }

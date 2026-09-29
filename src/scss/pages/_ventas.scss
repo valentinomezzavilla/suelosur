@@ -281,7 +281,7 @@
   &__actions {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
+    gap: 0.4rem;
     flex-shrink: 0;
   }
 }
@@ -329,6 +329,29 @@
   font-weight: 700;
   color: $dark;
   font-size: $fs-sm;
+}
+
+// Input numérico dentro del carrito (días de contenedor / cantidad de producto):
+// mismo lenguaje visual que los botones +/- que lo flanquean, en vez del chrome
+// genérico y más alto de .input-sm (quedaba desalineado en la fila).
+.dias-contenedor,
+.cantidad-cantera {
+  width: 3.6rem;
+  min-height: 28px;
+  height: 28px;
+  padding: 0 0.4rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: $fs-sm;
+  border: 1px solid $border-input;
+  border-radius: $radius-sm;
+  box-shadow: none;
+  background: #fff;
+  color: $ink;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  &:hover:not(:focus) { border-color: $border-input-hover; }
+  &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
 }
 
 .cart_empty {

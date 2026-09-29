@@ -150,6 +150,15 @@
                 <form action="/alquileres/contenedores/<%= alquiler.id %>/retirar" method="POST">
                   <button class="btn btn-sm btn-outline-secondary">⚠️ Marcar para retirar</button>
                 </form>
+                <% const proximoDisponible = disponibles[0] %>
+                <% if (proximoDisponible) { %>
+                  <form action="/alquileres/contenedores/<%= alquiler.id %>/reponer" method="POST"
+                        onsubmit="return confirm('¿Reponer el contenedor N° <%= alquiler.detalle.numero_contenedor %> por el N° <%= proximoDisponible.numero_contenedor %> (próximo disponible)? El N° <%= alquiler.detalle.numero_contenedor %> queda libre para otro alquiler.')">
+                    <button class="btn btn-sm btn-outline-secondary" title="Se asigna el contenedor N° <%= proximoDisponible.numero_contenedor %>">🔁 Reponer nueva unidad</button>
+                  </form>
+                <% } else { %>
+                  <span class="badge rounded-pill px-3 badge-pendiente align-self-center" title="No hay contenedores disponibles para reponer">🔁 Sin unidades para reponer</span>
+                <% } %>
               <% } %>
               <% if (alquiler.estado === 'entregado' && estadoCont === 'pendiente_retiro') { %>
                 <span class="badge rounded-pill px-3 badge-alerta align-self-center">Esperando retiro del chofer</span>

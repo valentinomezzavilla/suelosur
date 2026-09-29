@@ -1,8 +1,8 @@
 'use strict'
 
-// Suma N días hábiles (lunes a viernes, sin feriados) a una fecha 'YYYY-MM-DD'. El día
+// Suma N días hábiles (lunes a sábado, sin feriados) a una fecha 'YYYY-MM-DD'. El día
 // de inicio CUENTA como día 1 del plazo (así lo pide el negocio: un alquiler de 4 días
-// que arranca jueves cubre jueves-viernes-lunes-martes, no jueves + 4 días hábiles más),
+// que arranca jueves cubre jueves-viernes-sábado-lunes, no jueves + 4 días hábiles más),
 // así que para llegar al día N hay que avanzar N-1 días hábiles desde el inicio.
 // Espejo en JS de la función SQL `sumar_dias_habiles` (src/config/db.js) — mismos
 // resultados, para no desalinear lo que se calcula en Node de lo que calcula Postgres.
@@ -17,8 +17,8 @@ function sumarDiasHabiles(fechaISO, dias) {
   if (restantes <= 0) return base
   while (restantes > 0) {
     d.setDate(d.getDate() + 1)
-    const dow = d.getDay() // 0 = domingo, 6 = sábado
-    if (dow !== 0 && dow !== 6) restantes--
+    const dow = d.getDay() // 0 = domingo
+    if (dow !== 0) restantes--
   }
   return d.toISOString().slice(0, 10)
 }
@@ -37,7 +37,7 @@ function diasHabilesEntre(fechaInicioISO, fechaFinISO) {
   while (d < fin) {
     d.setDate(d.getDate() + 1)
     const dow = d.getDay()
-    if (dow !== 0 && dow !== 6) dias++
+    if (dow !== 0) dias++
   }
   return dias + 1
 }

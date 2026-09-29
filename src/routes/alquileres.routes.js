@@ -21,6 +21,7 @@ router.post('/contenedores/:id/asignar',         auth, acceso, ctrlCont.asignarC
 router.post('/contenedores/:id/despachar',       auth, acceso, ctrlCont.despachar)
 router.post('/contenedores/:id/entregar',        auth, acceso, ctrlCont.entregar)
 router.post('/contenedores/:id/retirar',         auth, acceso, ctrlCont.retirar)
+router.post('/contenedores/:id/reponer',         auth, acceso, ctrlCont.reponer)
 router.post('/contenedores/:id/devolver',        auth, acceso, ctrlCont.devolverAPlanta)
 router.post('/contenedores/:id/ampliar',         auth, acceso, ctrlCont.ampliar)
 router.post('/contenedores/:id/anular',          auth, acceso, ctrlCont.anular)

@@ -2,11 +2,11 @@
 const AlquileresModel        = require('../models/alquileres.model')
 const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
-const ConfigContenedoresModel = require('../models/config_contenedores.model')
 const OperacionesModel        = require('../models/operaciones.model')
 const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
 const { textoDestino } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
+const { leerRemito } = require('../utils/remito')
 
 const AlquileresController = {
 
@@ -24,18 +24,17 @@ const AlquileresController = {
 
   async nuevo(req, res) {
     try {
-      const [{ disponibles, porLiberar }, configPrecios, choferesDisp, camionesDisp, zonas] = await Promise.all([
+      const [{ disponibles, porLiberar }, choferesDisp, camionesDisp, zonas] = await Promise.all([
         AlquileresModel.contenedoresDisponibles(),
-        ConfigContenedoresModel.obtenerPrecios(),
         OperacionesModel.choferesDisponibles(),
         OperacionesModel.camionesDisponibles('contenedores'),
         require('../models/zonas.model').listarActivas(),
       ])
       res.render('pages/alquileres/nuevo', {
         titulo: 'Nuevo Alquiler de Contenedor',
-        disponibles, porLiberar, configPrecios, choferesDisp, camionesDisp, zonas,
+        disponibles, porLiberar, choferesDisp, camionesDisp, zonas,
         configPlazos: { cuenta_corriente: PLAZO_CUENTA_CORRIENTE, estandar: PLAZO_ESTANDAR },
-        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/alquilerService.js'],
+        scripts: ['/js/buscarCliente.js', '/js/formValidation.js', '/js/remitoCheck.js', '/js/alquilerService.js'],
       })
     } catch (err) {
       console.error(err)
@@ -46,12 +45,20 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra } = req.body
+      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra, remito } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
+      // El precio siempre se carga a mano: no hay tarifa fija/automática.
+      const precioAlquilerNum = parseFloat(precio_alquiler)
+      if (!precio_alquiler || isNaN(precioAlquilerNum) || precioAlquilerNum <= 0) {
+        req.flash('error', 'Ingresá el precio del alquiler.')
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      const remitoLeido = await leerRemito(remito)
+      if (remitoLeido.error) { req.flash('error', remitoLeido.error); return res.redirect('/alquileres/contenedores/nuevo') }
       if (metodoPago === 'cuenta_corriente') {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
         if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/contenedores/nuevo') }
@@ -124,6 +131,7 @@ const AlquileresController = {
           zona_entrega, plazo_alquiler, precio_alquiler,
           metodo_pago: metodoPago, observaciones, obra,
           fecha_inicio: fechaInicio || null, fecha_fin: fechaFinReal,
+          nro_remito: remitoLeido.nro,
         })
         const monto = parseFloat(precio_alquiler) || 0
         const destinoTxt = textoDestino({ domicilio: domicilio_entrega, obra })
@@ -163,6 +171,7 @@ const AlquileresController = {
           zona_entrega, plazo_alquiler, precio_alquiler,
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, obra, fecha_inicio: fechaInicio,
+          nro_remito: remitoLeido.nro,
         })
         await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
         // El alquiler sigue abierto: el ingreso se genera recién al retirar el contenedor.
@@ -181,6 +190,7 @@ const AlquileresController = {
           id_contenedor: id_contenedor || null, metodo_pago: metodoPago,
           observaciones, obra, alquiler_actual_id,
           fecha_entrega_planificada: fechaInicio || null,
+          nro_remito: remitoLeido.nro,
         })
       } else {
         result = await AlquileresModel.crear({
@@ -191,6 +201,7 @@ const AlquileresController = {
           observaciones, obra,
           fecha_entrega_planificada: fechaInicio || null,
           id_chofer: id_chofer || null, id_camion: id_camion || null,
+          nro_remito: remitoLeido.nro,
         })
       }
       await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
@@ -326,6 +337,19 @@ const AlquileresController = {
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar retiro.')
+    }
+    res.redirect(`/alquileres/contenedores/${req.params.id}`)
+  },
+
+  // Repone el contenedor de un alquiler en curso por una unidad nueva disponible,
+  // elegida automáticamente. La operación sigue igual, solo cambia qué contenedor la cubre.
+  async reponer(req, res) {
+    try {
+      const r = await AlquileresModel.reponerContenedor(req.params.id)
+      req.flash('success', `Contenedor N° ${r.numeroAnterior} repuesto por el N° ${r.numeroNuevo}.`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al reponer el contenedor.')
     }
     res.redirect(`/alquileres/contenedores/${req.params.id}`)
   },
