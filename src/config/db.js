@@ -1493,20 +1493,6 @@ async function initDB() {
     CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','saldo_a_favor'))
   `).catch(() => {})
 
-  // El nombre del cliente en transacciones.cliente es una foto de texto tomada al crear
-  // la transacción — antes algunos caminos guardaban solo el nombre de pila y otros el
-  // nombre completo, así que un mismo cliente ("FEHUSA"/"FEHUSA", por ejemplo) quedaba
-  // con transacciones que decían "FEHUSA" y otras "FEHUSA FEHUSA". El filtro de Cliente
-  // en Transacciones busca por coincidencia de texto, así que esas quedaban invisibles
-  // al filtrar por el nombre completo aunque existieran. Se recalcula acá para que todas
-  // las transacciones con cliente_id queden con el nombre completo actual.
-  await pool.query(`
-    UPDATE transacciones t SET cliente = TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellido,''))
-    FROM clientes c
-    WHERE c.id = t.cliente_id
-      AND t.cliente IS DISTINCT FROM TRIM(COALESCE(c.nombre,'') || ' ' || COALESCE(c.apellido,''))
-  `).catch(e => console.error('Normalizar nombre de cliente en transacciones:', e.message))
-
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 

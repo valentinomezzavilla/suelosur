@@ -110,7 +110,7 @@
         <select name="id_cliente" class="form-select form-select-sm">
           <option value="">Todos los clientes</option>
           <% clientes.forEach(c => { %>
-            <option value="<%= c.id %>" <%= filtros.id_cliente === c.id ? 'selected' : '' %>><%= `${c.nombre} ${c.apellido || ''}`.trim() %></option>
+            <option value="<%= c.id %>" <%= filtros.id_cliente === c.id ? 'selected' : '' %>><%= c.nombre %></option>
           <% }) %>
         </select>
       </div>
