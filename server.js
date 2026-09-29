@@ -15,19 +15,10 @@ process.on('unhandledRejection', (reason) => {
 
 initDB()
   .then(async () => {
-    // Ventas "entregadas" que se quedaron sin su transacción de ingreso (podía pasar
-    // antes de que entregar+registrar fuera atómico). Corre ANTES de sincronizar cuenta
-    // corriente, porque una venta sin transacción tampoco tenía su cargo. Idempotente.
-    const VentasModel = require('./src/models/ventas.model')
-    try {
-      const reparadas = await VentasModel.repararEntregasSinTransaccion()
-      if (reparadas.length) console.log(`🧾 Transacciones: ${reparadas.length} venta(s) reparada(s)\n   ` + reparadas.join('\n   '))
-    } catch (e) { console.error('Reparar entregas sin transacción:', e.message) }
-
     // Cuenta corriente: cada venta a cta. cte. no anulada con exactamente un cargo por su
     // total (completa los que faltan, corrige importes, quita los de anuladas). Idempotente.
     try {
-      const cambios = await VentasModel.sincronizarTodosLosCargosCC()
+      const cambios = await require('./src/models/ventas.model').sincronizarTodosLosCargosCC()
       if (cambios.length) console.log(`💳 Cuenta corriente: ${cambios.length} cargo(s) corregido(s)\n   ` + cambios.join('\n   '))
     } catch (e) { console.error('Sincronizar cargos de cuenta corriente:', e.message) }
 

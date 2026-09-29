@@ -19,14 +19,10 @@ const TransaccionesModel = {
   PREFIJO,
   codigo: codigoTransaccion,
 
-  // `q` permite correrlo dentro de una transacción abierta (ver ventas.model.js:
-  // entregarYRegistrar) para que marcar la operación como entregada y registrar su
-  // ingreso sea una sola operación atómica — si algo falla en el medio, no queda una
-  // venta "entregada" sin su transacción.
-  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }, q = query) {
-    const { n } = (await q(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
+  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }) {
+    const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
     // fecha opcional: si no se pasa, usa la fecha/hora actual (carga histórica la puede fijar en el pasado).
-    const { rows } = await q(`
+    const { rows } = await query(`
       INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
       RETURNING id
@@ -37,9 +33,9 @@ const TransaccionesModel = {
 
   // ¿La operación ya generó su ingreso? Evita cobrar dos veces la misma operación
   // (por ejemplo, alquileres viejos que ya habían cobrado al entregar).
-  async existePorOperacion(id_op_encabezado, q = query) {
+  async existePorOperacion(id_op_encabezado) {
     if (!id_op_encabezado) return false
-    const r = (await q(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
+    const r = (await query(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
     return !!r
   },
 

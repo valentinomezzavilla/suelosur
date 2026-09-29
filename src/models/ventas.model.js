@@ -321,56 +321,28 @@ const VentasModel = {
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), true)
   },
 
-  // `q` permite correrlo dentro de una transacción ya abierta (ver entregarYRegistrar,
-  // que además registra la transacción de ingreso en la MISMA transacción de base de
-  // datos: si algo falla en el medio, no queda una venta "entregada" sin su ingreso).
-  async entregar(id, q = null) {
-    const runner = q || query
-    const op = (await runner(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+  async entregar(id) {
+    const op = (await query(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op) return
-    const marcarEntregado = async (q2) => {
-      await q2(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id])
+    await transaction(async (q) => {
+      await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id])
       // Los renglones de contenedor (dias no nulo) y los de productos sin control de
       // stock (depende_stock = 0) no mueven stock
-      const detalles = (await q2(`
+      const detalles = (await q(`
         SELECT d.id_producto, d.cantidad_pedida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         WHERE d.id_orden_pedido = ? AND d.dias IS NULL AND COALESCE(p.depende_stock, 1) = 1
       `, [id])).rows
       for (const d of detalles) {
-        await q2(`
+        await q(`
           UPDATE stock SET cantidad_actual = GREATEST(0, cantidad_actual - ?),
                            cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar - ?)
           WHERE id_producto = ?
         `, [d.cantidad_pedida, d.cantidad_pedida, d.id_producto])
       }
-    }
-    if (q) await marcarEntregado(q)
-    else await transaction(marcarEntregado)
+    })
     // Viaje terminado: el camión vuelve a "disponible" automáticamente
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id), false)
-  },
-
-  // Entrega una venta y registra su ingreso (transacción + cargo a cuenta corriente si
-  // corresponde) como UNA sola operación atómica: o se hacen las tres cosas, o ninguna.
-  // Antes se hacían por separado y, si algo fallaba entre medio (una excepción, un corte
-  // de red a la base), la venta quedaba marcada "entregada" pero sin su transacción de
-  // ingreso — invisible en Transacciones aunque siguiera apareciendo en Ventas.
-  // `datosTransaccion(op)` arma los datos de TransaccionesModel.crear a partir de la op
-  // ya entregada (cada canal de venta redacta la descripción distinto).
-  async entregarYRegistrar(id, datosTransaccion) {
-    const TransaccionesModel = require('./transacciones.model')
-    return await transaction(async (q) => {
-      const antes = (await q(`SELECT estado FROM op_encabezado WHERE id = ?`, [id])).rows[0]
-      if (!antes || !['pendiente', 'despachado'].includes(antes.estado)) return null
-      await VentasModel.entregar(id, q)
-      const op = (await q(`SELECT * FROM op_encabezado WHERE id = ?`, [id])).rows[0]
-      if (!await TransaccionesModel.existePorOperacion(id, q)) {
-        await TransaccionesModel.crear(datosTransaccion(op), q)
-      }
-      await VentasModel.sincronizarCargoCC(id, q)
-      return op
-    })
   },
 
   async anular(id) {
@@ -518,45 +490,6 @@ VentasModel.sincronizarTodosLosCargosCC = async function () {
     if (cambio) cambios.push(`OP-${String(o.nro_op).padStart(4, '0')}: ${cambio}`)
   }
   return cambios
-}
-
-// Repara ventas 'entregado' que se quedaron sin su transacción de ingreso — podía pasar
-// antes de que entregar+registrar fuera atómico (ver entregarYRegistrar): si algo fallaba
-// entre marcar la entrega y crear la transacción, la venta quedaba "entregada" pero
-// invisible en Transacciones. Corre al arrancar; idempotente (no toca las que ya tienen
-// su transacción, y no duplica si se corre más de una vez).
-VentasModel.repararEntregasSinTransaccion = async function () {
-  const TransaccionesModel = require('./transacciones.model')
-  const huerfanas = (await query(`
-    SELECT op.id, op.nro_op FROM op_encabezado op
-    WHERE op.tipo_op = 'M' AND op.estado = 'entregado'
-      AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
-    ORDER BY op.id
-  `)).rows
-  const reparadas = []
-  for (const o of huerfanas) {
-    const op = await VentasModel.obtener(o.id)
-    if (!op) continue
-    const esViaje = op.modalidad === 'flete'
-    const destino = esViaje ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
-    await transaction(async (q) => {
-      await TransaccionesModel.crear({
-        tipo:            esViaje ? 'Venta Viaje' : 'Venta Cantera',
-        id_op_encabezado: op.id,
-        nro_remito:      op.nro_remito,
-        cliente_id:      op.id_cliente,
-        cliente:         op.cliente_nombre,
-        monto:           op.total,
-        descripcion:     esViaje
-          ? [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
-          : (op.observaciones || ''),
-        metodo_pago:     op.metodo_pago || 'efectivo',
-      }, q)
-      await VentasModel.sincronizarCargoCC(op.id, q)
-    })
-    reparadas.push(`OP-${String(op.nro_op).padStart(4, '0')}: transacción creada por $${Math.round(op.total).toLocaleString('es-AR')}`)
-  }
-  return reparadas
 }
 
 VentasModel.importesVenta = importesVenta

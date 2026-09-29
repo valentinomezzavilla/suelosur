@@ -1,5 +1,6 @@
 'use strict'
 const VentasModel       = require('../models/ventas.model')
+const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel     = require('../models/clientes.model')
 const OperacionesModel  = require('../models/operaciones.model')
 const AsignacionesModel = require('../models/asignaciones.model')
@@ -187,9 +188,9 @@ const VentasController = {
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
 
-      // Entrega + transacción + cargo a cuenta corriente: una sola operación atómica,
-      // así no puede quedar la venta "entregada" sin su ingreso si algo falla en el medio.
-      await VentasModel.entregarYRegistrar(id_op, () => ({
+      await VentasModel.entregar(id_op)
+
+      await TransaccionesModel.crear({
         tipo:            'Venta Cantera',
         id_op_encabezado: id_op,
         nro_remito,
@@ -199,7 +200,10 @@ const VentasController = {
         descripcion:     desc,
         metodo_pago:     metodoPago || 'efectivo',
         fecha:           fechaRetro,
-      }))
+      })
+
+      // A cuenta corriente: el cargo en la cuenta del cliente
+      await VentasModel.sincronizarCargoCC(id_op)
 
       res.redirect(`/ventas/cantera/confirmacion?tipo=cantera&cliente=${encodeURIComponent(nombre)}&total=${total}&remito=${nro_remito}`)
     } catch (err) {
@@ -390,8 +394,8 @@ const VentasController = {
       }
 
       if (esFinalizarAhora) {
-        // Entrega + transacción + cargo a cuenta corriente: una sola operación atómica.
-        await VentasModel.entregarYRegistrar(id_op, () => ({
+        await VentasModel.entregar(id_op)
+        await TransaccionesModel.crear({
           tipo:            'Venta Viaje',
           id_op_encabezado: id_op,
           nro_remito,
@@ -401,7 +405,7 @@ const VentasController = {
           descripcion:     `Viaje a ${destino}`,
           metodo_pago:     metodoPago || 'efectivo',
           fecha:           fechaRetroactiva(fecha),
-        }))
+        })
       }
 
       req.flash('success', `Viaje OP-${String(nro_op).padStart(4,'0')} ${esFinalizarAhora ? 'finalizado' : 'programado'} correctamente.`)
@@ -497,22 +501,27 @@ const VentasController = {
         req.flash('warning', 'La orden ya estaba entregada o anulada.')
         return res.redirect(`/ventas/${op.id}`)
       }
+      await VentasModel.entregar(op.id)
       const esViaje = op.modalidad === 'flete'
       const destino = esViaje ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
-      // Entrega + transacción + cargo a cuenta corriente: una sola operación atómica.
-      await VentasModel.entregarYRegistrar(op.id, () => ({
-        tipo:            esViaje ? 'Venta Viaje' : 'Venta Cantera',
-        id_op_encabezado: op.id,
-        nro_remito:      op.nro_remito,
-        cliente_id:      op.id_cliente,
-        cliente:         op.cliente_nombre,
-        monto:           op.total,
-        // En los viajes el destino va primero, para que la transacción diga adónde se llevó
-        descripcion:     esViaje
-          ? [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
-          : (op.observaciones || ''),
-        metodo_pago:     op.metodo_pago || 'efectivo',
-      }))
+      // Registrar transacción al entregar
+      if (!await TransaccionesModel.existePorOperacion(op.id)) {
+        await TransaccionesModel.crear({
+          tipo:            esViaje ? 'Venta Viaje' : 'Venta Cantera',
+          id_op_encabezado: op.id,
+          nro_remito:      op.nro_remito,
+          cliente_id:      op.id_cliente,
+          cliente:         op.cliente_nombre,
+          monto:           op.total,
+          // En los viajes el destino va primero, para que la transacción diga adónde se llevó
+          descripcion:     esViaje
+            ? [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
+            : (op.observaciones || ''),
+          metodo_pago:     op.metodo_pago || 'efectivo',
+        })
+      }
+      // A cuenta corriente: el cargo ya existe desde el alta; esto lo confirma (no duplica)
+      await VentasModel.sincronizarCargoCC(op.id)
       req.flash('success', 'Entrega confirmada.')
       res.redirect(`/ventas/${req.params.id}/remito`)
     } catch (err) {
