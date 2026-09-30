@@ -7,7 +7,7 @@
     <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Cobranzas de Contenedores</h4>
     <small class="text-muted">Alquileres "a convenir una vez finalizado", ya retirados, sin método de pago cerrado.</small>
   </div>
-  <a href="/contenedores" class="btn btn-outline-secondary">← Volver</a>
+  <a href="/alquileres/contenedores" class="btn btn-outline-secondary">← Volver</a>
 </div>
 
 <div class="card shadow-sm">
@@ -38,7 +38,7 @@
           <td><small class="text-muted"><%= p.fecha_retiro ? formatFecha(p.fecha_retiro) : '—' %></small></td>
           <td class="text-end fw-semibold"><%= money(p.montoEstimado) %></td>
           <td>
-            <form action="/contenedores/cobranzas/<%= p.id %>/resolver" method="POST"
+            <form action="/alquileres/contenedores/cobranzas/<%= p.id %>/resolver" method="POST"
                   class="d-flex flex-wrap gap-2 align-items-end"
                   onsubmit="return confirm('¿Registrar el cobro de OP-<%= String(p.nro_op).padStart(4,'0') %>?')">
               <div>

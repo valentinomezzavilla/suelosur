@@ -469,10 +469,9 @@ formAlquiler?.addEventListener('submit', (e) => {
     }
 
     // Validar campos obligatorios manualmente
+    // Calle u obra ya se validan al enviar (al menos uno); el número es opcional (esquinas).
     const campos = [
         { id: 'fechaInicio', nombre: 'Fecha de inicio' },
-        { id: 'calle',       nombre: 'Calle' },
-        { id: 'numero',      nombre: 'Número' },
     ];
     if (!sinFechaFin() && !historicoEnCurso()) campos.push({ id: 'fechaFin', nombre: 'Fecha de fin' });
     const faltantes = campos.filter(c => !document.getElementById(c.id)?.value.trim());
@@ -483,7 +482,7 @@ formAlquiler?.addEventListener('submit', (e) => {
         if (primero) primero.focus();
         return;
     }
-    const requeridos = ['#fechaInicio', '#calle', '#numero'];
+    const requeridos = ['#fechaInicio'];
     if (!sinFechaFin() && !historicoEnCurso()) requeridos.push('#fechaFin');
     if (typeof validarFormulario === 'function' && !validarFormulario(e.target, requeridos)) {
         e.preventDefault();
