@@ -30,7 +30,6 @@
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('box', { size: 18 }) %> Contenedores</h4>
   <div class="d-flex gap-2">
     <a href="/contenedores/circuito" class="btn btn-outline-secondary"><%- icon('map', { size: 15 }) %> Circuito del día</a>
-    <a href="/contenedores/cobranzas" class="btn btn-outline-secondary"><%- icon('receipt', { size: 15 }) %> Cobranzas</a>
     <% if (user?.rol === 'dueno') { %>
       <a href="/contenedores/configuracion" class="btn btn-outline-secondary"><%- icon('settings', { size: 15 }) %> Configuración</a>
     <% } %>

@@ -12,4 +12,12 @@ function textoDestino({ calle, numero, domicilio, obra } = {}) {
   return ''
 }
 
-module.exports = { textoDestino }
+// Para direcciones sin altura (esquinas, "X y Y") el formulario obligaba a completar el
+// número y se repetía la calle ahí. Si el número es igual a la calle, no es un número.
+function numeroSinRepetirCalle(calle, numero) {
+  const n = String(numero || '').trim()
+  if (n && n.toLowerCase() === String(calle || '').trim().toLowerCase()) return ''
+  return n
+}
+
+module.exports = { textoDestino, numeroSinRepetirCalle }

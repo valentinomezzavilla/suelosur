@@ -9,8 +9,8 @@ const acceso     = roles('admin_ventas', 'dueno')
 
 router.get('/',                 auth, acceso, ctrl.index)
 router.get('/circuito',         auth, acceso, ctrl.circuito)
-router.get('/cobranzas',        auth, acceso, ctrl.cobranzas)
-router.post('/cobranzas/:id/resolver', auth, acceso, ctrl.resolverCobranza)
+// Cobranzas vive en Alquileres de contenedores; se deja el redirect por los favoritos viejos.
+router.get('/cobranzas',        auth, acceso, (req, res) => res.redirect('/alquileres/contenedores/cobranzas'))
 router.get('/configuracion',    auth, roles('dueno'), ctrlConfig.index)
 router.post('/configuracion',   auth, roles('dueno'), ctrlConfig.guardar)
 router.get('/nuevo',            auth, acceso, ctrl.nuevo)

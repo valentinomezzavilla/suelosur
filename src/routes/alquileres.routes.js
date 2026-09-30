@@ -12,6 +12,8 @@ router.get('/', auth, acceso, (req, res) => res.redirect('/alquileres/contenedor
 
 // ── Alquileres de contenedores ────────────────────────────────
 router.get('/contenedores',                      auth, acceso, ctrlCont.index)
+router.get('/contenedores/cobranzas',            auth, acceso, ctrlCont.cobranzas)
+router.post('/contenedores/cobranzas/:id/resolver', auth, acceso, ctrlCont.resolverCobranza)
 router.get('/contenedores/nuevo',                auth, acceso, ctrlCont.nuevo)
 router.post('/contenedores',                     auth, acceso, ctrlCont.crear)
 router.get('/contenedores/:id',                  auth, acceso, ctrlCont.detalle)

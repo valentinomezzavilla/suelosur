@@ -5,7 +5,7 @@ const FlotaModel = require('./flota.model')
 const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
 const ClientesModel = require('./clientes.model')
-const { textoDestino } = require('../utils/destino')
+const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { sumarDiasHabiles } = require('../utils/diasHabiles')
 
 // Nombre completo del cliente (nombre + apellido) — mismo criterio que en
@@ -236,8 +236,9 @@ const AlquileresModel = {
   },
 
   // Edición de los datos comerciales / de entrega del alquiler
-  async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
-    const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+  async actualizar(id_op, { calle, numero: numeroForm, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
+    const numero = numeroSinRepetirCalle(calle, numeroForm)
+    const domicilio_entrega = `${calle || ''} ${numero}`.trim()
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])

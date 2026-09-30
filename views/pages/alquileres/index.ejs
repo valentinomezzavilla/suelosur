@@ -57,7 +57,7 @@
           <th class="text-center">Fin de alquiler</th>
           <th class="text-center">${opts.colDias || 'Días restantes'}</th>
           <th class="text-center">Estado</th>
-          <th class="text-center"></th>
+          <th class="text-center">Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -84,7 +84,11 @@
                 : (a.dias_restantes != null ? a.dias_restantes + 'd' : '—')}
             </td>
             <td class="text-center"><span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span></td>
-            <td class="text-center"><a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-outline-secondary">Ver</a></td>
+            <td class="text-center text-nowrap">
+              <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-outline-secondary" title="Ver">${icon('eye', { size: 15 })}</a>
+              ${a.estado !== 'anulado' ? `<a href="/alquileres/contenedores/${a.id}/editar" class="btn btn-sm btn-outline-secondary" title="Editar">${icon('edit', { size: 15 })}</a>` : ''}
+              <a href="/remitos/${a.id}/pdf" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir remito PDF">${icon('printer', { size: 15 })}</a>
+            </td>
           </tr>`
         }).join('')}
       </tbody>
@@ -121,6 +125,7 @@
   <h4 class="page-title">Alquileres de contenedores</h4>
   <div class="d-flex gap-2">
     <a href="/contenedores/circuito" class="btn btn-ghost btn-sm">Circuito del día</a>
+    <a href="/alquileres/contenedores/cobranzas" class="btn btn-ghost btn-sm">Cobranzas</a>
     <a href="/alquileres/contenedores/nuevo" class="btn btn-primary-modern btn-sm">+ Nuevo alquiler</a>
   </div>
 </div>

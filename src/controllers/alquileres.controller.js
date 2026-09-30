@@ -4,7 +4,7 @@ const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const OperacionesModel        = require('../models/operaciones.model')
 const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
-const { textoDestino } = require('../utils/destino')
+const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
 
@@ -46,7 +46,7 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra, remito } = req.body
+      const { clienteId, calle, numero: numeroForm, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra, remito } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
@@ -75,7 +75,8 @@ const AlquileresController = {
         return res.redirect('/alquileres/contenedores/nuevo')
       }
 
-      const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+      const numero = numeroSinRepetirCalle(calle, numeroForm)
+      const domicilio_entrega = `${calle || ''} ${numero}`.trim()
       // Carga histórica: un alquiler viejo que puede haber terminado o seguir en curso.
       const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
       const historicoEnCurso = esHistorico && req.body.estado_historico === 'en_curso'
@@ -412,6 +413,49 @@ const AlquileresController = {
       req.flash('error', 'Error al anular.')
     }
     res.redirect('/alquileres/contenedores')
+  },
+
+  // ── Cobranzas: alquileres "a convenir" ya retirados y sin cobrar ──────────────
+  async cobranzas(req, res) {
+    try {
+      const pendientes = await AlquileresModel.pendientesDeCobro()
+      // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
+      // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
+      for (const p of pendientes) {
+        const cierre = await AlquileresModel.datosCierre(p.id)
+        p.montoEstimado = cierre ? cierre.precioActual : (p.precio_alquiler || 0)
+      }
+      res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
+    } catch (err) {
+      console.error(err); req.flash('error', 'Error al cargar las cobranzas.'); res.redirect('/alquileres/contenedores')
+    }
+  },
+
+  // Resuelve un "a convenir" pendiente: cobra con el método elegido ahora.
+  async resolverCobranza(req, res) {
+    const back = '/alquileres/contenedores/cobranzas'
+    try {
+      const { metodo_pago_final, precio_final } = req.body
+      if (!metodo_pago_final) {
+        req.flash('error', 'Elegí un método de pago para cerrar el cobro.')
+        return res.redirect(back)
+      }
+      if (metodo_pago_final === 'saldo_a_favor') {
+        const alquiler = await AlquileresModel.obtener(req.params.id)
+        const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
+      }
+      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
+      if (monto == null) {
+        req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
+      } else {
+        req.flash('success', `Cobro registrado por $${Math.round(monto).toLocaleString('es-AR')}.`)
+      }
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al registrar el cobro.')
+    }
+    res.redirect(back)
   },
 }
 

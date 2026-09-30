@@ -1,7 +1,6 @@
 'use strict'
 const ContenedoresModel = require('../models/contenedores.model')
 const AlquileresModel   = require('../models/alquileres.model')
-const ClientesModel     = require('../models/clientes.model')
 const paginar           = require('../utils/paginar')
 
 const ContenedoresController = {
@@ -115,49 +114,6 @@ const ContenedoresController = {
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/contenedores')
     }
-  },
-
-  // ── Cobranzas: alquileres "a convenir" ya retirados y sin cobrar ──────────────
-  async cobranzas(req, res) {
-    try {
-      const pendientes = await AlquileresModel.pendientesDeCobro()
-      // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
-      // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
-      for (const p of pendientes) {
-        const cierre = await AlquileresModel.datosCierre(p.id)
-        p.montoEstimado = cierre ? cierre.precioActual : (p.precio_alquiler || 0)
-      }
-      res.render('pages/contenedores/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
-    } catch (err) {
-      console.error(err); req.flash('error', 'Error al cargar las cobranzas.'); res.redirect('/contenedores')
-    }
-  },
-
-  // Resuelve un "a convenir" pendiente: cobra con el método elegido ahora.
-  async resolverCobranza(req, res) {
-    const back = '/contenedores/cobranzas'
-    try {
-      const { metodo_pago_final, precio_final } = req.body
-      if (!metodo_pago_final) {
-        req.flash('error', 'Elegí un método de pago para cerrar el cobro.')
-        return res.redirect(back)
-      }
-      if (metodo_pago_final === 'saldo_a_favor') {
-        const alquiler = await AlquileresModel.obtener(req.params.id)
-        const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
-        if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
-      }
-      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
-      if (monto == null) {
-        req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
-      } else {
-        req.flash('success', `Cobro registrado por $${Math.round(monto).toLocaleString('es-AR')}.`)
-      }
-    } catch (err) {
-      console.error(err)
-      req.flash('error', err.message || 'Error al registrar el cobro.')
-    }
-    res.redirect(back)
   },
 }
 
