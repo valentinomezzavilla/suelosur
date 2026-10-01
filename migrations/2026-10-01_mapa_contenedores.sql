@@ -10,7 +10,10 @@ ALTER TABLE op_detalle_contenedor ALTER COLUMN domicilio_lat TYPE DOUBLE PRECISI
 ALTER TABLE op_detalle_contenedor ALTER COLUMN domicilio_lng TYPE DOUBLE PRECISION;
 
 -- Resultado de la geocodificación:
---   'ok' | 'manual' | 'sin_resultado' | 'ambigua' | 'sin_direccion' | 'error'
+--   ubicado:    'ok' (exacta) | 'cruce' (esquina) | 'calle' / 'barrio' (aproximadas) | 'manual'
+--   sin ubicar: 'sin_resultado' | 'ambigua' | 'sin_direccion' | 'error'
 --   NULL = todavía no se intentó (lo toma el script de backfill).
+-- geo_detalle: qué se encontró (ej. "Barrio Docta (centro aproximado)").
 ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_estado         TEXT;
 ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_actualizado_en TEXT;
+ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_detalle        TEXT;
