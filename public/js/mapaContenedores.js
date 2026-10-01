@@ -10,7 +10,7 @@
     sin_resultado: 'No se encontró la dirección',
     ambigua:       'Dirección ambigua (varios lugares posibles)',
     sin_direccion: 'Solo tiene obra, sin calle',
-    error:         'Falló la búsqueda (reintentar con el backfill)',
+    error:         'Falló la búsqueda (se reintenta con el backfill)',
   }
 
   const map = L.map('mapaContenedores').setView(CORDOBA_CENTER, 12)
@@ -37,9 +37,10 @@
 
   function icono(it) {
     const estado = it.estado === 'pendiente_retiro' ? 'pendiente_retiro' : 'en_alquiler'
+    const aprox = it.aproximada ? ' pin-cont--aprox' : ''
     return L.divIcon({
       className: '',
-      html: `<div class="pin-cont pin-cont--${estado}"><span>${esc(it.numero_contenedor ?? '?')}</span></div>`,
+      html: `<div class="pin-cont pin-cont--${estado}${aprox}"><span>${esc(it.numero_contenedor ?? '?')}</span></div>`,
       iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -32],
     })
   }
@@ -55,6 +56,8 @@
         ${it.obra ? `<div class="popup-cont__fila"><b>Obra:</b> ${esc(it.obra)}</div>` : ''}
         <div class="popup-cont__fila"><b>Inicio:</b> ${fmtFecha(it.fecha_inicio)}</div>
         <div class="popup-cont__fila"><b>Estado:</b> ${estado}${it.geo_estado === 'manual' ? ' · <i>ubicado a mano</i>' : ''}</div>
+        ${it.aproximada ? `<div class="popup-cont__aprox">Ubicación aproximada: ${esc(it.geo_detalle || (it.geo_estado === 'barrio' ? 'centro del barrio' : 'sobre la calle, sin la altura'))}</div>` : ''}
+        ${it.geo_estado === 'cruce' && it.geo_detalle ? `<div class="popup-cont__fila"><i>${esc(it.geo_detalle)}</i></div>` : ''}
         <div class="popup-cont__acciones">
           <a href="${comoLlegar}" target="_blank" rel="noopener">Cómo llegar</a>
           ${CFG.puedeEditar ? `<a href="/alquileres/contenedores/${it.id}">Ver ${nroOp(it.nro_op)}</a>` : ''}
@@ -108,8 +111,9 @@
     renderSinUbicar(sinUbicar)
 
     const total = ubicados.length + sinUbicar.length
+    const aprox = ubicados.filter(it => it.aproximada).length
     $('mapaResumen').textContent = total
-      ? `${ubicados.length} en el mapa${sinUbicar.length ? ` · ${sinUbicar.length} sin ubicar` : ''}`
+      ? `${ubicados.length} en el mapa${aprox ? ` (${aprox} aprox.)` : ''}${sinUbicar.length ? ` · ${sinUbicar.length} sin ubicar` : ''}`
       : ''
 
     if (!total) {

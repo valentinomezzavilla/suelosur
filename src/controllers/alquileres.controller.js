@@ -458,6 +458,9 @@ const AlquileresController = {
           fecha_inicio: f.fecha_inicio,
           estado: f.contenedor_estado,
           geo_estado: f.geo_estado,
+          geo_detalle: f.geo_detalle || '',
+          // Ubicada por el centro del barrio o de la calle, no por la altura exacta
+          aproximada: f.geo_estado === 'calle' || f.geo_estado === 'barrio',
           lat: f.lat,
           lng: f.lng,
         }

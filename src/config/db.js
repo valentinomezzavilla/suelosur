@@ -1506,8 +1506,10 @@ async function initDB() {
 
   // MIGRACIÓN: mapa de contenedores. La dirección de cada alquiler se geocodifica UNA
   // vez (al crear/editar) y las coordenadas quedan acá. geo_estado dice cómo salió:
-  // 'ok' | 'manual' | 'sin_resultado' | 'ambigua' | 'sin_direccion' | 'error';
-  // NULL = todavía no se intentó (lo levanta el backfill). Ver migrations/.
+  // ubicado: 'ok' (exacta) | 'cruce' | 'calle' / 'barrio' (aproximadas) | 'manual';
+  // sin ubicar: 'sin_resultado' | 'ambigua' | 'sin_direccion' | 'error';
+  // NULL = todavía no se intentó (lo levanta el backfill). geo_detalle = qué se encontró.
+  // Ver migrations/.
   // DOUBLE PRECISION: con REAL (float4) las coordenadas vuelven redondeadas a ~10-15 m.
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS domicilio_lat DOUBLE PRECISION`).catch(() => {})
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS domicilio_lng DOUBLE PRECISION`).catch(() => {})
@@ -1515,6 +1517,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_detalle_contenedor ALTER COLUMN domicilio_lng TYPE DOUBLE PRECISION`).catch(() => {})
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_estado TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_actualizado_en TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_detalle TEXT`).catch(() => {})
 
   console.log('✅ Base de datos PostgreSQL inicializada')
 }

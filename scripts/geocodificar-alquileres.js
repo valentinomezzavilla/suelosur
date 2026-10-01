@@ -21,7 +21,7 @@ const DRY_RUN    = args.has('--dry-run')
 
 async function main() {
   // Por si el script corre antes de que la app haya arrancado con la migración (initDB).
-  for (const col of ['domicilio_lat DOUBLE PRECISION', 'domicilio_lng DOUBLE PRECISION', 'geo_estado TEXT', 'geo_actualizado_en TEXT']) {
+  for (const col of ['domicilio_lat DOUBLE PRECISION', 'domicilio_lng DOUBLE PRECISION', 'geo_estado TEXT', 'geo_actualizado_en TEXT', 'geo_detalle TEXT']) {
     await query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS ${col}`)
   }
   await query(`ALTER TABLE op_detalle_contenedor ALTER COLUMN domicilio_lat TYPE DOUBLE PRECISION`)
@@ -31,7 +31,7 @@ async function main() {
   // Activo = entregado y el contenedor sigue en el domicilio; programado = pendiente/despachado.
   const soloVigentes = TODOS ? '' : `AND (op.estado IN ('pendiente','despachado') OR um.estado_paso IN ('en_alquiler','pendiente_retiro'))`
   const filas = (await query(`
-    SELECT op.id, op.nro_op, op.estado, oc.domicilio_calle, oc.domicilio_numero, oc.geo_estado
+    SELECT op.id, op.nro_op, op.estado, op.obra, oc.domicilio_calle, oc.domicilio_numero, oc.geo_estado
     FROM op_encabezado op
     JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
     LEFT JOIN (
@@ -54,7 +54,7 @@ async function main() {
     const geo = await AlquileresModel.ubicar(f.id)
     const estado = geo?.estado || 'error'
     resumen[estado] = (resumen[estado] || 0) + 1
-    console.log(`  ${op}  ${consulta}  →  ${estado}${geo?.lat != null ? ` (${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)})` : ''}`)
+    console.log(`  ${op}  ${consulta}  →  ${estado}${geo?.lat != null ? ` (${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)})` : ''}${geo?.detalle ? '  ' + geo.detalle : ''}`)
   }
   if (!DRY_RUN) console.log('Resumen:', resumen)
 }

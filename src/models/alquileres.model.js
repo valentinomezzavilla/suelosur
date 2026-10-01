@@ -256,7 +256,7 @@ const AlquileresModel = {
       `, [domicilio_entrega, calle || null, numero || null, zona_entrega || '',
           normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op])
       if (direccionCambio) {
-        await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id_op])
+        await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id_op])
       }
     })
     return { direccionCambio }
@@ -264,22 +264,26 @@ const AlquileresModel = {
 
   // ── Mapa de contenedores ──────────────────────────────────────
 
-  async guardarUbicacion(id_op, { lat, lng, estado }) {
+  async guardarUbicacion(id_op, { lat, lng, estado, detalle }) {
     await query(`
       UPDATE op_detalle_contenedor
-      SET domicilio_lat = ?, domicilio_lng = ?, geo_estado = ?,
+      SET domicilio_lat = ?, domicilio_lng = ?, geo_estado = ?, geo_detalle = ?,
           geo_actualizado_en = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
       WHERE id_orden_pedido = ?
-    `, [lat ?? null, lng ?? null, estado, id_op])
+    `, [lat ?? null, lng ?? null, estado, detalle || null, id_op])
   },
 
-  // Geocodifica la dirección del alquiler (Nominatim) y guarda el resultado, salga
+  // Geocodifica la dirección del alquiler (OpenStreetMap) y guarda el resultado, salga
   // bien o mal: si falla queda sin coordenadas y aparece en "sin ubicar" del mapa.
   async ubicar(id_op) {
     const { geocodificarDireccion } = require('../services/geocoding.service')
-    const oc = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    const oc = (await query(`
+      SELECT oc.domicilio_calle, oc.domicilio_numero, op.obra
+      FROM op_detalle_contenedor oc JOIN op_encabezado op ON op.id = oc.id_orden_pedido
+      WHERE oc.id_orden_pedido = ? LIMIT 1
+    `, [id_op])).rows[0]
     if (!oc) return null
-    const geo = await geocodificarDireccion({ calle: oc.domicilio_calle, numero: oc.domicilio_numero })
+    const geo = await geocodificarDireccion({ calle: oc.domicilio_calle, numero: oc.domicilio_numero, obra: oc.obra })
     await this.guardarUbicacion(id_op, geo)
     return geo
   },
@@ -291,7 +295,7 @@ const AlquileresModel = {
     return (await query(`
       SELECT op.id, op.nro_op, op.obra, ${nombreCompleto('cli')} AS cliente_nombre,
              oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, oc.zona_entrega,
-             oc.domicilio_lat AS lat, oc.domicilio_lng AS lng, oc.geo_estado,
+             oc.domicilio_lat AS lat, oc.domicilio_lng AS lng, oc.geo_estado, oc.geo_detalle,
              cont.numero_contenedor, um.estado_paso AS contenedor_estado,
              to_char(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), 'YYYY-MM-DD') AS fecha_inicio
       FROM op_encabezado op
