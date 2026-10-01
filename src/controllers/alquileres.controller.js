@@ -8,6 +8,18 @@ const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
 
+// Geocodifica la dirección del alquiler sin hacer esperar al usuario: si Nominatim
+// falla o tarda, el alquiler ya quedó creado y aparece en "sin ubicar" del mapa.
+function ubicarEnSegundoPlano(id_op) {
+  AlquileresModel.ubicar(id_op).catch(e => console.error('Ubicar alquiler:', e.message))
+}
+
+// Coordenadas dentro de Argentina continental (para la ubicación cargada a mano).
+function coordenadaValida(lat, lng) {
+  return Number.isFinite(lat) && Number.isFinite(lng)
+    && lat >= -55.5 && lat <= -21 && lng >= -74 && lng <= -53
+}
+
 const AlquileresController = {
 
   async index(req, res) {
@@ -176,6 +188,7 @@ const AlquileresController = {
           nro_remito: remitoLeido.nro,
         })
         await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
+        ubicarEnSegundoPlano(result.id)
         // El alquiler sigue abierto: el ingreso se genera recién al retirar el contenedor.
         req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. Se cobra al retirar el contenedor.`)
         return res.redirect('/alquileres/contenedores')
@@ -207,6 +220,7 @@ const AlquileresController = {
         })
       }
       await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
+      ubicarEnSegundoPlano(result.id)
 
       req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4,'0')} ${esProgramado ? 'programado' : 'creado'}.`)
       res.redirect('/alquileres/contenedores')
@@ -284,11 +298,12 @@ const AlquileresController = {
         const cliente = actual?.id_cliente ? await ClientesModel.obtener(actual.id_cliente) : null
         if (!cliente?.cuenta_corriente) plazo_alquiler = PLAZO_ESTANDAR
       }
-      await AlquileresModel.actualizar(req.params.id, {
+      const { direccionCambio } = await AlquileresModel.actualizar(req.params.id, {
         ...req.body,
         plazo_alquiler,
         fecha_entrega_planificada: fechaInicio || req.body.fecha_entrega_planificada || null,
       })
+      if (direccionCambio) ubicarEnSegundoPlano(req.params.id)
       req.flash('success', 'Alquiler actualizado.')
       res.redirect(`/alquileres/contenedores/${req.params.id}`)
     } catch (err) {
@@ -413,6 +428,64 @@ const AlquileresController = {
       req.flash('error', 'Error al anular.')
     }
     res.redirect('/alquileres/contenedores')
+  },
+
+  // ── Mapa de contenedores ──────────────────────────────────────────────────────
+  // La vista y su JSON solo leen las coordenadas guardadas: abrir el mapa no
+  // geocodifica nada. Los choferes lo ven en modo lectura.
+  async mapa(req, res) {
+    res.render('pages/alquileres/mapa', {
+      titulo: 'Mapa de Contenedores',
+      puedeEditar: req.session.user?.rol !== 'chofer',
+      scripts: ['/js/mapaContenedores.js'],
+    })
+  },
+
+  async mapaData(req, res) {
+    try {
+      await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
+      const filas = await AlquileresModel.datosMapa()
+      const items = filas.map(f => {
+        const dir = textoDestino({ domicilio: f.domicilio_entrega, calle: f.domicilio_calle, numero: f.domicilio_numero })
+        return {
+          id: f.id,
+          nro_op: f.nro_op,
+          cliente: f.cliente_nombre || '',
+          direccion: dir ? `${dir}, Córdoba` : '',
+          obra: f.obra || '',
+          zona: f.zona_entrega || '',
+          numero_contenedor: f.numero_contenedor,
+          fecha_inicio: f.fecha_inicio,
+          estado: f.contenedor_estado,
+          geo_estado: f.geo_estado,
+          lat: f.lat,
+          lng: f.lng,
+        }
+      })
+      res.json({
+        ubicados:  items.filter(i => i.lat != null && i.lng != null),
+        sinUbicar: items.filter(i => i.lat == null || i.lng == null),
+        puedeEditar: req.session.user?.rol !== 'chofer',
+      })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: 'Error al cargar los datos del mapa.' })
+    }
+  },
+
+  // Corrección manual: el usuario marca en el mapa dónde está el contenedor.
+  async guardarUbicacionManual(req, res) {
+    try {
+      const lat = parseFloat(req.body.lat), lng = parseFloat(req.body.lng)
+      if (!coordenadaValida(lat, lng)) return res.status(400).json({ error: 'Ubicación inválida.' })
+      const alquiler = await AlquileresModel.obtener(req.params.id)
+      if (!alquiler) return res.status(404).json({ error: 'Alquiler no encontrado.' })
+      await AlquileresModel.guardarUbicacion(alquiler.id, { lat, lng, estado: 'manual' })
+      res.json({ ok: true })
+    } catch (err) {
+      console.error(err)
+      res.status(500).json({ error: 'Error al guardar la ubicación.' })
+    }
   },
 
   // ── Cobranzas: alquileres "a convenir" ya retirados y sin cobrar ──────────────

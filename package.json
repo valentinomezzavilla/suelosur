@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "concurrently \"nodemon server.js\" \"sass --watch src/scss/main.scss:public/css/main.css\"",
     "build": "sass src/scss/main.scss:public/css/main.css",
-    "start": "node server.js"
+    "start": "node server.js",
+    "geocodificar:alquileres": "node scripts/geocodificar-alquileres.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
