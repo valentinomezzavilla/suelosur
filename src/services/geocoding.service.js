@@ -227,7 +227,7 @@ async function buscarCruce([calle1, calle2]) {
     way["highway"]["name"~"${regexNombre(calle2)}",i](${bbox})->.b;
     node(w.a)(w.b);
     out;`
-  const data = await enCola(async () => {
+  const consultar = () => enCola(async () => {
     const resp = await fetch(OVERPASS_URL, {
       method: 'POST',
       headers: { 'User-Agent': USER_AGENT, 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -236,6 +236,12 @@ async function buscarCruce([calle1, calle2]) {
     })
     if (!resp.ok) throw new Error(`Overpass respondió ${resp.status}`)
     return resp.json()
+  })
+  // Overpass devuelve 504/429 seguido cuando está cargado: un reintento a los pocos
+  // segundos casi siempre alcanza (la geocodificación se hace una sola vez por alquiler).
+  const data = await consultar().catch(async () => {
+    await new Promise(r => setTimeout(r, 4000))
+    return consultar()
   })
   const nodos = (data.elements || []).map(n => ({ lat: n.lat, lng: n.lon }))
   if (!nodos.length) return null
