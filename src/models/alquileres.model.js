@@ -235,10 +235,16 @@ const AlquileresModel = {
     }
   },
 
-  // Edición de los datos comerciales / de entrega del alquiler
+  // Edición de los datos comerciales / de entrega del alquiler.
+  // Devuelve { direccionCambio }: si cambió la calle o el número, las coordenadas
+  // guardadas ya no sirven — se borran acá y quien llama vuelve a geocodificar.
   async actualizar(id_op, { calle, numero: numeroForm, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
     const numero = numeroSinRepetirCalle(calle, numeroForm)
     const domicilio_entrega = `${calle || ''} ${numero}`.trim()
+    const previo = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+    const direccionCambio = !!previo
+      && (norm(previo.domicilio_calle) !== norm(calle) || norm(previo.domicilio_numero) !== norm(numero))
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])
@@ -249,7 +255,55 @@ const AlquileresModel = {
         WHERE id_orden_pedido = ?
       `, [domicilio_entrega, calle || null, numero || null, zona_entrega || '',
           normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op])
+      if (direccionCambio) {
+        await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id_op])
+      }
     })
+    return { direccionCambio }
+  },
+
+  // ── Mapa de contenedores ──────────────────────────────────────
+
+  async guardarUbicacion(id_op, { lat, lng, estado }) {
+    await query(`
+      UPDATE op_detalle_contenedor
+      SET domicilio_lat = ?, domicilio_lng = ?, geo_estado = ?,
+          geo_actualizado_en = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      WHERE id_orden_pedido = ?
+    `, [lat ?? null, lng ?? null, estado, id_op])
+  },
+
+  // Geocodifica la dirección del alquiler (Nominatim) y guarda el resultado, salga
+  // bien o mal: si falla queda sin coordenadas y aparece en "sin ubicar" del mapa.
+  async ubicar(id_op) {
+    const { geocodificarDireccion } = require('../services/geocoding.service')
+    const oc = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    if (!oc) return null
+    const geo = await geocodificarDireccion({ calle: oc.domicilio_calle, numero: oc.domicilio_numero })
+    await this.guardarUbicacion(id_op, geo)
+    return geo
+  },
+
+  // Contenedores alquilados ahora (entregados y todavía en el domicilio: 'en_alquiler'
+  // o 'pendiente_retiro'), con las coordenadas ya guardadas. Mismo criterio que la
+  // tabla "en curso". No geocodifica nada.
+  async datosMapa() {
+    return (await query(`
+      SELECT op.id, op.nro_op, op.obra, ${nombreCompleto('cli')} AS cliente_nombre,
+             oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, oc.zona_entrega,
+             oc.domicilio_lat AS lat, oc.domicilio_lng AS lng, oc.geo_estado,
+             cont.numero_contenedor, um.estado_paso AS contenedor_estado,
+             to_char(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), 'YYYY-MM-DD') AS fecha_inicio
+      FROM op_encabezado op
+      JOIN clientes cli ON cli.id = op.id_cliente
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor AND um.id_op_contenedor = oc.id
+      LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
+      WHERE op.tipo_op = 'C' AND op.estado = 'entregado'
+        AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
+      ORDER BY cont.numero_contenedor
+    `)).rows
   },
 
   async despachar(id_op) {

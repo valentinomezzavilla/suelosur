@@ -7,6 +7,7 @@
     truck:     '<rect x="1" y="6" width="14" height="11" rx="1"/><polygon points="15 9 19 9 22 12 22 17 15 17 15 9"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="19" r="2"/>',
     hardhat:   '<path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a8 8 0 0 1 16 0v3"/>',
     map:       '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>',
+    mapPin:    '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
     users:     '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     arrowDown: '<line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>',
     arrowUp:   '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
@@ -73,6 +74,9 @@
       </a>
       <a href="/alquileres/contenedores/cobranzas" class="nav-link is-indent <%= t==='Cobranzas de Contenedores'?'is-active':'' %>">
         <%- ic('receipt') %><span>Cobranzas</span>
+      </a>
+      <a href="/alquileres/contenedores/mapa" class="nav-link is-indent <%= t==='Mapa de Contenedores'?'is-active':'' %>">
+        <%- ic('mapPin') %><span>Mapa de contenedores</span>
       </a>
       <a href="/alquileres/maquinaria" class="nav-link is-indent <%= t==='Alquileres — Maquinaria'?'is-active':'' %>">
         <%- ic('hardhat') %><span>Maquinaria</span>
@@ -147,6 +151,7 @@
     <% if (user?.rol === 'chofer') { %>
     <div class="nav-section">
       <a href="/hoja-de-ruta" class="nav-link"><%- ic('map') %><span>Mi ruta del día</span></a>
+      <a href="/alquileres/contenedores/mapa" class="nav-link <%= t==='Mapa de Contenedores'?'is-active':'' %>"><%- ic('mapPin') %><span>Mapa de contenedores</span></a>
     </div>
     <% } %>
 

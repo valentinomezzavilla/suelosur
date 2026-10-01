@@ -1,0 +1,97 @@
+<style>
+  .mapa-cont-wrap { position: relative; }
+  #mapaContenedores {
+    width: 100%; height: calc(100vh - 230px); min-height: 360px;
+    border-radius: 12px; border: 1px solid #e5e7eb; z-index: 0;
+  }
+  .mapa-cont-overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: none; z-index: 500; padding: 1rem;
+  }
+  .mapa-cont-overlay__msg {
+    background: rgba(255,255,255,.95); border: 1px solid #e5e7eb; border-radius: 10px;
+    padding: .85rem 1.1rem; font-weight: 600; color: #374151; text-align: center;
+    box-shadow: 0 4px 16px rgba(0,0,0,.08); max-width: 320px;
+  }
+  .mapa-cont-aviso {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 600;
+    background: #1f2937; color: #fff; border-radius: 999px; padding: .45rem .9rem;
+    font-size: .85rem; display: flex; gap: .6rem; align-items: center; white-space: nowrap;
+    max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis;
+  }
+  .mapa-cont-aviso button { background: none; border: 0; color: #fbbf24; font-weight: 700; padding: 0; }
+  .mapa-cont-picking #mapaContenedores { cursor: crosshair; }
+
+  .mapa-leyenda { display: flex; gap: 1rem; flex-wrap: wrap; font-size: .85rem; color: #4b5563; }
+  .mapa-leyenda__dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: .35rem; vertical-align: -1px; }
+
+  .pin-cont {
+    display: flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  }
+  .pin-cont span { transform: rotate(45deg); color: #fff; font-weight: 700; font-size: 12px; line-height: 1; }
+  .pin-cont--en_alquiler      { background: #ea7a1b; }
+  .pin-cont--pendiente_retiro { background: #dc2626; }
+
+  .popup-cont { font-size: .88rem; line-height: 1.45; min-width: 190px; }
+  .popup-cont__titulo { font-weight: 700; font-size: .95rem; margin-bottom: .25rem; }
+  .popup-cont__fila b { color: #374151; }
+  .popup-cont__acciones { display: flex; gap: .75rem; margin-top: .45rem; flex-wrap: wrap; }
+
+  .sin-ubicar-item {
+    display: flex; justify-content: space-between; align-items: center; gap: .75rem;
+    padding: .7rem 1rem; border-bottom: 1px solid #f1f1f1; flex-wrap: wrap;
+  }
+  .sin-ubicar-item:last-child { border-bottom: 0; }
+  .sin-ubicar-item__info { min-width: 0; flex: 1 1 220px; }
+  .sin-ubicar-item__dir { font-size: .85rem; color: #6b7280; word-break: break-word; }
+  .sin-ubicar-item__acciones { display: flex; gap: .4rem; flex-wrap: wrap; }
+
+  @media (max-width: 576px) {
+    #mapaContenedores { height: calc(100vh - 260px); }
+    .sin-ubicar-item__acciones { width: 100%; }
+    .sin-ubicar-item__acciones .btn { flex: 1; }
+  }
+</style>
+
+<div class="page-header">
+  <h4 class="page-title"><%- icon('map', { size: 18 }) %> Mapa de Contenedores</h4>
+  <div class="d-flex gap-2 flex-wrap">
+    <button type="button" id="btnRecargarMapa" class="btn btn-ghost btn-sm">Actualizar</button>
+    <% if (puedeEditar) { %>
+      <a href="/alquileres/contenedores" class="btn btn-ghost btn-sm">← Alquileres</a>
+    <% } %>
+  </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+  <div class="mapa-leyenda">
+    <span><span class="mapa-leyenda__dot" style="background:#ea7a1b"></span>En alquiler</span>
+    <span><span class="mapa-leyenda__dot" style="background:#dc2626"></span>Pendiente de retiro</span>
+  </div>
+  <small class="text-muted" id="mapaResumen"></small>
+</div>
+
+<div class="mapa-cont-wrap mb-3" id="mapaWrap">
+  <div id="mapaContenedores"></div>
+  <div class="mapa-cont-overlay" id="mapaOverlay" style="display:none">
+    <div class="mapa-cont-overlay__msg" id="mapaOverlayMsg"></div>
+  </div>
+  <div class="mapa-cont-aviso" id="mapaAviso" style="display:none">
+    <span id="mapaAvisoTxt"></span>
+    <button type="button" id="mapaAvisoCancelar">Cancelar</button>
+  </div>
+</div>
+
+<div class="card-modern mb-3" id="cardSinUbicar" style="display:none">
+  <div class="card-modern-header d-flex justify-content-between align-items-center" style="background:#fef9e7;">
+    <span class="card-modern-title">Sin ubicar — no se pudo encontrar la dirección</span>
+    <span class="badge badge-pendiente rounded-pill px-3" id="sinUbicarCount">0</span>
+  </div>
+  <div class="card-modern-body p-0" id="listaSinUbicar"></div>
+</div>
+
+<script>
+  window.MAPA_CONTENEDORES = { puedeEditar: <%= puedeEditar ? 'true' : 'false' %> }
+</script>

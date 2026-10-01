@@ -6,6 +6,8 @@ const roles      = require('../middlewares/roles')
 const ctrlCont   = require('../controllers/alquileres.controller')
 const ctrlMaq    = require('../controllers/alquileres_maquinaria.controller')
 const acceso     = roles('admin_ventas', 'dueno')
+// El mapa (solo lectura) también lo usan los choferes desde el celular.
+const accesoMapa = roles('admin_ventas', 'dueno', 'chofer')
 
 // ── Índice general: redirige a sub-secciones ──────────────────
 router.get('/', auth, acceso, (req, res) => res.redirect('/alquileres/contenedores'))
@@ -14,6 +16,9 @@ router.get('/', auth, acceso, (req, res) => res.redirect('/alquileres/contenedor
 router.get('/contenedores',                      auth, acceso, ctrlCont.index)
 router.get('/contenedores/cobranzas',            auth, acceso, ctrlCont.cobranzas)
 router.post('/contenedores/cobranzas/:id/resolver', auth, acceso, ctrlCont.resolverCobranza)
+router.get('/contenedores/mapa',                 auth, accesoMapa, ctrlCont.mapa)
+router.get('/contenedores/mapa-data',            auth, accesoMapa, ctrlCont.mapaData)
+router.post('/contenedores/:id/ubicacion',       auth, acceso, ctrlCont.guardarUbicacionManual)
 router.get('/contenedores/nuevo',                auth, acceso, ctrlCont.nuevo)
 router.post('/contenedores',                     auth, acceso, ctrlCont.crear)
 router.get('/contenedores/:id',                  auth, acceso, ctrlCont.detalle)
