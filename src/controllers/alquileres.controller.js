@@ -135,6 +135,56 @@ const AlquileresController = {
       }
       const plazo_alquiler = rPlazo.plazo
 
+      // ── Varios contenedores: alquiler agrupado (una OP por contenedor) ──
+      const seleccion = leerContenedoresDelForm(req.body)
+      if (seleccion.error) {
+        req.flash('error', seleccion.error)
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      if (seleccion.contenedores.length >= 2) {
+        if (esHistorico) {
+          req.flash('error', 'La carga histórica es de a un contenedor por alquiler.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
+        if (alquiler_actual_id) {
+          req.flash('error', 'El próximo alquiler encadenado ("próximos a finalizar") es de a un contenedor.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
+        // Cada contenedor puede traer precio y fecha de fin propios; vacíos = los generales.
+        const contenedores = []
+        for (const c of seleccion.contenedores) {
+          const precio = c.precio !== '' ? parseFloat(c.precio) : precioAlquilerNum
+          if (!(precio > 0)) {
+            req.flash('error', 'Revisá el precio de cada contenedor: tiene que ser mayor a cero.')
+            return res.redirect('/alquileres/contenedores/nuevo')
+          }
+          const rp = calcularPlazoAlquiler({
+            fechaInicio, fechaFin: c.fin || fechaFin, sinFechaFin, esHistorico: false,
+            fechaFinManual: fechaFinManual || !!c.fin, tieneCC,
+          })
+          if (rp.error) {
+            req.flash('error', rp.error)
+            return res.redirect('/alquileres/contenedores/nuevo')
+          }
+          contenedores.push({ id_contenedor: c.id_contenedor, precio_alquiler: precio, plazo_alquiler: rp.plazo })
+        }
+        const cobroModo = req.body.cobro_modo === 'alquiler' ? 'alquiler' : 'contenedor'
+        const grupo = await AlquileresModel.crearGrupo({
+          cobro_modo: cobroModo, en_curso: esEnCurso, contenedores, nro_remito: remitoLeido.nro,
+          id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
+          domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero, zona_entrega,
+          metodo_pago: metodoPago, observaciones, obra, fecha_inicio: fechaInicio || null,
+          id_chofer: id_chofer || null, id_camion: id_camion || null,
+        })
+        const FacturacionModel = require('../models/facturacion.model')
+        for (const op of grupo.ops) await FacturacionModel.marcarAlCrear(op.id, req.body.paraFacturar, op.precio_alquiler)
+        // Se geocodifica una sola vez; ubicar copia las coordenadas al resto del grupo.
+        ubicarEnSegundoPlano(grupo.ops[0].id)
+        const nros = grupo.ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')
+        req.flash('success', `Alquiler de ${grupo.ops.length} contenedores ${esEnCurso ? 'cargado como en curso' : 'creado'}: ${nros}. Cobro por ${cobroModo}.`)
+        return res.redirect('/alquileres/contenedores')
+      }
+
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
       if (esHistorico && !historicoEnCurso) {
         if (!fechaInicio) {

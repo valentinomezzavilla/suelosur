@@ -330,6 +330,24 @@ const AlquileresModel = {
     `, [lat ?? null, lng ?? null, estado, detalle || null, id_op])
   },
 
+  // Copia las coordenadas de una OP a las demás OP de su grupo que tienen la misma
+  // dirección: un alquiler agrupado se geocodifica una sola vez. Las que se editaron con
+  // otra dirección no se tocan.
+  async copiarUbicacionAlGrupo(id_op) {
+    await query(`
+      UPDATE op_detalle_contenedor oc
+      SET domicilio_lat = src.domicilio_lat, domicilio_lng = src.domicilio_lng,
+          geo_estado = src.geo_estado, geo_detalle = src.geo_detalle, geo_actualizado_en = src.geo_actualizado_en
+      FROM op_detalle_contenedor src
+      JOIN op_encabezado op_src ON op_src.id = src.id_orden_pedido
+      JOIN op_encabezado op ON op.id_grupo = op_src.id_grupo
+      WHERE src.id_orden_pedido = ? AND op_src.id_grupo IS NOT NULL
+        AND oc.id_orden_pedido = op.id AND op.id <> op_src.id
+        AND LOWER(TRIM(COALESCE(oc.domicilio_calle, ''))) = LOWER(TRIM(COALESCE(src.domicilio_calle, '')))
+        AND LOWER(TRIM(COALESCE(oc.domicilio_numero, ''))) = LOWER(TRIM(COALESCE(src.domicilio_numero, '')))
+    `, [id_op])
+  },
+
   // Geocodifica la dirección del alquiler (OpenStreetMap) y guarda el resultado, salga
   // bien o mal: si falla queda sin coordenadas y aparece en "sin ubicar" del mapa.
   async ubicar(id_op) {
@@ -342,6 +360,7 @@ const AlquileresModel = {
     if (!oc) return null
     const geo = await geocodificarDireccion({ calle: oc.domicilio_calle, numero: oc.domicilio_numero, obra: oc.obra })
     await this.guardarUbicacion(id_op, geo)
+    await this.copiarUbicacionAlGrupo(id_op)
     return geo
   },
 

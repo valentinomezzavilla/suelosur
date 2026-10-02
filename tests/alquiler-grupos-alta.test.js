@@ -106,4 +106,19 @@ describe('alta de alquileres en el modelo', () => {
       contenedores: [{ id_contenedor: cont, plazo_alquiler: 4, precio_alquiler: 100 }] }),
       /al menos dos contenedores/)
   })
+
+  it('copiarUbicacionAlGrupo: copia las coordenadas a las OP del grupo con la misma dirección', async () => {
+    const conts = await datos.crearContenedores(3)
+    const r = await AlquileresModel.crearGrupo({
+      ...comunes, cobro_modo: 'contenedor', en_curso: false,
+      contenedores: conts.map(id_contenedor => ({ id_contenedor, plazo_alquiler: 4, precio_alquiler: 100 })),
+    })
+    const [op1, op2, op3] = r.ops.map(o => o.id)
+    await prueba.q(`UPDATE op_detalle_contenedor SET domicilio_calle = 'Otra calle' WHERE id_orden_pedido = ?`, [op3])
+    await AlquileresModel.guardarUbicacion(op1, { lat: -31.41, lng: -64.19, estado: 'ok', detalle: 'Prueba' })
+    await AlquileresModel.copiarUbicacionAlGrupo(op1)
+    const geo = async (id) => (await prueba.q(`SELECT domicilio_lat AS lat, geo_estado FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [id])).rows[0]
+    assert.deepEqual(await geo(op2), { lat: -31.41, geo_estado: 'ok' })
+    assert.deepEqual(await geo(op3), { lat: null, geo_estado: null })
+  })
 })
