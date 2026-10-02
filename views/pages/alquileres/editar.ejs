@@ -1,6 +1,10 @@
 <%
   const d = alquiler.detalle || {}
-  const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente']]
+  const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente'],['a_convenir','A convenir una vez finalizado']]
+  // El método actual se muestra aunque no esté en la lista (ej. saldo a favor): si no,
+  // el select caería en "Sin especificar" y al guardar se perdería.
+  const metodoActual = alquiler.metodo_pago || d.metodo_pago || ''
+  if (metodoActual && !metodos.some(([k]) => k === metodoActual)) metodos.push([metodoActual, metodoActual === 'saldo_a_favor' ? 'Saldo a favor' : metodoActual])
   const calle = d.domicilio_calle || d.domicilio_entrega || ''
   const numero = d.domicilio_numero || ''
   // Fecha inicio = entrega planificada; fecha fin = inicio + plazo (días).
@@ -50,10 +54,20 @@
         <div class="col-md-3"><label class="form-label">Método de pago</label>
           <select name="metodo_pago" class="form-select">
             <option value="">— Sin especificar —</option>
-            <% metodos.forEach(([k,l]) => { %><option value="<%= k %>" <%= (alquiler.metodo_pago||d.metodo_pago)===k?'selected':'' %>><%= l %></option><% }) %>
+            <% metodos.forEach(([k,l]) => { %><option value="<%= k %>" <%= metodoActual===k?'selected':'' %>><%= l %></option><% }) %>
           </select>
         </div>
         <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= alquiler.observaciones || '' %></textarea></div>
+        <% // Las mismas OP que actualiza actualizarCompartidosGrupo: sin cobrar y, con cobro por
+           // contenedor, todavía sin retirar.
+           const restantes = alquiler.grupo ? alquiler.grupo.ops.filter(o => o.estado !== 'anulado' && o.id !== alquiler.id
+             && !o.cobrada && (alquiler.grupo.cobro_modo === 'alquiler' || o.abierta)).length : 0
+           if (restantes > 0) { %>
+          <label class="toggle-row col-12">
+            <input type="checkbox" name="aplicar_grupo" value="1" checked>
+            <span>Aplicar dirección, obra, zona, método de pago y observaciones a <%= restantes === 1 ? 'el otro contenedor' : `los otros ${restantes} contenedores` %> del alquiler que todavía no se cobr<%= restantes === 1 ? 'ó' : 'aron' %> (plazo, precio y fechas son de cada uno)</span>
+          </label>
+        <% } %>
       </div>
       <div class="d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-naranja px-4">Guardar cambios</button>

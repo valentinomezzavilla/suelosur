@@ -38,6 +38,22 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /Faltan retirar 1\./)
   })
 
+  it('editar: el método de pago "a convenir" sigue elegido (no se pierde al guardar)', async () => {
+    const alquiler = {
+      id: 101, nro_op: 261, estado: 'entregado', metodo_pago: 'a_convenir', observaciones: '', obra: null,
+      fecha_entrega_planificada: '2026-09-28', grupo: null,
+      detalle: { domicilio_calle: 'San Lorenzo', domicilio_numero: '501', plazo_alquiler: 4, precio_alquiler: 100, zona_entrega: '' },
+    }
+    const html = await renderVista('pages/alquileres/editar', { alquiler, zonas: [] })
+    assert.match(html, /<option value="a_convenir" selected>/)
+  })
+
+  it('panel del grupo: botón de anular completo solo si queda alguna OP pendiente', async () => {
+    const conPendiente = { ...grupoEjemplo, ops: [{ ...grupoEjemplo.ops[0], estado: 'pendiente' }, grupoEjemplo.ops[1]] }
+    assert.match(await renderVista('partials/alquiler_grupo', { grupo: conPendiente, opActualId: 101 }), /anular-grupo/)
+    assert.doesNotMatch(await renderVista('partials/alquiler_grupo', { grupo: grupoEjemplo, opActualId: 101 }), /anular-grupo/)
+  })
+
   it('listado: insignia de grupo solo en los alquileres agrupados', async () => {
     const fila = (extra) => ({
       id: 101, nro_op: 261, nro_remito: 5, cliente_nombre: 'Cliente', numero_contenedor: 19,

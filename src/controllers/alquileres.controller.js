@@ -367,8 +367,16 @@ const AlquileresController = {
         plazo_alquiler,
         fecha_entrega_planificada: fechaInicio || req.body.fecha_entrega_planificada || null,
       })
+      // "Aplicar a todos": los datos compartidos pasan al resto del alquiler agrupado.
+      const aplicarGrupo = req.body.aplicar_grupo === '1' || req.body.aplicar_grupo === 'on'
+      const otras = aplicarGrupo ? await AlquileresModel.actualizarCompartidosGrupo(req.params.id) : 0
+      // ubicar copia las coordenadas a las OP del grupo con la misma dirección. Si la
+      // dirección de esta OP no cambió pero se pasó a otras, alcanza con copiarles las suyas.
       if (direccionCambio) ubicarEnSegundoPlano(req.params.id)
-      req.flash('success', 'Alquiler actualizado.')
+      else if (otras) await AlquileresModel.copiarUbicacionAlGrupo(req.params.id)
+      req.flash('success', otras
+        ? `Alquiler actualizado (y ${otras} contenedor${otras === 1 ? '' : 'es'} más del grupo).`
+        : 'Alquiler actualizado.')
       res.redirect(`/alquileres/contenedores/${req.params.id}`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error al actualizar.'); res.redirect(`/alquileres/contenedores/${req.params.id}/editar`)
@@ -506,6 +514,22 @@ const AlquileresController = {
     res.redirect('/alquileres/contenedores')
   },
 
+  async anularGrupo(req, res) {
+    try {
+      const n = await AlquileresModel.anularGrupo(req.params.id)
+      // Si el resto ya estaba retirado y el cobro es por alquiler, se cobra ahora.
+      const grupo = await AlquileresModel.grupoConCobroPorAlquiler(req.params.id)
+      const monto = grupo ? await AlquileresModel.cobrarGrupo(grupo.id) : null
+      req.flash('success', n
+        ? `Se anularon ${n} contenedor${n === 1 ? '' : 'es'} del alquiler${monto != null ? `. Se cobró lo ya retirado por $${Math.round(monto).toLocaleString('es-AR')}` : ''}.`
+        : 'No había contenedores pendientes para anular: los demás ya se entregaron.')
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al anular el alquiler.')
+    }
+    res.redirect(`/alquileres/contenedores/${req.params.id}`)
+  },
+
   // ── Mapa de contenedores ──────────────────────────────────────────────────────
   // La vista y su JSON solo leen las coordenadas guardadas: abrir el mapa no
   // geocodifica nada. Los choferes lo ven en modo lectura.
@@ -513,7 +537,7 @@ const AlquileresController = {
     res.render('pages/alquileres/mapa', {
       titulo: 'Mapa de Contenedores',
       puedeEditar: req.session.user?.rol !== 'chofer',
-      scripts: ['/js/mapaContenedores.js'],
+      scripts: ['/js/mapaUtils.js', '/js/mapaContenedores.js'],
     })
   },
 
@@ -561,6 +585,7 @@ const AlquileresController = {
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) return res.status(404).json({ error: 'Alquiler no encontrado.' })
       await AlquileresModel.guardarUbicacion(alquiler.id, { lat, lng, estado: 'manual' })
+      await AlquileresModel.copiarUbicacionAlGrupo(alquiler.id)
       res.json({ ok: true })
     } catch (err) {
       console.error(err)

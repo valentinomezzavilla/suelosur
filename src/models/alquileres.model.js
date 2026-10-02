@@ -67,6 +67,9 @@ function normalizarPlazo(plazo, porDefecto) {
   return Number.isNaN(n) ? porDefecto : n
 }
 
+// Dirección normalizada para comparar si cambió (espacios y mayúsculas no cuentan).
+const normDir = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+
 const AlquileresModel = {
 
   // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
@@ -354,9 +357,8 @@ const AlquileresModel = {
     const numero = numeroSinRepetirCalle(calle, numeroForm)
     const domicilio_entrega = `${calle || ''} ${numero}`.trim()
     const previo = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
-    const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
     const direccionCambio = !!previo
-      && (norm(previo.domicilio_calle) !== norm(calle) || norm(previo.domicilio_numero) !== norm(numero))
+      && (normDir(previo.domicilio_calle) !== normDir(calle) || normDir(previo.domicilio_numero) !== normDir(numero))
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])
@@ -372,6 +374,51 @@ const AlquileresModel = {
       }
     })
     return { direccionCambio }
+  },
+
+  // Datos compartidos del alquiler agrupado (dirección, obra, zona, método de pago y
+  // observaciones): los copia de esta OP a las demás OP del grupo que siguen vivas. Plazo,
+  // precio y fechas son de cada contenedor y no se tocan. Si cambia la dirección de una
+  // OP, se borran sus coordenadas (las vuelve a llenar ubicar). Devuelve cuántas actualizó.
+  //  - No toca las OP ya cobradas (su método tiene que seguir coincidiendo con su cobro)
+  //    ni, con cobro por contenedor, las ya retiradas: una retirada "a convenir" espera
+  //    en Cobranzas y cambiarle el método la sacaría de ahí sin cobrarla. Con cobro por
+  //    alquiler las retiradas sin cobrar sí se actualizan: se cobran todas juntas al final.
+  //  - Un método vacío no pisa el de las otras (el formulario puede no traerlo).
+  async actualizarCompartidosGrupo(id_op) {
+    return await transaction(async (q) => {
+      const src = (await q(`
+        SELECT op.id_grupo, op.metodo_pago, op.observaciones, op.obra,
+               oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, oc.zona_entrega
+        FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        WHERE op.id = ?
+      `, [id_op])).rows[0]
+      if (!src?.id_grupo) return 0
+      const otras = (await q(`
+        SELECT op.id FROM op_encabezado op
+        JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+        WHERE op.id_grupo = ? AND op.id <> ? AND op.estado <> 'anulado'
+          AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
+          AND (ag.cobro_modo = 'alquiler' OR ${SQL_OP_ABIERTA})
+        ORDER BY op.id
+      `, [src.id_grupo, id_op])).rows.map(r => r.id)
+      for (const id of otras) {
+        const previo = (await q(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [id])).rows[0]
+        await q(`UPDATE op_encabezado SET metodo_pago = COALESCE(NULLIF(?, ''), metodo_pago), observaciones = ?, obra = ? WHERE id = ?`,
+          [src.metodo_pago, src.observaciones, src.obra, id])
+        await q(`
+          UPDATE op_detalle_contenedor
+          SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,
+              metodo_pago = COALESCE(NULLIF(?, ''), metodo_pago)
+          WHERE id_orden_pedido = ?
+        `, [src.domicilio_entrega, src.domicilio_calle, src.domicilio_numero, src.zona_entrega, src.metodo_pago, id])
+        if (normDir(previo?.domicilio_calle) !== normDir(src.domicilio_calle) || normDir(previo?.domicilio_numero) !== normDir(src.domicilio_numero)) {
+          await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id])
+        }
+      }
+      return otras.length
+    })
   },
 
   // ── Mapa de contenedores ──────────────────────────────────────
@@ -588,6 +635,63 @@ const AlquileresModel = {
           [oc.id_contenedor, oc.id])
       }
     }
+  },
+
+  // Anula todas las OP del grupo que todavía se pueden anular (pendientes o despachadas);
+  // las ya entregadas siguen su curso. Devuelve cuántas anuló.
+  async anularGrupo(id_op) {
+    const grupo = await this.grupoDe(id_op)
+    if (!grupo) throw new Error('Este alquiler no es de varios contenedores.')
+    const anulables = grupo.ops.filter(o => o.estado === 'pendiente' || o.estado === 'despachado')
+    for (const o of anulables) await this.anular(o.id)
+    return anulables.length
+  },
+
+  // Agrupa alquileres YA cargados por separado en un alquiler agrupado (ej. dos alquileres
+  // idénticos cargados a mano antes de que existiera esta opción). Solo alquileres de
+  // contenedor del mismo cliente, sin anular, sin grupo y sin cobrar. Con simular = true
+  // hace todas las validaciones y no escribe nada.
+  async agruparExistentes(nrosOp, cobroModo = 'contenedor', { simular = false } = {}) {
+    const nros = [...new Set((nrosOp || []).map(n => parseInt(n, 10)).filter(Number.isFinite))]
+    if (nros.length < 2) throw new Error('Indicá al menos dos N° de OP para agrupar.')
+    return await transaction(async (q) => {
+      const ops = (await q(`
+        SELECT op.id, op.nro_op, op.id_cliente, op.estado, op.id_grupo, op.tipo_op, op.metodo_pago, op.nro_remito,
+               oc.domicilio_entrega, cont.numero_contenedor,
+               (oc.id IS NOT NULL AND NOT ${SQL_OP_ABIERTA}) AS retirado,
+               EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrada
+        FROM op_encabezado op
+        LEFT JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+        WHERE op.nro_op = ANY(?::int[]) ORDER BY op.id FOR UPDATE OF op
+      `, [nros])).rows
+      const nombre = (n) => 'OP-' + String(n).padStart(4, '0')
+      const faltan = nros.filter(n => !ops.some(o => o.nro_op === n))
+      if (faltan.length) throw new Error(`No existe ${faltan.map(nombre).join(', ')}.`)
+      for (const o of ops) {
+        if (o.tipo_op !== 'C') throw new Error(`${nombre(o.nro_op)} no es un alquiler de contenedor.`)
+        if (o.estado === 'anulado') throw new Error(`${nombre(o.nro_op)} está anulada.`)
+        if (o.id_grupo) throw new Error(`${nombre(o.nro_op)} ya pertenece a un alquiler agrupado.`)
+        if (o.cobrada) throw new Error(`${nombre(o.nro_op)} ya se cobró: no se puede agrupar.`)
+      }
+      if (new Set(ops.map(o => String(o.id_cliente))).size > 1) throw new Error('Las OP son de clientes distintos.')
+      // Cobro por alquiler: el grupo se cobra entero con el método de la OP principal, así
+      // que todas tienen que tener el mismo (si no, una quedaría cobrada con otro método).
+      const metodos = [...new Set(ops.map(o => o.metodo_pago || 'sin especificar'))]
+      if (cobroModo === 'alquiler' && metodos.length > 1) {
+        throw new Error(`Las OP tienen métodos de pago distintos (${ops.map(o => `${nombre(o.nro_op)}: ${o.metodo_pago || 'sin especificar'}`).join(', ')}). Para cobrar por alquiler tienen que tener el mismo: corregilo en cada OP o agrupalas con cobro por contenedor.`)
+      }
+      // El detalle sirve para revisar la simulación antes de confirmar.
+      const resumen = ops.map(o => ({
+        id: o.id, nro_op: o.nro_op, estado: o.estado, numero_contenedor: o.numero_contenedor,
+        metodo_pago: o.metodo_pago, retirado: !!o.retirado, domicilio_entrega: o.domicilio_entrega, nro_remito: o.nro_remito,
+      }))
+      if (simular) return { simulado: true, ops: resumen }
+      const { id } = (await q(`INSERT INTO alquiler_grupos (cobro_modo) VALUES (?) RETURNING id`,
+        [cobroModo === 'alquiler' ? 'alquiler' : 'contenedor'])).rows[0]
+      await q(`UPDATE op_encabezado SET id_grupo = ? WHERE id = ANY(?::bigint[])`, [id, ops.map(o => o.id)])
+      return { id_grupo: id, ops: resumen }
+    })
   },
 
   async clientes() {
