@@ -492,7 +492,13 @@ const AlquileresController = {
   async anular(req, res) {
     try {
       await AlquileresModel.anular(req.params.id)
-      req.flash('success', 'Alquiler anulado.')
+      // Si era el último contenedor pendiente de un alquiler agrupado con cobro por
+      // alquiler y los demás ya se retiraron, el cobro del grupo se genera ahora.
+      const grupo = await AlquileresModel.grupoConCobroPorAlquiler(req.params.id)
+      const monto = grupo ? await AlquileresModel.cobrarGrupo(grupo.id) : null
+      req.flash('success', monto != null
+        ? `Alquiler anulado. Se cobró el resto del alquiler agrupado por $${Math.round(monto).toLocaleString('es-AR')}.`
+        : 'Alquiler anulado.')
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al anular.')

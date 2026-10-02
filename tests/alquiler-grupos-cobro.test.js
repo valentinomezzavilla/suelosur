@@ -5,6 +5,8 @@ const { describe, it, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const AlquileresModel = require('../src/models/alquileres.model')
 const { llamar } = require('./helpers/controlador')
+const TransaccionesModel = require('../src/models/transacciones.model')
+const ClientesModel = require('../src/models/clientes.model')
 
 describe('cobro de alquileres agrupados', () => {
   let admin
@@ -144,5 +146,33 @@ describe('cobro de alquileres agrupados', () => {
     } })
     assert.deepEqual(r.flashes, [{ tipo: 'success', msg: 'Cobro registrado por $350.' }])
     assert.deepEqual([(await txDe(g.ops[0]))[0].monto, (await txDe(g.ops[1]))[0].monto], [100, 250])
+  })
+
+  it('anular el último contenedor pendiente de un grupo cobra lo ya retirado', async () => {
+    const g = await grupoEnCurso({ cobro_modo: 'alquiler', en_curso: false })
+    await AlquileresModel.entregar(g.ops[0])
+    await retirar(g.ops[0])
+    await AlquileresModel.cobrarAlCerrar(g.ops[0])
+    const r = await llamar('anular', { user: { id: admin, rol: 'dueno' }, params: { id: String(g.ops[1]) } })
+    assert.match(r.flashes[0].msg, /^Alquiler anulado\. Se cobró el resto del alquiler agrupado por \$/)
+    assert.equal((await txDe(g.ops[0])).length, 1)
+  })
+
+  it('no se puede borrar por separado una transacción de un cobro agrupado con cuenta corriente', async () => {
+    const g = await grupoEnCurso({ cobro_modo: 'alquiler', metodo_pago: 'cuenta_corriente', cuentaCorriente: true })
+    await retirar(g.ops[0]); await retirar(g.ops[1])
+    await AlquileresModel.cobrarAlCerrar(g.ops[1])
+    const tx = (await prueba.q(`SELECT id FROM transacciones WHERE id_op_encabezado = ?`, [g.ops[1]])).rows[0]
+    await assert.rejects(TransaccionesModel.eliminar(tx.id), /no se puede eliminar una transacción por separado/)
+    assert.equal((await txDe(g.ops[1])).length, 1)
+  })
+
+  it('cuentas corrientes: el cargo único del grupo cuenta para todas sus OP', async () => {
+    const g = await grupoEnCurso({ cobro_modo: 'alquiler', metodo_pago: 'cuenta_corriente', cuentaCorriente: true })
+    const sinCargo = async () => (await ClientesModel.operacionesSinCargo(g.id_cliente)).map(o => o.id).sort((a, b) => a - b)
+    assert.deepEqual(await sinCargo(), g.ops) // en curso: todavía sin cargo
+    await retirar(g.ops[0]); await retirar(g.ops[1])
+    await AlquileresModel.cobrarAlCerrar(g.ops[1])
+    assert.deepEqual(await sinCargo(), [])
   })
 })

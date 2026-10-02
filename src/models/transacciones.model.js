@@ -121,6 +121,22 @@ const TransaccionesModel = {
     if (!tx) throw new Error('La transacción no existe.')
     const idOp = tx.id_op_encabezado
 
+    // Cobro de un alquiler agrupado "por alquiler" con un solo cargo de cuenta corriente
+    // por el total: borrar una de sus transacciones (y con ella su operación) dejaría la
+    // cuenta del cliente descuadrada, porque el cargo cubre a todos los contenedores.
+    if (idOp) {
+      const agrupado = (await query(`
+        SELECT 1 FROM op_encabezado op
+        JOIN alquiler_grupos ag ON ag.id = op.id_grupo AND ag.cobro_modo = 'alquiler'
+        WHERE op.id = ? AND EXISTS (
+          SELECT 1 FROM movimientos_cuenta m
+          WHERE m.id_op_encabezado IN (SELECT g.id FROM op_encabezado g WHERE g.id_grupo = op.id_grupo))
+      `, [idOp])).rows[0]
+      if (agrupado) {
+        throw new Error('Este cobro es de un alquiler con varios contenedores y se registró en la cuenta corriente del cliente como un solo cargo: no se puede eliminar una transacción por separado.')
+      }
+    }
+
     // Estado de la operación: define qué stock hay que devolver
     const op = idOp
       ? (await query(`SELECT estado FROM op_encabezado WHERE id = ?`, [idOp])).rows[0]
