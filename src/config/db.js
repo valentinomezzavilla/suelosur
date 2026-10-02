@@ -1544,9 +1544,29 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_actualizado_en TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_detalle TEXT`).catch(() => {})
 
+  await migrarGruposAlquiler()
   await migrarHorasALocal()
 
   console.log('✅ Base de datos PostgreSQL inicializada')
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MIGRACIÓN: alquileres con varios contenedores. Un alquiler agrupado es un grupo de
+// operaciones (una por contenedor) que comparten cliente, dirección, remito y modo de
+// cobro. Un alquiler de un solo contenedor no tiene grupo (id_grupo NULL).
+// Sin .catch(): si falla, initDB falla y Render no levanta la versión nueva (la vieja
+// sigue andando), en vez de arrancar sin las columnas que el código necesita.
+// ─────────────────────────────────────────────────────────────────
+async function migrarGruposAlquiler() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS alquiler_grupos (
+      id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      cobro_modo TEXT NOT NULL DEFAULT 'contenedor' CHECK (cobro_modo IN ('contenedor', 'alquiler')),
+      created_at TEXT DEFAULT ahora_local()
+    )
+  `)
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS id_grupo BIGINT REFERENCES alquiler_grupos(id)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_op_encabezado_id_grupo ON op_encabezado (id_grupo) WHERE id_grupo IS NOT NULL`)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1639,4 +1659,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler }
