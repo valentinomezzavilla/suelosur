@@ -288,25 +288,29 @@ const AlquileresModel = {
     return geo
   },
 
-  // Contenedores alquilados ahora (entregados y todavía en el domicilio: 'en_alquiler'
-  // o 'pendiente_retiro'), con las coordenadas ya guardadas. Mismo criterio que la
-  // tabla "en curso". No geocodifica nada.
+  // Alquileres para el mapa, con las coordenadas ya guardadas (no geocodifica nada):
+  //  - en curso: entregados y con el contenedor todavía en el domicilio ('en_alquiler'
+  //    o 'pendiente_retiro') — mismo criterio que la tabla "en curso";
+  //  - programados: pendientes de iniciar ('pendiente' / 'despachado').
+  // dias_restantes se calcula igual que en listarPorEstado (plazo en días hábiles).
   async datosMapa() {
     return (await query(`
       SELECT op.id, op.nro_op, op.obra, ${nombreCompleto('cli')} AS cliente_nombre,
              oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, oc.zona_entrega,
              oc.domicilio_lat AS lat, oc.domicilio_lng AS lng, oc.geo_estado, oc.geo_detalle,
-             cont.numero_contenedor, um.estado_paso AS contenedor_estado,
-             to_char(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), 'YYYY-MM-DD') AS fecha_inicio
+             op.estado AS op_estado, cont.numero_contenedor, um.estado_paso AS contenedor_estado,
+             to_char(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), 'YYYY-MM-DD') AS fecha_inicio,
+             (sumar_dias_habiles(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
-      JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor AND um.id_op_contenedor = oc.id
+      LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor AND um.id_op_contenedor = oc.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
       LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
-      WHERE op.tipo_op = 'C' AND op.estado = 'entregado'
-        AND um.estado_paso IN ('en_alquiler','pendiente_retiro')
-      ORDER BY cont.numero_contenedor
+      WHERE op.tipo_op = 'C'
+        AND (op.estado IN ('pendiente','despachado')
+             OR (op.estado = 'entregado' AND um.estado_paso IN ('en_alquiler','pendiente_retiro')))
+      ORDER BY cont.numero_contenedor NULLS LAST
     `)).rows
   },
 
