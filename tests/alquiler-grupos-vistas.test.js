@@ -38,6 +38,12 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /Faltan retirar 1\./)
   })
 
+  it('panel del grupo: botón de anular completo solo si queda alguna OP pendiente', async () => {
+    const conPendiente = { ...grupoEjemplo, ops: [{ ...grupoEjemplo.ops[0], estado: 'pendiente' }, grupoEjemplo.ops[1]] }
+    assert.match(await renderVista('partials/alquiler_grupo', { grupo: conPendiente, opActualId: 101 }), /anular-grupo/)
+    assert.doesNotMatch(await renderVista('partials/alquiler_grupo', { grupo: grupoEjemplo, opActualId: 101 }), /anular-grupo/)
+  })
+
   it('listado: insignia de grupo solo en los alquileres agrupados', async () => {
     const fila = (extra) => ({
       id: 101, nro_op: 261, nro_remito: 5, cliente_nombre: 'Cliente', numero_contenedor: 19,

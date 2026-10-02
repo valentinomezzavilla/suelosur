@@ -590,6 +590,16 @@ const AlquileresModel = {
     }
   },
 
+  // Anula todas las OP del grupo que todavía se pueden anular (pendientes o despachadas);
+  // las ya entregadas siguen su curso. Devuelve cuántas anuló.
+  async anularGrupo(id_op) {
+    const grupo = await this.grupoDe(id_op)
+    if (!grupo) throw new Error('Este alquiler no es de varios contenedores.')
+    const anulables = grupo.ops.filter(o => o.estado === 'pendiente' || o.estado === 'despachado')
+    for (const o of anulables) await this.anular(o.id)
+    return anulables.length
+  },
+
   async clientes() {
     return (await query(`SELECT id, nombre FROM clientes WHERE activo = 1 ORDER BY nombre`)).rows
   },

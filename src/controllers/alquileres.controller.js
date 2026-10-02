@@ -506,6 +506,22 @@ const AlquileresController = {
     res.redirect('/alquileres/contenedores')
   },
 
+  async anularGrupo(req, res) {
+    try {
+      const n = await AlquileresModel.anularGrupo(req.params.id)
+      // Si el resto ya estaba retirado y el cobro es por alquiler, se cobra ahora.
+      const grupo = await AlquileresModel.grupoConCobroPorAlquiler(req.params.id)
+      const monto = grupo ? await AlquileresModel.cobrarGrupo(grupo.id) : null
+      req.flash('success', n
+        ? `Se anularon ${n} contenedor${n === 1 ? '' : 'es'} del alquiler${monto != null ? `. Se cobró lo ya retirado por $${Math.round(monto).toLocaleString('es-AR')}` : ''}.`
+        : 'No había contenedores pendientes para anular: los demás ya se entregaron.')
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al anular el alquiler.')
+    }
+    res.redirect(`/alquileres/contenedores/${req.params.id}`)
+  },
+
   // ── Mapa de contenedores ──────────────────────────────────────────────────────
   // La vista y su JSON solo leen las coordenadas guardadas: abrir el mapa no
   // geocodifica nada. Los choferes lo ven en modo lectura.

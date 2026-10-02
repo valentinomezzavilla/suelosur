@@ -43,5 +43,11 @@
         Cobro por alquiler: se cobra todo junto al retirar el último contenedor.<%= grupo.abiertas ? ` Faltan retirar ${grupo.abiertas}.` : '' %>
       </p>
     <% } %>
+    <% if (grupo.ops.some(o => o.estado === 'pendiente' || o.estado === 'despachado')) { %>
+      <form action="/alquileres/contenedores/<%= opActualId %>/anular-grupo" method="POST" class="px-3 pb-3"
+            onsubmit="return confirm('¿Anular todos los contenedores de este alquiler que todavía no se entregaron?')">
+        <button class="btn btn-sm btn-outline-danger">❌ Anular alquiler completo</button>
+      </form>
+    <% } %>
   </div>
 </div>
