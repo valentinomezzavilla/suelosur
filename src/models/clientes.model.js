@@ -159,10 +159,11 @@ const ClientesModel = {
     return null
   },
 
-  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }) {
-    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+  // `q` permite registrarlo dentro de una transacción (cobro de un alquiler agrupado).
+  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }, q = query) {
+    const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null])
-    await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
+    await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return rows[0].id
   },
 

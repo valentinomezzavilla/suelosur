@@ -19,16 +19,17 @@ const TransaccionesModel = {
   PREFIJO,
   codigo: codigoTransaccion,
 
-  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }) {
+  // `q` permite registrarla dentro de una transacción (cobro de un alquiler agrupado).
+  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }, q = query) {
     // Con cliente cargado, el texto del cliente sale siempre de la ficha (nombre + apellido):
     // cada camino de venta/alquiler pasaba un nombre armado distinto (a veces solo el de pila).
     if (cliente_id) {
-      const c = (await query(`SELECT nombre, apellido FROM clientes WHERE id = ?`, [cliente_id])).rows[0]
+      const c = (await q(`SELECT nombre, apellido FROM clientes WHERE id = ?`, [cliente_id])).rows[0]
       if (c) cliente = ClientesModel.nombreCompleto(c)
     }
-    const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
+    const { n } = (await q(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
     // fecha opcional: si no se pasa, usa la fecha/hora actual (carga histórica la puede fijar en el pasado).
-    const { rows } = await query(`
+    const { rows } = await q(`
       INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
       RETURNING id
