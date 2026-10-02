@@ -16,10 +16,22 @@ async function crearContenedores(n) {
   return ids
 }
 
-async function crearCliente({ cuentaCorriente = false } = {}) {
+async function crearCliente({ cuentaCorriente = false, saldo = 0 } = {}) {
   return (await q(
-    `INSERT INTO clientes (nombre, apellido, cuenta_corriente, activo, saldo) VALUES ('PRUEBA', 'GRUPOS', ?, 1, 0) RETURNING id`,
-    [cuentaCorriente ? 1 : 0])).rows[0].id
+    `INSERT INTO clientes (nombre, apellido, cuenta_corriente, activo, saldo) VALUES ('PRUEBA', 'GRUPOS', ?, 1, ?) RETURNING id`,
+    [cuentaCorriente ? 1 : 0, saldo])).rows[0].id
+}
+
+// Chofer con usuario propio (como el que entra a la hoja de ruta): { id_usuario, id_empleado }.
+async function crearChofer() {
+  const sufijo = Math.random().toString(36).slice(2, 10)
+  const id_usuario = (await q(
+    `INSERT INTO users (usuario, password_hash, nombre, rol) VALUES (?, 'x', 'Chofer Prueba', 'chofer') RETURNING id`,
+    ['chofer_prueba_' + sufijo])).rows[0].id
+  const id_empleado = (await q(
+    `INSERT INTO empleados (nombre, apellido, id_usuario, activo) VALUES ('Chofer', 'Prueba', ?, 1) RETURNING id`,
+    [id_usuario])).rows[0].id
+  return { id_usuario, id_empleado }
 }
 
 async function idAdministrativo() {
@@ -36,4 +48,4 @@ function datosComunes({ id_cliente, id_administrativo, metodo_pago = 'efectivo',
   }
 }
 
-module.exports = { crearContenedores, crearCliente, idAdministrativo, datosComunes }
+module.exports = { crearContenedores, crearCliente, crearChofer, idAdministrativo, datosComunes }

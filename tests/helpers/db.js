@@ -53,6 +53,10 @@ async function abrir() {
   const hayGrupos = (await cliente.query(
     `SELECT 1 FROM information_schema.columns WHERE table_name = 'op_encabezado' AND column_name = 'id_grupo'`)).rowCount
   if (!hayGrupos && typeof db.migrarGruposAlquiler === 'function') await db.migrarGruposAlquiler()
+  // Lo mismo con la marca de precio asignado: sin desplegar, se aplica dentro de la prueba.
+  const hayPrecioAsignado = (await cliente.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = 'op_detalle_contenedor' AND column_name = 'precio_asignado_en'`)).rowCount
+  if (!hayPrecioAsignado && typeof db.migrarAsignacionPrecio === 'function') await db.migrarAsignacionPrecio()
 }
 
 async function cerrar() {

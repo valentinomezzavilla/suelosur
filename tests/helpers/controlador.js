@@ -4,10 +4,10 @@
 // Requerirlo DESPUÉS de ./db (el controlador carga los modelos).
 const Controller = require('../../src/controllers/alquileres.controller')
 
-function llamar(accion, { body = {}, params = {}, user }) {
+function llamar(accion, { body = {}, params = {}, query = {}, user }) {
   return new Promise((resolve, reject) => {
     const flashes = []
-    const req = { body, params, session: { user }, flash: (tipo, msg) => flashes.push({ tipo, msg }) }
+    const req = { body, params, query, session: { user }, flash: (tipo, msg) => flashes.push({ tipo, msg }) }
     const res = {
       redirect: (url) => resolve({ url, flashes }),
       render: (vista, data) => resolve({ vista, data, flashes }),

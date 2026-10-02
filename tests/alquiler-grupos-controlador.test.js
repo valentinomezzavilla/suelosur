@@ -24,9 +24,9 @@ describe('controlador de alquileres: alta', () => {
     FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
     WHERE op.id_cliente = ? ORDER BY op.id`, [id_cliente])).rows
 
+  // El formulario de alta ya no manda precio ni método de pago: se asignan después en Cobranzas.
   const cuerpo = (extra) => ({
-    calle: 'San Lorenzo', numero: '501', fechaInicio: inicio, fechaFin: sumarDiasHabiles(inicio, 4),
-    precio_alquiler: '100', metodoPago: 'efectivo', ...extra,
+    calle: 'San Lorenzo', numero: '501', fechaInicio: inicio, fechaFin: sumarDiasHabiles(inicio, 4), ...extra,
   })
 
   it('un contenedor, sin cuenta corriente: plazo estándar aunque se edite el fin', async () => {
@@ -63,27 +63,26 @@ describe('controlador de alquileres: alta', () => {
     assert.deepEqual(r.flashes, [{ tipo: 'error', msg: 'La fecha de fin no puede ser anterior a la de inicio.' }])
   })
 
-  it('varios contenedores: un grupo, precio y fin propios, cobro elegido', async () => {
+  it('varios contenedores: un grupo sin precio, con fin propio y el cobro por definir', async () => {
     const id_cliente = await datos.crearCliente({ cuentaCorriente: true })
     const [c1, c2] = await datos.crearContenedores(2)
     const r = await llamar('crear', { user: admin, body: cuerpo({
       clienteId: String(id_cliente),
       ids_contenedor: [String(c1), String(c2)],
-      precio_c: { ['c' + c2]: '150' },
       fin_c: { ['c' + c2]: sumarDiasHabiles(inicio, 7) },
-      cobro_modo: 'alquiler',
     }) })
     assert.equal(r.url, '/alquileres/contenedores')
     assert.equal(r.flashes[0].tipo, 'success')
-    assert.match(r.flashes[0].msg, /Alquiler de 2 contenedores creado: OP-\d{4}, OP-\d{4}\. Cobro por alquiler\./)
+    assert.match(r.flashes[0].msg, /Alquiler de 2 contenedores creado: OP-\d{4}, OP-\d{4}\. Falta asignarle el precio: Cobranzas → Asignar precio\./)
     const ops = await opsDe(id_cliente)
     assert.equal(ops.length, 2)
     assert.ok(ops[0].id_grupo)
     assert.equal(ops[0].id_grupo, ops[1].id_grupo)
-    assert.deepEqual(ops.map(o => o.precio_alquiler), [100, 150])
+    assert.deepEqual(ops.map(o => o.precio_alquiler), [null, null]) // sin precio, no $0
     assert.deepEqual(ops.map(o => o.plazo_alquiler), [10, 7]) // cuenta corriente: 10 por defecto; el segundo, a mano
+    // El cobro por contenedor / por alquiler se elige al asignar el precio: hasta entonces, por contenedor
     const g = (await prueba.q(`SELECT cobro_modo FROM alquiler_grupos WHERE id = ?`, [ops[0].id_grupo])).rows[0]
-    assert.equal(g.cobro_modo, 'alquiler')
+    assert.equal(g.cobro_modo, 'contenedor')
   })
 
   it('varios contenedores con fecha de inicio pasada: se cargan como en curso', async () => {
@@ -101,21 +100,27 @@ describe('controlador de alquileres: alta', () => {
     const id_cliente = await datos.crearCliente()
     const [c1, c2] = await datos.crearContenedores(2)
     const r = await llamar('crear', { user: admin, body: cuerpo({
-      clienteId: String(id_cliente), finalizado: '1', ids_contenedor: [String(c1), String(c2)],
+      clienteId: String(id_cliente), finalizado: '1', precio_alquiler: '100', metodoPago: 'efectivo', // el histórico pide precio y método
+      ids_contenedor: [String(c1), String(c2)],
     }) })
     assert.equal(r.url, '/alquileres/contenedores/nuevo')
     assert.deepEqual(r.flashes, [{ tipo: 'error', msg: 'La carga histórica es de a un contenedor por alquiler.' }])
     assert.equal((await opsDe(id_cliente)).length, 0)
   })
 
-  it('varios contenedores con un precio en cero: error y no se crea nada', async () => {
-    const id_cliente = await datos.crearCliente()
+  it('varios contenedores: el precio, el método y el cobro de un formulario viejo se ignoran', async () => {
+    const id_cliente = await datos.crearCliente({ cuentaCorriente: true })
     const [c1, c2] = await datos.crearContenedores(2)
-    const r = await llamar('crear', { user: admin, body: cuerpo({
-      clienteId: String(id_cliente), ids_contenedor: [String(c1), String(c2)], precio_c: { ['c' + c1]: '0' },
+    await llamar('crear', { user: admin, body: cuerpo({
+      clienteId: String(id_cliente), ids_contenedor: [String(c1), String(c2)],
+      precio_alquiler: '100', precio_c: { ['c' + c1]: '0' }, metodoPago: 'cuenta_corriente', cobro_modo: 'alquiler',
     }) })
-    assert.deepEqual(r.flashes, [{ tipo: 'error', msg: 'Revisá el precio de cada contenedor: tiene que ser mayor a cero.' }])
-    assert.equal((await opsDe(id_cliente)).length, 0)
+    const ops = await opsDe(id_cliente)
+    assert.deepEqual(ops.map(o => o.precio_alquiler), [null, null])
+    const g = (await prueba.q(`SELECT cobro_modo FROM alquiler_grupos WHERE id = ?`, [ops[0].id_grupo])).rows[0]
+    assert.equal(g.cobro_modo, 'contenedor')
+    const metodos = (await prueba.q(`SELECT metodo_pago FROM op_encabezado WHERE id_cliente = ? ORDER BY id`, [id_cliente])).rows
+    assert.deepEqual(metodos.map(m => m.metodo_pago), [null, null])
   })
 
   it('retiro en grupo por alquiler "a convenir": el primero sin método; el último pide método y cobra todo', async () => {

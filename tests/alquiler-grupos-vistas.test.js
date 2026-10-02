@@ -4,7 +4,7 @@ const assert = require('node:assert/strict')
 const { renderVista } = require('./helpers/vistas')
 
 describe('vistas de alquileres agrupados', () => {
-  it('nuevo: barra de selección múltiple y bloque de varios contenedores con selector de cobro', async () => {
+  it('nuevo: barra de selección múltiple y bloque de varios contenedores (sin selector de cobro)', async () => {
     const html = await renderVista('pages/alquileres/nuevo', {
       disponibles: [{ id: 3, numero_contenedor: 19 }, { id: 5, numero_contenedor: 20 }],
       porLiberar: [], choferesDisp: [], camionesDisp: [], zonas: [],
@@ -14,16 +14,16 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /id="btnContinuarSeleccion"/)
     assert.match(html, /id="bloqueVariosContenedores"/)
     assert.match(html, /id="inputsContenedores"/)
-    assert.match(html, /name="cobro_modo" value="contenedor" checked/)
-    assert.match(html, /name="cobro_modo" value="alquiler"/)
+    // El cobro por contenedor / por alquiler se elige al asignar el precio, no en el alta
+    assert.doesNotMatch(html, /name="cobro_modo"/)
     assert.match(html, /id="rowCheckFinalizado"/)
   })
 
   const grupoEjemplo = {
     id: 9, cobro_modo: 'alquiler', abiertas: 1,
     ops: [
-      { id: 101, nro_op: 261, estado: 'entregado', id_contenedor: 1, numero_contenedor: 19, contenedor_estado: 'en_alquiler', dias_restantes: 3, abierta: true, cobrada: false },
-      { id: 102, nro_op: 262, estado: 'entregado', id_contenedor: 2, numero_contenedor: 20, contenedor_estado: null, dias_restantes: null, abierta: false, cobrada: false },
+      { id: 101, nro_op: 261, estado: 'entregado', id_contenedor: 1, numero_contenedor: 19, contenedor_estado: 'en_alquiler', dias_restantes: 3, abierta: true, cobrada: false, precio_alquiler: 100 },
+      { id: 102, nro_op: 262, estado: 'entregado', id_contenedor: 2, numero_contenedor: 20, contenedor_estado: null, dias_restantes: null, abierta: false, cobrada: false, precio_alquiler: 100 },
     ],
   }
 
@@ -71,6 +71,7 @@ describe('vistas de alquileres agrupados', () => {
 
   it('Cobranzas: la fila de un grupo pide el monto de cada contenedor', async () => {
     const html = await renderVista('pages/alquileres/cobranzas', {
+      sinPrecio: [],
       pendientes: [{
         id: 101, nro_op: 261, id_grupo: 9, esGrupo: true, cliente_nombre: 'Cliente', domicilio_entrega: 'San Lorenzo 501',
         numero_contenedor: '19, 20', fecha_retiro: '2026-10-01 10:00:00', montoEstimado: 300, saldo_favor_cliente: 0,
@@ -86,7 +87,7 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /OP-0261, OP-0262/)
   })
 
-  const cierreEj = { precioInicial: 100, precioActual: 120, dias: 5, mesInicio: 'septiembre 2026', cambioDePrecio: false }
+  const cierreEj = { precioInicial: 100, precioActual: 120, precioACobrar: 120, sinPrecio: false, precioAsignado: false, dias: 5, mesInicio: 'septiembre 2026', cambioDePrecio: false }
   const grupoAbierto = (otraAbierta) => ({ cobro_modo: 'alquiler', ops: [{ id: 101, abierta: true }, { id: 102, abierta: otraAbierta }] })
 
   it('cierre de un contenedor suelto: un solo monto, como siempre', async () => {
@@ -106,7 +107,7 @@ describe('vistas de alquileres agrupados', () => {
   it('cierre del último contenedor del grupo: un monto por contenedor', async () => {
     const html = await renderVista('partials/alquiler_cierre', {
       alquiler: { id: 101, metodo_pago: 'efectivo' }, cierre: cierreEj, saldoFavorCliente: 0, grupo: grupoAbierto(false),
-      cierresGrupo: [{ id: 101, numero_contenedor: 19, precioActual: 120 }, { id: 102, numero_contenedor: 20, precioActual: 130 }],
+      cierresGrupo: [{ id: 101, numero_contenedor: 19, precioACobrar: 120 }, { id: 102, numero_contenedor: 20, precioACobrar: 130 }],
     })
     assert.match(html, /name="precio_final\[op101\]"/)
     assert.match(html, /name="precio_final\[op102\]"/)
