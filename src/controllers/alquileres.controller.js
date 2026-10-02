@@ -14,6 +14,16 @@ function ubicarEnSegundoPlano(id_op) {
   AlquileresModel.ubicar(id_op).catch(e => console.error('Ubicar alquiler:', e.message))
 }
 
+// Estado del alquiler para el color del pin en el mapa. "Por finalizar" usa el mismo
+// criterio que la tarjeta del listado (vence hoy o mañana; al vencer pasa solo a
+// 'pendiente_retiro' por autoVencerAlquileres).
+function estadoMapa(f) {
+  if (f.op_estado === 'pendiente' || f.op_estado === 'despachado') return 'pendiente'
+  if (f.contenedor_estado === 'pendiente_retiro') return 'a_retirar'
+  if (f.dias_restantes != null && f.dias_restantes <= 1) return 'por_finalizar'
+  return 'en_curso'
+}
+
 // Coordenadas dentro de Argentina continental (para la ubicación cargada a mano).
 function coordenadaValida(lat, lng) {
   return Number.isFinite(lat) && Number.isFinite(lng)
@@ -456,7 +466,8 @@ const AlquileresController = {
           zona: f.zona_entrega || '',
           numero_contenedor: f.numero_contenedor,
           fecha_inicio: f.fecha_inicio,
-          estado: f.contenedor_estado,
+          estado: estadoMapa(f),
+          dias_restantes: f.dias_restantes,
           geo_estado: f.geo_estado,
           geo_detalle: f.geo_detalle || '',
           // Ubicada por el centro del barrio o de la calle, no por la altura exacta

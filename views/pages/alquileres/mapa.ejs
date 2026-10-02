@@ -31,8 +31,10 @@
     border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35);
   }
   .pin-cont span { transform: rotate(45deg); color: #fff; font-weight: 700; font-size: 12px; line-height: 1; }
-  .pin-cont--en_alquiler      { background: #ea7a1b; }
-  .pin-cont--pendiente_retiro { background: #dc2626; }
+  .pin-cont--pendiente     { background: #6b7280; }
+  .pin-cont--en_curso      { background: #16a34a; }
+  .pin-cont--por_finalizar { background: #f97316; }
+  .pin-cont--a_retirar     { background: #dc2626; }
   .pin-cont--aprox { border: 2px dashed #fff; opacity: .82; }
   .popup-cont__aprox { margin-top: .3rem; font-size: .8rem; color: #92400e; background: #fef3c7; border-radius: 6px; padding: .25rem .45rem; }
 
@@ -69,9 +71,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
   <div class="mapa-leyenda">
-    <span><span class="mapa-leyenda__dot" style="background:#ea7a1b"></span>En alquiler</span>
-    <span><span class="mapa-leyenda__dot" style="background:#dc2626"></span>Pendiente de retiro</span>
-    <span><span class="mapa-leyenda__dot" style="background:#9ca3af;border:2px dashed #fff;outline:1px solid #9ca3af"></span>Ubicación aproximada (barrio / calle)</span>
+    <span><span class="mapa-leyenda__dot" style="background:#6b7280"></span>Pendiente de iniciar</span>
+    <span><span class="mapa-leyenda__dot" style="background:#16a34a"></span>En curso</span>
+    <span><span class="mapa-leyenda__dot" style="background:#f97316"></span>Finaliza mañana</span>
+    <span><span class="mapa-leyenda__dot" style="background:#dc2626"></span>A retirar</span>
+    <span><span class="mapa-leyenda__dot" style="background:#fff;border:2px dashed #4b5563"></span>Borde punteado = ubicación aproximada</span>
   </div>
   <small class="text-muted" id="mapaResumen"></small>
 </div>

@@ -27,6 +27,13 @@
     const [a, m, d] = String(iso).slice(0, 10).split('-')
     return `${d}/${m}/${a}`
   }
+  // Color y texto del pin según el estado del alquiler (ver estadoMapa en el controller)
+  const ESTADOS = {
+    pendiente:     'Pendiente de iniciar',
+    en_curso:      'En curso',
+    por_finalizar: 'En curso — finaliza mañana',
+    a_retirar:     'En curso — A RETIRAR',
+  }
   const nroOp = (n) => 'OP-' + String(n).padStart(4, '0')
   const contTxt = (it) => it.numero_contenedor != null ? 'N° ' + it.numero_contenedor : 'Sin n°'
 
@@ -36,7 +43,7 @@
   }
 
   function icono(it) {
-    const estado = it.estado === 'pendiente_retiro' ? 'pendiente_retiro' : 'en_alquiler'
+    const estado = ESTADOS[it.estado] ? it.estado : 'en_curso'
     const aprox = it.aproximada ? ' pin-cont--aprox' : ''
     return L.divIcon({
       className: '',
@@ -46,7 +53,7 @@
   }
 
   function popup(it) {
-    const estado = it.estado === 'pendiente_retiro' ? 'Pendiente de retiro' : 'En alquiler'
+    const estado = ESTADOS[it.estado] || ESTADOS.en_curso
     const comoLlegar = `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lng}`
     return `
       <div class="popup-cont">
@@ -54,7 +61,7 @@
         <div class="popup-cont__fila"><b>Cliente:</b> ${esc(it.cliente) || '—'}</div>
         <div class="popup-cont__fila"><b>Dirección:</b> ${esc(it.direccion) || '—'}</div>
         ${it.obra ? `<div class="popup-cont__fila"><b>Obra:</b> ${esc(it.obra)}</div>` : ''}
-        <div class="popup-cont__fila"><b>Inicio:</b> ${fmtFecha(it.fecha_inicio)}</div>
+        <div class="popup-cont__fila"><b>${it.estado === 'pendiente' ? 'Inicio previsto' : 'Inicio'}:</b> ${fmtFecha(it.fecha_inicio)}</div>
         <div class="popup-cont__fila"><b>Estado:</b> ${estado}${it.geo_estado === 'manual' ? ' · <i>ubicado a mano</i>' : ''}</div>
         ${it.aproximada ? `<div class="popup-cont__aprox">Ubicación aproximada: ${esc(it.geo_detalle || (it.geo_estado === 'barrio' ? 'centro del barrio' : 'sobre la calle, sin la altura'))}</div>` : ''}
         ${it.geo_estado === 'cruce' && it.geo_detalle ? `<div class="popup-cont__fila"><i>${esc(it.geo_detalle)}</i></div>` : ''}
@@ -117,10 +124,10 @@
       : ''
 
     if (!total) {
-      overlay('No hay contenedores alquilados en este momento.')
+      overlay('No hay alquileres en curso ni pendientes de iniciar.')
       map.setView(CORDOBA_CENTER, 12)
     } else if (!ubicados.length) {
-      overlay('Ningún contenedor alquilado tiene ubicación todavía. Revisá la lista "Sin ubicar".')
+      overlay('Ningún alquiler tiene ubicación todavía. Revisá la lista "Sin ubicar".')
       map.setView(CORDOBA_CENTER, 12)
     } else {
       overlay(null)
