@@ -91,4 +91,27 @@ describe('acciones sobre alquileres agrupados', () => {
     const calle = (await prueba.q(`SELECT domicilio_calle FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [g.ops[1]])).rows[0].domicilio_calle
     assert.equal(calle, 'Otra calle')
   })
+
+  it('agruparExistentes: simula, agrupa y no deja reagrupar ni mezclar clientes', async () => {
+    const id_cliente = await datos.crearCliente()
+    const comunes = datos.datosComunes({ id_cliente, id_administrativo: admin, fecha_inicio: '2026-09-28' })
+    const [c1, c2, c3] = await datos.crearContenedores(3)
+    const a = await AlquileresModel.crearEnCurso({ ...comunes, id_contenedor: c1, plazo_alquiler: 4, precio_alquiler: 100 })
+    const b = await AlquileresModel.crearEnCurso({ ...comunes, id_contenedor: c2, plazo_alquiler: 4, precio_alquiler: 100 })
+
+    const sim = await AlquileresModel.agruparExistentes([a.nro_op, b.nro_op], 'alquiler', { simular: true })
+    assert.equal(sim.simulado, true)
+    assert.equal((await prueba.q(`SELECT id_grupo FROM op_encabezado WHERE id = ?`, [a.id])).rows[0].id_grupo, null)
+
+    const r = await AlquileresModel.agruparExistentes([a.nro_op, b.nro_op], 'alquiler')
+    const grupos = (await prueba.q(`SELECT id_grupo FROM op_encabezado WHERE id = ANY(?::bigint[])`, [[a.id, b.id]])).rows.map(x => x.id_grupo)
+    assert.deepEqual(grupos, [r.id_grupo, r.id_grupo])
+    assert.equal((await AlquileresModel.grupoDe(a.id)).cobro_modo, 'alquiler')
+
+    await assert.rejects(AlquileresModel.agruparExistentes([a.nro_op, b.nro_op]), /ya pertenece a un alquiler agrupado/)
+    const otro = await datos.crearCliente()
+    const c = await AlquileresModel.crearEnCurso({ ...datos.datosComunes({ id_cliente: otro, id_administrativo: admin }), id_contenedor: c3, plazo_alquiler: 4, precio_alquiler: 100 })
+    const d = await AlquileresModel.crear({ ...comunes, id_contenedor: null, plazo_alquiler: 4, precio_alquiler: 100 })
+    await assert.rejects(AlquileresModel.agruparExistentes([c.nro_op, d.nro_op]), /clientes distintos/)
+  })
 })

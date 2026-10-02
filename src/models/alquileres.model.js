@@ -634,6 +634,38 @@ const AlquileresModel = {
     return anulables.length
   },
 
+  // Agrupa alquileres YA cargados por separado en un alquiler agrupado (ej. dos alquileres
+  // idénticos cargados a mano antes de que existiera esta opción). Solo alquileres de
+  // contenedor del mismo cliente, sin anular, sin grupo y sin cobrar. Con simular = true
+  // hace todas las validaciones y no escribe nada.
+  async agruparExistentes(nrosOp, cobroModo = 'contenedor', { simular = false } = {}) {
+    const nros = [...new Set((nrosOp || []).map(n => parseInt(n, 10)).filter(Number.isFinite))]
+    if (nros.length < 2) throw new Error('Indicá al menos dos N° de OP para agrupar.')
+    return await transaction(async (q) => {
+      const ops = (await q(`
+        SELECT op.id, op.nro_op, op.id_cliente, op.estado, op.id_grupo, op.tipo_op,
+               EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrada
+        FROM op_encabezado op WHERE op.nro_op = ANY(?::int[]) ORDER BY op.id FOR UPDATE
+      `, [nros])).rows
+      const nombre = (n) => 'OP-' + String(n).padStart(4, '0')
+      const faltan = nros.filter(n => !ops.some(o => o.nro_op === n))
+      if (faltan.length) throw new Error(`No existe ${faltan.map(nombre).join(', ')}.`)
+      for (const o of ops) {
+        if (o.tipo_op !== 'C') throw new Error(`${nombre(o.nro_op)} no es un alquiler de contenedor.`)
+        if (o.estado === 'anulado') throw new Error(`${nombre(o.nro_op)} está anulada.`)
+        if (o.id_grupo) throw new Error(`${nombre(o.nro_op)} ya pertenece a un alquiler agrupado.`)
+        if (o.cobrada) throw new Error(`${nombre(o.nro_op)} ya se cobró: no se puede agrupar.`)
+      }
+      if (new Set(ops.map(o => String(o.id_cliente))).size > 1) throw new Error('Las OP son de clientes distintos.')
+      const resumen = ops.map(o => ({ id: o.id, nro_op: o.nro_op }))
+      if (simular) return { simulado: true, ops: resumen }
+      const { id } = (await q(`INSERT INTO alquiler_grupos (cobro_modo) VALUES (?) RETURNING id`,
+        [cobroModo === 'alquiler' ? 'alquiler' : 'contenedor'])).rows[0]
+      await q(`UPDATE op_encabezado SET id_grupo = ? WHERE id = ANY(?::bigint[])`, [id, ops.map(o => o.id)])
+      return { id_grupo: id, ops: resumen }
+    })
+  },
+
   async clientes() {
     return (await query(`SELECT id, nombre FROM clientes WHERE activo = 1 ORDER BY nombre`)).rows
   },

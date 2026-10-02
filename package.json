@@ -8,6 +8,7 @@
     "build": "sass src/scss/main.scss:public/css/main.css",
     "start": "node server.js",
     "geocodificar:alquileres": "node scripts/geocodificar-alquileres.js",
+    "agrupar:alquileres": "node scripts/agrupar-alquileres.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
   },
   "dependencies": {
