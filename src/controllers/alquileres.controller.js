@@ -4,7 +4,8 @@ const { hoyISO } = require('../utils/fecha')
 const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const OperacionesModel        = require('../models/operaciones.model')
-const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
+const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR, calcularPlazoAlquiler } = require('../config/alquiler')
+const { leerContenedoresDelForm, leerMontosPorOp } = require('../utils/contenedoresForm')
 const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
@@ -126,23 +127,13 @@ const AlquileresController = {
         req.flash('error', 'Solo los clientes con cuenta corriente pueden quedar sin fecha de fin. Para un alquiler que ya venía en curso, cargá una fecha de inicio anterior a hoy.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
-      let plazo_alquiler = (sinFechaFin || (esHistorico && !fechaFinReal))
-        ? null
-        : plazoPorCuentaCorriente(tieneCC)
-      if (!sinFechaFin && (esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
-        // El plazo se guarda en DÍAS HÁBILES (ver sumar_dias_habiles): si la fecha de fin
-        // se editó a mano, hay que contar los hábiles entre las dos fechas, no los corridos.
-        plazo_alquiler = diasHabilesEntre(fechaInicio, fechaFinReal)
-        if (plazo_alquiler < 0) {
-          req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
-          return res.redirect('/alquileres/contenedores/nuevo')
-        }
+      // Plazo en días hábiles según las reglas del alta (ver calcularPlazoAlquiler).
+      const rPlazo = calcularPlazoAlquiler({ fechaInicio, fechaFin, sinFechaFin, esHistorico, fechaFinManual, tieneCC })
+      if (rPlazo.error) {
+        req.flash('error', rPlazo.error)
+        return res.redirect('/alquileres/contenedores/nuevo')
       }
-      // Sin cuenta corriente el plazo es SIEMPRE el estándar (hoy 4 días hábiles): pase lo
-      // que pase en el formulario (fecha de fin editada a mano, manipulada, etc.) nunca se
-      // guarda un plazo mayor. No aplica a carga histórica: ahí se registra la duración real
-      // de un alquiler que ya terminó, no una fecha de vencimiento futura.
-      if (!tieneCC && !esHistorico && plazo_alquiler != null) plazo_alquiler = PLAZO_ESTANDAR
+      const plazo_alquiler = rPlazo.plazo
 
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
       if (esHistorico && !historicoEnCurso) {
