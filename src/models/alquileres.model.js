@@ -67,6 +67,9 @@ function normalizarPlazo(plazo, porDefecto) {
   return Number.isNaN(n) ? porDefecto : n
 }
 
+// Dirección normalizada para comparar si cambió (espacios y mayúsculas no cuentan).
+const normDir = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+
 const AlquileresModel = {
 
   // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
@@ -354,9 +357,8 @@ const AlquileresModel = {
     const numero = numeroSinRepetirCalle(calle, numeroForm)
     const domicilio_entrega = `${calle || ''} ${numero}`.trim()
     const previo = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
-    const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
     const direccionCambio = !!previo
-      && (norm(previo.domicilio_calle) !== norm(calle) || norm(previo.domicilio_numero) !== norm(numero))
+      && (normDir(previo.domicilio_calle) !== normDir(calle) || normDir(previo.domicilio_numero) !== normDir(numero))
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])
@@ -372,6 +374,38 @@ const AlquileresModel = {
       }
     })
     return { direccionCambio }
+  },
+
+  // Datos compartidos del alquiler agrupado (dirección, obra, zona, método de pago y
+  // observaciones): los copia de esta OP a las demás OP no anuladas del grupo. Plazo,
+  // precio y fechas son de cada contenedor y no se tocan. Si cambia la dirección de una
+  // OP, se borran sus coordenadas (las vuelve a llenar ubicar). Devuelve cuántas actualizó.
+  async actualizarCompartidosGrupo(id_op) {
+    return await transaction(async (q) => {
+      const src = (await q(`
+        SELECT op.id_grupo, op.metodo_pago, op.observaciones, op.obra,
+               oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, oc.zona_entrega
+        FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        WHERE op.id = ?
+      `, [id_op])).rows[0]
+      if (!src?.id_grupo) return 0
+      const otras = (await q(`SELECT id FROM op_encabezado WHERE id_grupo = ? AND id <> ? AND estado <> 'anulado' ORDER BY id`,
+        [src.id_grupo, id_op])).rows.map(r => r.id)
+      for (const id of otras) {
+        const previo = (await q(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [id])).rows[0]
+        await q(`UPDATE op_encabezado SET metodo_pago = ?, observaciones = ?, obra = ? WHERE id = ?`,
+          [src.metodo_pago, src.observaciones, src.obra, id])
+        await q(`
+          UPDATE op_detalle_contenedor
+          SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?, metodo_pago = ?
+          WHERE id_orden_pedido = ?
+        `, [src.domicilio_entrega, src.domicilio_calle, src.domicilio_numero, src.zona_entrega, src.metodo_pago, id])
+        if (normDir(previo?.domicilio_calle) !== normDir(src.domicilio_calle) || normDir(previo?.domicilio_numero) !== normDir(src.domicilio_numero)) {
+          await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id])
+        }
+      }
+      return otras.length
+    })
   },
 
   // ── Mapa de contenedores ──────────────────────────────────────

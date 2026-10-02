@@ -367,8 +367,14 @@ const AlquileresController = {
         plazo_alquiler,
         fecha_entrega_planificada: fechaInicio || req.body.fecha_entrega_planificada || null,
       })
+      // "Aplicar a todos": los datos compartidos pasan al resto del alquiler agrupado.
+      const aplicarGrupo = req.body.aplicar_grupo === '1' || req.body.aplicar_grupo === 'on'
+      const otras = aplicarGrupo ? await AlquileresModel.actualizarCompartidosGrupo(req.params.id) : 0
+      // ubicar copia las coordenadas a las OP del grupo con la misma dirección
       if (direccionCambio) ubicarEnSegundoPlano(req.params.id)
-      req.flash('success', 'Alquiler actualizado.')
+      req.flash('success', otras
+        ? `Alquiler actualizado (y ${otras} contenedor${otras === 1 ? '' : 'es'} más del grupo).`
+        : 'Alquiler actualizado.')
       res.redirect(`/alquileres/contenedores/${req.params.id}`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error al actualizar.'); res.redirect(`/alquileres/contenedores/${req.params.id}/editar`)
@@ -577,6 +583,7 @@ const AlquileresController = {
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (!alquiler) return res.status(404).json({ error: 'Alquiler no encontrado.' })
       await AlquileresModel.guardarUbicacion(alquiler.id, { lat, lng, estado: 'manual' })
+      await AlquileresModel.copiarUbicacionAlGrupo(alquiler.id)
       res.json({ ok: true })
     } catch (err) {
       console.error(err)

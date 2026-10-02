@@ -54,6 +54,13 @@
           </select>
         </div>
         <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= alquiler.observaciones || '' %></textarea></div>
+        <% if (alquiler.grupo) {
+             const restantes = alquiler.grupo.ops.filter(o => o.estado !== 'anulado' && o.id !== alquiler.id).length %>
+          <label class="toggle-row col-12">
+            <input type="checkbox" name="aplicar_grupo" value="1" checked>
+            <span>Aplicar dirección, obra, zona, método de pago y observaciones a <%= restantes === 1 ? 'el otro contenedor' : `los otros ${restantes} contenedores` %> del alquiler (plazo, precio y fechas son de cada uno)</span>
+          </label>
+        <% } %>
       </div>
       <div class="d-flex gap-2 mt-3">
         <button type="submit" class="btn btn-naranja px-4">Guardar cambios</button>
