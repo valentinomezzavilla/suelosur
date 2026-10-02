@@ -35,15 +35,28 @@ const SQL_MOV_ALQUILER_OP = `
   ORDER BY id_op_contenedor, fecha_movimiento ASC
 `
 
-// Una OP de un alquiler agrupado está ABIERTA mientras no terminó su ciclo: todavía sin
-// contenedor (no se entregó), o su contenedor sigue con un movimiento de ESTA OP que no
-// es 'disponible'. Si el contenedor volvió a planta, o pasó directo al próximo alquiler
-// encadenado (su último movimiento es de otra OP), la OP está cerrada. Un contenedor
-// repuesto ("Reponer") cuenta por la unidad nueva. Las anuladas nunca están abiertas.
-// Alias: op = op_encabezado, oc = op_detalle_contenedor, um = último movimiento del
-// contenedor (SQL_ULTIMO_MOV unido por id_contenedor).
-const SQL_OP_ABIERTA = `(op.estado <> 'anulado' AND (oc.id_contenedor IS NULL
-  OR (um.id_op_contenedor = oc.id AND um.estado_paso <> 'disponible')))`
+// Fecha en que el contenedor de una OP dejó el domicilio del cliente (texto de
+// fecha_movimiento), o NULL si sigue afuera:
+//  - el 'disponible' de ESTA OP para su contenedor ACTUAL (retiro a planta). Con "Reponer",
+//    la unidad vieja tiene su propio 'disponible', pero cuenta la unidad nueva;
+//  - si el contenedor pasó directo al próximo alquiler encadenado, el primer movimiento
+//    atribuido a otra OP después del último de esta.
+// Los movimientos manuales (sin OP) no cuentan: no dicen que el contenedor se retiró.
+// Alias: oc = op_detalle_contenedor.
+const SQL_FECHA_CIERRE_OP = `COALESCE(
+  (SELECT MIN(mc.fecha_movimiento) FROM movimiento_contenedor mc
+    WHERE mc.id_contenedor = oc.id_contenedor AND mc.id_op_contenedor = oc.id AND mc.estado_paso = 'disponible'),
+  (SELECT mc.fecha_movimiento FROM movimiento_contenedor mc
+    WHERE mc.id_contenedor = oc.id_contenedor AND mc.id_op_contenedor IS NOT NULL AND mc.id_op_contenedor <> oc.id
+      AND mc.id > (SELECT MAX(mp.id) FROM movimiento_contenedor mp WHERE mp.id_contenedor = oc.id_contenedor AND mp.id_op_contenedor = oc.id)
+    ORDER BY mc.id LIMIT 1))`
+
+// Una OP de un alquiler agrupado está ABIERTA mientras no terminó su ciclo: sin entregar
+// (pendiente o despachada, o todavía sin contenedor), o entregada y sin fecha de cierre
+// (ver SQL_FECHA_CIERRE_OP). Las anuladas nunca están abiertas.
+// Alias: op = op_encabezado, oc = op_detalle_contenedor.
+const SQL_OP_ABIERTA = `(op.estado <> 'anulado' AND (op.estado IN ('pendiente', 'despachado')
+  OR oc.id_contenedor IS NULL OR ${SQL_FECHA_CIERRE_OP} IS NULL))`
 
 // plazo_alquiler NULL = alquiler sin fecha de fin definida. Hay que distinguirlo del
 // "no vino nada" (que toma el default), por eso no alcanza con `parseInt(x) || n`.
@@ -214,6 +227,8 @@ const AlquileresModel = {
              CASE WHEN um.id_op_contenedor = oc.id THEN um.estado_paso END AS contenedor_estado,
              (sumar_dias_habiles(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
              ${SQL_OP_ABIERTA} AS abierta,
+             ${SQL_FECHA_CIERRE_OP} AS fecha_cierre,
+             oc.precio_alquiler,
              EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrada
       FROM op_encabezado op
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
@@ -682,10 +697,14 @@ const AlquileresModel = {
   // Datos para cerrar el alquiler y cobrarlo: el precio pactado al inicio (que puede
   // ser de hace meses) y el sugerido con la tarifa vigente hoy. El cobro se hace al
   // retirar el contenedor, no al entregarlo.
-  async datosCierre(id_op) {
+  // `alRetiro`: contar los días hasta el día en que se retiró el contenedor de ESTA OP
+  // (si ya se retiró) en vez de hasta hoy. Lo usa el cobro por alquiler de un grupo, que
+  // cobra todo junto al retirar el último: cada contenedor tiene que contar solo sus días.
+  async datosCierre(id_op, { alRetiro = false } = {}) {
     const op = (await query(`
       SELECT op.fecha_entrega_planificada, op.obra, oc.precio_alquiler, oc.plazo_alquiler,
-             oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, cont.numero_contenedor
+             oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, cont.numero_contenedor,
+             ${SQL_FECHA_CIERRE_OP} AS fecha_cierre
       FROM op_encabezado op
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
@@ -696,12 +715,14 @@ const AlquileresModel = {
     const precioInicial = parseFloat(op.precio_alquiler) || 0
     const cfg = await ConfigContenedoresModel.obtenerPrecios()
 
-    // Días reales que estuvo afuera, desde el inicio cargado hasta hoy
+    // Días reales que estuvo afuera, desde el inicio cargado hasta hoy (o hasta el retiro)
     const inicio = op.fecha_entrega_planificada ? String(op.fecha_entrega_planificada).slice(0, 10) : null
     let dias = null
     if (inicio) {
-      const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-      dias = Math.max(0, Math.round((hoy - new Date(inicio + 'T00:00:00')) / 86400000))
+      const hasta = (alRetiro && op.fecha_cierre)
+        ? new Date(String(op.fecha_cierre).slice(0, 10) + 'T00:00:00')
+        : new Date(new Date().setHours(0, 0, 0, 0))
+      dias = Math.max(0, Math.round((hasta - new Date(inicio + 'T00:00:00')) / 86400000))
     }
     // Tarifa vigente: el precio base a partir del plazo largo, o por día si fue corto
     const precioActual = (dias != null && dias > 0 && dias < 9) ? dias * cfg.precioDia : cfg.precioAlquiler
@@ -751,7 +772,6 @@ const AlquileresModel = {
         FROM op_encabezado op
         JOIN clientes cli ON cli.id = op.id_cliente
         JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
-        LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor
         WHERE op.id_grupo = ? AND op.estado <> 'anulado'
         ORDER BY op.id
       `, [id_grupo])).rows
@@ -769,7 +789,8 @@ const AlquileresModel = {
       let total = 0
       const numeros = []
       for (const o of aCobrar) {
-        const cierre = await this.datosCierre(o.id)
+        // Cada contenedor cuenta sus días hasta su propio retiro, no hasta el último
+        const cierre = await this.datosCierre(o.id, { alRetiro: true })
         const valor = montos[o.id]
         const manual = valor != null && String(valor).trim() !== ''
         const monto = manual ? (parseFloat(valor) || 0) : cierre.precioActual
@@ -885,12 +906,15 @@ const AlquileresModel = {
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
       LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo
       WHERE op.tipo_op = 'C' AND op.estado = 'entregado' AND op.metodo_pago = 'a_convenir'
-        AND EXISTS (SELECT 1 FROM movimiento_contenedor m WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible')
+        AND (ag.cobro_modo = 'alquiler'
+             OR EXISTS (SELECT 1 FROM movimiento_contenedor m WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible'))
         AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
       ORDER BY fecha_retiro ASC NULLS LAST
     `)).rows
     // Alquiler agrupado con cobro por alquiler: UNA fila por grupo, y solo cuando ya se
-    // retiraron todos sus contenedores (antes no hay nada que cobrar todavía).
+    // retiraron todos sus contenedores (antes no hay nada que cobrar todavía). Las OPs
+    // salen de grupoDe, que también da por cerrada la que pasó directo al próximo
+    // alquiler sin volver a planta (esa no tiene un 'disponible' propio).
     const resultado = []
     const vistos = new Set()
     for (const f of filas) {
@@ -899,14 +923,17 @@ const AlquileresModel = {
       vistos.add(f.id_grupo)
       const grupo = await this.grupoDe(f.id)
       if (!grupo || grupo.abiertas > 0) continue
-      const ops = filas.filter(x => x.id_grupo === f.id_grupo)
+      const ops = grupo.ops.filter(o => o.estado !== 'anulado' && !o.cobrada)
+      if (!ops.length) continue
+      const cierres = ops.map(o => o.fecha_cierre).filter(Boolean)
       resultado.push({
-        ...ops[0], esGrupo: true, ops,
-        numero_contenedor: ops.map(x => x.numero_contenedor).filter(Boolean).join(', '),
-        fecha_retiro: ops.map(x => x.fecha_retiro).filter(Boolean).sort().pop() || null,
+        ...f, esGrupo: true, ops,
+        numero_contenedor: ops.map(o => o.numero_contenedor).filter(Boolean).join(', '),
+        fecha_retiro: cierres.length ? cierres.reduce((a, b) => (new Date(b) > new Date(a) ? b : a)) : null,
       })
     }
-    return resultado
+    const orden = (p) => (p.fecha_retiro ? new Date(p.fecha_retiro).getTime() : Infinity)
+    return resultado.sort((a, b) => orden(a) - orden(b))
   },
 
   // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor

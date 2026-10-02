@@ -305,7 +305,7 @@ const AlquileresController = {
       if (g?.cobro_modo === 'alquiler' && !g.ops.some(o => o.abierta && o.id !== alquiler.id)) {
         cierresGrupo = []
         for (const o of g.ops.filter(o => o.estado !== 'anulado' && !o.cobrada)) {
-          const c = await AlquileresModel.datosCierre(o.id)
+          const c = await AlquileresModel.datosCierre(o.id, { alRetiro: true })
           cierresGrupo.push({ id: o.id, numero_contenedor: o.numero_contenedor, precioActual: c ? c.precioActual : 0 })
         }
       }
@@ -577,7 +577,7 @@ const AlquileresController = {
       for (const p of pendientes) {
         // En una fila de grupo, el estimado de cada contenedor y el total
         for (const o of (p.esGrupo ? p.ops : [p])) {
-          const cierre = await AlquileresModel.datosCierre(o.id)
+          const cierre = await AlquileresModel.datosCierre(o.id, { alRetiro: !!p.esGrupo })
           o.montoEstimado = cierre ? cierre.precioActual : (o.precio_alquiler || 0)
         }
         if (p.esGrupo) p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)

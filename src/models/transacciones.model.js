@@ -65,6 +65,17 @@ const TransaccionesModel = {
     const anterior = tx.metodo_pago || 'efectivo'
     if (anterior === nuevoMetodo) return
 
+    // Alquiler de varios contenedores cobrado "por alquiler": el cargo de cuenta corriente
+    // es uno solo por el total (anclado a la OP principal), así que cambiar el método de
+    // una sola transacción lo dejaría descuadrado.
+    if (tx.id_op_encabezado) {
+      const agrupado = (await query(`
+        SELECT 1 FROM op_encabezado op JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+        WHERE op.id = ? AND ag.cobro_modo = 'alquiler'
+      `, [tx.id_op_encabezado])).rows[0]
+      if (agrupado) throw new Error('Este cobro es de un alquiler con varios contenedores cobrado todo junto: el método de pago no se puede cambiar por separado.')
+    }
+
     if (nuevoMetodo === 'cuenta_corriente' && (!tx.cliente_id || !tx.id_op_encabezado)) {
       throw new Error('No se puede pasar a cuenta corriente: la transacción no tiene cliente y operación asociados.')
     }
