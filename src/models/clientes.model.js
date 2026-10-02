@@ -2,9 +2,16 @@
 const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 
-// Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado)
+// Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
+// En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
+// (anclado a su OP principal): un cargo de cualquier OP del grupo cuenta para todas.
 const SQL_OP_SIN_CARGO = `op.metodo_pago = 'cuenta_corriente' AND op.estado <> 'anulado'
-  AND NOT EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo = 'deuda')`
+  AND NOT EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.tipo = 'deuda' AND (
+    m.id_op_encabezado = op.id
+    OR m.id_op_encabezado IN (
+      SELECT g.id FROM op_encabezado g
+      JOIN alquiler_grupos ag ON ag.id = g.id_grupo AND ag.cobro_modo = 'alquiler'
+      WHERE g.id_grupo = op.id_grupo)))`
 const SQL_PENDIENTES_CC = `SELECT COUNT(*) FROM op_encabezado op WHERE op.id_cliente = c.id AND ${SQL_OP_SIN_CARGO}`
 
 const ClientesModel = {
@@ -159,10 +166,11 @@ const ClientesModel = {
     return null
   },
 
-  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }) {
-    const { rows } = await query(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+  // `q` permite registrarlo dentro de una transacción (cobro de un alquiler agrupado).
+  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }, q = query) {
+    const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
       [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null])
-    await query(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
+    await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return rows[0].id
   },
 

@@ -173,71 +173,10 @@
 
             <%# Cierre del alquiler: es el momento en que se cobra %>
             <% if (alquiler.estado === 'entregado' && ['en_alquiler','pendiente_retiro'].includes(estadoCont) && cierre) { %>
-              <div class="cierre-alquiler mt-3">
-                <p class="fw-semibold mb-1">Cerrar alquiler y cobrar</p>
-                <p class="text-muted small mb-2">
-                  El ingreso se registra al retirar el contenedor.
-                  <% if (cierre.cambioDePrecio) { %>
-                    Precio pactado al inicio (<%= cierre.mesInicio %>):
-                    <strong>$<%= Math.round(cierre.precioInicial).toLocaleString('es-AR') %></strong>.
-                  <% } %>
-                  <% if (cierre.dias != null) { %>Lleva <%= cierre.dias %> días.<% } %>
-                </p>
-                <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
-                      id="formDevolver" class="d-flex flex-wrap gap-2 align-items-end">
-                  <div>
-                    <label for="precioFinal" class="form-label mb-1 small">Monto a cobrar</label>
-                    <input type="number" step="0.01" min="0" name="precio_final" id="precioFinal"
-                           class="form-control form-control-sm" style="max-width:170px"
-                           value="<%= Math.round(cierre.precioActual) %>">
-                  </div>
-                  <% if (alquiler.metodo_pago === 'a_convenir') { %>
-                    <div>
-                      <label for="metodoPagoFinal" class="form-label mb-1 small">Método de pago *</label>
-                      <select name="metodo_pago_final" id="metodoPagoFinal" class="form-select form-select-sm" style="max-width:200px">
-                        <option value="">Seleccionar…</option>
-                        <option value="efectivo">Efectivo</option>
-                        <option value="transferencia">Transferencia</option>
-                        <option value="cheque">Cheque</option>
-                        <option value="cuenta_corriente">Cuenta corriente</option>
-                        <% if (saldoFavorCliente > 0) { %>
-                          <option value="saldo_a_favor">Usar saldo a favor del cliente ($<%= Math.round(saldoFavorCliente).toLocaleString('es-AR') %>)</option>
-                        <% } %>
-                      </select>
-                    </div>
-                    <label class="toggle-row mb-1" for="pendientePago">
-                      <input type="checkbox" name="pendiente_pago" id="pendientePago" value="1">
-                      <span>Pendiente de pago</span>
-                    </label>
-                  <% } %>
-                  <button class="btn btn-sm btn-outline-success">🏠 Registrar retiro y cobrar</button>
-                </form>
-                <% if (alquiler.metodo_pago === 'a_convenir') { %>
-                  <p class="form-hint mb-0 mt-1">Este alquiler quedó "a convenir": elegí un método de pago o marcá "Pendiente de pago" (queda en Cobranzas).</p>
-                <% } %>
-                <script>
-                (function () {
-                  var form = document.getElementById('formDevolver')
-                  if (!form) return
-                  var sel = document.getElementById('metodoPagoFinal')
-                  var chk = document.getElementById('pendientePago')
-                  if (sel && chk) {
-                    sel.addEventListener('change', function () { if (sel.value) chk.checked = false })
-                    chk.addEventListener('change', function () { if (chk.checked) sel.value = '' })
-                  }
-                  form.addEventListener('submit', function (e) {
-                    if (sel && !chk.checked && !sel.value) {
-                      alert('Elegí un método de pago o marcá "Pendiente de pago".')
-                      e.preventDefault()
-                      return
-                    }
-                    if (!confirm('¿Cerrar el alquiler? El contenedor queda disponible' + (chk && chk.checked ? ' y el cobro queda pendiente en Cobranzas.' : '.'))) {
-                      e.preventDefault()
-                    }
-                  })
-                })()
-                </script>
-              </div>
+              <%- include('../../partials/alquiler_cierre', {
+                    alquiler, cierre, saldoFavorCliente,
+                    grupo: alquiler.grupo || null,
+                    cierresGrupo: typeof cierresGrupo !== 'undefined' ? cierresGrupo : null }) %>
             <% } %>
           <% } %>
         <% } %>
@@ -246,6 +185,10 @@
     </div>
   </div>
 </div>
+
+<% if (alquiler.grupo) { %>
+  <%- include('../../partials/alquiler_grupo', { grupo: alquiler.grupo, opActualId: alquiler.id }) %>
+<% } %>
 
 <!-- Timeline de movimientos -->
 <% if (alquiler.movimientos?.length) { %>

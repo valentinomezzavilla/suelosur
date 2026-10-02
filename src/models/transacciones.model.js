@@ -19,16 +19,17 @@ const TransaccionesModel = {
   PREFIJO,
   codigo: codigoTransaccion,
 
-  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }) {
+  // `q` permite registrarla dentro de una transacción (cobro de un alquiler agrupado).
+  async crear({ tipo, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha }, q = query) {
     // Con cliente cargado, el texto del cliente sale siempre de la ficha (nombre + apellido):
     // cada camino de venta/alquiler pasaba un nombre armado distinto (a veces solo el de pila).
     if (cliente_id) {
-      const c = (await query(`SELECT nombre, apellido FROM clientes WHERE id = ?`, [cliente_id])).rows[0]
+      const c = (await q(`SELECT nombre, apellido FROM clientes WHERE id = ?`, [cliente_id])).rows[0]
       if (c) cliente = ClientesModel.nombreCompleto(c)
     }
-    const { n } = (await query(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
+    const { n } = (await q(`SELECT COALESCE(MAX(numero),0) + 1 AS n FROM transacciones WHERE tipo = ?`, [tipo])).rows[0]
     // fecha opcional: si no se pasa, usa la fecha/hora actual (carga histórica la puede fijar en el pasado).
-    const { rows } = await query(`
+    const { rows } = await q(`
       INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
       RETURNING id
@@ -63,6 +64,17 @@ const TransaccionesModel = {
     if (!tx) throw new Error('La transacción no existe.')
     const anterior = tx.metodo_pago || 'efectivo'
     if (anterior === nuevoMetodo) return
+
+    // Alquiler de varios contenedores cobrado "por alquiler": el cargo de cuenta corriente
+    // es uno solo por el total (anclado a la OP principal), así que cambiar el método de
+    // una sola transacción lo dejaría descuadrado.
+    if (tx.id_op_encabezado) {
+      const agrupado = (await query(`
+        SELECT 1 FROM op_encabezado op JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+        WHERE op.id = ? AND ag.cobro_modo = 'alquiler'
+      `, [tx.id_op_encabezado])).rows[0]
+      if (agrupado) throw new Error('Este cobro es de un alquiler con varios contenedores cobrado todo junto: el método de pago no se puede cambiar por separado.')
+    }
 
     if (nuevoMetodo === 'cuenta_corriente' && (!tx.cliente_id || !tx.id_op_encabezado)) {
       throw new Error('No se puede pasar a cuenta corriente: la transacción no tiene cliente y operación asociados.')
@@ -119,6 +131,22 @@ const TransaccionesModel = {
     const tx = (await query(`SELECT id, id_op_encabezado FROM transacciones WHERE id = ?`, [id])).rows[0]
     if (!tx) throw new Error('La transacción no existe.')
     const idOp = tx.id_op_encabezado
+
+    // Cobro de un alquiler agrupado "por alquiler" con un solo cargo de cuenta corriente
+    // por el total: borrar una de sus transacciones (y con ella su operación) dejaría la
+    // cuenta del cliente descuadrada, porque el cargo cubre a todos los contenedores.
+    if (idOp) {
+      const agrupado = (await query(`
+        SELECT 1 FROM op_encabezado op
+        JOIN alquiler_grupos ag ON ag.id = op.id_grupo AND ag.cobro_modo = 'alquiler'
+        WHERE op.id = ? AND EXISTS (
+          SELECT 1 FROM movimientos_cuenta m
+          WHERE m.id_op_encabezado IN (SELECT g.id FROM op_encabezado g WHERE g.id_grupo = op.id_grupo))
+      `, [idOp])).rows[0]
+      if (agrupado) {
+        throw new Error('Este cobro es de un alquiler con varios contenedores y se registró en la cuenta corriente del cliente como un solo cargo: no se puede eliminar una transacción por separado.')
+      }
+    }
 
     // Estado de la operación: define qué stock hay que devolver
     const op = idOp

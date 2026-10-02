@@ -4,7 +4,8 @@ const { hoyISO } = require('../utils/fecha')
 const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const OperacionesModel        = require('../models/operaciones.model')
-const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR } = require('../config/alquiler')
+const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR, calcularPlazoAlquiler } = require('../config/alquiler')
+const { leerContenedoresDelForm, leerMontosPorOp } = require('../utils/contenedoresForm')
 const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
@@ -126,23 +127,63 @@ const AlquileresController = {
         req.flash('error', 'Solo los clientes con cuenta corriente pueden quedar sin fecha de fin. Para un alquiler que ya venía en curso, cargá una fecha de inicio anterior a hoy.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
-      let plazo_alquiler = (sinFechaFin || (esHistorico && !fechaFinReal))
-        ? null
-        : plazoPorCuentaCorriente(tieneCC)
-      if (!sinFechaFin && (esHistorico || fechaFinManual) && fechaInicio && fechaFinReal) {
-        // El plazo se guarda en DÍAS HÁBILES (ver sumar_dias_habiles): si la fecha de fin
-        // se editó a mano, hay que contar los hábiles entre las dos fechas, no los corridos.
-        plazo_alquiler = diasHabilesEntre(fechaInicio, fechaFinReal)
-        if (plazo_alquiler < 0) {
-          req.flash('error', 'La fecha de fin no puede ser anterior a la de inicio.')
+      // Plazo en días hábiles según las reglas del alta (ver calcularPlazoAlquiler).
+      const rPlazo = calcularPlazoAlquiler({ fechaInicio, fechaFin, sinFechaFin, esHistorico, fechaFinManual, tieneCC })
+      if (rPlazo.error) {
+        req.flash('error', rPlazo.error)
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      const plazo_alquiler = rPlazo.plazo
+
+      // ── Varios contenedores: alquiler agrupado (una OP por contenedor) ──
+      const seleccion = leerContenedoresDelForm(req.body)
+      if (seleccion.error) {
+        req.flash('error', seleccion.error)
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      if (seleccion.contenedores.length >= 2) {
+        if (esHistorico) {
+          req.flash('error', 'La carga histórica es de a un contenedor por alquiler.')
           return res.redirect('/alquileres/contenedores/nuevo')
         }
+        if (alquiler_actual_id) {
+          req.flash('error', 'El próximo alquiler encadenado ("próximos a finalizar") es de a un contenedor.')
+          return res.redirect('/alquileres/contenedores/nuevo')
+        }
+        // Cada contenedor puede traer precio y fecha de fin propios; vacíos = los generales.
+        const contenedores = []
+        for (const c of seleccion.contenedores) {
+          const precio = c.precio !== '' ? parseFloat(c.precio) : precioAlquilerNum
+          if (!(precio > 0)) {
+            req.flash('error', 'Revisá el precio de cada contenedor: tiene que ser mayor a cero.')
+            return res.redirect('/alquileres/contenedores/nuevo')
+          }
+          const rp = calcularPlazoAlquiler({
+            fechaInicio, fechaFin: c.fin || fechaFin, sinFechaFin, esHistorico: false,
+            fechaFinManual: fechaFinManual || !!c.fin, tieneCC,
+          })
+          if (rp.error) {
+            req.flash('error', rp.error)
+            return res.redirect('/alquileres/contenedores/nuevo')
+          }
+          contenedores.push({ id_contenedor: c.id_contenedor, precio_alquiler: precio, plazo_alquiler: rp.plazo })
+        }
+        const cobroModo = req.body.cobro_modo === 'alquiler' ? 'alquiler' : 'contenedor'
+        const grupo = await AlquileresModel.crearGrupo({
+          cobro_modo: cobroModo, en_curso: esEnCurso, contenedores, nro_remito: remitoLeido.nro,
+          id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
+          domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero, zona_entrega,
+          metodo_pago: metodoPago, observaciones, obra, fecha_inicio: fechaInicio || null,
+          id_chofer: id_chofer || null, id_camion: id_camion || null,
+        })
+        const FacturacionModel = require('../models/facturacion.model')
+        for (const op of grupo.ops) await FacturacionModel.marcarAlCrear(op.id, req.body.paraFacturar, op.precio_alquiler)
+        // Se geocodifica una sola vez; ubicar copia las coordenadas al resto del grupo.
+        ubicarEnSegundoPlano(grupo.ops[0].id)
+        const nros = grupo.ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')
+        req.flash('success', `Alquiler de ${grupo.ops.length} contenedores ${esEnCurso ? 'cargado como en curso' : 'creado'}: ${nros}. Cobro por ${cobroModo}.`)
+        return res.redirect('/alquileres/contenedores')
       }
-      // Sin cuenta corriente el plazo es SIEMPRE el estándar (hoy 4 días hábiles): pase lo
-      // que pase en el formulario (fecha de fin editada a mano, manipulada, etc.) nunca se
-      // guarda un plazo mayor. No aplica a carga histórica: ahí se registra la duración real
-      // de un alquiler que ya terminó, no una fecha de vencimiento futura.
-      if (!tieneCC && !esHistorico && plazo_alquiler != null) plazo_alquiler = PLAZO_ESTANDAR
 
       // ── Carga histórica: alquiler ya finalizado (ingreso + historial, sin contenedor) ──
       if (esHistorico && !historicoEnCurso) {
@@ -257,6 +298,17 @@ const AlquileresController = {
       const solapamiento = req.session.solapamiento?.opId === String(alquiler.id) ? req.session.solapamiento : null
       if (solapamiento) delete req.session.solapamiento
       const clienteAlq = await ClientesModel.obtener(alquiler.id_cliente)
+      // Último contenedor abierto de un grupo con cobro por alquiler: su cierre cobra todo
+      // el grupo, así que se muestran los montos de cierre de cada contenedor.
+      let cierresGrupo = null
+      const g = alquiler.grupo
+      if (g?.cobro_modo === 'alquiler' && !g.ops.some(o => o.abierta && o.id !== alquiler.id)) {
+        cierresGrupo = []
+        for (const o of g.ops.filter(o => o.estado !== 'anulado' && !o.cobrada)) {
+          const c = await AlquileresModel.datosCierre(o.id, { alRetiro: true })
+          cierresGrupo.push({ id: o.id, numero_contenedor: o.numero_contenedor, precioActual: c ? c.precioActual : 0 })
+        }
+      }
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
@@ -266,6 +318,7 @@ const AlquileresController = {
         diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),
         saldoFavorCliente: Math.max(0, Number(clienteAlq?.saldo) || 0),
         cierre: alquiler.detalle ? await AlquileresModel.datosCierre(alquiler.id) : null,
+        cierresGrupo,
       })
     } catch (err) {
       console.error(err)
@@ -402,27 +455,33 @@ const AlquileresController = {
   async devolverAPlanta(req, res) {
     try {
       const alquiler = await AlquileresModel.obtener(req.params.id)
-      // "A convenir una vez finalizado": al marcar Retirado hay que resolverlo sí o sí
-      // — un método de pago real, o el check de "pendiente de pago" (queda en Cobranzas).
+      // Alquiler agrupado con cobro por alquiler: solo el retiro del último contenedor cobra.
+      const grupoAlq = alquiler?.grupo?.cobro_modo === 'alquiler' ? alquiler.grupo : null
+      const faltanOtros = grupoAlq ? grupoAlq.ops.filter(o => o.abierta && o.id !== alquiler.id).length : 0
+      // "A convenir una vez finalizado": al cobrar hay que resolverlo sí o sí — un método de
+      // pago real, o el check de "pendiente de pago" (queda en Cobranzas).
       const pendientePago = req.body.pendiente_pago === '1' || req.body.pendiente_pago === 'on'
       const metodoPagoFinal = (req.body.metodo_pago_final || '').trim() || null
-      if (alquiler?.metodo_pago === 'a_convenir' && !pendientePago && !metodoPagoFinal) {
+      if (alquiler?.metodo_pago === 'a_convenir' && faltanOtros === 0 && !pendientePago && !metodoPagoFinal) {
         req.flash('error', 'Este alquiler quedó "a convenir": indicá un método de pago o marcá "Pendiente de pago".')
         return res.redirect(`/alquileres/contenedores/${req.params.id}`)
       }
       await AlquileresModel.devolverAPlanta(req.params.id)
-      // El alquiler termina acá: es el momento en que se cobra (salvo que haya
-      // quedado explícitamente pendiente de pago).
+      // El alquiler termina acá: es el momento en que se cobra (salvo que haya quedado
+      // explícitamente pendiente de pago, o que en un grupo falten contenedores).
       const monto = pendientePago ? null
-        : await AlquileresModel.cobrarAlCerrar(req.params.id, req.body.precio_final, metodoPagoFinal)
+        : await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(req.body.precio_final), metodoPagoFinal)
       if (alquiler?.detalle?.alquiler_siguiente_id) {
         await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
-      req.flash('success', monto != null
-        ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}.`
-        : pendientePago
-          ? 'Contenedor retirado — pago pendiente, quedó en Cobranzas.'
-          : 'Contenedor retirado — ciclo completado.')
+      const cantGrupo = grupoAlq ? grupoAlq.ops.filter(o => o.estado !== 'anulado').length : 0
+      req.flash('success', faltanOtros > 0
+        ? `Contenedor retirado. El alquiler se cobra todo junto al retirar el último contenedor (falta${faltanOtros === 1 ? '' : 'n'} ${faltanOtros}).`
+        : monto != null
+          ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}${grupoAlq ? ` (${cantGrupo} contenedores)` : ''}.`
+          : pendientePago
+            ? 'Contenedor retirado — pago pendiente, quedó en Cobranzas.'
+            : 'Contenedor retirado — ciclo completado.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar devolución.')
@@ -433,7 +492,13 @@ const AlquileresController = {
   async anular(req, res) {
     try {
       await AlquileresModel.anular(req.params.id)
-      req.flash('success', 'Alquiler anulado.')
+      // Si era el último contenedor pendiente de un alquiler agrupado con cobro por
+      // alquiler y los demás ya se retiraron, el cobro del grupo se genera ahora.
+      const grupo = await AlquileresModel.grupoConCobroPorAlquiler(req.params.id)
+      const monto = grupo ? await AlquileresModel.cobrarGrupo(grupo.id) : null
+      req.flash('success', monto != null
+        ? `Alquiler anulado. Se cobró el resto del alquiler agrupado por $${Math.round(monto).toLocaleString('es-AR')}.`
+        : 'Alquiler anulado.')
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al anular.')
@@ -510,8 +575,12 @@ const AlquileresController = {
       // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
       // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
       for (const p of pendientes) {
-        const cierre = await AlquileresModel.datosCierre(p.id)
-        p.montoEstimado = cierre ? cierre.precioActual : (p.precio_alquiler || 0)
+        // En una fila de grupo, el estimado de cada contenedor y el total
+        for (const o of (p.esGrupo ? p.ops : [p])) {
+          const cierre = await AlquileresModel.datosCierre(o.id, { alRetiro: !!p.esGrupo })
+          o.montoEstimado = cierre ? cierre.precioActual : (o.precio_alquiler || 0)
+        }
+        if (p.esGrupo) p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)
       }
       res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
     } catch (err) {
@@ -533,7 +602,7 @@ const AlquileresController = {
         const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
         if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
       }
-      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
+      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(precio_final), metodo_pago_final)
       if (monto == null) {
         req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
       } else {
