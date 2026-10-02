@@ -1,5 +1,18 @@
 <!-- Componente reutilizable: Metodo de pago -->
+<%#
+  Locals opcionales:
+    conAConvenir  → ofrece "A convenir una vez finalizado".
+    soloFacturar  → solo la sección "Operación para Facturar" (sin el selector de método).
+    sinFacturar   → solo el selector de método (sin el check de facturar).
+%>
+<%
+  const _soloFacturar = typeof soloFacturar !== 'undefined' && soloFacturar
+  const _sinFacturar  = typeof sinFacturar  !== 'undefined' && sinFacturar
+%>
 <div class="form-section">
+    <% if (_soloFacturar) { %>
+    <h3 class="form-section__title">Facturación</h3>
+    <% } else { %>
     <h3 class="form-section__title">Metodo de pago</h3>
     <div class="form-group">
         <label for="metodoPago">Metodo</label>
@@ -18,8 +31,11 @@
         <% } %>
         <p class="form-hint" id="hintSaldoFavor" style="display:none"></p>
     </div>
+    <% } %>
+    <% if (!_sinFacturar) { %>
     <label class="toggle-row mt-2" for="paraFacturar">
         <input type="checkbox" name="paraFacturar" id="paraFacturar" value="1">
         Operación para Facturar
     </label>
+    <% } %>
 </div>

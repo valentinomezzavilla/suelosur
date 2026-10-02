@@ -85,7 +85,7 @@ const ClientesController = {
       const AlquileresModel = require('../models/alquileres.model')
       const sinCargo = await Promise.all((await ClientesModel.operacionesSinCargo(cli.id)).map(async o => {
         let estimado = null
-        if (o.tipo_op === 'C') estimado = (await AlquileresModel.datosCierre(o.id))?.precioActual ?? (Number(o.precio_alquiler) || null)
+        if (o.tipo_op === 'C') estimado = (await AlquileresModel.datosCierre(o.id))?.precioACobrar ?? (Number(o.precio_alquiler) || null)
         else if (o.tipo_op === 'MA') estimado = Number(o.precio_maquinaria) || null
         return { ...o, estimado }
       }))

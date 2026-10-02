@@ -9,9 +9,12 @@
     : !o.id_contenedor ? 'Sin contenedor'
     : (ETIQUETA[o.contenedor_estado] || o.contenedor_estado || '—')
   const activas = grupo.ops.filter(o => o.estado !== 'anulado').length
+  // Mientras ningún contenedor tiene precio, el cobro (por contenedor o por alquiler) no se
+  // eligió todavía: se elige al asignar el precio en Cobranzas.
+  const cobroSinDefinir = grupo.ops.filter(o => o.estado !== 'anulado').every(o => o.precio_alquiler == null)
 %>
 <div class="card shadow-sm mb-3" id="grupo">
-  <div class="card-header-orange px-3 py-2">🧩 Alquiler agrupado — <%= activas %> contenedor<%= activas === 1 ? '' : 'es' %> · cobro por <%= grupo.cobro_modo %></div>
+  <div class="card-header-orange px-3 py-2">🧩 Alquiler agrupado — <%= activas %> contenedor<%= activas === 1 ? '' : 'es' %> · <%= cobroSinDefinir ? 'cobro a definir al asignar el precio' : 'cobro por ' + grupo.cobro_modo %></div>
   <div class="card-body p-0">
     <table class="table-modern mb-0">
       <thead>
@@ -33,7 +36,7 @@
             <td class="text-center"><%= o.numero_contenedor ? 'N° ' + o.numero_contenedor : '—' %></td>
             <td class="text-center"><%= estadoDe(o) %></td>
             <td class="text-center"><%= o.abierta && o.dias_restantes != null ? o.dias_restantes + 'd' : '—' %></td>
-            <td class="text-center"><%= o.cobrada ? 'Cobrado' : (o.estado === 'anulado' ? '—' : 'Pendiente') %></td>
+            <td class="text-center"><%= o.cobrada ? 'Cobrado' : (o.estado === 'anulado' ? '—' : (o.precio_alquiler == null ? 'Sin precio' : 'Pendiente')) %></td>
           </tr>
         <% }) %>
       </tbody>

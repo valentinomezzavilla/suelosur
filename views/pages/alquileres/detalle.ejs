@@ -12,7 +12,7 @@
     en_alquiler:       'Entregado',
     pendiente_retiro:  'Pendiente Retiro',
   }
-  const METODO_PAGO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', a_convenir: 'A convenir una vez finalizado' }
+  const METODO_PAGO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor', a_convenir: 'A convenir una vez finalizado' }
   const iconCont = {
     disponible: '✅', pendiente_despacho: '📋', despachado: '🚛',
     en_alquiler: '⏳', pendiente_retiro: '⚠️',
@@ -58,14 +58,27 @@
         <% } %>
         <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
         <p class="mb-1"><strong>Plazo:</strong> <%= alquiler.detalle?.plazo_alquiler != null ? alquiler.detalle.plazo_alquiler + ' días hábiles' : 'Sin fecha de fin' %></p>
+        <%# precio_alquiler NULL = sin precio (todavía no se le asignó); 0 es un precio cero a propósito %>
+        <% const sinPrecio = !!alquiler.detalle && alquiler.detalle.precio_alquiler == null %>
         <p class="mb-1"><strong>Precio:</strong>
-          <% const precio = alquiler.detalle?.precio_alquiler || 0 %>
-          <%= precio > 0 ? `$${precio.toFixed(2)}` : '—' %>
+          <% if (sinPrecio) { %>
+            <span class="badge rounded-pill px-2 badge-pendiente">Sin precio</span>
+            <% if (!estaAnulado) { %>
+              <a href="/alquileres/contenedores/cobranzas#op-<%= alquiler.id %>" class="btn btn-sm btn-outline-success ms-1 py-0">Asignar precio</a>
+            <% } %>
+          <% } else { %>
+            <% const precio = alquiler.detalle?.precio_alquiler || 0 %>
+            <%= precio > 0 ? `$${precio.toFixed(2)}` : (alquiler.detalle?.precio_asignado_en ? '$0.00 (sin cargo)' : '—') %>
+          <% } %>
         </p>
         <p class="mb-0"><strong>Pago:</strong>
-          <%= METODO_PAGO_LABEL[alquiler.metodo_pago] || alquiler.metodo_pago || '—' %>
-          <% if (alquiler.metodo_pago === 'a_convenir') { %>
-            <span class="badge rounded-pill px-2 badge-pendiente">Sin resolver</span>
+          <% if (sinPrecio) { %>
+            <span class="text-muted">A definir al asignar el precio</span>
+          <% } else { %>
+            <%= METODO_PAGO_LABEL[alquiler.metodo_pago] || alquiler.metodo_pago || '—' %>
+            <% if (alquiler.metodo_pago === 'a_convenir') { %>
+              <span class="badge rounded-pill px-2 badge-pendiente">Sin resolver</span>
+            <% } %>
           <% } %>
         </p>
         <% if (alquiler.observaciones) { %>

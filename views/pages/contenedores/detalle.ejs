@@ -172,7 +172,7 @@
               </td>
               <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
               <td><small class="text-muted"><%= a.zona_entrega || '—' %></small></td>
-              <td class="text-end"><small class="fw-semibold"><%= a.precio_alquiler ? '$' + Number(a.precio_alquiler).toLocaleString('es-AR') : '—' %></small></td>
+              <td class="text-end"><small class="fw-semibold"><%= a.precio_alquiler == null ? 'Sin precio' : (a.precio_alquiler ? '$' + Number(a.precio_alquiler).toLocaleString('es-AR') : '—') %></small></td>
             </tr>
             <% }) %>
           </tbody>

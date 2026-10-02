@@ -3,23 +3,37 @@
   en el domicilio. Locals: alquiler, cierre, saldoFavorCliente, grupo (alquiler.grupo o
   null) y cierresGrupo (monto de cierre de cada contenedor; solo cuando este es el último
   contenedor abierto de un grupo con cobro por alquiler).
+  Un alquiler sin precio (cierre.sinPrecio) se retira igual, sin monto ni método: no se
+  cobra hasta que se le asigne el precio en Cobranzas → Asignar precio.
 %>
 <%
   const grupoAlq = (grupo && grupo.cobro_modo === 'alquiler') ? grupo : null
+  const sinPrecio = !!cierre.sinPrecio
   const faltanOtros = grupoAlq ? grupoAlq.ops.filter(o => o.abierta && o.id !== alquiler.id).length : 0
   const pideMetodo = alquiler.metodo_pago === 'a_convenir' && faltanOtros === 0
-  const confirmar = faltanOtros > 0
-    ? '¿Registrar el retiro? El contenedor queda disponible y el alquiler se cobra al retirar el último.'
-    : '¿Cerrar el alquiler? El contenedor queda disponible.'
+  const soloRetiro = sinPrecio || faltanOtros > 0
+  const confirmar = sinPrecio
+    ? '¿Registrar el retiro? El contenedor queda disponible. El alquiler no tiene precio: el cobro se genera cuando se lo asignes en Cobranzas.'
+    : faltanOtros > 0
+      ? '¿Registrar el retiro? El contenedor queda disponible y el alquiler se cobra al retirar el último.'
+      : '¿Cerrar el alquiler? El contenedor queda disponible.'
 %>
 <div class="cierre-alquiler mt-3">
-  <p class="fw-semibold mb-1"><%= faltanOtros > 0 ? 'Registrar retiro' : 'Cerrar alquiler y cobrar' %></p>
+  <p class="fw-semibold mb-1"><%= soloRetiro ? 'Registrar retiro' : 'Cerrar alquiler y cobrar' %></p>
   <p class="text-muted small mb-2">
-    <% if (faltanOtros > 0) { %>
+    <% if (sinPrecio) { %>
+      Este alquiler no tiene precio todavía: se puede retirar igual, sin cobrar. Queda en
+      <a href="/alquileres/contenedores/cobranzas#op-<%= alquiler.id %>">Cobranzas → Asignar precio</a>
+      y el cobro se genera cuando le asignes el precio.
+      <% if (cierre.dias != null) { %>Lleva <%= cierre.dias %> días.<% } %>
+    <% } else if (faltanOtros > 0) { %>
       Cobro por alquiler: este contenedor se retira sin cobrar; se cobra todo junto al retirar el último
       (falta<%= faltanOtros === 1 ? '' : 'n' %> <%= faltanOtros %>).
     <% } else { %>
       El ingreso se registra al retirar el contenedor.
+      <% if (cierre.precioAsignado) { %>
+        Precio asignado: <strong>$<%= Math.round(cierre.precioInicial).toLocaleString('es-AR') %></strong>.
+      <% } %>
       <% if (cierre.cambioDePrecio) { %>
         Precio pactado al inicio (<%= cierre.mesInicio %>):
         <strong>$<%= Math.round(cierre.precioInicial).toLocaleString('es-AR') %></strong>.
@@ -30,20 +44,20 @@
   </p>
   <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
         id="formDevolver" class="d-flex flex-wrap gap-2 align-items-end" data-confirmar="<%= confirmar %>">
-    <% if (faltanOtros === 0 && cierresGrupo) { %>
+    <% if (!sinPrecio && faltanOtros === 0 && cierresGrupo) { %>
       <% cierresGrupo.forEach(c => { %>
         <div>
           <label for="precioFinal_<%= c.id %>" class="form-label mb-1 small">N° <%= c.numero_contenedor || '?' %></label>
           <input type="number" step="0.01" min="0" name="precio_final[op<%= c.id %>]" id="precioFinal_<%= c.id %>"
-                 class="form-control form-control-sm" style="max-width:150px" value="<%= Math.round(c.precioActual) %>">
+                 class="form-control form-control-sm" style="max-width:150px" value="<%= Math.round(c.precioACobrar) %>">
         </div>
       <% }) %>
-    <% } else if (faltanOtros === 0) { %>
+    <% } else if (!sinPrecio && faltanOtros === 0) { %>
       <div>
         <label for="precioFinal" class="form-label mb-1 small">Monto a cobrar</label>
         <input type="number" step="0.01" min="0" name="precio_final" id="precioFinal"
                class="form-control form-control-sm" style="max-width:170px"
-               value="<%= Math.round(cierre.precioActual) %>">
+               value="<%= Math.round(cierre.precioACobrar) %>">
       </div>
     <% } %>
     <% if (pideMetodo) { %>
@@ -65,7 +79,7 @@
         <span>Pendiente de pago</span>
       </label>
     <% } %>
-    <button class="btn btn-sm btn-outline-success"><%= faltanOtros > 0 ? '🏠 Registrar retiro' : '🏠 Registrar retiro y cobrar' %></button>
+    <button class="btn btn-sm btn-outline-success"><%= soloRetiro ? '🏠 Registrar retiro' : '🏠 Registrar retiro y cobrar' %></button>
   </form>
   <% if (pideMetodo) { %>
     <p class="form-hint mb-0 mt-1">Este alquiler quedó "a convenir": elegí un método de pago o marcá "Pendiente de pago" (queda en Cobranzas).</p>

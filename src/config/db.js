@@ -1545,6 +1545,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_detalle TEXT`).catch(() => {})
 
   await migrarGruposAlquiler()
+  await migrarAsignacionPrecio()
   await migrarHorasALocal()
 
   console.log('✅ Base de datos PostgreSQL inicializada')
@@ -1567,6 +1568,18 @@ async function migrarGruposAlquiler() {
   `)
   await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS id_grupo BIGINT REFERENCES alquiler_grupos(id)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_op_encabezado_id_grupo ON op_encabezado (id_grupo) WHERE id_grupo IS NOT NULL`)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MIGRACIÓN: alquileres de contenedor sin precio. Los alquileres nuevos se cargan con
+// precio_alquiler NULL (sin precio, que no es lo mismo que $0) y el precio y el método de
+// pago se asignan después, en Cobranzas → Asignar precio. precio_asignado_en guarda cuándo
+// se asignó: sirve para distinguir un precio asignado (es lo que se cobra al retirar) de
+// uno cargado al dar de alta el alquiler (los viejos: al retirar se cobra por días).
+// NULL = precio de alta. No toca datos existentes. Sin .catch(): igual que arriba.
+// ─────────────────────────────────────────────────────────────────
+async function migrarAsignacionPrecio() {
+  await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS precio_asignado_en TEXT`)
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1659,4 +1672,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio }

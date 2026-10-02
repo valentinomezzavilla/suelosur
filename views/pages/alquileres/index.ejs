@@ -24,6 +24,12 @@
     return `<a href="/alquileres/contenedores/${a.id}#grupo" class="badge rounded-pill px-2 badge-en-transito text-decoration-none ms-1" title="Alquiler con varios contenedores">Grupo · ${a.grupo_cant} contenedores</a>`
   }
 
+  // Alquiler cargado sin precio (precio_alquiler NULL): falta asignarlo en Cobranzas → Asignar precio.
+  function insigniaSinPrecio(a) {
+    if (a.precio_alquiler != null) return ''
+    return `<a href="/alquileres/contenedores/cobranzas#op-${a.id}" class="badge rounded-pill px-2 badge-pendiente text-decoration-none ms-1" title="Falta asignar el precio y el método de pago">Sin precio</a>`
+  }
+
   // Tarjetas para "Por finalizar" — más visibles que una fila de tabla.
   function cardsFinalizar(lista) {
     if (!lista.length) return `<div class="empty-state empty-state--compact"><div class="empty-state__icon">✅</div><p class="empty-state__msg">No hay alquileres finalizando próximamente.</p></div>`
@@ -38,7 +44,7 @@
           <span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span>
         </div>
         <div class="finalizar-card__cliente">${a.cliente_nombre}</div>
-        ${a.id_grupo ? `<div class="mb-1">${insigniaGrupo(a)}</div>` : ''}
+        ${a.id_grupo || a.precio_alquiler == null ? `<div class="mb-1">${insigniaGrupo(a)}${insigniaSinPrecio(a)}</div>` : ''}
         <div class="finalizar-card__dom">${a.domicilio_entrega || (a.obra ? 'Obra: ' + a.obra : '—')}</div>
         <div class="finalizar-card__fecha">
           <span class="finalizar-card__fecha-val">${a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—'}</span>
@@ -73,7 +79,7 @@
           return `
           <tr>
             <td class="fw-bold">
-              <a href="/alquileres/contenedores/${a.id}" class="text-decoration-none text-orange">OP-${String(a.nro_op).padStart(4,'0')}</a>${insigniaGrupo(a)}
+              <a href="/alquileres/contenedores/${a.id}" class="text-decoration-none text-orange">OP-${String(a.nro_op).padStart(4,'0')}</a>${insigniaGrupo(a)}${insigniaSinPrecio(a)}
               ${a.nro_remito ? `<br><small class="text-muted">R: 0001-${String(a.nro_remito).padStart(8,'0')}</small>` : ''}
             </td>
             <td class="fw-semibold">${a.cliente_nombre}</td>
@@ -133,7 +139,7 @@
   <div class="d-flex gap-2 flex-wrap">
     <a href="/alquileres/contenedores/mapa" class="btn btn-ghost btn-sm"><%- icon('map', { size: 14 }) %> Mapa de Contenedores</a>
     <a href="/contenedores/circuito" class="btn btn-ghost btn-sm">Circuito del día</a>
-    <a href="/alquileres/contenedores/cobranzas" class="btn btn-ghost btn-sm">Cobranzas</a>
+    <a href="/alquileres/contenedores/cobranzas" class="btn btn-ghost btn-sm">Cobranzas<% if (typeof sinPrecio !== 'undefined' && sinPrecio > 0) { %> <span class="badge rounded-pill px-2 badge-pendiente" title="Alquileres sin precio para asignar"><%= sinPrecio %></span><% } %></a>
     <a href="/alquileres/contenedores/nuevo" class="btn btn-primary-modern btn-sm">+ Nuevo alquiler</a>
   </div>
 </div>

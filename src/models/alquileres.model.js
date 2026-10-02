@@ -70,7 +70,28 @@ function normalizarPlazo(plazo, porDefecto) {
 // Dirección normalizada para comparar si cambió (espacios y mayúsculas no cuentan).
 const normDir = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
 
+// precio_alquiler NULL = alquiler sin precio (todavía no se le asignó). No es lo mismo que
+// $0 (un precio cero a propósito), por eso no alcanza con `parseFloat(x) || 0`.
+function precioONull(precio) {
+  if (precio === null || precio === undefined || String(precio).trim() === '') return null
+  const n = parseFloat(precio)
+  return Number.isFinite(n) ? n : null
+}
+
+// Tarifa por días vigente: de 1 a 8 días se cobra por día; desde los 9 días (o sin días
+// que contar) el precio base.
+function tarifaPorDias(dias, cfg) {
+  return (dias != null && dias > 0 && dias < 9) ? dias * cfg.precioDia : cfg.precioAlquiler
+}
+
+// Métodos de pago reales: con ellos se asigna el precio de un alquiler sin precio y se carga
+// uno histórico ya terminado. 'a_convenir' no está: es justamente no haber resuelto todavía
+// cómo se paga.
+const METODOS_PAGO = ['efectivo', 'transferencia', 'cheque', 'cuenta_corriente', 'saldo_a_favor']
+
 const AlquileresModel = {
+
+  METODOS_PAGO,
 
   // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
   // HÁBILES desde la entrega) y siguen 'en_alquiler' pasan automáticamente a
@@ -286,7 +307,7 @@ const AlquileresModel = {
       INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
     `, [id_op, d.id_contenedor || null, d.domicilio_entrega || '', d.domicilio_calle || null, d.domicilio_numero || null,
-        d.zona_entrega || '', normalizarPlazo(d.plazo_alquiler, 5), parseFloat(d.precio_alquiler) || 0, d.metodo_pago || null])
+        d.zona_entrega || '', normalizarPlazo(d.plazo_alquiler, 5), precioONull(d.precio_alquiler), d.metodo_pago || null])
     if (d.id_contenedor) {
       await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, ?)`,
         [d.id_contenedor, detRows[0].id,
@@ -336,7 +357,7 @@ const AlquileresModel = {
           ...base, nro_remito: nro_rem, id_grupo,
           id_contenedor: c.id_contenedor, plazo_alquiler: c.plazo_alquiler, precio_alquiler: c.precio_alquiler,
         }, { enCurso: !!en_curso })
-        ops.push({ ...r, id_contenedor: c.id_contenedor, precio_alquiler: parseFloat(c.precio_alquiler) || 0 })
+        ops.push({ ...r, id_contenedor: c.id_contenedor, precio_alquiler: precioONull(c.precio_alquiler) })
       }
       return { id_grupo, nro_remito: nro_rem, ops }
     })
@@ -353,22 +374,34 @@ const AlquileresModel = {
   // Edición de los datos comerciales / de entrega del alquiler.
   // Devuelve { direccionCambio }: si cambió la calle o el número, las coordenadas
   // guardadas ya no sirven — se borran acá y quien llama vuelve a geocodificar.
+  // Un alquiler SIN precio no se edita por acá: su precio y su método de pago se asignan en
+  // Cobranzas → Asignar precio (con la validación de cuenta corriente), así que la edición
+  // no los toca (y sobre todo no le pone un $0 por no venir en el formulario).
   async actualizar(id_op, { calle, numero: numeroForm, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
     const numero = numeroSinRepetirCalle(calle, numeroForm)
     const domicilio_entrega = `${calle || ''} ${numero}`.trim()
-    const previo = (await query(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
+    const previo = (await query(`SELECT domicilio_calle, domicilio_numero, precio_alquiler FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     const direccionCambio = !!previo
       && (normDir(previo.domicilio_calle) !== normDir(calle) || normDir(previo.domicilio_numero) !== normDir(numero))
+    const sinPrecio = !!previo && previo.precio_alquiler == null
     await transaction(async (q) => {
-      await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`,
-        [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, (obra || '').trim() || null, id_op])
-      await q(`
-        UPDATE op_detalle_contenedor
-        SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,
-            plazo_alquiler = ?, precio_alquiler = ?, metodo_pago = ?
-        WHERE id_orden_pedido = ?
-      `, [domicilio_entrega, calle || null, numero || null, zona_entrega || '',
-          normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null, id_op])
+      await q(sinPrecio
+        ? `UPDATE op_encabezado SET observaciones = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`
+        : `UPDATE op_encabezado SET observaciones = ?, fecha_entrega_planificada = ?, obra = ?, metodo_pago = ? WHERE id = ?`,
+        [observaciones || '', fecha_entrega_planificada || null, (obra || '').trim() || null,
+         ...(sinPrecio ? [] : [metodo_pago || null]), id_op])
+      await q(sinPrecio
+        ? `
+          UPDATE op_detalle_contenedor
+          SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?, plazo_alquiler = ?
+          WHERE id_orden_pedido = ?`
+        : `
+          UPDATE op_detalle_contenedor
+          SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?, plazo_alquiler = ?,
+              precio_alquiler = ?, metodo_pago = ?
+          WHERE id_orden_pedido = ?`,
+        [domicilio_entrega, calle || null, numero || null, zona_entrega || '', normalizarPlazo(plazo_alquiler, 5),
+         ...(sinPrecio ? [] : [parseFloat(precio_alquiler) || 0, metodo_pago || null]), id_op])
       if (direccionCambio) {
         await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id_op])
       }
@@ -385,6 +418,8 @@ const AlquileresModel = {
   //    en Cobranzas y cambiarle el método la sacaría de ahí sin cobrarla. Con cobro por
   //    alquiler las retiradas sin cobrar sí se actualizan: se cobran todas juntas al final.
   //  - Un método vacío no pisa el de las otras (el formulario puede no traerlo).
+  //  - Un contenedor SIN precio no recibe método de pago: se asigna junto con el precio
+  //    (Cobranzas → Asignar precio).
   async actualizarCompartidosGrupo(id_op) {
     return await transaction(async (q) => {
       const src = (await q(`
@@ -395,24 +430,25 @@ const AlquileresModel = {
       `, [id_op])).rows[0]
       if (!src?.id_grupo) return 0
       const otras = (await q(`
-        SELECT op.id FROM op_encabezado op
+        SELECT op.id, (oc.precio_alquiler IS NULL) AS sin_precio FROM op_encabezado op
         JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
         JOIN alquiler_grupos ag ON ag.id = op.id_grupo
         WHERE op.id_grupo = ? AND op.id <> ? AND op.estado <> 'anulado'
           AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
           AND (ag.cobro_modo = 'alquiler' OR ${SQL_OP_ABIERTA})
         ORDER BY op.id
-      `, [src.id_grupo, id_op])).rows.map(r => r.id)
-      for (const id of otras) {
+      `, [src.id_grupo, id_op])).rows
+      for (const { id, sin_precio } of otras) {
+        const metodo = sin_precio ? null : src.metodo_pago
         const previo = (await q(`SELECT domicilio_calle, domicilio_numero FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [id])).rows[0]
         await q(`UPDATE op_encabezado SET metodo_pago = COALESCE(NULLIF(?, ''), metodo_pago), observaciones = ?, obra = ? WHERE id = ?`,
-          [src.metodo_pago, src.observaciones, src.obra, id])
+          [metodo, src.observaciones, src.obra, id])
         await q(`
           UPDATE op_detalle_contenedor
           SET domicilio_entrega = ?, domicilio_calle = ?, domicilio_numero = ?, zona_entrega = ?,
               metodo_pago = COALESCE(NULLIF(?, ''), metodo_pago)
           WHERE id_orden_pedido = ?
-        `, [src.domicilio_entrega, src.domicilio_calle, src.domicilio_numero, src.zona_entrega, src.metodo_pago, id])
+        `, [src.domicilio_entrega, src.domicilio_calle, src.domicilio_numero, src.zona_entrega, metodo, id])
         if (normDir(previo?.domicilio_calle) !== normDir(src.domicilio_calle) || normDir(previo?.domicilio_numero) !== normDir(src.domicilio_numero)) {
           await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id])
         }
@@ -769,7 +805,7 @@ const AlquileresModel = {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [id_op, id_contenedor, domicilio_entrega || '',
           domicilio_calle || null, domicilio_numero || null,
-          zona_entrega || '', normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0,
+          zona_entrega || '', normalizarPlazo(plazo_alquiler, 5), precioONull(precio_alquiler),
           metodo_pago || null])
 
       await q(`
@@ -804,9 +840,17 @@ const AlquileresModel = {
   // `alRetiro`: contar los días hasta el día en que se retiró el contenedor de ESTA OP
   // (si ya se retiró) en vez de hasta hoy. Lo usa el cobro por alquiler de un grupo, que
   // cobra todo junto al retirar el último: cada contenedor tiene que contar solo sus días.
-  async datosCierre(id_op, { alRetiro = false } = {}) {
-    const op = (await query(`
-      SELECT op.fecha_entrega_planificada, op.obra, oc.precio_alquiler, oc.plazo_alquiler,
+  // `q`: leer con el cliente de una transacción en curso (para ver lo que ella escribió).
+  //
+  // Qué se cobra al cerrar (precioACobrar):
+  //  - alquiler con precio ASIGNADO en Cobranzas (precio_asignado_en): ese precio;
+  //  - alquiler con precio de alta (los viejos): la tarifa por días de hoy (precioActual),
+  //    y el precio de alta queda como referencia;
+  //  - alquiler SIN precio (sinPrecio): no hay nada que cobrar hasta que se le asigne uno.
+  // precioSugerido es lo que se propone al asignar el precio.
+  async datosCierre(id_op, { alRetiro = false, q = query } = {}) {
+    const op = (await q(`
+      SELECT op.fecha_entrega_planificada, op.obra, oc.precio_alquiler, oc.precio_asignado_en, oc.plazo_alquiler,
              oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, cont.numero_contenedor,
              ${SQL_FECHA_CIERRE_OP} AS fecha_cierre
       FROM op_encabezado op
@@ -817,6 +861,8 @@ const AlquileresModel = {
     if (!op) return null
 
     const precioInicial = parseFloat(op.precio_alquiler) || 0
+    const sinPrecio = op.precio_alquiler == null
+    const precioAsignado = op.precio_asignado_en != null
     const cfg = await ConfigContenedoresModel.obtenerPrecios()
 
     // Días reales que estuvo afuera, desde el inicio cargado hasta hoy (o hasta el retiro)
@@ -829,7 +875,10 @@ const AlquileresModel = {
       dias = Math.max(0, Math.round((hasta - new Date(inicio + 'T00:00:00')) / 86400000))
     }
     // Tarifa vigente: el precio base a partir del plazo largo, o por día si fue corto
-    const precioActual = (dias != null && dias > 0 && dias < 9) ? dias * cfg.precioDia : cfg.precioAlquiler
+    const precioActual = tarifaPorDias(dias, cfg)
+    // Sugerido al asignar el precio: el plazo cargado en el alta (con las ampliaciones) a la
+    // tarifa por días. Un alquiler sin fecha de fin no tiene plazo: se usan los días reales.
+    const precioSugerido = op.plazo_alquiler > 0 ? tarifaPorDias(op.plazo_alquiler, cfg) : precioActual
 
     const MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
     let mesInicio = null
@@ -839,10 +888,13 @@ const AlquileresModel = {
     }
     return {
       precioInicial, precioActual, dias, inicio, mesInicio,
+      sinPrecio, precioAsignado, precioSugerido, plazo: op.plazo_alquiler,
+      precioACobrar: precioAsignado ? precioInicial : precioActual,
       numero_contenedor: op.numero_contenedor, domicilio_entrega: op.domicilio_entrega,
       destino: textoDestino({ domicilio: op.domicilio_entrega, calle: op.domicilio_calle, numero: op.domicilio_numero, obra: op.obra }),
-      // Distinto = conviene mostrar el precio de referencia entre paréntesis
-      cambioDePrecio: precioInicial > 0 && Math.round(precioInicial) !== Math.round(precioActual),
+      // Distinto = conviene mostrar el precio de referencia entre paréntesis. Un precio
+      // asignado es el que se cobra, así que no hay referencia que mostrar.
+      cambioDePrecio: !precioAsignado && precioInicial > 0 && Math.round(precioInicial) !== Math.round(precioActual),
     }
   },
 
@@ -857,7 +909,8 @@ const AlquileresModel = {
 
   // Cobro de un alquiler agrupado "por alquiler". Cobra solo cuando no queda ninguna OP
   // abierta (se retiró el último contenedor). Devuelve null sin tocar nada si falta
-  // retirar alguno, si es "a convenir" y no viene el método, o si ya estaba cobrado.
+  // retirar alguno, si es "a convenir" y no viene el método, si algún contenedor no tiene
+  // precio todavía (se cobra cuando se le asigne) o si ya estaba cobrado.
   //  - Una transacción por OP, cada una con su monto (la facturación, el borrado y el
   //    control de "ya cobrada" funcionan por operación).
   //  - UN solo movimiento de cuenta corriente / saldo a favor por el total, anclado a la
@@ -865,13 +918,16 @@ const AlquileresModel = {
   // Todo en una transacción y con el grupo bloqueado (FOR UPDATE): un doble clic, o el
   // chofer y la oficina cerrando a la vez, no pueden cobrar dos veces.
   // `montos`: { [id_op]: monto } para ajustar el precio de cierre de cada contenedor.
-  async cobrarGrupo(id_grupo, { montos = {}, metodoPagoFinal = null } = {}) {
-    return await transaction(async (q) => {
+  // `q`: cliente de una transacción ya abierta (asignarPrecioGrupo cobra en la misma
+  // transacción en la que asigna los precios); sin él, abre la suya.
+  async cobrarGrupo(id_grupo, { montos = {}, metodoPagoFinal = null, q: qExterno = null } = {}) {
+    const cobrar = async (q) => {
       await q(`SELECT id FROM alquiler_grupos WHERE id = ? FOR UPDATE`, [id_grupo])
       const ops = (await q(`
         SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.metodo_pago,
                ${nombreCompleto('cli')} AS cliente_nombre,
                ${SQL_OP_ABIERTA} AS abierta,
+               (oc.precio_alquiler IS NULL) AS sin_precio,
                EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrada
         FROM op_encabezado op
         JOIN clientes cli ON cli.id = op.id_cliente
@@ -880,6 +936,8 @@ const AlquileresModel = {
         ORDER BY op.id
       `, [id_grupo])).rows
       if (!ops.length || ops.some(o => o.abierta)) return null
+      // Sin precio no hay nada que cobrar: el cobro se genera cuando se asigne el precio.
+      if (ops.some(o => o.sin_precio)) return null
       const aCobrar = ops.filter(o => !o.cobrada)
       if (!aCobrar.length) return null
 
@@ -894,10 +952,10 @@ const AlquileresModel = {
       const numeros = []
       for (const o of aCobrar) {
         // Cada contenedor cuenta sus días hasta su propio retiro, no hasta el último
-        const cierre = await this.datosCierre(o.id, { alRetiro: true })
+        const cierre = await this.datosCierre(o.id, { alRetiro: true, q })
         const valor = montos[o.id]
         const manual = valor != null && String(valor).trim() !== ''
-        const monto = manual ? (parseFloat(valor) || 0) : cierre.precioActual
+        const monto = manual ? (parseFloat(valor) || 0) : cierre.precioACobrar
         total += monto
         numeros.push(`#${cierre.numero_contenedor || '?'}`)
         await TransaccionesModel.crear({
@@ -921,12 +979,53 @@ const AlquileresModel = {
         }, q)
       }
       return total
-    })
+    }
+    return qExterno ? cobrar(qExterno) : await transaction(cobrar)
+  },
+
+  // Registra el cobro de UNA operación: la transacción (ingreso) y, si el método es cuenta
+  // corriente o saldo a favor, el movimiento en la cuenta del cliente. Lo usan el cierre
+  // del alquiler (cobrarAlCerrar) y la asignación de precio de uno ya retirado
+  // (asignarPrecio). Con `q` corre dentro de la transacción de quien llama.
+  async _registrarCobro({ op, cierre, monto, metodoPago }, q = query) {
+    // Si el alquiler arrancó con otro precio, se deja la referencia en la descripción
+    const referencia = (cierre.cambioDePrecio && cierre.mesInicio)
+      ? ` (Precio inicial ${cierre.mesInicio}: $${Math.round(cierre.precioInicial).toLocaleString('es-AR')})`
+      : ''
+    const detalle = `Alquiler contenedor #${cierre.numero_contenedor || '?'}${cierre.destino ? ' — ' + cierre.destino : ''}`
+
+    await TransaccionesModel.crear({
+      tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: op.nro_remito,
+      cliente_id: op.id_cliente, cliente: op.cliente_nombre, monto,
+      descripcion: detalle + referencia,
+      metodo_pago: metodoPago || 'efectivo',
+    }, q)
+    if (metodoPago === 'cuenta_corriente' && op.id_cliente) {
+      await ClientesModel.agregarMovimiento(op.id_cliente, {
+        tipo: 'deuda',
+        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
+        monto: -monto,
+        id_op_encabezado: op.id,
+      }, q)
+    }
+    if (metodoPago === 'saldo_a_favor' && op.id_cliente) {
+      await ClientesModel.agregarMovimiento(op.id_cliente, {
+        tipo: 'uso_saldo_favor',
+        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
+        monto: -monto,
+        id_op_encabezado: op.id,
+      }, q)
+    }
   },
 
   // Genera el ingreso del alquiler al cerrarlo (cuando se retira el contenedor).
-  // `montoManual` permite ajustar el precio en el momento del cierre; si no viene,
-  // usa la tarifa vigente. Si la operación ya tenía un ingreso, no hace nada.
+  // `montoManual` permite ajustar el precio en el momento del cierre; si no viene, cobra
+  // el precio asignado en Cobranzas o, en un alquiler con precio de alta, la tarifa
+  // vigente (ver datosCierre). Si la operación ya tenía un ingreso, no hace nada.
+  //
+  // Un alquiler SIN precio no genera ingreso (devuelve null): se retira igual, sin
+  // bloquear a la oficina ni al chofer, y sigue en Cobranzas → Asignar precio; el cobro se
+  // genera cuando se le asigne el precio (asignarPrecio).
   //
   // `metodoPagoFinal` resuelve los alquileres cargados "a convenir una vez
   // finalizado": si el método de pago pactado es 'a_convenir' y no viene uno acá,
@@ -944,53 +1043,33 @@ const AlquileresModel = {
         : (montoManual != null && String(montoManual).trim() !== '') ? { [id_op]: montoManual } : {}
       return this.cobrarGrupo(grupo.id, { montos, metodoPagoFinal })
     }
-    if (await TransaccionesModel.existePorOperacion(id_op)) return null
-    const op = (await query(`
-      SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, ${nombreCompleto('cli')} AS cliente_nombre
-      FROM op_encabezado op JOIN clientes cli ON cli.id = op.id_cliente WHERE op.id = ?
-    `, [id_op])).rows[0]
-    const cierre = await this.datosCierre(id_op)
-    if (!op || !cierre) return null
+    // Con la OP bloqueada (FOR UPDATE), en una transacción: así un retiro y una asignación de
+    // precio (asignarPrecio, que bloquea la misma fila) que ocurren a la vez no pueden dejar un
+    // alquiler retirado, con precio y sin cobrar, y dos cierres simultáneos no cobran dos veces.
+    return await transaction(async (q) => {
+      await q(`SELECT id FROM op_encabezado WHERE id = ? FOR UPDATE`, [id_op])
+      if (await TransaccionesModel.existePorOperacion(id_op, q)) return null
+      const op = (await q(`
+        SELECT op.id, op.nro_remito, op.id_cliente, op.metodo_pago, op.nro_op, ${nombreCompleto('cli')} AS cliente_nombre
+        FROM op_encabezado op JOIN clientes cli ON cli.id = op.id_cliente WHERE op.id = ?
+      `, [id_op])).rows[0]
+      const cierre = await this.datosCierre(id_op, { q })
+      if (!op || !cierre) return null
+      if (cierre.sinPrecio) return null
 
-    let metodoPago = op.metodo_pago
-    if (metodoPago === 'a_convenir') {
-      if (!metodoPagoFinal) return null
-      metodoPago = metodoPagoFinal
-      await query(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodoPago, id_op])
-    }
+      let metodoPago = op.metodo_pago
+      if (metodoPago === 'a_convenir') {
+        if (!metodoPagoFinal) return null
+        metodoPago = metodoPagoFinal
+        await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodoPago, id_op])
+      }
 
-    const manual = montoManual != null && String(montoManual).trim() !== ''
-    const monto = manual ? (parseFloat(montoManual) || 0) : cierre.precioActual
+      const manual = montoManual != null && String(montoManual).trim() !== ''
+      const monto = manual ? (parseFloat(montoManual) || 0) : cierre.precioACobrar
 
-    // Si el alquiler arrancó con otro precio, se deja la referencia en la descripción
-    const referencia = (cierre.cambioDePrecio && cierre.mesInicio)
-      ? ` (Precio inicial ${cierre.mesInicio}: $${Math.round(cierre.precioInicial).toLocaleString('es-AR')})`
-      : ''
-    const detalle = `Alquiler contenedor #${cierre.numero_contenedor || '?'}${cierre.destino ? ' — ' + cierre.destino : ''}`
-
-    await TransaccionesModel.crear({
-      tipo: 'Alquiler', id_op_encabezado: op.id, nro_remito: op.nro_remito,
-      cliente_id: op.id_cliente, cliente: op.cliente_nombre, monto,
-      descripcion: detalle + referencia,
-      metodo_pago: metodoPago || 'efectivo',
+      await this._registrarCobro({ op, cierre, monto, metodoPago }, q)
+      return monto
     })
-    if (metodoPago === 'cuenta_corriente' && op.id_cliente) {
-      await ClientesModel.agregarMovimiento(op.id_cliente, {
-        tipo: 'deuda',
-        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
-        monto: -monto,
-        id_op_encabezado: op.id,
-      })
-    }
-    if (metodoPago === 'saldo_a_favor' && op.id_cliente) {
-      await ClientesModel.agregarMovimiento(op.id_cliente, {
-        tipo: 'uso_saldo_favor',
-        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
-        monto: -monto,
-        id_op_encabezado: op.id,
-      })
-    }
-    return monto
   },
 
   // Alquileres de contenedor "a convenir una vez finalizado" que ya se retiraron
@@ -1038,6 +1117,175 @@ const AlquileresModel = {
     }
     const orden = (p) => (p.fecha_retiro ? new Date(p.fecha_retiro).getTime() : Infinity)
     return resultado.sort((a, b) => orden(a) - orden(b))
+  },
+
+  // Alquileres de contenedor SIN precio (precio_alquiler NULL), sin anular: pendientes de
+  // iniciar, en curso o ya retirados. Alimenta Cobranzas → Asignar precio.
+  // Devuelve bloques, los ya retirados primero (el cobro no se genera hasta que se les
+  // asigne el precio), después los en curso y los pendientes:
+  //  - { todoJunto: false, filas: [fila] }  un alquiler de un contenedor, o un contenedor
+  //    de un alquiler agrupado que se asigna por separado ("por contenedor");
+  //  - { todoJunto: true, id_grupo, filas }  alquiler agrupado en el que NINGÚN contenedor
+  //    tiene precio todavía: se puede asignar todo junto ("por alquiler": un solo cargo en
+  //    cuenta corriente por el total) o cada contenedor por separado.
+  // Cada fila trae el estado (pendiente / en_curso / retirado), los días transcurridos, el
+  // plazo, el precio sugerido y lo que hace falta para ofrecer los métodos de pago (si el
+  // cliente tiene cuenta corriente y su saldo a favor).
+  async sinPrecio() {
+    const filas = (await query(`
+      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, op.estado, op.obra,
+             ${nombreCompleto('cli')} AS cliente_nombre,
+             (COALESCE(cli.cuenta_corriente, 0) = 1) AS cliente_con_cc,
+             GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,
+             oc.domicilio_entrega, oc.plazo_alquiler, oc.id_contenedor, cont.numero_contenedor,
+             COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), ''), LEFT(ma.fecha_alquiler, 10)) AS fecha_inicio,
+             ${SQL_FECHA_CIERRE_OP} AS fecha_retiro,
+             (SELECT COUNT(*) FROM op_encabezado g WHERE g.id_grupo = op.id_grupo AND g.estado <> 'anulado')::int AS grupo_cant
+      FROM op_encabezado op
+      JOIN clientes cli ON cli.id = op.id_cliente
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
+      WHERE op.tipo_op = 'C' AND op.estado <> 'anulado' AND oc.precio_alquiler IS NULL
+      ORDER BY op.id
+    `)).rows
+    for (const f of filas) {
+      f.estado_asignar = f.estado !== 'entregado' ? 'pendiente'
+        : (f.id_contenedor != null && f.fecha_retiro != null ? 'retirado' : 'en_curso')
+      const cierre = await this.datosCierre(f.id, { alRetiro: true })
+      f.dias = f.estado_asignar === 'pendiente' ? null : cierre.dias
+      f.precio_sugerido = cierre.precioSugerido
+    }
+
+    const porGrupo = new Map()
+    for (const f of filas) {
+      if (f.id_grupo) porGrupo.set(f.id_grupo, [...(porGrupo.get(f.id_grupo) || []), f])
+    }
+    const bloques = []
+    const vistos = new Set()
+    for (const f of filas) {
+      const delGrupo = f.id_grupo ? porGrupo.get(f.id_grupo) : null
+      if (delGrupo && delGrupo.length >= 2 && delGrupo.length === f.grupo_cant) {
+        if (vistos.has(f.id_grupo)) continue
+        vistos.add(f.id_grupo)
+        bloques.push({ todoJunto: true, id_grupo: f.id_grupo, filas: delGrupo })
+      } else {
+        bloques.push({ todoJunto: false, filas: [f] })
+      }
+    }
+    const urgencia = { retirado: 0, en_curso: 1, pendiente: 2 }
+    const prioridad = (b) => Math.min(...b.filas.map(f => urgencia[f.estado_asignar]))
+    const inicio = (b) => b.filas.map(f => f.fecha_inicio || '9999-12-31').sort()[0]
+    return bloques.sort((a, b) => prioridad(a) - prioridad(b) || inicio(a).localeCompare(inicio(b)) || a.filas[0].id - b.filas[0].id)
+  },
+
+  // Cuántos alquileres sin precio hay para asignar (el aviso del listado y de Cobranzas).
+  async cantidadSinPrecio() {
+    return (await query(`
+      SELECT COUNT(*)::int AS n FROM op_encabezado op
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      WHERE op.tipo_op = 'C' AND op.estado <> 'anulado' AND oc.precio_alquiler IS NULL
+    `)).rows[0].n
+  },
+
+  // Valida lo que no depende del alquiler para asignar precio y método: el método tiene que
+  // ser uno de los permitidos, y cuenta corriente / saldo a favor se piden solo a clientes
+  // que los tengan (la pantalla no los ofrece si no, pero el servidor no confía en eso).
+  async _validarMetodoAsignar(metodo_pago, id_cliente) {
+    if (!METODOS_PAGO.includes(metodo_pago)) throw new Error('Elegí un método de pago.')
+    if (metodo_pago === 'cuenta_corriente') {
+      const errCC = await ClientesModel.errorCuentaCorriente(id_cliente)
+      if (errCC) throw new Error(errCC)
+    }
+    if (metodo_pago === 'saldo_a_favor') {
+      const errSaldo = await ClientesModel.errorSaldoFavor(id_cliente)
+      if (errSaldo) throw new Error(errSaldo)
+    }
+  },
+
+  // Asigna precio y método de pago a UN alquiler sin precio (Cobranzas → Asignar precio).
+  // Si el contenedor ya se retiró, el cobro se genera en este momento con el precio cargado;
+  // si todavía no, se genera al retirarlo (cobrarAlCerrar cobra el precio asignado).
+  // Todo en una transacción y con la OP bloqueada: un doble clic no puede asignar ni cobrar
+  // dos veces. Devuelve { monto, cobrado }.
+  async asignarPrecio(id_op, { precio, metodo_pago }) {
+    const monto = precioONull(precio)
+    if (monto == null) throw new Error('Ingresá el precio del alquiler.')
+    if (monto < 0) throw new Error('El precio no puede ser negativo.')
+    return await transaction(async (q) => {
+      const op = (await q(`
+        SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.estado, ag.cobro_modo,
+               oc.precio_alquiler, ${nombreCompleto('cli')} AS cliente_nombre,
+               (op.estado = 'entregado' AND oc.id_contenedor IS NOT NULL AND ${SQL_FECHA_CIERRE_OP} IS NOT NULL) AS retirado
+        FROM op_encabezado op
+        JOIN clientes cli ON cli.id = op.id_cliente
+        JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+        WHERE op.id = ? AND op.tipo_op = 'C'
+        FOR UPDATE OF op
+      `, [id_op])).rows[0]
+      if (!op) throw new Error('Alquiler no encontrado.')
+      if (op.estado === 'anulado') throw new Error('El alquiler está anulado.')
+      if (op.precio_alquiler != null) throw new Error('Este alquiler ya tiene precio asignado.')
+      if (op.cobro_modo === 'alquiler') throw new Error('Este alquiler se cobra por alquiler: asignale el precio a todos sus contenedores juntos.')
+      await this._validarMetodoAsignar(metodo_pago, op.id_cliente)
+
+      await q(`UPDATE op_detalle_contenedor SET precio_alquiler = ?, metodo_pago = ?, precio_asignado_en = ahora_local() WHERE id_orden_pedido = ?`,
+        [monto, metodo_pago, op.id])
+      await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodo_pago, op.id])
+
+      // Ya retirado no hay otro momento en que se cobre: se cobra ahora.
+      if (op.retirado) {
+        const cierre = await this.datosCierre(op.id, { alRetiro: true, q })
+        await this._registrarCobro({ op, cierre, monto, metodoPago: metodo_pago }, q)
+      }
+      return { monto, cobrado: !!op.retirado }
+    })
+  },
+
+  // Asigna precio y método de pago a TODOS los contenedores de un alquiler agrupado, que
+  // pasa a cobrarse "por alquiler": un solo método, un precio por contenedor, y un solo
+  // cargo en cuenta corriente por el total. Solo si ningún contenedor del grupo tiene precio
+  // todavía. `precios`: { [id_op]: monto }. Si ya se retiraron todos, se cobra ahora; si
+  // falta alguno, se cobra todo junto al retirar el último (cobrarGrupo). Devuelve
+  // { total, cobrado }.
+  async asignarPrecioGrupo(id_op, { precios = {}, metodo_pago }) {
+    return await transaction(async (q) => {
+      const g = (await q(`
+        SELECT ag.id FROM op_encabezado op JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+        WHERE op.id = ? AND op.tipo_op = 'C' FOR UPDATE OF ag
+      `, [id_op])).rows[0]
+      if (!g) throw new Error('Este alquiler no es de varios contenedores.')
+      const ops = (await q(`
+        SELECT op.id, op.id_cliente, oc.precio_alquiler, cont.numero_contenedor
+        FROM op_encabezado op
+        JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+        LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+        WHERE op.id_grupo = ? AND op.estado <> 'anulado'
+        ORDER BY op.id
+        FOR UPDATE OF op
+      `, [g.id])).rows
+      if (!ops.length) throw new Error('El alquiler no tiene contenedores sin anular.')
+      if (ops.some(o => o.precio_alquiler != null)) {
+        throw new Error('Algún contenedor de este alquiler ya tiene precio: asignalos de a uno.')
+      }
+      const montos = {}
+      for (const o of ops) {
+        const monto = precioONull(precios[o.id])
+        if (monto == null || monto < 0) throw new Error(`Ingresá el precio del contenedor N° ${o.numero_contenedor || '?'}.`)
+        montos[o.id] = monto
+      }
+      await this._validarMetodoAsignar(metodo_pago, ops[0].id_cliente)
+
+      await q(`UPDATE alquiler_grupos SET cobro_modo = 'alquiler' WHERE id = ?`, [g.id])
+      for (const o of ops) {
+        await q(`UPDATE op_detalle_contenedor SET precio_alquiler = ?, metodo_pago = ?, precio_asignado_en = ahora_local() WHERE id_orden_pedido = ?`,
+          [montos[o.id], metodo_pago, o.id])
+        await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodo_pago, o.id])
+      }
+      const cobrado = await this.cobrarGrupo(g.id, { montos, q })
+      return { total: Object.values(montos).reduce((a, b) => a + b, 0), cobrado: cobrado != null }
+    })
   },
 
   // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor

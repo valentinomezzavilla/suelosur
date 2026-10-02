@@ -188,8 +188,25 @@ function elegirPlazoCC(dias) {
 document.getElementById('btnPlazo4')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.estandar));
 document.getElementById('btnPlazo10')?.addEventListener('click', () => elegirPlazoCC(plazosCfg.cuenta_corriente));
 
-// ── Precio (siempre manual, sin tarifa automática) ─────────────
+// ── Precio y método de pago ───────────────────────────────────
+// Los alquileres nuevos se cargan SIN precio ni método de pago: se asignan después en
+// Cobranzas → Asignar precio. Solo la carga histórica de un alquiler que YA terminó los pide
+// (se registra su ingreso con la fecha pasada). El resto del tiempo el bloque está oculto y
+// sus campos deshabilitados, así no se mandan ni se validan.
 const precioInput = document.getElementById('precioAlquilerInput');
+const bloqueCobroHistorico = document.getElementById('bloqueCobroHistorico');
+const avisoSinPrecio = document.getElementById('avisoSinPrecio');
+
+function pideCobro() { return modoFinalizado() && !historicoEnCurso(); }
+
+function aplicarBloqueCobroHistorico() {
+    const visible = pideCobro();
+    if (bloqueCobroHistorico) {
+        bloqueCobroHistorico.style.display = visible ? '' : 'none';
+        bloqueCobroHistorico.querySelectorAll('input, select').forEach(el => { el.disabled = !visible; });
+    }
+    if (avisoSinPrecio) avisoSinPrecio.style.display = visible ? 'none' : '';
+}
 
 // ── Estado de la selección ────────────────────────────────────
 let contenedorSeleccionado = null; // { id, numero, fin, alquilerActualId }
@@ -239,13 +256,8 @@ function actualizarResumen() {
         if (elDias) elDias.textContent = '—';
     }
 
-    // Precio: siempre el que se cargó a mano.
-    // Con varios contenedores, el total es la suma de cada uno (vacío = el precio general).
-    const precioGeneral = Number(precioInput?.value) || 0;
-    const precio = esMultiple()
-        ? Array.from(document.querySelectorAll('.multi-cont-precio'))
-            .reduce((suma, inp) => suma + (Number(inp.value) || precioGeneral), 0)
-        : precioGeneral;
+    // Precio: solo lo pide la carga histórica ya finalizada; los demás alquileres se cargan sin precio.
+    const precio = pideCobro() ? (Number(precioInput?.value) || 0) : 0;
     if (elTotalV) elTotalV.textContent = precio > 0 ? `$${precio.toLocaleString('es-AR')}` : '—';
     if (elTotal)  elTotal.style.display = precio > 0 ? 'flex' : 'none';
 
@@ -256,9 +268,9 @@ function actualizarResumen() {
     if (elDir) elDir.textContent = calle && numero ? `${calle} ${numero}` : calle || '—';
 
     // método de pago
-    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', a_convenir: 'A convenir una vez finalizado' };
+    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor' };
     const elPago  = document.getElementById('res-pago');
-    if (elPago) elPago.textContent = pagoMap[metodoPagoEl?.value] || '—';
+    if (elPago) elPago.textContent = pideCobro() ? (pagoMap[metodoPagoEl?.value] || '—') : 'A definir (Cobranzas → Asignar precio)';
 }
 
 ['fechaInicio', 'fechaFin', 'calle', 'numero', 'metodoPago', 'precioAlquilerInput'].forEach(id => {
@@ -313,10 +325,10 @@ function actualizarBarraSeleccion() {
     });
 }
 
-// Con 2 o más contenedores: una fila por contenedor (precio y fin propios, opcionales) y
-// los hidden ids_contenedor[]. Con 0 o 1, el bloque queda oculto y vacío. Las claves
-// llevan "c" adelante (precio_c[c<ID>]): con claves numéricas el servidor perdería a qué
-// contenedor corresponde cada valor.
+// Con 2 o más contenedores: una fila por contenedor (fecha de fin propia, opcional) y los
+// hidden ids_contenedor[]. Con 0 o 1, el bloque queda oculto y vacío. Las claves llevan "c"
+// adelante (fin_c[c<ID>]): con claves numéricas el servidor perdería a qué contenedor
+// corresponde cada valor.
 function armarBloqueVarios() {
     if (inputsConts) inputsConts.innerHTML = '';
     if (listaVarios) listaVarios.innerHTML = '';
@@ -329,9 +341,6 @@ function armarBloqueVarios() {
         listaVarios?.insertAdjacentHTML('beforeend', `
             <div class="multi-cont-fila">
                 <span class="multi-cont-fila__num">#${escHtml(c.numero)}</span>
-                <label>Precio ($)
-                    <input type="number" name="precio_c[c${id}]" class="input-sm multi-cont-precio" min="0.01" step="any" placeholder="El general">
-                </label>
                 <label>Fin
                     <input type="date" name="fin_c[c${id}]" class="input-sm multi-cont-fin">
                 </label>
@@ -492,6 +501,7 @@ function aplicarEstadoHistorico() {
     if (rowSinFechaFin)     rowSinFechaFin.style.display = enCurso ? 'none' : (permiteSinFechaFin() ? '' : 'none');
     if (!enCurso && selContHistorico) selContHistorico.value = '';
     sincronizarContenedorHistorico();
+    aplicarBloqueCobroHistorico();
     actualizarResumen();
 }
 
@@ -513,6 +523,7 @@ function aplicarModoFinalizado(activo) {
     aplicarFechaFinAutomatica();
     aplicarSinFechaFin(!!checkSinFechaFin?.checked);
     if (activo) aplicarEstadoHistorico();
+    aplicarBloqueCobroHistorico();
     if (activo && modalContLabel) modalContLabel.textContent = 'Alquiler histórico';
 }
 
@@ -584,8 +595,8 @@ formAlquiler?.addEventListener('submit', (e) => {
     const clienteId = document.getElementById('inputClienteId')?.value;
     if (!clienteId) { e.preventDefault(); alert('Buscá y seleccioná un cliente antes de confirmar.'); return; }
 
-    // El precio siempre se carga a mano.
-    if (!(Number(precioInput?.value) > 0)) {
+    // Solo el histórico ya finalizado pide precio; los demás se cargan sin precio.
+    if (pideCobro() && !(Number(precioInput?.value) > 0)) {
         e.preventDefault(); alert('Ingresá el precio del alquiler.'); precioInput?.focus(); return;
     }
 
@@ -610,4 +621,5 @@ formAlquiler?.addEventListener('submit', (e) => {
     }
 });
 
+aplicarBloqueCobroHistorico();
 actualizarResumen();

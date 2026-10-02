@@ -40,9 +40,10 @@ const TransaccionesModel = {
 
   // ¿La operación ya generó su ingreso? Evita cobrar dos veces la misma operación
   // (por ejemplo, alquileres viejos que ya habían cobrado al entregar).
-  async existePorOperacion(id_op_encabezado) {
+  // `q` permite consultarlo dentro de una transacción en curso (cobro de un alquiler).
+  async existePorOperacion(id_op_encabezado, q = query) {
     if (!id_op_encabezado) return false
-    const r = (await query(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
+    const r = (await q(`SELECT 1 FROM transacciones WHERE id_op_encabezado = ? LIMIT 1`, [id_op_encabezado])).rows[0]
     return !!r
   },
 

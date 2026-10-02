@@ -1,17 +1,143 @@
 <%
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2 })
+  const nroOp = (n) => 'OP-' + String(n).padStart(4, '0')
+  const ESTADO = {
+    pendiente: { label: 'Pendiente', badge: 'badge-pendiente' },
+    en_curso:  { label: 'En curso',  badge: 'badge-en-transito' },
+    retirado:  { label: 'Retirado',  badge: 'badge-activo' },
+  }
+  const cantSinPrecio = sinPrecio.reduce((n, b) => n + b.filas.length, 0)
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Cobranzas de Contenedores</h4>
-    <small class="text-muted">Alquileres "a convenir una vez finalizado", ya retirados, sin método de pago cerrado.</small>
+    <small class="text-muted">Asignar el precio de los alquileres cargados sin precio y cerrar los "a convenir" ya retirados.</small>
   </div>
   <a href="/alquileres/contenedores" class="btn btn-outline-secondary">← Volver</a>
 </div>
 
-<div class="card shadow-sm">
+<%# ── 1. Asignar precio: alquileres nuevos, cargados sin precio ni método de pago ── %>
+<div class="card shadow-sm mb-4" id="asignar-precio">
+  <div class="card-header-light px-3 py-2 d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Asignar precio</span>
+    <span class="badge rounded-pill px-3 <%= cantSinPrecio ? 'badge-pendiente' : 'badge-activo' %>"><%= cantSinPrecio %></span>
+  </div>
   <div class="card-body p-0">
+    <p class="small text-muted px-3 pt-3 mb-2">
+      Alquileres cargados sin precio ni método de pago. Si el contenedor <strong>ya se retiró</strong>, el cobro se
+      registra apenas asignás el precio; si <strong>sigue en curso</strong> (o todavía no se entregó), se cobra al retirarlo
+      y retirar sin precio nunca se bloquea.
+    </p>
+    <% if (!sinPrecio.length) { %>
+      <%- include('../../partials/empty_state', { icono: '✅', mensaje: 'No hay alquileres sin precio. Todo está asignado.' }) %>
+    <% } else { %>
+    <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Contenedor / OP</th>
+          <th>Cliente / Domicilio</th>
+          <th>Inicio / Días</th>
+          <th class="text-center">Estado</th>
+          <th class="text-end">Sugerido</th>
+          <th>Asignar precio y método</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% sinPrecio.forEach(b => {
+             const primera = b.filas[0]
+             const todosRetirados = b.filas.every(f => f.estado_asignar === 'retirado') %>
+          <% if (b.todoJunto) { %>
+          <tr class="table-active">
+            <td colspan="6">
+              <div class="d-flex flex-wrap gap-3 align-items-end justify-content-between">
+                <div>
+                  <span class="badge rounded-pill px-2 badge-en-transito">Alquiler agrupado · <%= b.filas.length %> contenedores</span>
+                  <strong class="ms-1"><%= primera.cliente_nombre %></strong>
+                  <small class="text-muted ms-1"><%= b.filas.map(f => nroOp(f.nro_op)).join(', ') %></small>
+                  <div class="small text-muted">Todo junto: un precio por contenedor, un solo método y un solo cargo en cuenta corriente por el total. O asigná cada contenedor por separado, más abajo.</div>
+                </div>
+                <form action="/alquileres/contenedores/cobranzas/<%= primera.id %>/asignar-precio" method="POST"
+                      class="d-flex flex-wrap gap-2 align-items-end" data-asignar data-nombre="el alquiler agrupado" data-retirado="<%= todosRetirados ? 1 : 0 %>">
+                  <input type="hidden" name="cobro_modo" value="alquiler">
+                  <% b.filas.forEach(f => { %>
+                    <label class="small mb-0">N° <%= f.numero_contenedor || '?' %>
+                      <input type="number" step="0.01" min="0" required name="precio[op<%= f.id %>]" class="form-control form-control-sm"
+                             style="max-width:120px" value="<%= Math.round(f.precio_sugerido) %>">
+                    </label>
+                  <% }) %>
+                  <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px">
+                    <%- include('../../partials/metodo_pago_opciones', { conCC: primera.cliente_con_cc, saldoFavor: primera.saldo_favor_cliente }) %>
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-outline-success"><%= todosRetirados ? 'Asignar todo junto y cobrar' : 'Asignar todo junto' %></button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          <% } %>
+          <% b.filas.forEach(f => {
+               const est = ESTADO[f.estado_asignar] %>
+          <tr id="op-<%= f.id %>">
+            <td>
+              <span class="fw-semibold text-orange"><%= f.numero_contenedor ? 'N° ' + f.numero_contenedor : 'Sin asignar' %></span><br>
+              <small class="text-muted"><%= nroOp(f.nro_op) %></small>
+              <% if (f.id_grupo && f.grupo_cant > 1) { %><br><span class="badge rounded-pill px-2 badge-en-transito text-wrap">Grupo · <%= f.grupo_cant %> contenedores</span><% } %>
+            </td>
+            <td>
+              <small class="fw-semibold"><%= f.cliente_nombre %></small><br>
+              <small class="text-muted"><%= f.domicilio_entrega || (f.obra ? 'Obra: ' + f.obra : '—') %></small>
+            </td>
+            <td>
+              <small><%= f.fecha_inicio ? formatFecha(f.fecha_inicio) : '—' %></small><br>
+              <small class="text-muted" title="El plazo está en días hábiles"><%= f.dias != null ? f.dias + ' días' : '—' %> · <%= f.plazo_alquiler != null ? 'plazo ' + f.plazo_alquiler + 'd' : 'sin fin' %></small>
+            </td>
+            <td class="text-center"><span class="badge rounded-pill px-2 <%= est.badge %>"><%= est.label %></span></td>
+            <td class="text-end fw-semibold text-nowrap"><%= money(f.precio_sugerido) %></td>
+            <td>
+              <form action="/alquileres/contenedores/cobranzas/<%= f.id %>/asignar-precio" method="POST"
+                    class="d-flex flex-wrap gap-2 align-items-end" data-asignar data-nombre="<%= nroOp(f.nro_op) %>" data-retirado="<%= f.estado_asignar === 'retirado' ? 1 : 0 %>">
+                <input type="number" step="0.01" min="0" required name="precio" class="form-control form-control-sm"
+                       style="max-width:130px" value="<%= Math.round(f.precio_sugerido) %>" title="Precio del alquiler">
+                <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px">
+                  <%- include('../../partials/metodo_pago_opciones', { conCC: f.cliente_con_cc, saldoFavor: f.saldo_favor_cliente }) %>
+                </select>
+                <button type="submit" class="btn btn-sm btn-outline-success"><%= f.estado_asignar === 'retirado' ? 'Asignar y cobrar' : 'Asignar' %></button>
+                <a href="/alquileres/contenedores/<%= f.id %>" class="btn btn-sm btn-outline-secondary" title="Ver alquiler"><%- icon('eye', { size: 14 }) %></a>
+              </form>
+            </td>
+          </tr>
+          <% }) %>
+        <% }) %>
+      </tbody>
+    </table>
+    </div>
+    <% } %>
+  </div>
+</div>
+<script>
+  // Confirma la asignación con el monto y avisa cuándo se cobra; un precio en $0 se confirma aparte.
+  document.querySelectorAll('form[data-asignar]').forEach(function (form) {
+    form.addEventListener('submit', function (e) {
+      var precios = Array.prototype.map.call(form.querySelectorAll('input[name^="precio"]'), function (i) { return parseFloat(i.value) || 0 })
+      var total = precios.reduce(function (a, b) { return a + b }, 0)
+      var hayCero = precios.some(function (p) { return p === 0 })
+      var texto = '¿Asignar ' + form.dataset.nombre + ' por $' + Math.round(total).toLocaleString('es-AR') + '? '
+        + (form.dataset.retirado === '1' ? 'Ya está retirado: el cobro se registra ahora.' : 'El cobro se genera al retirar el contenedor.')
+      if (hayCero) texto = 'Hay un precio en $0 (sin cargo). ' + texto
+      if (!confirm(texto)) e.preventDefault()
+    })
+  })
+</script>
+
+<%# ── 2. A convenir: alquileres ya cargados con precio, retirados y sin método de pago cerrado ── %>
+<div class="card shadow-sm" id="a-convenir">
+  <div class="card-header-light px-3 py-2 d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">A convenir</span>
+    <span class="badge rounded-pill px-3 <%= pendientes.length ? 'badge-pendiente' : 'badge-activo' %>"><%= pendientes.length %></span>
+  </div>
+  <div class="card-body p-0">
+    <p class="small text-muted px-3 pt-3 mb-2">Alquileres "a convenir una vez finalizado", ya retirados, sin método de pago cerrado.</p>
     <% if (!pendientes.length) { %>
       <%- include('../../partials/empty_state', { icono: '✅', mensaje: 'No hay cobros pendientes. Todo lo "a convenir" está cerrado.' }) %>
     <% } else { %>

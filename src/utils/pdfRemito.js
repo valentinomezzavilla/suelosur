@@ -79,8 +79,8 @@ function construirRemito(doc, r) {
     doc.font('Helvetica')
        .text(Number(it.cantidad).toLocaleString('es-AR'), cols.cant, y + 6, { width: width * 0.10, align: 'right' })
        .text(it.unidad || '', cols.unid, y + 6, { width: width * 0.10, align: 'center' })
-       .text(money(it.precioUnit), cols.pu, y + 6, { width: width * 0.12, align: 'right' })
-       .text(money(it.subtotal), cols.sub, y + 6, { width: wSub - 6, align: 'right' })
+       .text(it.sinPrecio ? 'A definir' : money(it.precioUnit), cols.pu, y + 6, { width: width * 0.12, align: 'right' })
+       .text(it.sinPrecio ? 'A definir' : money(it.subtotal), cols.sub, y + 6, { width: wSub - 6, align: 'right' })
     y += rowH
   })
 
@@ -89,7 +89,7 @@ function construirRemito(doc, r) {
   y += 8
   doc.fillColor(TINTA).fontSize(11).font('Helvetica-Bold')
      .text('TOTAL', left, y, { width: width * 0.74, align: 'right' })
-     .text(money(r.total), left, y, { width: wSub - 6, align: 'right' })
+     .text(r.sinPrecio ? 'A definir' : money(r.total), left, y, { width: wSub - 6, align: 'right' })
   y += 28
 
   // ── Observaciones ───────────────────────────────────────────

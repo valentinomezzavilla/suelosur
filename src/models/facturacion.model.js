@@ -126,10 +126,12 @@ module.exports = {
   tipoSugerido, desglose, cuitValido, documentoReceptor, conceptoAfip, redondear,
 
   // Se llama al crear cualquier venta/alquiler: marca la OP si se tildó "Operación para Facturar".
+  // `monto` null = todavía sin importe (un alquiler sin precio): se guarda NULL, no 0, para
+  // que el monto salga del precio que se le asigne después en vez de quedar tapado por un 0.
   async marcarAlCrear(id_op, flag, monto) {
     if (!id_op || !esVerdadero(flag)) return
     await query(`UPDATE op_encabezado SET para_facturar = 1, monto_facturar = ? WHERE id = ?`,
-      [Number(monto) || 0, id_op])
+      [monto === null ? null : (Number(monto) || 0), id_op])
   },
 
   // Marcar una OP ya existente (desde su detalle)

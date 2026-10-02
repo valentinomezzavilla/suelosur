@@ -89,6 +89,8 @@ const RemitosModel = {
           descripcion: `Alquiler de contenedor de obra${d.numero_contenedor ? ' N° ' + d.numero_contenedor : ''}`,
           unidad: 'días', cantidad: d.plazo_alquiler, precioUnit: d.precio_alquiler || 0,
           subtotal: d.precio_alquiler || 0,
+          // Alquiler sin precio todavía: el remito dice "A definir" en vez de $0
+          sinPrecio: d.precio_alquiler == null,
         }]
         r.entrega = {
           domicilio: textoDestino({ domicilio: d.domicilio_entrega, calle: d.domicilio_calle, numero: d.domicilio_numero, obra: op.obra }),
@@ -117,6 +119,7 @@ const RemitosModel = {
     }
 
     r.total = r.items.reduce((s, i) => s + (i.subtotal || 0), 0)
+    r.sinPrecio = r.items.some(i => i.sinPrecio)
     return r
   },
 

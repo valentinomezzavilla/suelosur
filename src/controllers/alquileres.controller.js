@@ -9,6 +9,13 @@ const { leerContenedoresDelForm, leerMontosPorOp } = require('../utils/contenedo
 const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
+const { registrarAuditoria } = require('../utils/auditoria')
+
+// Se agrega al aviso de un alquiler recién cargado: nace sin precio ni método de pago.
+const AVISO_ASIGNAR_PRECIO = 'Falta asignarle el precio: Cobranzas → Asignar precio.'
+
+const METODO_PAGO_TEXTO = { efectivo: 'efectivo', transferencia: 'transferencia', cheque: 'cheque', cuenta_corriente: 'cuenta corriente', saldo_a_favor: 'saldo a favor' }
+const pesos = (n) => '$' + Math.round(n).toLocaleString('es-AR')
 
 // Geocodifica la dirección del alquiler sin hacer esperar al usuario: si Nominatim
 // falla o tarda, el alquiler ya quedó creado y aparece en "sin ubicar" del mapa.
@@ -39,7 +46,8 @@ const AlquileresController = {
       await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const q = req.query.q || ''
       const grupos = await AlquileresModel.listarPorEstado({ q })
-      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q } })
+      const sinPrecio = await AlquileresModel.cantidadSinPrecio()
+      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q }, sinPrecio })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los alquileres.')
@@ -70,16 +78,29 @@ const AlquileresController = {
 
   async crear(req, res) {
     try {
-      const { clienteId, calle, numero: numeroForm, zona_entrega, fechaInicio, fechaFin, precio_alquiler, id_contenedor, metodoPago, observaciones, alquiler_actual_id, id_chofer, id_camion, obra, remito } = req.body
+      const { clienteId, calle, numero: numeroForm, zona_entrega, fechaInicio, fechaFin, id_contenedor, observaciones, alquiler_actual_id, id_chofer, id_camion, obra, remito } = req.body
       const clienteIdClean = (clienteId && clienteId.trim()) || null
       if (!clienteIdClean) {
         req.flash('error', 'Seleccioná un cliente.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
-      // El precio siempre se carga a mano: no hay tarifa fija/automática.
-      const precioAlquilerNum = parseFloat(precio_alquiler)
-      if (!precio_alquiler || isNaN(precioAlquilerNum) || precioAlquilerNum <= 0) {
+      // Carga histórica: un alquiler viejo que puede haber terminado o seguir en curso.
+      const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
+      const historicoEnCurso = esHistorico && req.body.estado_historico === 'en_curso'
+      // Los alquileres nuevos se cargan SIN precio y SIN método de pago (precio_alquiler NULL):
+      // se asignan después, en Cobranzas → Asignar precio. La única excepción es la carga
+      // histórica de un alquiler que YA TERMINÓ: su ingreso se registra acá, con la fecha
+      // pasada, así que pide los dos. Si el formulario manda precio o método en otro caso, se
+      // ignoran.
+      const historicoFinalizado = esHistorico && !historicoEnCurso
+      const precio_alquiler = historicoFinalizado ? parseFloat(req.body.precio_alquiler) : null
+      const metodoPago = historicoFinalizado ? req.body.metodoPago : null
+      if (historicoFinalizado && !(precio_alquiler > 0)) {
         req.flash('error', 'Ingresá el precio del alquiler.')
+        return res.redirect('/alquileres/contenedores/nuevo')
+      }
+      if (historicoFinalizado && !AlquileresModel.METODOS_PAGO.includes(metodoPago)) {
+        req.flash('error', 'Elegí un método de pago.')
         return res.redirect('/alquileres/contenedores/nuevo')
       }
       const remitoLeido = await leerRemito(remito)
@@ -101,9 +122,6 @@ const AlquileresController = {
 
       const numero = numeroSinRepetirCalle(calle, numeroForm)
       const domicilio_entrega = `${calle || ''} ${numero}`.trim()
-      // Carga histórica: un alquiler viejo que puede haber terminado o seguir en curso.
-      const esHistorico = req.body.finalizado === '1' || req.body.finalizado === 'on'
-      const historicoEnCurso = esHistorico && req.body.estado_historico === 'en_curso'
       // Alquiler sin fecha de fin: o no se conoce, o el contenedor queda en el
       // domicilio por tiempo indeterminado. Los históricos en curso nunca la tienen.
       const sinFechaFin = historicoEnCurso
@@ -150,14 +168,10 @@ const AlquileresController = {
           req.flash('error', 'El próximo alquiler encadenado ("próximos a finalizar") es de a un contenedor.')
           return res.redirect('/alquileres/contenedores/nuevo')
         }
-        // Cada contenedor puede traer precio y fecha de fin propios; vacíos = los generales.
+        // Cada contenedor puede traer fecha de fin propia; vacía = la general. El precio y el
+        // cobro "por contenedor / por alquiler" se eligen después, al asignar el precio.
         const contenedores = []
         for (const c of seleccion.contenedores) {
-          const precio = c.precio !== '' ? parseFloat(c.precio) : precioAlquilerNum
-          if (!(precio > 0)) {
-            req.flash('error', 'Revisá el precio de cada contenedor: tiene que ser mayor a cero.')
-            return res.redirect('/alquileres/contenedores/nuevo')
-          }
           const rp = calcularPlazoAlquiler({
             fechaInicio, fechaFin: c.fin || fechaFin, sinFechaFin, esHistorico: false,
             fechaFinManual: fechaFinManual || !!c.fin, tieneCC,
@@ -166,14 +180,13 @@ const AlquileresController = {
             req.flash('error', rp.error)
             return res.redirect('/alquileres/contenedores/nuevo')
           }
-          contenedores.push({ id_contenedor: c.id_contenedor, precio_alquiler: precio, plazo_alquiler: rp.plazo })
+          contenedores.push({ id_contenedor: c.id_contenedor, plazo_alquiler: rp.plazo })
         }
-        const cobroModo = req.body.cobro_modo === 'alquiler' ? 'alquiler' : 'contenedor'
         const grupo = await AlquileresModel.crearGrupo({
-          cobro_modo: cobroModo, en_curso: esEnCurso, contenedores, nro_remito: remitoLeido.nro,
+          en_curso: esEnCurso, contenedores, nro_remito: remitoLeido.nro,
           id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
           domicilio_entrega, domicilio_calle: calle, domicilio_numero: numero, zona_entrega,
-          metodo_pago: metodoPago, observaciones, obra, fecha_inicio: fechaInicio || null,
+          observaciones, obra, fecha_inicio: fechaInicio || null,
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
         const FacturacionModel = require('../models/facturacion.model')
@@ -181,7 +194,7 @@ const AlquileresController = {
         // Se geocodifica una sola vez; ubicar copia las coordenadas al resto del grupo.
         ubicarEnSegundoPlano(grupo.ops[0].id)
         const nros = grupo.ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')
-        req.flash('success', `Alquiler de ${grupo.ops.length} contenedores ${esEnCurso ? 'cargado como en curso' : 'creado'}: ${nros}. Cobro por ${cobroModo}.`)
+        req.flash('success', `Alquiler de ${grupo.ops.length} contenedores ${esEnCurso ? 'cargado como en curso' : 'creado'}: ${nros}. ${AVISO_ASIGNAR_PRECIO}`)
         return res.redirect('/alquileres/contenedores')
       }
 
@@ -239,10 +252,10 @@ const AlquileresController = {
           observaciones, obra, fecha_inicio: fechaInicio,
           nro_remito: remitoLeido.nro,
         })
-        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
+        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler)
         ubicarEnSegundoPlano(result.id)
-        // El alquiler sigue abierto: el ingreso se genera recién al retirar el contenedor.
-        req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. Se cobra al retirar el contenedor.`)
+        // El alquiler sigue abierto: el ingreso se genera al retirar el contenedor, una vez asignado el precio.
+        req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. ${AVISO_ASIGNAR_PRECIO}`)
         return res.redirect('/alquileres/contenedores')
       }
 
@@ -271,10 +284,10 @@ const AlquileresController = {
           nro_remito: remitoLeido.nro,
         })
       }
-      await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, parseFloat(precio_alquiler) || 0)
+      await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler)
       ubicarEnSegundoPlano(result.id)
 
-      req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4,'0')} ${esProgramado ? 'programado' : 'creado'}.`)
+      req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4,'0')} ${esProgramado ? 'programado' : 'creado'}. ${AVISO_ASIGNAR_PRECIO}`)
       res.redirect('/alquileres/contenedores')
     } catch (err) {
       console.error(err)
@@ -306,7 +319,7 @@ const AlquileresController = {
         cierresGrupo = []
         for (const o of g.ops.filter(o => o.estado !== 'anulado' && !o.cobrada)) {
           const c = await AlquileresModel.datosCierre(o.id, { alRetiro: true })
-          cierresGrupo.push({ id: o.id, numero_contenedor: o.numero_contenedor, precioActual: c ? c.precioActual : 0 })
+          cierresGrupo.push({ id: o.id, numero_contenedor: o.numero_contenedor, precioACobrar: c ? c.precioACobrar : 0 })
         }
       }
       res.render('pages/alquileres/detalle', {
@@ -452,7 +465,12 @@ const AlquileresController = {
       const cliente = await ClientesModel.obtener(alquiler.id_cliente)
       const dias = plazoPorCuentaCorriente(!!cliente?.cuenta_corriente)
       await AlquileresModel.ampliarPlazo(req.params.id, dias)
-      req.flash('success', `Alquiler ampliado ${dias} días.`)
+      // Un precio ya asignado (y todavía sin cobrar) no se recalcula con los días nuevos: se
+      // avisa para que se ajuste antes del retiro si corresponde.
+      const precioAsignado = alquiler.detalle?.precio_asignado_en && !await TransaccionesModel.existePorOperacion(alquiler.id)
+      req.flash('success', precioAsignado
+        ? `Alquiler ampliado ${dias} días. Ya tiene el precio asignado (${pesos(alquiler.detalle.precio_alquiler)}): si corresponde, actualizalo en Editar antes del retiro.`
+        : `Alquiler ampliado ${dias} días.`)
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al ampliar el alquiler.')
@@ -483,7 +501,12 @@ const AlquileresController = {
         await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
       const cantGrupo = grupoAlq ? grupoAlq.ops.filter(o => o.estado !== 'anulado').length : 0
-      req.flash('success', faltanOtros > 0
+      // Sin precio el retiro nunca se bloquea: no se genera cobro y el alquiler sigue en
+      // Cobranzas → Asignar precio, donde se cobra apenas se le asigne el precio.
+      const sinPrecio = alquiler?.detalle ? alquiler.detalle.precio_alquiler == null : false
+      req.flash('success', sinPrecio
+        ? 'Contenedor retirado. El alquiler no tiene precio todavía: asignalo en Cobranzas → Asignar precio para que se genere el cobro.'
+        : faltanOtros > 0
         ? `Contenedor retirado. El alquiler se cobra todo junto al retirar el último contenedor (falta${faltanOtros === 1 ? '' : 'n'} ${faltanOtros}).`
         : monto != null
           ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}${grupoAlq ? ` (${cantGrupo} contenedores)` : ''}.`
@@ -593,9 +616,12 @@ const AlquileresController = {
     }
   },
 
-  // ── Cobranzas: alquileres "a convenir" ya retirados y sin cobrar ──────────────
+  // ── Cobranzas ─────────────────────────────────────────────────────────────────
+  // Dos secciones: "Asignar precio" (alquileres nuevos sin precio, en cualquier estado) y
+  // "A convenir" (los ya cargados con precio, retirados y sin método de pago cerrado).
   async cobranzas(req, res) {
     try {
+      const sinPrecio = await AlquileresModel.sinPrecio()
       const pendientes = await AlquileresModel.pendientesDeCobro()
       // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
       // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
@@ -603,14 +629,52 @@ const AlquileresController = {
         // En una fila de grupo, el estimado de cada contenedor y el total
         for (const o of (p.esGrupo ? p.ops : [p])) {
           const cierre = await AlquileresModel.datosCierre(o.id, { alRetiro: !!p.esGrupo })
-          o.montoEstimado = cierre ? cierre.precioActual : (o.precio_alquiler || 0)
+          o.montoEstimado = cierre ? cierre.precioACobrar : (o.precio_alquiler || 0)
         }
         if (p.esGrupo) p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)
       }
-      res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
+      res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', sinPrecio, pendientes })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al cargar las cobranzas.'); res.redirect('/alquileres/contenedores')
     }
+  },
+
+  // Asigna precio y método de pago a un alquiler sin precio (Cobranzas → Asignar precio).
+  //  - Un contenedor: precio + método. Si ya se retiró, se cobra en el momento; si no, al
+  //    retirarlo.
+  //  - Alquiler agrupado "todo junto" (cobro_modo = 'alquiler'): un precio por contenedor
+  //    (precio[op<ID>]) y un solo método; el grupo pasa a cobrarse por alquiler.
+  // El método de pago se valida en el modelo: cuenta corriente solo si el cliente la tiene.
+  async asignarPrecio(req, res) {
+    const back = '/alquileres/contenedores/cobranzas'
+    try {
+      const { metodo_pago, cobro_modo } = req.body
+      const medio = METODO_PAGO_TEXTO[metodo_pago] || metodo_pago
+      if (cobro_modo === 'alquiler') {
+        const precios = leerMontosPorOp(req.body.precio)
+        const r = await AlquileresModel.asignarPrecioGrupo(req.params.id, { precios, metodo_pago })
+        await registrarAuditoria({
+          entidad_tipo: 'alquiler', entidad_id: req.params.id, accion: 'asignar_precio_grupo',
+          usuario: req.session.user?.id, detalle: { precios, metodo_pago, total: r.total, cobrado: r.cobrado },
+        })
+        req.flash('success', r.cobrado
+          ? `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (${medio}). Se cobró todo junto.`
+          : `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (${medio}). Se cobra todo junto al retirar el último contenedor.`)
+      } else {
+        const r = await AlquileresModel.asignarPrecio(req.params.id, { precio: req.body.precio, metodo_pago })
+        await registrarAuditoria({
+          entidad_tipo: 'alquiler', entidad_id: req.params.id, accion: 'asignar_precio',
+          usuario: req.session.user?.id, detalle: { precio: r.monto, metodo_pago, cobrado: r.cobrado },
+        })
+        req.flash('success', r.cobrado
+          ? `Precio asignado: ${pesos(r.monto)} (${medio}). Cobro registrado.`
+          : `Precio asignado: ${pesos(r.monto)} (${medio}). El cobro se genera al retirar el contenedor.`)
+      }
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al asignar el precio.')
+    }
+    res.redirect(back)
   },
 
   // Resuelve un "a convenir" pendiente: cobra con el método elegido ahora.

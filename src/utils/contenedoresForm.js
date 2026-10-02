@@ -8,19 +8,17 @@
 
 // Selección del alta (Nuevo alquiler):
 //  - ids_contenedor[]  → contenedores elegidos (string si es uno, array si son varios)
-//  - precio_c[c<ID>]   → precio propio de ese contenedor (vacío = el precio general)
 //  - fin_c[c<ID>]      → fecha de fin propia (vacío = la fecha de fin general)
+// El alta no pide precio: se asigna después, en Cobranzas → Asignar precio.
 function leerContenedoresDelForm(body = {}) {
   const crudo = body.ids_contenedor
   const lista = Array.isArray(crudo) ? crudo : (crudo == null ? [] : [crudo])
   const ids = lista.map(v => String(v).trim()).filter(Boolean)
   if (new Set(ids).size !== ids.length) return { error: 'Elegiste el mismo contenedor más de una vez.' }
-  const precios = (body.precio_c && typeof body.precio_c === 'object') ? body.precio_c : {}
   const fines = (body.fin_c && typeof body.fin_c === 'object') ? body.fin_c : {}
   return {
     contenedores: ids.map(id => ({
       id_contenedor: id,
-      precio: String(precios['c' + id] ?? '').trim(),
       fin: String(fines['c' + id] ?? '').trim(),
     })),
   }

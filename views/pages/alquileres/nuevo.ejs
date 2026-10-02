@@ -214,39 +214,38 @@
         </p>
       </div>
 
-      <!-- Precio -->
-      <div class="form-section">
-        <h3 class="form-section__title">Precio</h3>
-        <div class="form-group">
-          <label for="precioAlquilerInput">Precio ($) *</label>
-          <input type="number" name="precio_alquiler" id="precioAlquilerInput" class="input-sm"
-            min="0.01" step="any" required placeholder="Ingresá el precio del alquiler">
-        </div>
-      </div>
-
       <!-- Varios contenedores (solo con 2 o más elegidos) -->
       <div class="form-section" id="bloqueVariosContenedores" style="display:none">
         <h3 class="form-section__title">Contenedores del alquiler</h3>
         <p class="form-hint">
-          Cada contenedor se entrega, vence y se retira por su cuenta. Precio y fecha de fin vacíos
-          toman los generales de arriba.
+          Cada contenedor se entrega, vence y se retira por su cuenta. La fecha de fin vacía toma la
+          general de arriba. El precio y cómo se cobra (por contenedor o por alquiler) se eligen
+          después, en <strong>Cobranzas → Asignar precio</strong>.
         </p>
         <div id="listaVariosContenedores" class="multi-cont-lista"></div>
-        <div class="form-group" style="margin-top:0.75rem">
-          <label>¿Cómo se cobra?</label>
-          <label class="toggle-row">
-            <input type="radio" name="cobro_modo" value="contenedor" checked>
-            <span>Por contenedor — cada uno se cobra al retirarlo</span>
-          </label>
-          <label class="toggle-row">
-            <input type="radio" name="cobro_modo" value="alquiler">
-            <span>Por alquiler — todo junto al retirar el último</span>
-          </label>
-        </div>
       </div>
 
-      <!-- Método de pago -->
-      <%- include('../../partials/metodo_pago', { conAConvenir: true }) %>
+      <!-- Precio y método de pago: los alquileres nuevos se cargan SIN ellos. Solo la carga
+           histórica de un alquiler que ya terminó los pide (se registra su ingreso con la
+           fecha pasada). Los campos están deshabilitados mientras el bloque está oculto. -->
+      <p class="form-hint" id="avisoSinPrecio">
+        El alquiler se carga <strong>sin precio ni método de pago</strong>: se asignan después en
+        <strong>Cobranzas → Asignar precio</strong>. Retirar el contenedor sin precio no se bloquea.
+      </p>
+      <div id="bloqueCobroHistorico" style="display:none">
+        <div class="form-section">
+          <h3 class="form-section__title">Precio</h3>
+          <div class="form-group">
+            <label for="precioAlquilerInput">Precio ($) *</label>
+            <input type="number" name="precio_alquiler" id="precioAlquilerInput" class="input-sm"
+              min="0.01" step="any" placeholder="Ingresá el precio del alquiler" disabled>
+          </div>
+        </div>
+        <%- include('../../partials/metodo_pago', { sinFacturar: true }) %>
+      </div>
+
+      <!-- Facturación -->
+      <%- include('../../partials/metodo_pago', { soloFacturar: true }) %>
 
       <!-- Chofer / Camión -->
       <div class="form-section" id="seccionChoferCamion">
