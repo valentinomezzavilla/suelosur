@@ -298,6 +298,17 @@ const AlquileresController = {
       const solapamiento = req.session.solapamiento?.opId === String(alquiler.id) ? req.session.solapamiento : null
       if (solapamiento) delete req.session.solapamiento
       const clienteAlq = await ClientesModel.obtener(alquiler.id_cliente)
+      // Último contenedor abierto de un grupo con cobro por alquiler: su cierre cobra todo
+      // el grupo, así que se muestran los montos de cierre de cada contenedor.
+      let cierresGrupo = null
+      const g = alquiler.grupo
+      if (g?.cobro_modo === 'alquiler' && !g.ops.some(o => o.abierta && o.id !== alquiler.id)) {
+        cierresGrupo = []
+        for (const o of g.ops.filter(o => o.estado !== 'anulado' && !o.cobrada)) {
+          const c = await AlquileresModel.datosCierre(o.id)
+          cierresGrupo.push({ id: o.id, numero_contenedor: o.numero_contenedor, precioActual: c ? c.precioActual : 0 })
+        }
+      }
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
@@ -307,6 +318,7 @@ const AlquileresController = {
         diasAmpliacion: plazoPorCuentaCorriente(!!clienteAlq?.cuenta_corriente),
         saldoFavorCliente: Math.max(0, Number(clienteAlq?.saldo) || 0),
         cierre: alquiler.detalle ? await AlquileresModel.datosCierre(alquiler.id) : null,
+        cierresGrupo,
       })
     } catch (err) {
       console.error(err)
@@ -443,27 +455,33 @@ const AlquileresController = {
   async devolverAPlanta(req, res) {
     try {
       const alquiler = await AlquileresModel.obtener(req.params.id)
-      // "A convenir una vez finalizado": al marcar Retirado hay que resolverlo sí o sí
-      // — un método de pago real, o el check de "pendiente de pago" (queda en Cobranzas).
+      // Alquiler agrupado con cobro por alquiler: solo el retiro del último contenedor cobra.
+      const grupoAlq = alquiler?.grupo?.cobro_modo === 'alquiler' ? alquiler.grupo : null
+      const faltanOtros = grupoAlq ? grupoAlq.ops.filter(o => o.abierta && o.id !== alquiler.id).length : 0
+      // "A convenir una vez finalizado": al cobrar hay que resolverlo sí o sí — un método de
+      // pago real, o el check de "pendiente de pago" (queda en Cobranzas).
       const pendientePago = req.body.pendiente_pago === '1' || req.body.pendiente_pago === 'on'
       const metodoPagoFinal = (req.body.metodo_pago_final || '').trim() || null
-      if (alquiler?.metodo_pago === 'a_convenir' && !pendientePago && !metodoPagoFinal) {
+      if (alquiler?.metodo_pago === 'a_convenir' && faltanOtros === 0 && !pendientePago && !metodoPagoFinal) {
         req.flash('error', 'Este alquiler quedó "a convenir": indicá un método de pago o marcá "Pendiente de pago".')
         return res.redirect(`/alquileres/contenedores/${req.params.id}`)
       }
       await AlquileresModel.devolverAPlanta(req.params.id)
-      // El alquiler termina acá: es el momento en que se cobra (salvo que haya
-      // quedado explícitamente pendiente de pago).
+      // El alquiler termina acá: es el momento en que se cobra (salvo que haya quedado
+      // explícitamente pendiente de pago, o que en un grupo falten contenedores).
       const monto = pendientePago ? null
-        : await AlquileresModel.cobrarAlCerrar(req.params.id, req.body.precio_final, metodoPagoFinal)
+        : await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(req.body.precio_final), metodoPagoFinal)
       if (alquiler?.detalle?.alquiler_siguiente_id) {
         await AlquileresModel.activarProgramado(alquiler.detalle.alquiler_siguiente_id)
       }
-      req.flash('success', monto != null
-        ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}.`
-        : pendientePago
-          ? 'Contenedor retirado — pago pendiente, quedó en Cobranzas.'
-          : 'Contenedor retirado — ciclo completado.')
+      const cantGrupo = grupoAlq ? grupoAlq.ops.filter(o => o.estado !== 'anulado').length : 0
+      req.flash('success', faltanOtros > 0
+        ? `Contenedor retirado. El alquiler se cobra todo junto al retirar el último contenedor (falta${faltanOtros === 1 ? '' : 'n'} ${faltanOtros}).`
+        : monto != null
+          ? `Contenedor retirado — alquiler cerrado por $${Math.round(monto).toLocaleString('es-AR')}${grupoAlq ? ` (${cantGrupo} contenedores)` : ''}.`
+          : pendientePago
+            ? 'Contenedor retirado — pago pendiente, quedó en Cobranzas.'
+            : 'Contenedor retirado — ciclo completado.')
     } catch (err) {
       console.error(err)
       req.flash('error', err.message || 'Error al registrar devolución.')

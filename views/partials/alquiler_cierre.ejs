@@ -1,0 +1,94 @@
+<%#
+  Cierre del alquiler (retiro + cobro). Lo incluye detalle.ejs cuando el contenedor está
+  en el domicilio. Locals: alquiler, cierre, saldoFavorCliente, grupo (alquiler.grupo o
+  null) y cierresGrupo (monto de cierre de cada contenedor; solo cuando este es el último
+  contenedor abierto de un grupo con cobro por alquiler).
+%>
+<%
+  const grupoAlq = (grupo && grupo.cobro_modo === 'alquiler') ? grupo : null
+  const faltanOtros = grupoAlq ? grupoAlq.ops.filter(o => o.abierta && o.id !== alquiler.id).length : 0
+  const pideMetodo = alquiler.metodo_pago === 'a_convenir' && faltanOtros === 0
+  const confirmar = faltanOtros > 0
+    ? '¿Registrar el retiro? El contenedor queda disponible y el alquiler se cobra al retirar el último.'
+    : '¿Cerrar el alquiler? El contenedor queda disponible.'
+%>
+<div class="cierre-alquiler mt-3">
+  <p class="fw-semibold mb-1"><%= faltanOtros > 0 ? 'Registrar retiro' : 'Cerrar alquiler y cobrar' %></p>
+  <p class="text-muted small mb-2">
+    <% if (faltanOtros > 0) { %>
+      Cobro por alquiler: este contenedor se retira sin cobrar; se cobra todo junto al retirar el último
+      (falta<%= faltanOtros === 1 ? '' : 'n' %> <%= faltanOtros %>).
+    <% } else { %>
+      El ingreso se registra al retirar el contenedor.
+      <% if (cierre.cambioDePrecio) { %>
+        Precio pactado al inicio (<%= cierre.mesInicio %>):
+        <strong>$<%= Math.round(cierre.precioInicial).toLocaleString('es-AR') %></strong>.
+      <% } %>
+      <% if (cierre.dias != null) { %>Lleva <%= cierre.dias %> días.<% } %>
+      <% if (cierresGrupo) { %>Se cobra todo el alquiler: <%= cierresGrupo.length %> contenedores.<% } %>
+    <% } %>
+  </p>
+  <form action="/alquileres/contenedores/<%= alquiler.id %>/devolver" method="POST"
+        id="formDevolver" class="d-flex flex-wrap gap-2 align-items-end" data-confirmar="<%= confirmar %>">
+    <% if (faltanOtros === 0 && cierresGrupo) { %>
+      <% cierresGrupo.forEach(c => { %>
+        <div>
+          <label for="precioFinal_<%= c.id %>" class="form-label mb-1 small">N° <%= c.numero_contenedor || '?' %></label>
+          <input type="number" step="0.01" min="0" name="precio_final[op<%= c.id %>]" id="precioFinal_<%= c.id %>"
+                 class="form-control form-control-sm" style="max-width:150px" value="<%= Math.round(c.precioActual) %>">
+        </div>
+      <% }) %>
+    <% } else if (faltanOtros === 0) { %>
+      <div>
+        <label for="precioFinal" class="form-label mb-1 small">Monto a cobrar</label>
+        <input type="number" step="0.01" min="0" name="precio_final" id="precioFinal"
+               class="form-control form-control-sm" style="max-width:170px"
+               value="<%= Math.round(cierre.precioActual) %>">
+      </div>
+    <% } %>
+    <% if (pideMetodo) { %>
+      <div>
+        <label for="metodoPagoFinal" class="form-label mb-1 small">Método de pago *</label>
+        <select name="metodo_pago_final" id="metodoPagoFinal" class="form-select form-select-sm" style="max-width:200px">
+          <option value="">Seleccionar…</option>
+          <option value="efectivo">Efectivo</option>
+          <option value="transferencia">Transferencia</option>
+          <option value="cheque">Cheque</option>
+          <option value="cuenta_corriente">Cuenta corriente</option>
+          <% if (saldoFavorCliente > 0) { %>
+            <option value="saldo_a_favor">Usar saldo a favor del cliente ($<%= Math.round(saldoFavorCliente).toLocaleString('es-AR') %>)</option>
+          <% } %>
+        </select>
+      </div>
+      <label class="toggle-row mb-1" for="pendientePago">
+        <input type="checkbox" name="pendiente_pago" id="pendientePago" value="1">
+        <span>Pendiente de pago</span>
+      </label>
+    <% } %>
+    <button class="btn btn-sm btn-outline-success"><%= faltanOtros > 0 ? '🏠 Registrar retiro' : '🏠 Registrar retiro y cobrar' %></button>
+  </form>
+  <% if (pideMetodo) { %>
+    <p class="form-hint mb-0 mt-1">Este alquiler quedó "a convenir": elegí un método de pago o marcá "Pendiente de pago" (queda en Cobranzas).</p>
+  <% } %>
+  <script>
+  (function () {
+    var form = document.getElementById('formDevolver')
+    if (!form) return
+    var sel = document.getElementById('metodoPagoFinal')
+    var chk = document.getElementById('pendientePago')
+    if (sel && chk) {
+      sel.addEventListener('change', function () { if (sel.value) chk.checked = false })
+      chk.addEventListener('change', function () { if (chk.checked) sel.value = '' })
+    }
+    form.addEventListener('submit', function (e) {
+      if (sel && !chk.checked && !sel.value) {
+        alert('Elegí un método de pago o marcá "Pendiente de pago".')
+        e.preventDefault()
+        return
+      }
+      var texto = form.dataset.confirmar + (chk && chk.checked ? ' El cobro queda pendiente en Cobranzas.' : '')
+      if (!confirm(texto)) e.preventDefault()
+    })
+  })()
+  </script>
+</div>

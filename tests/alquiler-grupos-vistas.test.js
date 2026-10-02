@@ -69,4 +69,31 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /name="precio_final\[op102\]"/)
     assert.match(html, /OP-0261, OP-0262/)
   })
+
+  const cierreEj = { precioInicial: 100, precioActual: 120, dias: 5, mesInicio: 'septiembre 2026', cambioDePrecio: false }
+  const grupoAbierto = (otraAbierta) => ({ cobro_modo: 'alquiler', ops: [{ id: 101, abierta: true }, { id: 102, abierta: otraAbierta }] })
+
+  it('cierre de un contenedor suelto: un solo monto, como siempre', async () => {
+    const html = await renderVista('partials/alquiler_cierre', { alquiler: { id: 101, metodo_pago: 'efectivo' }, cierre: cierreEj, saldoFavorCliente: 0, grupo: null, cierresGrupo: null })
+    assert.match(html, /name="precio_final"/)
+    assert.match(html, /Registrar retiro y cobrar/)
+  })
+
+  it('cierre en grupo por alquiler con otro contenedor afuera: retiro sin cobro', async () => {
+    const html = await renderVista('partials/alquiler_cierre', { alquiler: { id: 101, metodo_pago: 'a_convenir' }, cierre: cierreEj, saldoFavorCliente: 0, grupo: grupoAbierto(true), cierresGrupo: null })
+    assert.doesNotMatch(html, /name="precio_final/)
+    assert.doesNotMatch(html, /metodo_pago_final/) // el método se pide recién en el último
+    assert.match(html, /se cobra todo junto al retirar el último/)
+    assert.match(html, /\(falta 1\)/)
+  })
+
+  it('cierre del último contenedor del grupo: un monto por contenedor', async () => {
+    const html = await renderVista('partials/alquiler_cierre', {
+      alquiler: { id: 101, metodo_pago: 'efectivo' }, cierre: cierreEj, saldoFavorCliente: 0, grupo: grupoAbierto(false),
+      cierresGrupo: [{ id: 101, numero_contenedor: 19, precioActual: 120 }, { id: 102, numero_contenedor: 20, precioActual: 130 }],
+    })
+    assert.match(html, /name="precio_final\[op101\]"/)
+    assert.match(html, /name="precio_final\[op102\]"/)
+    assert.match(html, /Se cobra todo el alquiler: 2 contenedores/)
+  })
 })

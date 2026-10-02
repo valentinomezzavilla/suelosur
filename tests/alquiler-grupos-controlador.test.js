@@ -117,4 +117,26 @@ describe('controlador de alquileres: alta', () => {
     assert.deepEqual(r.flashes, [{ tipo: 'error', msg: 'Revisá el precio de cada contenedor: tiene que ser mayor a cero.' }])
     assert.equal((await opsDe(id_cliente)).length, 0)
   })
+
+  it('retiro en grupo por alquiler "a convenir": el primero sin método; el último pide método y cobra todo', async () => {
+    const id_cliente = await datos.crearCliente()
+    const conts = await datos.crearContenedores(2)
+    const g = await AlquileresModel.crearGrupo({
+      ...datos.datosComunes({ id_cliente, id_administrativo: admin.id, metodo_pago: 'a_convenir', fecha_inicio: '2026-09-28' }),
+      cobro_modo: 'alquiler', en_curso: true,
+      contenedores: conts.map(id_contenedor => ({ id_contenedor, plazo_alquiler: 4, precio_alquiler: 100 })),
+    })
+    const [op1, op2] = g.ops.map(o => o.id)
+
+    let r = await llamar('devolverAPlanta', { user: admin, params: { id: String(op1) }, body: {} })
+    assert.deepEqual(r.flashes, [{ tipo: 'success', msg: 'Contenedor retirado. El alquiler se cobra todo junto al retirar el último contenedor (falta 1).' }])
+
+    r = await llamar('devolverAPlanta', { user: admin, params: { id: String(op2) }, body: {} })
+    assert.equal(r.flashes[0].tipo, 'error') // "a convenir": falta el método en el último
+
+    r = await llamar('devolverAPlanta', { user: admin, params: { id: String(op2) }, body: {
+      metodo_pago_final: 'efectivo', precio_final: { ['op' + op1]: '100', ['op' + op2]: '200' },
+    } })
+    assert.deepEqual(r.flashes, [{ tipo: 'success', msg: 'Contenedor retirado — alquiler cerrado por $300 (2 contenedores).' }])
+  })
 })
