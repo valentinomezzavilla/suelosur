@@ -15,11 +15,11 @@ describe('acciones sobre alquileres agrupados', () => {
   })
   after(prueba.cerrar)
 
-  async function grupo({ en_curso = false, cobro_modo = 'contenedor' } = {}) {
+  async function grupo({ en_curso = false, cobro_modo = 'contenedor', metodo_pago = 'efectivo' } = {}) {
     const id_cliente = await datos.crearCliente()
     const conts = await datos.crearContenedores(2)
     const g = await AlquileresModel.crearGrupo({
-      ...datos.datosComunes({ id_cliente, id_administrativo: admin, fecha_inicio: '2026-09-28' }),
+      ...datos.datosComunes({ id_cliente, id_administrativo: admin, metodo_pago, fecha_inicio: '2026-09-28' }),
       cobro_modo, en_curso,
       contenedores: conts.map(id_contenedor => ({ id_contenedor, plazo_alquiler: 4, precio_alquiler: 100 })),
     })
@@ -113,5 +113,70 @@ describe('acciones sobre alquileres agrupados', () => {
     const c = await AlquileresModel.crearEnCurso({ ...datos.datosComunes({ id_cliente: otro, id_administrativo: admin }), id_contenedor: c3, plazo_alquiler: 4, precio_alquiler: 100 })
     const d = await AlquileresModel.crear({ ...comunes, id_contenedor: null, plazo_alquiler: 4, precio_alquiler: 100 })
     await assert.rejects(AlquileresModel.agruparExistentes([c.nro_op, d.nro_op]), /clientes distintos/)
+  })
+
+  // Datos de edición de una OP del grupo (los mismos que manda el formulario).
+  const edicion = (extra) => ({
+    calle: 'San Lorenzo', numero: '501', zona_entrega: '', plazo_alquiler: 4, precio_alquiler: 100,
+    metodo_pago: 'efectivo', observaciones: '', fecha_entrega_planificada: '2026-09-28', obra: '', ...extra,
+  })
+
+  it('aplicar a todos no saca de Cobranzas un contenedor ya retirado "a convenir"', async () => {
+    const g = await grupo({ en_curso: true, metodo_pago: 'a_convenir' })
+    await AlquileresModel.devolverAPlanta(g.ops[0])
+    await AlquileresModel.actualizar(g.ops[1], edicion({ metodo_pago: 'efectivo' }))
+    await AlquileresModel.actualizarCompartidosGrupo(g.ops[1])
+    assert.ok((await AlquileresModel.pendientesDeCobro()).some(p => p.id === g.ops[0]))
+  })
+
+  it('aplicar a todos no borra "a convenir" del grupo por alquiler cuando el método viene vacío', async () => {
+    const g = await grupo({ en_curso: true, cobro_modo: 'alquiler', metodo_pago: 'a_convenir' })
+    await AlquileresModel.devolverAPlanta(g.ops[0])
+    await AlquileresModel.actualizar(g.ops[1], edicion({ metodo_pago: '' }))
+    await AlquileresModel.actualizarCompartidosGrupo(g.ops[1])
+    await AlquileresModel.devolverAPlanta(g.ops[1])
+    assert.equal(await AlquileresModel.cobrarAlCerrar(g.ops[1]), null)
+    assert.equal((await prueba.q(`SELECT metodo_pago FROM op_encabezado WHERE id = ?`, [g.ops[0]])).rows[0].metodo_pago, 'a_convenir')
+  })
+
+  it('aplicar a todos no toca los contenedores ya cobrados', async () => {
+    const g = await grupo({ en_curso: true })
+    await AlquileresModel.devolverAPlanta(g.ops[0])
+    await AlquileresModel.cobrarAlCerrar(g.ops[0])
+    await AlquileresModel.actualizar(g.ops[1], edicion({ calle: 'Av. Colón', numero: '100', metodo_pago: 'transferencia' }))
+    assert.equal(await AlquileresModel.actualizarCompartidosGrupo(g.ops[1]), 0)
+    const op1 = (await prueba.q(`
+      SELECT op.metodo_pago, oc.domicilio_calle FROM op_encabezado op
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id WHERE op.id = ?`, [g.ops[0]])).rows[0]
+    assert.deepEqual(op1, { metodo_pago: 'efectivo', domicilio_calle: 'San Lorenzo' })
+  })
+
+  it('controlador: aplicar a todos sin cambiar la dirección propia copia la ubicación al resto', async () => {
+    const g = await grupo()
+    await AlquileresModel.guardarUbicacion(g.ops[0], { lat: -31.41, lng: -64.18, estado: 'ok' })
+    await prueba.q(`UPDATE op_detalle_contenedor SET domicilio_calle = 'Vieja', domicilio_numero = '9', domicilio_entrega = 'Vieja 9' WHERE id_orden_pedido = ?`, [g.ops[1]])
+    const ubicarOriginal = AlquileresModel.ubicar
+    AlquileresModel.ubicar = async () => null // sin Nominatim
+    try {
+      await llamar('actualizar', { user: { id: admin, rol: 'dueno' }, params: { id: String(g.ops[0]) }, body: {
+        calle: 'San Lorenzo', numero: '501', zona_entrega: '', fechaInicio: '2026-09-28', fechaFin: '2026-10-02',
+        precio_alquiler: '100', metodo_pago: 'efectivo', observaciones: '', obra: '', aplicar_grupo: '1',
+      } })
+    } finally {
+      AlquileresModel.ubicar = ubicarOriginal
+    }
+    const lat = (await prueba.q(`SELECT domicilio_lat FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [g.ops[1]])).rows[0].domicilio_lat
+    assert.equal(lat, -31.41)
+  })
+
+  it('agruparExistentes: por alquiler exige el mismo método de pago y la simulación muestra el detalle', async () => {
+    const id_cliente = await datos.crearCliente()
+    const [c1, c2] = await datos.crearContenedores(2)
+    const a = await AlquileresModel.crearEnCurso({ ...datos.datosComunes({ id_cliente, id_administrativo: admin, metodo_pago: 'efectivo' }), id_contenedor: c1, plazo_alquiler: 4, precio_alquiler: 100 })
+    const b = await AlquileresModel.crearEnCurso({ ...datos.datosComunes({ id_cliente, id_administrativo: admin, metodo_pago: 'transferencia' }), id_contenedor: c2, plazo_alquiler: 4, precio_alquiler: 100 })
+    await assert.rejects(AlquileresModel.agruparExistentes([a.nro_op, b.nro_op], 'alquiler', { simular: true }), /métodos de pago distintos/)
+    const sim = await AlquileresModel.agruparExistentes([a.nro_op, b.nro_op], 'contenedor', { simular: true })
+    const numeros = (await prueba.q(`SELECT numero_contenedor FROM contenedores WHERE id = ANY(?::bigint[]) ORDER BY id`, [[c1, c2]])).rows.map(r => r.numero_contenedor)
+    assert.deepEqual(sim.ops.map(o => [o.numero_contenedor, o.metodo_pago, o.retirado]), [[numeros[0], 'efectivo', false], [numeros[1], 'transferencia', false]])
   })
 })

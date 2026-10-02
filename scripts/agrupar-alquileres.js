@@ -21,7 +21,13 @@ const confirmar = args.includes('--confirmar')
 async function main() {
   if (!['contenedor', 'alquiler'].includes(cobro)) throw new Error('--cobro tiene que ser "contenedor" o "alquiler".')
   const r = await AlquileresModel.agruparExistentes(nros, cobro, { simular: !confirmar })
-  const lista = r.ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')
+  const nombre = (o) => 'OP-' + String(o.nro_op).padStart(4, '0')
+  // Detalle de cada OP para revisarlo antes de confirmar
+  for (const o of r.ops) {
+    console.log(`  ${nombre(o)} · contenedor N° ${o.numero_contenedor ?? '—'} · ${o.estado}${o.retirado ? ' (ya retirado)' : ''}`
+      + ` · pago: ${o.metodo_pago || 'sin especificar'} · ${o.domicilio_entrega || 'sin dirección'} · remito ${o.nro_remito ?? '—'}`)
+  }
+  const lista = r.ops.map(nombre).join(', ')
   console.log(confirmar
     ? `Agrupadas ${lista} (grupo ${r.id_grupo}, cobro por ${cobro}).`
     : `Simulación OK: se agruparían ${lista} con cobro por ${cobro}. Repetir con --confirmar para aplicarlo.`)
