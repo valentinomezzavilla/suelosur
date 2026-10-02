@@ -1,4 +1,7 @@
 require('dotenv').config()
+// Render corre en UTC: sin esto, todo cálculo con fechas locales (setHours, getDate, etc.)
+// cambia de día a las 21 hs de Argentina. Tiene que ir antes de cualquier uso de Date.
+process.env.TZ = process.env.TZ || require('./src/utils/fecha').ZONA_HORARIA
 const { initDB, limpiarRastreoViejo } = require('./src/config/db')
 const app = require('./src/app')
 

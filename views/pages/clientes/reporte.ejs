@@ -46,7 +46,7 @@
     const hoy = new Date()
     const desde = document.getElementById('fechaDesde')
     const hasta = document.getElementById('fechaHasta')
-    const fmt = d => d.toISOString().slice(0, 10)
+    const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     if (p === 'mes') {
       desde.value = fmt(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
       hasta.value = fmt(new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0))

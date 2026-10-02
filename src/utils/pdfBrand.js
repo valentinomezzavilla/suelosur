@@ -7,7 +7,7 @@
 // ─────────────────────────────────────────────────────────────────
 const path = require('path')
 const fs = require('fs')
-const { fmtFechaHora } = require('./fecha')
+const { fmtFechaHora, ahoraLocal } = require('./fecha')
 
 // Paleta de marca
 const AZUL   = '#1c5bad'
@@ -93,7 +93,7 @@ function drawFooter(doc, { extra = '' } = {}) {
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
-  const txt = `${extra ? extra + ' · ' : ''}Generado el ${fmtFechaHora(new Date().toISOString())} · ${EMPRESA.razon}`
+  const txt = `${extra ? extra + ' · ' : ''}Generado el ${fmtFechaHora(ahoraLocal())} · ${EMPRESA.razon}`
   // 10pt por encima del límite inferior del área de contenido → no dispara salto.
   const y = doc.page.height - doc.page.margins.bottom - 10
   doc.fillColor(GRIS).fontSize(7).font('Helvetica')

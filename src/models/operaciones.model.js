@@ -58,7 +58,7 @@ const OperacionesModel = {
     }
     await query(`
       UPDATE op_encabezado
-      SET id_chofer = ?, id_camion = ?, asignacion_fecha = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), asignacion_usuario = ?
+      SET id_chofer = ?, id_camion = ?, asignacion_fecha = ahora_local(), asignacion_usuario = ?
       WHERE id = ?
     `, [id_chofer || null, id_camion || null, usuario || null, opId])
     registrarAuditoria({

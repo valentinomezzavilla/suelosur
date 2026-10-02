@@ -131,7 +131,7 @@ const AlertasModel = {
           SELECT fecha FROM mantenimiento_vehiculo WHERE id_vehiculo = ? ORDER BY fecha DESC LIMIT 1
         `, [v.id])).rows[0]
         if (!ultimo || !ultimo.fecha) continue
-        const prox = new Date(String(ultimo.fecha).slice(0, 10))
+        const prox = new Date(String(ultimo.fecha).slice(0, 10) + 'T00:00:00')
         prox.setMonth(prox.getMonth() + regla.cada_meses)
         const iso = prox.toISOString().slice(0, 10)
         const dias = diasHasta(iso)

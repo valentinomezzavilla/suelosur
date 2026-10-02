@@ -222,7 +222,7 @@ const ContenedoresModel = {
   async registrarMovimiento({ id_contenedor, id_op_contenedor, id_chofer, id_camion, estado_paso, observaciones, fecha_movimiento }) {
     await query(`
       INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, id_chofer, id_camion, fecha_movimiento, estado_paso, observaciones)
-      VALUES (?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?)
+      VALUES (?, ?, ?, ?, COALESCE(?, ahora_local()), ?, ?)
     `, [id_contenedor, id_op_contenedor || null,
         id_chofer || null, id_camion || null, fecha_movimiento || null,
         estado_paso, observaciones || ''])

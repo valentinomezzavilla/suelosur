@@ -6,6 +6,7 @@
 //   · egresos        → el libro de Compras / Pagos (salida de dinero, categoría "sueldo")
 // Alta y baja tocan los dos a la vez, así nunca quedan desalineados.
 const { query, transaction } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 
 // Tipos que restan (descuento) — el resto suma al neto pagado.
 const RESTAN = new Set(['descuento'])
@@ -72,7 +73,7 @@ const PagosEmpleadoModel = {
     const neto = redondear(base - desc + adic)
     if (neto <= 0) throw new Error('Los descuentos no pueden ser iguales o mayores al sueldo más las adiciones.')
 
-    const dia = fecha || new Date().toISOString().slice(0, 10)
+    const dia = fecha || hoyISO()
     const nombre = `${emp.nombre} ${emp.apellido || ''}`.trim()
     const detalle = (descripcion || '').trim()
 

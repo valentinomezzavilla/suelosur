@@ -8,7 +8,7 @@
     <form action="/circuitos" method="POST">
       <div class="row g-3 mb-3">
         <div class="col-md-6"><label class="form-label">Fecha *</label>
-          <input type="date" name="fecha" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>" required></div>
+          <input type="date" name="fecha" class="form-control" value="<%= hoyISO() %>" required></div>
         <div class="col-md-6"><label class="form-label">Chofer</label>
           <select name="id_empleado" class="form-select">
             <option value="">— Sin asignar —</option>

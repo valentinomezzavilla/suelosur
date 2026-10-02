@@ -1,6 +1,8 @@
 // ── Helpers ───────────────────────────────────────────────────
+// Fecha local 'YYYY-MM-DD' (toISOString da la fecha UTC: de noche ya es "mañana").
 function toInputDate(date) {
-    return date.toISOString().split('T')[0];
+    const p = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}`;
 }
 
 function formatFechaLocal(val) {

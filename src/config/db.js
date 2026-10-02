@@ -4,7 +4,7 @@
 // pg (async) · PostgreSQL / Supabase
 // ═══════════════════════════════════════════════════════════════════
 
-const { Pool, types } = require('pg')
+const { Pool, Client, types } = require('pg')
 const bcrypt  = require('bcryptjs')
 
 // Parsear NUMERIC / BIGINT / INT8 como números JS (no como strings).
@@ -13,7 +13,22 @@ const bcrypt  = require('bcryptjs')
 types.setTypeParser(1700, (v) => v == null ? null : parseFloat(v)) // NUMERIC
 types.setTypeParser(20,   (v) => v == null ? null : parseInt(v, 10)) // BIGINT / int8
 
+// Cada conexión trabaja en hora de Argentina: CURRENT_DATE, NOW()::date y los defaults
+// con CURRENT_DATE dan la fecha local (Supabase corre en UTC y entre las 21 y las 24 hs
+// ya era "mañana"). El pooler de Supabase ignora el parámetro de conexión `options`, así
+// que el SET se hace al abrir cada conexión, antes de entregarla (modo sesión, puerto
+// 5432: el SET vale para toda la conexión).
+const ZONA_HORARIA = 'America/Argentina/Cordoba'
+class ClienteHoraLocal extends Client {
+  connect(callback) {
+    const listo = super.connect().then(() => super.query(`SET TIME ZONE '${ZONA_HORARIA}'`)).then(() => undefined)
+    if (callback) { listo.then(() => callback(null), callback); return undefined }
+    return listo
+  }
+}
+
 const pool = new Pool({
+  Client: ClienteHoraLocal,
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false },
   max: 10,                       // máximo de conexiones simultáneas
@@ -59,6 +74,16 @@ async function transaction(fn) {
 // ═══════════════════════════════════════════════════════════════════
 async function initDB() {
 
+  // Fecha y hora actual en Argentina como texto 'YYYY-MM-DD HH24:MI:SS': es el formato de
+  // todas las columnas de fecha/hora del sistema (created_at, fecha_movimiento, etc.).
+  // Fija la zona explícitamente, así no depende de la sesión (ej. el SQL Editor de Supabase).
+  await pool.query(`
+    CREATE OR REPLACE FUNCTION ahora_local() RETURNS TEXT
+    LANGUAGE sql STABLE AS $$
+      SELECT to_char(NOW() AT TIME ZONE '${ZONA_HORARIA}', 'YYYY-MM-DD HH24:MI:SS')
+    $$
+  `)
+
   // ─────────────────────────────────────────────────────────────────
   // BLOQUE 1 — TABLAS CENTRALES
   // ─────────────────────────────────────────────────────────────────
@@ -70,7 +95,7 @@ async function initDB() {
       nombre        TEXT NOT NULL,
       rol           TEXT NOT NULL CHECK (rol IN ('admin_ventas','admin_contable','chofer','dueno')),
       activo        INTEGER DEFAULT 1,
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -90,7 +115,7 @@ async function initDB() {
       saldo            REAL DEFAULT 0,
       activo           INTEGER DEFAULT 1,
       numero           INTEGER,
-      created_at       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at       TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_numero ON clientes(numero)`)
@@ -102,7 +127,7 @@ async function initDB() {
       tipo        TEXT NOT NULL CHECK (tipo IN ('deuda','pago','ajuste','uso_saldo_favor')),
       descripcion TEXT NOT NULL DEFAULT '',
       monto       REAL NOT NULL,
-      created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at  TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -115,7 +140,7 @@ async function initDB() {
       precio_cantera    REAL DEFAULT 0,
       precio_viaje      REAL DEFAULT 0,
       activo            INTEGER DEFAULT 1,
-      created_at        TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at        TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -150,7 +175,7 @@ async function initDB() {
       fecha_proximo_mant TEXT,
       observaciones    TEXT DEFAULT '',
       dedicacion       TEXT DEFAULT 'ambos',
-      created_at       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at       TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -189,7 +214,7 @@ async function initDB() {
       firma_retiro              TEXT,
       firma_retiro_aclaracion   TEXT,
       archivo_remito_retiro     TEXT,
-      created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at                TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`
@@ -212,7 +237,7 @@ async function initDB() {
       fecha_ultima_pintada TEXT,
       observaciones        TEXT DEFAULT '',
       activo               INTEGER DEFAULT 1,
-      created_at           TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at           TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -239,7 +264,7 @@ async function initDB() {
       horas_uso       REAL DEFAULT 0,
       estado_operativo TEXT DEFAULT 'disponible',
       marca           TEXT,
-      created_at      TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at      TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -289,7 +314,7 @@ async function initDB() {
       id_op_contenedor BIGINT REFERENCES op_detalle_contenedor(id),
       id_chofer        BIGINT REFERENCES users(id),
       id_camion        BIGINT REFERENCES flota_vehiculos(id),
-      fecha_movimiento TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      fecha_movimiento TEXT NOT NULL DEFAULT ahora_local(),
       estado_paso      TEXT NOT NULL
                          CHECK (estado_paso IN (
                            'disponible','pendiente_despacho','despachado',
@@ -309,7 +334,7 @@ async function initDB() {
       id_op_maquinaria BIGINT REFERENCES op_detalle_maquinaria(id),
       id_operario      BIGINT REFERENCES users(id),
       id_camion        BIGINT REFERENCES flota_vehiculos(id),
-      fecha_movimiento TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      fecha_movimiento TEXT NOT NULL DEFAULT ahora_local(),
       estado_paso      TEXT NOT NULL
                          CHECK (estado_paso IN (
                            'en_planta','despachada','en_uso','a_retirar','en_servicio'
@@ -332,7 +357,7 @@ async function initDB() {
       proximo_fecha TEXT,
       taller        TEXT DEFAULT '',
       descripcion   TEXT DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -357,9 +382,9 @@ async function initDB() {
                          CHECK (metodo_pago IN (
                            'efectivo','transferencia','cheque','cuenta_corriente'
                          )),
-      fecha            TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      fecha            TEXT DEFAULT ahora_local(),
       numero           INTEGER,
-      created_at       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at       TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -376,7 +401,7 @@ async function initDB() {
       estado        TEXT NOT NULL DEFAULT 'borrador'
                       CHECK (estado IN ('borrador','confirmado','en_curso','finalizado')),
       observaciones TEXT DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -398,7 +423,7 @@ async function initDB() {
       estado           TEXT NOT NULL DEFAULT 'pendiente'
                          CHECK (estado IN ('pendiente','completada','cancelada')),
       observaciones    TEXT DEFAULT '',
-      created_at       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at       TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -414,7 +439,7 @@ async function initDB() {
       telefono   TEXT,
       email      TEXT,
       activo     INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -426,7 +451,7 @@ async function initDB() {
       estado        TEXT NOT NULL DEFAULT 'emitida'
                       CHECK (estado IN ('emitida','recibida','cancelada')),
       observaciones TEXT DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -451,7 +476,7 @@ async function initDB() {
       saldo_resultante REAL DEFAULT 0,
       descripcion      TEXT DEFAULT '',
       fecha            TEXT DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
-      created_at       TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at       TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -474,7 +499,7 @@ async function initDB() {
       descripcion   TEXT DEFAULT '',
       proximo_km    INTEGER,
       archivo       TEXT,
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -488,7 +513,7 @@ async function initDB() {
       km_al_cargar INTEGER DEFAULT 0,
       fecha        TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       estacion     TEXT,
-      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at   TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -536,7 +561,7 @@ async function initDB() {
       licencia_organismo        TEXT,
       fecha_baja                TEXT,
       motivo_baja               TEXT,
-      created_at                TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at                TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS idx_empleados_legajo ON empleados(legajo)`)
@@ -554,7 +579,7 @@ async function initDB() {
       archivo           TEXT,
       fecha_emision     TEXT,
       fecha_vencimiento TEXT,
-      created_at        TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at        TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_documentos_entidad ON documentos(entidad_tipo, entidad_id)`)
@@ -572,7 +597,7 @@ async function initDB() {
       aprobado       INTEGER DEFAULT 0,
       aprobado_por   BIGINT,
       observaciones  TEXT DEFAULT '',
-      created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at     TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -585,7 +610,7 @@ async function initDB() {
       monto       REAL NOT NULL DEFAULT 0,
       fecha       TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
       descripcion TEXT DEFAULT '',
-      created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at  TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -594,7 +619,7 @@ async function initDB() {
       id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       id_vehiculo   BIGINT NOT NULL REFERENCES flota_vehiculos(id),
       estado        TEXT NOT NULL,
-      fecha         TEXT NOT NULL DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      fecha         TEXT NOT NULL DEFAULT ahora_local(),
       id_usuario    BIGINT,
       observaciones TEXT DEFAULT ''
     )
@@ -608,7 +633,7 @@ async function initDB() {
       cada_km     INTEGER,
       cada_meses  INTEGER,
       descripcion TEXT DEFAULT '',
-      created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at  TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -623,7 +648,7 @@ async function initDB() {
       vencimiento TEXT,
       estado      TEXT DEFAULT 'pagado',
       archivo     TEXT,
-      created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at  TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -651,7 +676,7 @@ async function initDB() {
       accion       TEXT NOT NULL,
       id_usuario   BIGINT,
       detalle      TEXT DEFAULT '',
-      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at   TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_auditoria_entidad ON auditoria(entidad_tipo, entidad_id)`)
@@ -661,7 +686,7 @@ async function initDB() {
       id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
       clave      TEXT NOT NULL UNIQUE,
       valor      TEXT NOT NULL DEFAULT '',
-      created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -675,7 +700,7 @@ async function initDB() {
       fecha_hasta   TEXT,
       activo        INTEGER DEFAULT 1,
       observaciones TEXT DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at    TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_asig_recurso  ON asignaciones_recurso(recurso_tipo, recurso_id, activo)`)
@@ -692,7 +717,7 @@ async function initDB() {
       id_usuario     BIGINT,
       observaciones  TEXT DEFAULT '',
       fecha          TEXT NOT NULL DEFAULT to_char(CURRENT_DATE, 'YYYY-MM-DD'),
-      created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at     TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -705,7 +730,7 @@ async function initDB() {
       clave       TEXT NOT NULL UNIQUE,
       valor       TEXT NOT NULL DEFAULT '',
       descripcion TEXT DEFAULT '',
-      created_at  TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at  TEXT DEFAULT ahora_local()
     )
   `)
 
@@ -715,7 +740,7 @@ async function initDB() {
       id_maquinaria BIGINT REFERENCES maquinaria(id),
       clave         TEXT NOT NULL,
       valor         TEXT NOT NULL DEFAULT '',
-      created_at    TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
+      created_at    TEXT DEFAULT ahora_local(),
       UNIQUE(id_maquinaria, clave)
     )
   `)
@@ -911,7 +936,7 @@ async function initDB() {
       cae_vto                TEXT,
       estado                 TEXT NOT NULL DEFAULT 'emitida' CHECK (estado IN ('emitida','revertida')),
       id_usuario             BIGINT REFERENCES users(id),
-      created_at             TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at             TEXT DEFAULT ahora_local()
     )
   `)
   // Ticket de acceso de AFIP (WSAA): dura 12 h y AFIP rechaza pedir otro mientras siga vigente,
@@ -959,7 +984,7 @@ async function initDB() {
       sistema    INTEGER NOT NULL DEFAULT 0,
       activo     INTEGER NOT NULL DEFAULT 1,
       orden      INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at TEXT DEFAULT ahora_local()
     )
   `)
   const categoriasSemilla = [
@@ -1000,7 +1025,7 @@ async function initDB() {
       datos_extra  TEXT DEFAULT '{}',
       origen       TEXT DEFAULT 'manual',
       id_usuario   BIGINT,
-      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at   TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_fecha     ON egresos(fecha)`)
@@ -1072,7 +1097,7 @@ async function initDB() {
       id_empleado    BIGINT REFERENCES empleados(id),
       descripcion    TEXT DEFAULT '',
       id_usuario     BIGINT,
-      created_at     TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at     TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_cheques_estado ON cheques(estado)`)
@@ -1099,7 +1124,7 @@ async function initDB() {
       tarifa_flete REAL DEFAULT 0,
       orden        INTEGER DEFAULT 0,
       activo       INTEGER DEFAULT 1,
-      created_at   TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      created_at   TEXT DEFAULT ahora_local()
     )
   `)
   // Seed de zonas estándar SOLO si la tabla está vacía: las zonas se administran desde
@@ -1119,7 +1144,7 @@ async function initDB() {
       km_nuevo      INTEGER NOT NULL DEFAULT 0,
       distancia     REAL DEFAULT 0,
       motivo        TEXT DEFAULT '',
-      fecha         TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+      fecha         TEXT DEFAULT ahora_local()
     )
   `)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_histkm_vehiculo ON historial_kilometraje(id_vehiculo)`)
@@ -1394,7 +1419,7 @@ async function initDB() {
   // Los retiros que estaban en curso conservan esa marca antes de perder el estado
   await pool.query(`
     UPDATE op_encabezado op
-    SET retiro_iniciado_en = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS')
+    SET retiro_iniciado_en = ahora_local()
     FROM op_detalle_contenedor oc
     JOIN (
       SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
@@ -1519,7 +1544,82 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_actualizado_en TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS geo_detalle TEXT`).catch(() => {})
 
+  await migrarHorasALocal()
+
   console.log('✅ Base de datos PostgreSQL inicializada')
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MIGRACIÓN: fechas/horas en hora de Argentina (antes se guardaban en UTC y se mostraban
+// tal cual, 3 h adelantadas; lo de la noche caía en el día siguiente).
+// ─────────────────────────────────────────────────────────────────
+// Columnas que escribe el sistema con la hora actual. Las que tienen default lo pasan a
+// ahora_local(); el resto se escriben desde los modelos (ya con ahora_local()).
+// rastreo_chofer.fecha_registro NO está: se guarda con 'Z' y se lee como instante UTC.
+const COLUMNAS_CON_DEFAULT_HORA = [
+  ...['users', 'clientes', 'movimientos_cuenta', 'productos', 'flota_vehiculos', 'op_encabezado',
+    'contenedores', 'maquinaria', 'mantenimiento_maquinaria', 'transacciones', 'circuitos',
+    'circuito_paradas', 'proveedores', 'compras_encabezado', 'cc_proveedores', 'mantenimiento_vehiculo',
+    'combustible', 'empleados', 'documentos', 'control_horario', 'pagos_empleado', 'config_mantenimiento',
+    'gastos_vehiculo', 'auditoria', 'config_notificaciones', 'asignaciones_recurso', 'stock_ingresos',
+    'config_contenedores', 'config_maquinaria', 'facturas', 'categorias_egreso', 'egresos', 'cheques',
+    'zonas'].map(t => [t, 'created_at']),
+  ['movimiento_contenedor', 'fecha_movimiento'],
+  ['movimiento_maquinaria', 'fecha_movimiento'],
+  ['transacciones', 'fecha'],
+  ['estado_vehiculo_hist', 'fecha'],
+  ['historial_kilometraje', 'fecha'],
+]
+const COLUMNAS_HORA_SIN_DEFAULT = [
+  ['op_encabezado', 'asignacion_fecha'],
+  ['op_encabezado', 'retiro_iniciado_en'],
+  ['op_encabezado', 'facturado_en'],
+  ['op_detalle_contenedor', 'geo_actualizado_en'],
+  ['config_facturacion', 'updated_at'],
+]
+
+async function migrarHorasALocal() {
+  // Defaults: idempotente, corre en cada arranque (cubre bases creadas antes del cambio).
+  for (const [tabla, col] of COLUMNAS_CON_DEFAULT_HORA) {
+    await pool.query(`ALTER TABLE ${tabla} ALTER COLUMN ${col} SET DEFAULT ahora_local()`)
+      .catch(e => console.error(`Default hora local ${tabla}.${col}:`, e.message))
+  }
+
+  // Datos históricos: se pasan de UTC a hora Argentina UNA sola vez (el registro en
+  // migraciones_aplicadas lo garantiza, aunque arranquen dos instancias a la vez). Solo se
+  // convierten los valores con el formato que escribe el sistema ('YYYY-MM-DD HH:MM:SS'):
+  // los cargados a mano con datetime-local ('YYYY-MM-DDTHH:MM') ya estaban en hora local, y
+  // los que son solo fecha no tienen hora que corregir. Antes de convertir se copia cada
+  // valor original a bkp_hora_utc.
+  await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (nombre TEXT PRIMARY KEY, aplicada_en TEXT DEFAULT ahora_local())`)
+  await pool.query(`CREATE TABLE IF NOT EXISTS bkp_hora_utc (tabla TEXT, columna TEXT, fila_id BIGINT, valor_utc TEXT)`)
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    // '_v2': una primera corrida (2026-10-01 22:40) quedó registrada sin convertir nada.
+    const r = await client.query(`INSERT INTO migraciones_aplicadas (nombre) VALUES ('horas_utc_a_local_v2') ON CONFLICT DO NOTHING RETURNING nombre`)
+    if (!r.rowCount) { await client.query('ROLLBACK'); return }
+    const total = {}
+    for (const [tabla, col] of [...COLUMNAS_CON_DEFAULT_HORA, ...COLUMNAS_HORA_SIN_DEFAULT]) {
+      const existe = (await client.query(
+        `SELECT 1 FROM information_schema.columns WHERE table_name = $1 AND column_name = $2`, [tabla, col])).rowCount
+      if (!existe) continue
+      const filtro = `${col} ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}$'`
+      await client.query(`INSERT INTO bkp_hora_utc (tabla, columna, fila_id, valor_utc) SELECT $1, $2, id, ${col} FROM ${tabla} WHERE ${filtro}`, [tabla, col])
+      const u = await client.query(`
+        UPDATE ${tabla}
+        SET ${col} = to_char((${col}::timestamp AT TIME ZONE 'UTC') AT TIME ZONE '${ZONA_HORARIA}', 'YYYY-MM-DD HH24:MI:SS')
+        WHERE ${filtro}`)
+      if (u.rowCount) total[`${tabla}.${col}`] = u.rowCount
+    }
+    await client.query('COMMIT')
+    console.log('🕒 Horas históricas pasadas de UTC a hora Argentina:', total)
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {})
+    console.error('Migración de horas a hora local falló (se reintenta en el próximo arranque):', e.message)
+  } finally {
+    client.release()
+  }
 }
 
 // Borra el rastreo GPS de los choferes con más de N días (default 7).
@@ -1539,4 +1639,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal }

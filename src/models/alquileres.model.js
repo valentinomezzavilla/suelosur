@@ -268,7 +268,7 @@ const AlquileresModel = {
     await query(`
       UPDATE op_detalle_contenedor
       SET domicilio_lat = ?, domicilio_lng = ?, geo_estado = ?, geo_detalle = ?,
-          geo_actualizado_en = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+          geo_actualizado_en = ahora_local()
       WHERE id_orden_pedido = ?
     `, [lat ?? null, lng ?? null, estado, detalle || null, id_op])
   },
@@ -350,7 +350,7 @@ const AlquileresModel = {
   async iniciarRetiro(id_op) {
     const oc = (await query(`SELECT id, id_contenedor FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
     if (!oc?.id_contenedor) throw new Error('No hay contenedor asignado.')
-    await query(`UPDATE op_encabezado SET retiro_iniciado_en = to_char(NOW(), 'YYYY-MM-DD HH24:MI:SS') WHERE id = ?`, [id_op])
+    await query(`UPDATE op_encabezado SET retiro_iniciado_en = ahora_local() WHERE id = ?`, [id_op])
     await FlotaModel.setEnUso(await FlotaModel.camionDeOperacion(id_op), true)
   },
 

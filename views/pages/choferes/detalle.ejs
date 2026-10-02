@@ -311,8 +311,8 @@
           <div class="col-md-2 pg-ajuste"><label class="form-label">Neto a pagar</label><input type="text" id="pgNeto" class="form-control form-control-sm fw-bold" readonly></div>
         </div>
         <div class="row g-2 align-items-end mt-1">
-          <div class="col-md-2"><label class="form-label">Período</label><input type="month" name="periodo" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0,7) %>"></div>
-          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" value="<%= new Date().toISOString().slice(0,10) %>"></div>
+          <div class="col-md-2"><label class="form-label">Período</label><input type="month" name="periodo" class="form-control form-control-sm" value="<%= hoyISO().slice(0, 7) %>"></div>
+          <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" value="<%= hoyISO() %>"></div>
           <div class="col-md-2"><label class="form-label">Método de pago</label>
             <select name="metodo_pago" class="form-select form-select-sm">
               <option value="">—</option><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="cheque">Cheque</option>

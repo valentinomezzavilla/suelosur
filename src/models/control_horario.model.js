@@ -1,6 +1,7 @@
 'use strict'
 // Control horario / jornadas + horas extra.
 const { query } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 
 // Calcula horas entre HH:MM y HH:MM (maneja cruce de medianoche)
 function horasEntre(ini, fin) {
@@ -35,7 +36,7 @@ const ControlHorarioModel = {
       INSERT INTO control_horario (id_empleado, fecha, hora_ingreso, hora_egreso, horas_normales, horas_extra, motivo_extra, observaciones)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
-    `, [id_empleado, fecha || new Date().toISOString().slice(0, 10),
+    `, [id_empleado, fecha || hoyISO(),
         hora_ingreso || null, hora_egreso || null, normales, extra,
         motivo_extra || '', observaciones || ''])
     return rows[0].id
