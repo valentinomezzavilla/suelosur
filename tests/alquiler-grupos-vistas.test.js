@@ -52,4 +52,21 @@ describe('vistas de alquileres agrupados', () => {
     assert.equal((html.match(/Grupo · 2 contenedores/g) || []).length, 1)
     assert.match(html, /href="\/alquileres\/contenedores\/101#grupo"/)
   })
+
+  it('Cobranzas: la fila de un grupo pide el monto de cada contenedor', async () => {
+    const html = await renderVista('pages/alquileres/cobranzas', {
+      pendientes: [{
+        id: 101, nro_op: 261, id_grupo: 9, esGrupo: true, cliente_nombre: 'Cliente', domicilio_entrega: 'San Lorenzo 501',
+        numero_contenedor: '19, 20', fecha_retiro: '2026-10-01 10:00:00', montoEstimado: 300, saldo_favor_cliente: 0,
+        ops: [
+          { id: 101, nro_op: 261, numero_contenedor: 19, montoEstimado: 100 },
+          { id: 102, nro_op: 262, numero_contenedor: 20, montoEstimado: 200 },
+        ],
+      }],
+    })
+    assert.match(html, /Cobro por alquiler · 2 contenedores/)
+    assert.match(html, /name="precio_final\[op101\]"/)
+    assert.match(html, /name="precio_final\[op102\]"/)
+    assert.match(html, /OP-0261, OP-0262/)
+  })
 })

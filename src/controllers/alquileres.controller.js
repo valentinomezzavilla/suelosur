@@ -551,8 +551,12 @@ const AlquileresController = {
       // Monto estimado con la tarifa vigente (misma cuenta que se usaría al cerrar el
       // cobro), para que se vea de un vistazo cuánto habría que cobrar en cada caso.
       for (const p of pendientes) {
-        const cierre = await AlquileresModel.datosCierre(p.id)
-        p.montoEstimado = cierre ? cierre.precioActual : (p.precio_alquiler || 0)
+        // En una fila de grupo, el estimado de cada contenedor y el total
+        for (const o of (p.esGrupo ? p.ops : [p])) {
+          const cierre = await AlquileresModel.datosCierre(o.id)
+          o.montoEstimado = cierre ? cierre.precioActual : (o.precio_alquiler || 0)
+        }
+        if (p.esGrupo) p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)
       }
       res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', pendientes })
     } catch (err) {
@@ -574,7 +578,7 @@ const AlquileresController = {
         const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
         if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
       }
-      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, precio_final, metodo_pago_final)
+      const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(precio_final), metodo_pago_final)
       if (monto == null) {
         req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
       } else {

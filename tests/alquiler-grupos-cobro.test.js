@@ -4,6 +4,7 @@ const datos = require('./helpers/datos')
 const { describe, it, before, after } = require('node:test')
 const assert = require('node:assert/strict')
 const AlquileresModel = require('../src/models/alquileres.model')
+const { llamar } = require('./helpers/controlador')
 
 describe('cobro de alquileres agrupados', () => {
   let admin
@@ -120,5 +121,28 @@ describe('cobro de alquileres agrupados', () => {
     await AlquileresModel.anular(g.ops[1])
     assert.equal(await AlquileresModel.cobrarGrupo(g.id_grupo), await precioCierre(g.ops[0]))
     assert.deepEqual([(await txDe(g.ops[0])).length, (await txDe(g.ops[1])).length], [1, 0])
+  })
+
+  it('Cobranzas: un grupo "a convenir" aparece una sola vez y recién con todo retirado', async () => {
+    const g = await grupoEnCurso({ cobro_modo: 'alquiler', metodo_pago: 'a_convenir' })
+    await retirar(g.ops[0])
+    let filas = (await AlquileresModel.pendientesDeCobro()).filter(p => p.id_grupo === g.id_grupo)
+    assert.equal(filas.length, 0)
+    await retirar(g.ops[1])
+    filas = (await AlquileresModel.pendientesDeCobro()).filter(p => p.id_grupo === g.id_grupo)
+    assert.equal(filas.length, 1)
+    assert.equal(filas[0].esGrupo, true)
+    assert.deepEqual(filas[0].ops.map(o => o.id).sort((a, b) => a - b), g.ops)
+  })
+
+  it('Cobranzas: resolver el grupo cobra todos sus contenedores con los montos de cada uno', async () => {
+    const g = await grupoEnCurso({ cobro_modo: 'alquiler', metodo_pago: 'a_convenir' })
+    await retirar(g.ops[0]); await retirar(g.ops[1])
+    const user = { id: admin, rol: 'dueno' }
+    const r = await llamar('resolverCobranza', { user, params: { id: String(g.ops[0]) }, body: {
+      metodo_pago_final: 'efectivo', precio_final: { ['op' + g.ops[0]]: '100', ['op' + g.ops[1]]: '250' },
+    } })
+    assert.deepEqual(r.flashes, [{ tipo: 'success', msg: 'Cobro registrado por $350.' }])
+    assert.deepEqual([(await txDe(g.ops[0]))[0].monto, (await txDe(g.ops[1]))[0].monto], [100, 250])
   })
 })

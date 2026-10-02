@@ -872,8 +872,9 @@ const AlquileresModel = {
   // (el contenedor está de nuevo disponible) pero todavía no se les cargó el método
   // de pago real: pendientes de cobro. Alimenta el submódulo de Cobranzas.
   async pendientesDeCobro() {
-    return (await query(`
-      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, ${nombreCompleto('cli')} AS cliente_nombre,
+    const filas = (await query(`
+      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, ag.cobro_modo,
+             ${nombreCompleto('cli')} AS cliente_nombre,
              GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,
              oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
              (SELECT MIN(m.fecha_movimiento) FROM movimiento_contenedor m
@@ -882,11 +883,30 @@ const AlquileresModel = {
       JOIN clientes cli ON cli.id = op.id_cliente
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo
       WHERE op.tipo_op = 'C' AND op.estado = 'entregado' AND op.metodo_pago = 'a_convenir'
         AND EXISTS (SELECT 1 FROM movimiento_contenedor m WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible')
         AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
       ORDER BY fecha_retiro ASC NULLS LAST
     `)).rows
+    // Alquiler agrupado con cobro por alquiler: UNA fila por grupo, y solo cuando ya se
+    // retiraron todos sus contenedores (antes no hay nada que cobrar todavía).
+    const resultado = []
+    const vistos = new Set()
+    for (const f of filas) {
+      if (f.cobro_modo !== 'alquiler') { resultado.push(f); continue }
+      if (vistos.has(f.id_grupo)) continue
+      vistos.add(f.id_grupo)
+      const grupo = await this.grupoDe(f.id)
+      if (!grupo || grupo.abiertas > 0) continue
+      const ops = filas.filter(x => x.id_grupo === f.id_grupo)
+      resultado.push({
+        ...ops[0], esGrupo: true, ops,
+        numero_contenedor: ops.map(x => x.numero_contenedor).filter(Boolean).join(', '),
+        fecha_retiro: ops.map(x => x.fecha_retiro).filter(Boolean).sort().pop() || null,
+      })
+    }
+    return resultado
   },
 
   // Amplía el alquiler por el plazo que le corresponde al cliente. Si el contenedor
