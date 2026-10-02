@@ -193,6 +193,9 @@ const precioInput = document.getElementById('precioAlquilerInput');
 
 // ── Estado de la selección ────────────────────────────────────
 let contenedorSeleccionado = null; // { id, numero, fin, alquilerActualId }
+// Alquiler con varios contenedores: los elegidos en "Disponibles", en orden de selección.
+let seleccionMultiple = []; // [{ id, numero }]
+function esMultiple() { return seleccionMultiple.length >= 2; }
 
 // ── Resumen en tiempo real ────────────────────────────────────
 function actualizarResumen() {
@@ -210,7 +213,9 @@ function actualizarResumen() {
         const selHist = document.getElementById('contHistorico');
         const textoHist = historicoEnCurso() && selHist?.value
             ? selHist.options[selHist.selectedIndex]?.text : '';
-        elCont.textContent = textoHist || (contenedorSeleccionado ? `#${contenedorSeleccionado.numero}` : '—');
+        elCont.textContent = textoHist
+            || (esMultiple() ? seleccionMultiple.map(c => `#${c.numero}`).join(', ')
+                : (contenedorSeleccionado ? `#${contenedorSeleccionado.numero}` : '—'));
     }
 
     // fechas y días
@@ -235,7 +240,12 @@ function actualizarResumen() {
     }
 
     // Precio: siempre el que se cargó a mano.
-    const precio = Number(precioInput?.value) || 0;
+    // Con varios contenedores, el total es la suma de cada uno (vacío = el precio general).
+    const precioGeneral = Number(precioInput?.value) || 0;
+    const precio = esMultiple()
+        ? Array.from(document.querySelectorAll('.multi-cont-precio'))
+            .reduce((suma, inp) => suma + (Number(inp.value) || precioGeneral), 0)
+        : precioGeneral;
     if (elTotalV) elTotalV.textContent = precio > 0 ? `$${precio.toLocaleString('es-AR')}` : '—';
     if (elTotal)  elTotal.style.display = precio > 0 ? 'flex' : 'none';
 
@@ -273,42 +283,149 @@ document.getElementById('cerrarModalAlquiler')?.addEventListener('click', cerrar
 document.getElementById('cancelarModalAlquiler')?.addEventListener('click', cerrarModalAlquiler);
 modalAlquiler?.addEventListener('click', (e) => { if (e.target === modalAlquiler) cerrarModalAlquiler(); });
 
-// ── Selección de contenedor → abre el modal ───────────────────
-document.querySelectorAll('.btn-seleccionar-cont').forEach(btn => {
+// ── Selección de contenedores ─────────────────────────────────
+// En "Disponibles" se pueden elegir varios contenedores para un mismo alquiler (se sigue
+// con "Continuar"). En "Próximos a finalizar" es de a uno y abre el modal directo: el
+// próximo alquiler encadenado es de a un contenedor.
+const barraSeleccion = document.getElementById('barraSeleccion');
+const seleccionTexto = document.getElementById('seleccionTexto');
+const bloqueVarios   = document.getElementById('bloqueVariosContenedores');
+const listaVarios    = document.getElementById('listaVariosContenedores');
+const inputsConts    = document.getElementById('inputsContenedores');
+const rowCheckFinal  = document.getElementById('rowCheckFinalizado');
+
+function escHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function actualizarBarraSeleccion() {
+    const n = seleccionMultiple.length;
+    if (barraSeleccion) barraSeleccion.style.display = n ? 'flex' : 'none';
+    if (seleccionTexto) {
+        const nums = seleccionMultiple.map(c => `#${c.numero}`).join(', ');
+        seleccionTexto.textContent = n === 1 ? `1 contenedor elegido (${nums})` : `${n} contenedores elegidos (${nums})`;
+    }
+    document.querySelectorAll('#listaDisponibles .alquiler-card').forEach(card => {
+        const elegido = seleccionMultiple.some(c => c.id === card.dataset.id);
+        card.classList.toggle('alquiler-card--selected', elegido);
+        const btn = card.querySelector('.btn-seleccionar-cont');
+        if (btn) btn.textContent = elegido ? 'Quitar' : 'Seleccionar';
+    });
+}
+
+// Con 2 o más contenedores: una fila por contenedor (precio y fin propios, opcionales) y
+// los hidden ids_contenedor[]. Con 0 o 1, el bloque queda oculto y vacío. Las claves
+// llevan "c" adelante (precio_c[c<ID>]): con claves numéricas el servidor perdería a qué
+// contenedor corresponde cada valor.
+function armarBloqueVarios() {
+    if (inputsConts) inputsConts.innerHTML = '';
+    if (listaVarios) listaVarios.innerHTML = '';
+    if (bloqueVarios) bloqueVarios.style.display = esMultiple() ? '' : 'none';
+    if (rowCheckFinal) rowCheckFinal.style.display = esMultiple() ? 'none' : '';
+    if (!esMultiple()) return;
+    seleccionMultiple.forEach(c => {
+        const id = escHtml(c.id);
+        inputsConts?.insertAdjacentHTML('beforeend', `<input type="hidden" name="ids_contenedor[]" value="${id}">`);
+        listaVarios?.insertAdjacentHTML('beforeend', `
+            <div class="multi-cont-fila">
+                <span class="multi-cont-fila__num">#${escHtml(c.numero)}</span>
+                <label>Precio ($)
+                    <input type="number" name="precio_c[c${id}]" class="input-sm multi-cont-precio" min="0.01" step="any" placeholder="El general">
+                </label>
+                <label>Fin
+                    <input type="date" name="fin_c[c${id}]" class="input-sm multi-cont-fin">
+                </label>
+            </div>`);
+    });
+    listaVarios?.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('input', actualizarResumen);
+        inp.addEventListener('change', actualizarResumen);
+    });
+}
+
+function limpiarSeleccionMultiple() {
+    seleccionMultiple = [];
+    actualizarBarraSeleccion();
+    armarBloqueVarios();
+}
+
+// Un solo contenedor: carga los hidden y abre el modal (igual que siempre).
+function abrirConUnContenedor(card) {
+    document.querySelectorAll('.alquiler-card').forEach(c => c.classList.remove('alquiler-card--selected'));
+    card.classList.add('alquiler-card--selected');
+
+    contenedorSeleccionado = {
+        id:               card.dataset.id,
+        numero:           card.dataset.numero,
+        fin:              card.dataset.fin || null,
+        alquilerActualId: card.dataset.alquilerActual || '',
+    };
+
+    const inputId  = document.getElementById('inputContenedorId');
+    const inputAct = document.getElementById('inputAlquilerActualId');
+    if (inputId)  inputId.value  = contenedorSeleccionado.id;
+    if (inputAct) inputAct.value = contenedorSeleccionado.alquilerActualId;
+
+    const labelModal = document.getElementById('modal-cont-label');
+    if (labelModal) labelModal.textContent = `Contenedor #${contenedorSeleccionado.numero}`;
+
+    // si es "por finalizar", el alquiler nuevo arranca después de la liberación
+    if (contenedorSeleccionado.fin && fechaInicio) {
+        fechaInicio.min   = contenedorSeleccionado.fin;
+        fechaInicio.value = '';
+    }
+    aplicarFechaFinAutomatica();
+    armarBloqueVarios();
+    abrirModalAlquiler();
+    actualizarResumen();
+}
+
+// Varios contenedores: sin contenedor único ni encadenado; los ids van en las filas.
+function abrirConVariosContenedores() {
+    contenedorSeleccionado = null;
+    const inputId  = document.getElementById('inputContenedorId');
+    const inputAct = document.getElementById('inputAlquilerActualId');
+    if (inputId)  inputId.value  = '';
+    if (inputAct) inputAct.value = '';
+    if (fechaInicio) fechaInicio.min = '';
+    const labelModal = document.getElementById('modal-cont-label');
+    if (labelModal) labelModal.textContent = `${seleccionMultiple.length} contenedores (${seleccionMultiple.map(c => '#' + c.numero).join(', ')})`;
+    // La carga histórica es de a un contenedor
+    if (checkFinalizado?.checked) { checkFinalizado.checked = false; aplicarModoFinalizado(false); }
+    aplicarFechaFinAutomatica();
+    armarBloqueVarios();
+    abrirModalAlquiler();
+    actualizarResumen();
+}
+
+document.querySelectorAll('#listaDisponibles .btn-seleccionar-cont').forEach(btn => {
     btn.addEventListener('click', () => {
         const card = btn.closest('.alquiler-card');
         if (!card) return;
-
-        document.querySelectorAll('.alquiler-card').forEach(c => c.classList.remove('alquiler-card--selected'));
-        card.classList.add('alquiler-card--selected');
-
-        contenedorSeleccionado = {
-            id:               card.dataset.id,
-            numero:           card.dataset.numero,
-            fin:              card.dataset.fin || null,
-            alquilerActualId: card.dataset.alquilerActual || '',
-        };
-
-        // cargo los hidden del form
-        const inputId  = document.getElementById('inputContenedorId');
-        const inputAct = document.getElementById('inputAlquilerActualId');
-        if (inputId)  inputId.value  = contenedorSeleccionado.id;
-        if (inputAct) inputAct.value = contenedorSeleccionado.alquilerActualId;
-
-        // etiqueta del modal
-        const labelModal = document.getElementById('modal-cont-label');
-        if (labelModal) labelModal.textContent = `Contenedor #${contenedorSeleccionado.numero}`;
-
-        // si es "por finalizar", el alquiler nuevo arranca después de la liberación
-        if (contenedorSeleccionado.fin && fechaInicio) {
-            fechaInicio.min   = contenedorSeleccionado.fin;
-            fechaInicio.value = '';
-        }
-        aplicarFechaFinAutomatica();
-
-        abrirModalAlquiler();
-        actualizarResumen();
+        const i = seleccionMultiple.findIndex(c => c.id === card.dataset.id);
+        if (i >= 0) seleccionMultiple.splice(i, 1);
+        else seleccionMultiple.push({ id: card.dataset.id, numero: card.dataset.numero });
+        actualizarBarraSeleccion();
     });
+});
+
+document.querySelectorAll('#listaPorFinalizar .btn-seleccionar-cont').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const card = btn.closest('.alquiler-card');
+        if (!card) return;
+        limpiarSeleccionMultiple();
+        abrirConUnContenedor(card);
+    });
+});
+
+document.getElementById('btnLimpiarSeleccion')?.addEventListener('click', limpiarSeleccionMultiple);
+document.getElementById('btnContinuarSeleccion')?.addEventListener('click', () => {
+    if (esMultiple()) { abrirConVariosContenedores(); return; }
+    if (seleccionMultiple.length === 1) {
+        const card = Array.from(document.querySelectorAll('#listaDisponibles .alquiler-card'))
+            .find(c => c.dataset.id === seleccionMultiple[0].id);
+        if (card) abrirConUnContenedor(card);
+    }
 });
 
 // ── Pestañas disponibles / próximos a finalizar ───────────────
@@ -324,6 +441,7 @@ document.querySelectorAll('.cont-tab').forEach(tab => {
         if (listaPorFinalizar) listaPorFinalizar.style.display = verPorFinalizar ? '' : 'none';
         document.querySelectorAll('.alquiler-card').forEach(c => c.classList.remove('alquiler-card--selected'));
         contenedorSeleccionado = null;
+        limpiarSeleccionMultiple();
     });
 });
 
@@ -407,6 +525,7 @@ checkEditarFechaFin?.addEventListener('change', () => { aplicarFechaFinAutomatic
 
 // Abrir el modal SIN contenedor, directo en modo histórico
 document.getElementById('btnCargarFinalizado')?.addEventListener('click', () => {
+    limpiarSeleccionMultiple();
     contenedorSeleccionado = null;
     const inputId  = document.getElementById('inputContenedorId');
     const inputAct = document.getElementById('inputAlquilerActualId');
@@ -459,7 +578,7 @@ formAlquiler?.addEventListener('submit', (e) => {
         if (!selContHistorico?.value) {
             e.preventDefault(); alert('Elegí el contenedor que está en el domicilio del cliente.'); return;
         }
-    } else if (!modoFinalizado() && !contenedorSeleccionado) {
+    } else if (!modoFinalizado() && !contenedorSeleccionado && !esMultiple()) {
         e.preventDefault(); alert('Seleccioná un contenedor.'); return;
     }
     const clienteId = document.getElementById('inputClienteId')?.value;

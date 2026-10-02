@@ -64,6 +64,41 @@
   }
 }
 
+// Selección múltiple en "Nuevo alquiler": barra con los elegidos + filas por contenedor
+.seleccion-bar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 0.6rem 0.9rem;
+  background: #fff;
+  border: 1px solid $accent;
+  border-radius: $radius-md;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+
+  #seleccionTexto { font-weight: 600; margin-right: auto; }
+}
+
+.multi-cont-lista { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.multi-cont-fila {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+
+  &__num { font-weight: 700; min-width: 3.5rem; align-self: center; }
+
+  label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; }
+}
+
 // resumen sidebar
 .alquiler-resumen {
   background: $bg-card-alt;
