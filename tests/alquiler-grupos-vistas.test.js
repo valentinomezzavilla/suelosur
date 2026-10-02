@@ -18,4 +18,38 @@ describe('vistas de alquileres agrupados', () => {
     assert.match(html, /name="cobro_modo" value="alquiler"/)
     assert.match(html, /id="rowCheckFinalizado"/)
   })
+
+  const grupoEjemplo = {
+    id: 9, cobro_modo: 'alquiler', abiertas: 1,
+    ops: [
+      { id: 101, nro_op: 261, estado: 'entregado', id_contenedor: 1, numero_contenedor: 19, contenedor_estado: 'en_alquiler', dias_restantes: 3, abierta: true, cobrada: false },
+      { id: 102, nro_op: 262, estado: 'entregado', id_contenedor: 2, numero_contenedor: 20, contenedor_estado: null, dias_restantes: null, abierta: false, cobrada: false },
+    ],
+  }
+
+  it('panel del grupo: OP, contenedores, estados y aviso de cobro por alquiler', async () => {
+    const html = await renderVista('partials/alquiler_grupo', { grupo: grupoEjemplo, opActualId: 101 })
+    assert.match(html, /Alquiler agrupado — 2 contenedores · cobro por alquiler/)
+    assert.match(html, /OP-0261/)
+    assert.match(html, /OP-0262/)
+    assert.match(html, /En el domicilio/)
+    assert.match(html, /Retirado/)
+    assert.match(html, /\(esta\)/)
+    assert.match(html, /Faltan retirar 1\./)
+  })
+
+  it('listado: insignia de grupo solo en los alquileres agrupados', async () => {
+    const fila = (extra) => ({
+      id: 101, nro_op: 261, nro_remito: 5, cliente_nombre: 'Cliente', numero_contenedor: 19,
+      domicilio_entrega: 'San Lorenzo 501', obra: null, plazo_alquiler: 4, fecha_entrega_real: '2026-09-28',
+      fecha_entrega_planificada: '2026-09-28', fecha_fin_estimada: '2026-10-08', dias_restantes: 6,
+      estado: 'entregado', contenedor_estado: 'en_alquiler', id_grupo: null, grupo_cant: 0, ...extra,
+    })
+    const html = await renderVista('pages/alquileres/index', {
+      grupos: { porFinalizar: [], programados: [], actuales: [fila({ id_grupo: 9, grupo_cant: 2 }), fila({ id: 102, nro_op: 262 })] },
+      filtros: { q: '' },
+    })
+    assert.equal((html.match(/Grupo · 2 contenedores/g) || []).length, 1)
+    assert.match(html, /href="\/alquileres\/contenedores\/101#grupo"/)
+  })
 })

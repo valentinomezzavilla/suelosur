@@ -121,4 +121,36 @@ describe('alta de alquileres en el modelo', () => {
     assert.deepEqual(await geo(op2), { lat: -31.41, geo_estado: 'ok' })
     assert.deepEqual(await geo(op3), { lat: null, geo_estado: null })
   })
+
+  it('grupoDe: OP del grupo con abierta/cobrada; obtener y listarPorEstado lo reflejan', async () => {
+    const conts = await datos.crearContenedores(2)
+    const r = await AlquileresModel.crearGrupo({
+      ...comunes, cobro_modo: 'alquiler', en_curso: true,
+      contenedores: conts.map(id_contenedor => ({ id_contenedor, plazo_alquiler: 4, precio_alquiler: 100 })),
+    })
+    const [op1, op2] = r.ops.map(o => o.id)
+    let g = await AlquileresModel.grupoDe(op1)
+    assert.equal(g.id, r.id_grupo)
+    assert.equal(g.cobro_modo, 'alquiler')
+    assert.deepEqual(g.ops.map(o => o.id), [op1, op2])
+    assert.deepEqual(g.ops.map(o => [o.abierta, o.cobrada, o.contenedor_estado]), [[true, false, 'en_alquiler'], [true, false, 'en_alquiler']])
+    assert.equal(g.abiertas, 2)
+
+    await AlquileresModel.devolverAPlanta(op1)
+    g = await AlquileresModel.grupoDe(op2)
+    assert.deepEqual(g.ops.map(o => o.abierta), [false, true])
+    assert.equal(g.abiertas, 1)
+
+    assert.equal((await AlquileresModel.obtener(op2)).grupo.id, r.id_grupo)
+    const [suelto] = await datos.crearContenedores(1)
+    const s = await AlquileresModel.crearEnCurso({ ...comunes, id_contenedor: suelto, plazo_alquiler: 4, precio_alquiler: 100 })
+    assert.equal((await AlquileresModel.obtener(s.id)).grupo, null)
+
+    const { actuales, porFinalizar } = await AlquileresModel.listarPorEstado({})
+    const filas = [...actuales, ...porFinalizar]
+    const fila2 = filas.find(f => f.id === op2)
+    const filaSuelta = filas.find(f => f.id === s.id)
+    assert.deepEqual([fila2.id_grupo, fila2.grupo_cant], [r.id_grupo, 2])
+    assert.deepEqual([filaSuelta.id_grupo, filaSuelta.grupo_cant], [null, 0])
+  })
 })

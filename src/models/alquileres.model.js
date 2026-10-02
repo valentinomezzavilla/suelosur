@@ -35,6 +35,16 @@ const SQL_MOV_ALQUILER_OP = `
   ORDER BY id_op_contenedor, fecha_movimiento ASC
 `
 
+// Una OP de un alquiler agrupado está ABIERTA mientras no terminó su ciclo: todavía sin
+// contenedor (no se entregó), o su contenedor sigue con un movimiento de ESTA OP que no
+// es 'disponible'. Si el contenedor volvió a planta, o pasó directo al próximo alquiler
+// encadenado (su último movimiento es de otra OP), la OP está cerrada. Un contenedor
+// repuesto ("Reponer") cuenta por la unidad nueva. Las anuladas nunca están abiertas.
+// Alias: op = op_encabezado, oc = op_detalle_contenedor, um = último movimiento del
+// contenedor (SQL_ULTIMO_MOV unido por id_contenedor).
+const SQL_OP_ABIERTA = `(op.estado <> 'anulado' AND (oc.id_contenedor IS NULL
+  OR (um.id_op_contenedor = oc.id AND um.estado_paso <> 'disponible')))`
+
 // plazo_alquiler NULL = alquiler sin fecha de fin definida. Hay que distinguirlo del
 // "no vino nada" (que toma el default), por eso no alcanza con `parseInt(x) || n`.
 function normalizarPlazo(plazo, porDefecto) {
@@ -77,6 +87,8 @@ const AlquileresModel = {
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
+             op.id_grupo,
+             (SELECT COUNT(*) FROM op_encabezado g WHERE g.id_grupo = op.id_grupo AND g.estado <> 'anulado')::int AS grupo_cant,
              ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega,
              oc.plazo_alquiler, oc.precio_alquiler, oc.id_contenedor,
@@ -184,7 +196,35 @@ const AlquileresModel = {
       op.movimientos = []; op.estadoContenedor = null; op.diasEnDomicilio = null
       op.fechaFinAlquiler = null; op.diasRestantes = null
     }
+    op.grupo = op.id_grupo ? await this.grupoDe(op.id) : null
     return op
+  },
+
+  // Alquiler agrupado al que pertenece la OP (null si es de un solo contenedor), con todas
+  // sus OP: estado, contenedor, días restantes, si está abierta y si ya se cobró.
+  async grupoDe(id_op) {
+    const g = (await query(`
+      SELECT ag.id, ag.cobro_modo FROM op_encabezado op
+      JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+      WHERE op.id = ?
+    `, [id_op])).rows[0]
+    if (!g) return null
+    g.ops = (await query(`
+      SELECT op.id, op.nro_op, op.estado, oc.id_contenedor, cont.numero_contenedor,
+             CASE WHEN um.id_op_contenedor = oc.id THEN um.estado_paso END AS contenedor_estado,
+             (sumar_dias_habiles(COALESCE(NULLIF(LEFT(op.fecha_entrega_planificada, 10), '')::date, LEFT(ma.fecha_alquiler, 10)::date), oc.plazo_alquiler) - CURRENT_DATE) AS dias_restantes,
+             ${SQL_OP_ABIERTA} AS abierta,
+             EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrada
+      FROM op_encabezado op
+      JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
+      LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+      LEFT JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = oc.id_contenedor
+      LEFT JOIN (${SQL_MOV_ALQUILER_OP}) ma ON ma.id_op_contenedor = oc.id
+      WHERE op.id_grupo = ?
+      ORDER BY op.id
+    `, [g.id])).rows
+    g.abiertas = g.ops.filter(o => o.abierta).length
+    return g
   },
 
   // ¿El contenedor está ocupado? (último movimiento no 'disponible' O hay una op activa sin cerrar)

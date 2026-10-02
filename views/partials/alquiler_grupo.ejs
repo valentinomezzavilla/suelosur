@@ -1,0 +1,47 @@
+<%#
+  Panel "Alquiler agrupado" del detalle de una OP.
+  Locals: grupo (AlquileresModel.grupoDe) y opActualId (la OP que se está viendo).
+%>
+<%
+  const ETIQUETA = { pendiente_despacho: 'Pendiente', despachado: 'En camino', en_alquiler: 'En el domicilio', pendiente_retiro: 'Para retirar' }
+  const estadoDe = (o) => o.estado === 'anulado' ? 'Anulado'
+    : !o.abierta ? 'Retirado'
+    : !o.id_contenedor ? 'Sin contenedor'
+    : (ETIQUETA[o.contenedor_estado] || o.contenedor_estado || '—')
+  const activas = grupo.ops.filter(o => o.estado !== 'anulado').length
+%>
+<div class="card shadow-sm mb-3" id="grupo">
+  <div class="card-header-orange px-3 py-2">🧩 Alquiler agrupado — <%= activas %> contenedor<%= activas === 1 ? '' : 'es' %> · cobro por <%= grupo.cobro_modo %></div>
+  <div class="card-body p-0">
+    <table class="table-modern mb-0">
+      <thead>
+        <tr>
+          <th>OP</th>
+          <th class="text-center">Contenedor</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Días restantes</th>
+          <th class="text-center">Cobro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% grupo.ops.forEach(o => { const esta = Number(o.id) === Number(opActualId) %>
+          <tr<%- esta ? ' class="fw-semibold"' : '' %>>
+            <td>
+              <a href="/alquileres/contenedores/<%= o.id %>" class="text-decoration-none text-orange">OP-<%= String(o.nro_op).padStart(4, '0') %></a>
+              <%= esta ? '(esta)' : '' %>
+            </td>
+            <td class="text-center"><%= o.numero_contenedor ? 'N° ' + o.numero_contenedor : '—' %></td>
+            <td class="text-center"><%= estadoDe(o) %></td>
+            <td class="text-center"><%= o.abierta && o.dias_restantes != null ? o.dias_restantes + 'd' : '—' %></td>
+            <td class="text-center"><%= o.cobrada ? 'Cobrado' : (o.estado === 'anulado' ? '—' : 'Pendiente') %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% if (grupo.cobro_modo === 'alquiler') { %>
+      <p class="form-hint px-3 py-2 mb-0">
+        Cobro por alquiler: se cobra todo junto al retirar el último contenedor.<%= grupo.abiertas ? ` Faltan retirar ${grupo.abiertas}.` : '' %>
+      </p>
+    <% } %>
+  </div>
+</div>

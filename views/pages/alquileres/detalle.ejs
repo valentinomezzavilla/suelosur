@@ -247,6 +247,10 @@
   </div>
 </div>
 
+<% if (alquiler.grupo) { %>
+  <%- include('../../partials/alquiler_grupo', { grupo: alquiler.grupo, opActualId: alquiler.id }) %>
+<% } %>
+
 <!-- Timeline de movimientos -->
 <% if (alquiler.movimientos?.length) { %>
 <div class="card shadow-sm">
