@@ -188,9 +188,10 @@ const AlquileresModel = {
   },
 
   // ¿El contenedor está ocupado? (último movimiento no 'disponible' O hay una op activa sin cerrar)
-  async contenedorOcupado(id_contenedor) {
+  // `q` permite hacer el chequeo dentro de la transacción del alta (crearGrupo).
+  async contenedorOcupado(id_contenedor, q = query) {
     if (!id_contenedor) return false
-    const r = (await query(`
+    const r = (await q(`
       SELECT 1 FROM (
         SELECT DISTINCT ON (id_contenedor) id_contenedor, estado_paso
         FROM movimiento_contenedor ORDER BY id_contenedor, fecha_movimiento DESC, id DESC
@@ -203,27 +204,83 @@ const AlquileresModel = {
     return !!r
   },
 
-  async crear({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_entrega_planificada, id_chofer, id_camion, obra, nro_remito }) {
-    if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
+  // Inserta UNA operación de alquiler de contenedor (encabezado + detalle + movimiento)
+  // con el cliente de transacción `q`. La usan el alta de un contenedor (crear,
+  // crearEnCurso) y la de varios (crearGrupo), para que las dos hagan exactamente lo mismo.
+  //  - enCurso = false → 'pendiente', contenedor reservado ('pendiente_despacho').
+  //  - enCurso = true  → 'entregado', contenedor ya en el domicilio ('en_alquiler'); el
+  //    inicio real queda en fecha_entrega_planificada (y en fecha_emision).
+  async _insertarAlquiler(q, d, { enCurso = false } = {}) {
+    const { nro } = (await q(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
+    const { rows } = enCurso
+      ? await q(`
+          INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_emision, fecha_entrega_planificada, obra, id_grupo)
+          VALUES (?, ?, 'C', ?, ?, 'entregado', ?, ?, ?, ?, ?, ?) RETURNING id
+        `, [d.id_cliente, d.id_administrativo, nro, d.nro_remito, d.metodo_pago || null, d.observaciones || '',
+            d.fecha_inicio || null, d.fecha_inicio || null, d.obra || null, d.id_grupo || null])
+      : await q(`
+          INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, id_chofer, id_camion, obra, id_grupo)
+          VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?, ?) RETURNING id
+        `, [d.id_cliente, d.id_administrativo, nro, d.nro_remito, d.metodo_pago || null, d.observaciones || '',
+            d.fecha_entrega_planificada || null, d.id_chofer || null, d.id_camion || null, d.obra || null, d.id_grupo || null])
+    const id_op = rows[0].id
+    const { rows: detRows } = await q(`
+      INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
+    `, [id_op, d.id_contenedor || null, d.domicilio_entrega || '', d.domicilio_calle || null, d.domicilio_numero || null,
+        d.zona_entrega || '', normalizarPlazo(d.plazo_alquiler, 5), parseFloat(d.precio_alquiler) || 0, d.metodo_pago || null])
+    if (d.id_contenedor) {
+      await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, ?, ?)`,
+        [d.id_contenedor, detRows[0].id,
+         enCurso ? 'en_alquiler' : 'pendiente_despacho',
+         enCurso ? 'Alquiler en curso cargado — el contenedor ya estaba en el domicilio' : 'Contenedor reservado para despacho'])
+    }
+    return { id: id_op, nro_op: nro, id_oc: detRows[0].id }
+  },
+
+  async crear(datos) {
+    if (datos.id_contenedor && await this.contenedorOcupado(datos.id_contenedor)) {
       throw new Error('Ese contenedor ya está alquilado o reservado en otra operación. Para programar el próximo alquiler, usá "próximos a finalizar".')
     }
-    const { nro }         = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const nro_rem = nro_remito || nroSiguiente
+    const nro_rem = datos.nro_remito || nroSiguiente
     return await transaction(async (q) => {
-      const { rows } = await q(`INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_entrega_planificada, id_chofer, id_camion, obra) VALUES (?, ?, 'C', ?, ?, 'pendiente', ?, ?, ?, ?, ?, ?) RETURNING id`,
-        [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '', fecha_entrega_planificada || null, id_chofer || null, id_camion || null, obra || null])
-      const id_op = rows[0].id
-      const { rows: detRows } = await q(`INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`,
-        [id_op, id_contenedor || null,
-         domicilio_entrega || '', domicilio_calle || null, domicilio_numero || null,
-         zona_entrega || '', normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0,
-         metodo_pago || null])
-      if (id_contenedor) {
-        await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'pendiente_despacho', 'Contenedor reservado para despacho')`,
-          [id_contenedor, detRows[0].id])
+      const r = await this._insertarAlquiler(q, { ...datos, nro_remito: nro_rem }, { enCurso: false })
+      return { id: r.id, nro_op: r.nro_op, nro_remito: nro_rem }
+    })
+  },
+
+  // Alquiler de VARIOS contenedores: un grupo y una OP por contenedor, todo en una sola
+  // transacción. Si un contenedor ya no se puede reservar (o está repetido), no se crea
+  // ninguna OP. Comparten cliente, dirección, remito, método de pago y fechas; cada
+  // contenedor trae su plazo y su precio. Las OP quedan en orden de id: la primera es la
+  // principal del grupo (ahí se ancla el cargo de cuenta corriente del cobro por alquiler).
+  async crearGrupo({ cobro_modo, en_curso = false, contenedores, nro_remito, ...comunes }) {
+    if (!Array.isArray(contenedores) || contenedores.length < 2) {
+      throw new Error('Un alquiler agrupado necesita al menos dos contenedores.')
+    }
+    const ids = contenedores.map(c => String(c.id_contenedor))
+    if (new Set(ids).size !== ids.length) throw new Error('Elegiste el mismo contenedor más de una vez.')
+    const base = { ...comunes, fecha_entrega_planificada: comunes.fecha_entrega_planificada ?? comunes.fecha_inicio }
+    return await transaction(async (q) => {
+      for (const c of contenedores) {
+        if (await this.contenedorOcupado(c.id_contenedor, q)) {
+          const n = (await q(`SELECT numero_contenedor FROM contenedores WHERE id = ?`, [c.id_contenedor])).rows[0]?.numero_contenedor
+          throw new Error(`El contenedor N° ${n ?? c.id_contenedor} ya está alquilado o reservado en otra operación. No se creó ningún alquiler.`)
+        }
       }
-      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+      const nro_rem = nro_remito || (await q(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS n FROM op_encabezado`)).rows[0].n
+      const { id: id_grupo } = (await q(`INSERT INTO alquiler_grupos (cobro_modo) VALUES (?) RETURNING id`,
+        [cobro_modo === 'alquiler' ? 'alquiler' : 'contenedor'])).rows[0]
+      const ops = []
+      for (const c of contenedores) {
+        const r = await this._insertarAlquiler(q, {
+          ...base, nro_remito: nro_rem, id_grupo,
+          id_contenedor: c.id_contenedor, plazo_alquiler: c.plazo_alquiler, precio_alquiler: c.precio_alquiler,
+        }, { enCurso: !!en_curso })
+        ops.push({ ...r, id_contenedor: c.id_contenedor, precio_alquiler: parseFloat(c.precio_alquiler) || 0 })
+      }
+      return { id_grupo, nro_remito: nro_rem, ops }
     })
   },
 
@@ -551,32 +608,15 @@ const AlquileresModel = {
   // el contenedor, sin pasar por despacho ni generar tareas de chofer.
   // El movimiento se registra con la fecha de hoy (es cuando se toma conocimiento);
   // el inicio real del alquiler queda en fecha_entrega_planificada.
-  async crearEnCurso({ id_cliente, id_administrativo, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, id_contenedor, metodo_pago, observaciones, fecha_inicio, obra, nro_remito }) {
-    if (id_contenedor && await this.contenedorOcupado(id_contenedor)) {
+  async crearEnCurso(datos) {
+    if (datos.id_contenedor && await this.contenedorOcupado(datos.id_contenedor)) {
       throw new Error('Ese contenedor ya está alquilado o reservado en otra operación.')
     }
-    const { nro }         = (await query(`SELECT ${SQL_SIGUIENTE_NRO_OP} AS nro`)).rows[0]
     const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
-    const nro_rem = nro_remito || nroSiguiente
+    const nro_rem = datos.nro_remito || nroSiguiente
     return await transaction(async (q) => {
-      const { rows } = await q(`
-        INSERT INTO op_encabezado (id_cliente, id_administrativo, tipo_op, nro_op, nro_remito, estado, metodo_pago, observaciones, fecha_emision, fecha_entrega_planificada, obra)
-        VALUES (?, ?, 'C', ?, ?, 'entregado', ?, ?, ?, ?, ?)
-        RETURNING id
-      `, [id_cliente, id_administrativo, nro, nro_rem, metodo_pago || null, observaciones || '',
-          fecha_inicio || null, fecha_inicio || null, obra || null])
-      const id_op = rows[0].id
-      const { rows: detRows } = await q(`
-        INSERT INTO op_detalle_contenedor (id_orden_pedido, id_contenedor, domicilio_entrega, domicilio_calle, domicilio_numero, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id
-      `, [id_op, id_contenedor || null, domicilio_entrega || '',
-          domicilio_calle || null, domicilio_numero || null, zona_entrega || '',
-          normalizarPlazo(plazo_alquiler, 5), parseFloat(precio_alquiler) || 0, metodo_pago || null])
-      if (id_contenedor) {
-        await q(`INSERT INTO movimiento_contenedor (id_contenedor, id_op_contenedor, estado_paso, observaciones) VALUES (?, ?, 'en_alquiler', 'Alquiler en curso cargado — el contenedor ya estaba en el domicilio')`,
-          [id_contenedor, detRows[0].id])
-      }
-      return { id: id_op, nro_op: nro, nro_remito: nro_rem }
+      const r = await this._insertarAlquiler(q, { ...datos, nro_remito: nro_rem }, { enCurso: true })
+      return { id: r.id, nro_op: r.nro_op, nro_remito: nro_rem }
     })
   },
 
