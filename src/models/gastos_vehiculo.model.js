@@ -1,6 +1,7 @@
 'use strict'
 // Gastos del vehículo: seguros, impuestos, peajes, estacionamientos, multas, otros.
 const { query } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 
 const GastosVehiculoModel = {
 
@@ -19,7 +20,7 @@ const GastosVehiculoModel = {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `, [id_vehiculo, categoria, descripcion || '', parseFloat(monto) || 0,
-        fecha || new Date().toISOString().slice(0, 10), vencimiento || null, estado || 'pagado', archivo || null])
+        fecha || hoyISO(), vencimiento || null, estado || 'pagado', archivo || null])
     return rows[0].id
   },
 

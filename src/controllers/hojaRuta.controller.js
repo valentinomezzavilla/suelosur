@@ -1,5 +1,6 @@
 'use strict'
 const { query } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 const { nombreClienteSQL } = require('../utils/nombreCliente')
 const VentasModel = require('../models/ventas.model')
 const AlquileresModel = require('../models/alquileres.model')
@@ -50,7 +51,7 @@ async function tieneEnCurso(empId) {
 function esFutura(fechaISO) {
   if (!fechaISO) return false
   const f = String(fechaISO).slice(0, 10)
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyISO()
   return f > hoy
 }
 

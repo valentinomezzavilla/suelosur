@@ -21,7 +21,7 @@ const MESES       = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Se
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 const esVerdadero = (v) => v === true || v === 1 || ['1', 'on', 'true'].includes(String(v))
-const hoyISO = () => new Date().toISOString().slice(0, 10)
+const { hoyISO } = require('../utils/fecha')
 const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 const tipoDe = (op) => op.tipo_op === 'C' ? 'contenedor'
   : op.tipo_op === 'MA' ? 'maquinaria'
@@ -252,7 +252,7 @@ module.exports = {
       await q(`
         UPDATE op_encabezado
            SET facturado = 1, factura_id = ?, nro_factura = ?, fecha_factura = ?, facturado_por = ?,
-               facturado_en = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')
+               facturado_en = ahora_local()
          WHERE id = ANY(?::bigint[])
       `, [facturaId, numero, fecha, usuario || null, opIds])
       return facturaId

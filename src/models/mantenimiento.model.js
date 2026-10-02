@@ -1,6 +1,7 @@
 'use strict'
 // Mantenimiento de vehículos (preventivo/correctivo) + reglas por km/fecha.
 const { query, transaction } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 
 const MantenimientoModel = {
 
@@ -20,7 +21,7 @@ const MantenimientoModel = {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [id_vehiculo, categoria || 'preventivo', tipo_service || 'preventivo',
-          fecha || new Date().toISOString().slice(0, 10), parseFloat(costo) || 0,
+          fecha || hoyISO(), parseFloat(costo) || 0,
           parseInt(km) || 0, proxima_fecha || null, proximo_km ? parseInt(proximo_km) : null,
           taller || '', descripcion || '', observaciones || '', archivo || null])
       const k = parseInt(km) || 0

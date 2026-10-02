@@ -1,6 +1,7 @@
 'use strict'
 // Circuitos logísticos — agrupan paradas (operaciones) para un chofer + camión en una fecha.
 const { query, transaction } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 const { nombreClienteSQL } = require('../utils/nombreCliente')
 const { textoDestino } = require('../utils/destino')
 
@@ -45,7 +46,7 @@ const CircuitosModel = {
 
   async crear({ fecha, id_empleado, id_camion, observaciones }) {
     const { rows } = await query(`INSERT INTO circuitos (fecha, id_empleado, id_camion, estado, observaciones) VALUES (?, ?, ?, 'borrador', ?) RETURNING id`,
-      [fecha || new Date().toISOString().slice(0, 10), id_empleado || null, id_camion || null, observaciones || ''])
+      [fecha || hoyISO(), id_empleado || null, id_camion || null, observaciones || ''])
     return rows[0].id
   },
 

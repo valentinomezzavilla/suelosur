@@ -93,7 +93,7 @@ const EmpleadosModel = {
 
   // Baja lógica con motivo / reingreso
   async darBaja(id, motivo) {
-    await query(`UPDATE empleados SET activo = 0, estado_laboral = 'baja', fecha_baja = LEFT(to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), 10), motivo_baja = ? WHERE id = ?`,
+    await query(`UPDATE empleados SET activo = 0, estado_laboral = 'baja', fecha_baja = to_char(CURRENT_DATE, 'YYYY-MM-DD'), motivo_baja = ? WHERE id = ?`,
       [motivo || '', id])
   },
 

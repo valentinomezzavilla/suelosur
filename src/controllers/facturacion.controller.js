@@ -9,7 +9,7 @@ const { fmtFecha } = require('../utils/fecha')
 const ENTIDAD = 'operacion'
 const volver = (tab, extra = '') => `/facturacion?tab=${tab}${extra}`
 const RUTA_CONFIG = '/facturacion/configuracion'
-const hoyISO = () => new Date().toISOString().slice(0, 10)
+const { hoyISO } = require('../utils/fecha')
 const fechaValida = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? v : hoyISO()
 const errorUsuario = (msg) => Object.assign(new Error(msg), { usuario: true })
 const nroOp = (n) => 'OP-' + String(n).padStart(4, '0')

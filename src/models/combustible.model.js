@@ -1,6 +1,7 @@
 'use strict'
 // Combustible — cargas + consumo/rendimiento por vehículo.
 const { query, transaction } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 
 const CombustibleModel = {
 
@@ -24,7 +25,7 @@ const CombustibleModel = {
         VALUES (?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
-          parseInt(km_al_cargar) || 0, estacion || null, fecha || new Date().toISOString().slice(0, 10)])
+          parseInt(km_al_cargar) || 0, estacion || null, fecha || hoyISO()])
       // Actualizar km del vehículo si la carga reporta un km mayor
       const km = parseInt(km_al_cargar) || 0
       if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])

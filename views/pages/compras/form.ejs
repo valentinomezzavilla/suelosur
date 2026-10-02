@@ -91,7 +91,7 @@
           </div>
           <div class="col-md-4">
             <label class="form-label">Período</label>
-            <input type="month" name="periodo" id="periodo" class="form-control" value="<%= new Date().toISOString().slice(0,7) %>">
+            <input type="month" name="periodo" id="periodo" class="form-control" value="<%= hoyISO().slice(0, 7) %>">
           </div>
         </div>
       </div>
@@ -169,7 +169,7 @@
       <div class="row g-3 mb-3">
         <div class="col-md-4">
           <label class="form-label">Fecha</label>
-          <input type="date" name="fecha" class="form-control" value="<%= new Date().toISOString().slice(0,10) %>">
+          <input type="date" name="fecha" class="form-control" value="<%= hoyISO() %>">
         </div>
         <div class="col-md-4">
           <label class="form-label" id="lblMonto">Monto *</label>

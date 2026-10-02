@@ -41,7 +41,7 @@ app.use(flash())
 
 // ── Variables globales para todas las vistas ─────────────────────
 const { icon } = require('./config/icons')
-const { fmtFecha, fmtFechaHora } = require('./utils/fecha')
+const { fmtFecha, fmtFechaHora, hoyISO } = require('./utils/fecha')
 app.use((req, res, next) => {
   res.locals.user    = req.session.user || null
   res.locals.icon    = icon
@@ -51,6 +51,7 @@ app.use((req, res, next) => {
   // Formato único de fechas: DD/MM/AAAA (acepta ISO, datetime y dd-mm-aaaa)
   res.locals.formatFecha = fmtFecha
   res.locals.formatFechaHora = fmtFechaHora
+  res.locals.hoyISO = hoyISO
   res.locals.sumarDiasHabiles = require('./utils/diasHabiles').sumarDiasHabiles
   res.locals.codigoTx = require('./models/transacciones.model').codigo
   // Notificaciones in-app: conteo de alertas para el badge del sidebar

@@ -17,7 +17,7 @@ const { leerRemito, opConRemito } = require('../utils/remito')
 function fechaRetroactiva(fecha) {
   if (!fecha) return null
   const f = String(fecha).slice(0, 10)
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyISO()
   return f < hoy ? f : null
 }
 
@@ -564,7 +564,7 @@ const VentasController = {
     try {
       const ReportesModel = require('../models/reportes.model')
       const { generarLibroVentasPDF } = require('../utils/pdfLibroVentas')
-      const { fmtFecha } = require('../utils/fecha')
+      const { fmtFecha, hoyISO } = require('../utils/fecha')
       const { desde, hasta, clienteId } = req.query
       const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
       let clienteLabel = null
@@ -584,7 +584,7 @@ const VentasController = {
     try {
       const ReportesModel = require('../models/reportes.model')
       const { generarExcel } = require('../utils/excel')
-      const { fmtFecha } = require('../utils/fecha')
+      const { fmtFecha, hoyISO } = require('../utils/fecha')
       const { desde, hasta, clienteId } = req.query
       const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
       // La columna Cliente solo tiene sentido si el libro mezcla varios clientes — si ya

@@ -1,5 +1,6 @@
 'use strict'
 const path = require('path')
+const { hoyISO } = require('../utils/fecha')
 const fs   = require('fs')
 const { query } = require('../config/db')
 const EmpleadosModel  = require('../models/empleados.model')
@@ -302,7 +303,7 @@ const ChoferesController = {
     try {
       const emp = await EmpleadosModel.obtener(req.params.id)
       if (!emp) { req.flash('error', 'Empleado no encontrado.'); return res.redirect(back) }
-      const hoy = new Date().toISOString().slice(0, 10)
+      const hoy = hoyISO()
       // Queda en la ficha del empleado y en el libro de compras / pagos (con recibo)
       await PagosModel.registrar({
         id_empleado: emp.id, tipo: 'sueldo', periodo: hoy.slice(0, 7),
@@ -310,7 +311,7 @@ const ChoferesController = {
         descripcion: 'Pago registrado al resolver alerta de vencimiento',
         id_usuario: uid(req), origen: 'alerta',
       })
-      const base = emp.fecha_vencimiento_pago ? new Date(emp.fecha_vencimiento_pago + 'T00:00:00') : new Date()
+      const base = new Date(String(emp.fecha_vencimiento_pago || hoyISO()).slice(0, 10) + 'T00:00:00')
       base.setMonth(base.getMonth() + 1)
       const proximo = base.toISOString().slice(0, 10)
       await query(`UPDATE empleados SET fecha_vencimiento_pago = ? WHERE id = ?`, [proximo, emp.id])

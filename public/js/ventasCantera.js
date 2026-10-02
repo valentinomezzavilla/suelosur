@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // La fecha arranca en hoy pero se puede mover hacia atrás para cargar ventas viejas
     const fechaCantera = document.getElementById('fechaCantera');
-    if (fechaCantera && !fechaCantera.value) fechaCantera.value = new Date().toISOString().slice(0, 10);
+    if (fechaCantera && !fechaCantera.value) { const d = new Date(), p = (n) => String(n).padStart(2, '0'); fechaCantera.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
 
     renderCarrito();
 });

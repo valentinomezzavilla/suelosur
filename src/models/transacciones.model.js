@@ -30,7 +30,7 @@ const TransaccionesModel = {
     // fecha opcional: si no se pasa, usa la fecha/hora actual (carga histórica la puede fijar en el pasado).
     const { rows } = await query(`
       INSERT INTO transacciones (tipo, numero, id_op_encabezado, nro_remito, cliente_id, cliente, monto, descripcion, metodo_pago, fecha)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
       RETURNING id
     `, [tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
         cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo', fecha || null])

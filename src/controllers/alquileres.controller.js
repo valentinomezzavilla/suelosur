@@ -1,5 +1,6 @@
 'use strict'
 const AlquileresModel        = require('../models/alquileres.model')
+const { hoyISO } = require('../utils/fecha')
 const TransaccionesModel     = require('../models/transacciones.model')
 const ClientesModel          = require('../models/clientes.model')
 const OperacionesModel        = require('../models/operaciones.model')
@@ -107,9 +108,9 @@ const AlquileresController = {
       const sinFechaFin = historicoEnCurso
         || req.body.sin_fecha_fin === '1' || req.body.sin_fecha_fin === 'on'
       // Inicio anterior a hoy = el alquiler ya venía en curso, se carga como entregado.
-      const hoyISO = new Date().toISOString().slice(0, 10)
+      const hoy = hoyISO()
       const esEnCurso = historicoEnCurso
-        || (!esHistorico && !!fechaInicio && String(fechaInicio).slice(0, 10) < hoyISO)
+        || (!esHistorico && !!fechaInicio && String(fechaInicio).slice(0, 10) < hoy)
       const fechaFinReal = sinFechaFin ? null : (fechaFin || null)
 
       // El plazo lo fija que el cliente tenga cuenta corriente habilitada (la fecha de

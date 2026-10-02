@@ -139,7 +139,7 @@ const MaquinariaModel = {
     await query(`
       INSERT INTO movimiento_maquinaria
         (id_maquinaria, id_op_maquinaria, id_operario, id_camion, fecha_movimiento, estado_paso, horas_trabajadas, km_registrados, observaciones)
-      VALUES (?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')), ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, COALESCE(?, ahora_local()), ?, ?, ?, ?)
     `, [id_maquinaria, id_op_maquinaria || null,
         id_operario || null, id_camion || null, fecha_movimiento || null,
         estado_paso, parseFloat(horas_trabajadas) || 0,

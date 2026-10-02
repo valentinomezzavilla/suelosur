@@ -137,7 +137,7 @@ module.exports = {
 
   async guardar({ cuit, condicion_iva, pto_vta, entorno, certPem, keyPem, quitarCredenciales }, usuario) {
     const sets = ['cuit = ?', 'condicion_iva = ?', 'pto_vta = ?', 'entorno = ?', 'updated_by = ?',
-      `updated_at = to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')`]
+      `updated_at = ahora_local()`]
     const vals = [cuit || null, condicion_iva, pto_vta || null, entorno, usuario || null]
     let nuevaHuella = null
     if (quitarCredenciales) {

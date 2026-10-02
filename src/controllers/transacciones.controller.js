@@ -2,7 +2,7 @@
 const TransaccionesModel = require('../models/transacciones.model')
 const ClientesModel = require('../models/clientes.model')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
-const { fmtFecha } = require('../utils/fecha')
+const { fmtFecha, hoyISO } = require('../utils/fecha')
 
 const TIPOS = ['Venta Cantera', 'Venta Viaje', 'Alquiler', 'Maquinaria', 'Ajuste']
 const POR_PAGINA = 20
@@ -144,7 +144,7 @@ const TransaccionesController = {
         filtros.montoMax ? `Monto hasta $${Number(filtros.montoMax).toLocaleString('es-AR')}` : null,
       ].filter(Boolean).join(' · ')
       const titulo = 'Reporte de transacciones'
-      const hoy = new Date().toISOString().slice(0, 10)
+      const hoy = hoyISO()
       const nombreArchivo = `transacciones-${periodo.desde || 'inicio'}-a-${periodo.hasta || hoy}`
 
       if (formato === 'pdf') {

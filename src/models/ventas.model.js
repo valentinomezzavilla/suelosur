@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { hoyISO } = require('../utils/fecha')
 const { nombreClienteSQL } = require('../utils/nombreCliente')
 const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
@@ -371,7 +372,7 @@ const VentasModel = {
 
   // ── Vistas de cantera y viajes (compatibilidad Seminario) ─────
   async listarViajesPendientesHoy() {
-    const hoy = new Date().toISOString().slice(0, 10)
+    const hoy = hoyISO()
     return (await query(`
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
              op.domicilio_calle, op.metodo_pago, op.observaciones,
@@ -464,12 +465,12 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
     return cambio
   }
   // Venta cargada con fecha pasada: el cargo va en esa fecha (igual que su transacción)
-  const hoy = new Date().toISOString().slice(0, 10)
+  const hoy = hoyISO()
   const fecha = String(op.fecha_emision || '').slice(0, 10)
   const createdAt = fecha && fecha < hoy ? `${fecha} 12:00:00` : null
   await q(`
     INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado, created_at)
-    VALUES (?, ?, ?, ?, ?, COALESCE(?, to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS')))
+    VALUES (?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
   `, [op.id_cliente, tipoCargo, descripcion, monto, op.id, createdAt])
   await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
   return `cargo creado por ${-monto}`
