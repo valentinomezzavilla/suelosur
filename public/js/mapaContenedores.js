@@ -110,8 +110,9 @@
     const { ubicados = [], sinUbicar = [] } = data
     sinUbicarPorId = Object.fromEntries(sinUbicar.map(it => [String(it.id), it]))
 
-    ubicados.forEach(it => {
-      L.marker([it.lat, it.lng], { icon: icono(it), title: contTxt(it) })
+    // Los que comparten punto (ej. un alquiler agrupado) se separan unos metros al dibujarlos.
+    MapaUtils.separarSuperpuestos(ubicados).forEach(it => {
+      L.marker([it.latDibujo, it.lngDibujo], { icon: icono(it), title: contTxt(it) })
         .bindPopup(popup(it), { maxWidth: 280 })
         .addTo(capa)
     })

@@ -535,7 +535,7 @@ const AlquileresController = {
     res.render('pages/alquileres/mapa', {
       titulo: 'Mapa de Contenedores',
       puedeEditar: req.session.user?.rol !== 'chofer',
-      scripts: ['/js/mapaContenedores.js'],
+      scripts: ['/js/mapaUtils.js', '/js/mapaContenedores.js'],
     })
   },
 
