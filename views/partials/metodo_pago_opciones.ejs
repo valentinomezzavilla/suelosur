@@ -2,6 +2,7 @@
   Opciones del método de pago al asignar el precio de un alquiler (Cobranzas → Asignar precio).
   Locals: conCC (el cliente tiene la cuenta corriente habilitada) y saldoFavor (su saldo a favor).
   Cuenta corriente y saldo a favor solo se ofrecen a quien los tiene; el servidor lo valida igual.
+  "A convenir" fija el precio y deja el método para el retiro (o Cobranzas → A convenir).
 %>
 <option value="">Método de pago…</option>
 <option value="efectivo">Efectivo</option>
@@ -9,3 +10,4 @@
 <option value="cheque">Cheque</option>
 <% if (conCC) { %><option value="cuenta_corriente">Cuenta corriente</option><% } %>
 <% if (saldoFavor > 0) { %><option value="saldo_a_favor">Usar saldo a favor del cliente ($<%= Math.round(saldoFavor).toLocaleString('es-AR') %>)</option><% } %>
+<option value="a_convenir">A convenir una vez finalizado</option>

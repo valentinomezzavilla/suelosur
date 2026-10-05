@@ -14,7 +14,7 @@ const { registrarAuditoria } = require('../utils/auditoria')
 // Se agrega al aviso de un alquiler recién cargado: nace sin precio ni método de pago.
 const AVISO_ASIGNAR_PRECIO = 'Falta asignarle el precio: Cobranzas → Asignar precio.'
 
-const METODO_PAGO_TEXTO = { efectivo: 'efectivo', transferencia: 'transferencia', cheque: 'cheque', cuenta_corriente: 'cuenta corriente', saldo_a_favor: 'saldo a favor' }
+const METODO_PAGO_TEXTO = { efectivo: 'efectivo', transferencia: 'transferencia', cheque: 'cheque', cuenta_corriente: 'cuenta corriente', saldo_a_favor: 'saldo a favor', a_convenir: 'a convenir' }
 const pesos = (n) => '$' + Math.round(n).toLocaleString('es-AR')
 
 // Geocodifica la dirección del alquiler sin hacer esperar al usuario: si Nominatim
@@ -659,7 +659,9 @@ const AlquileresController = {
         })
         req.flash('success', r.cobrado
           ? `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (${medio}). Se cobró todo junto.`
-          : `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (${medio}). Se cobra todo junto al retirar el último contenedor.`)
+          : metodo_pago === 'a_convenir'
+            ? `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (a convenir). El método se elige al retirar el último contenedor.`
+            : `Precio asignado al alquiler agrupado: ${pesos(r.total)} en total (${medio}). Se cobra todo junto al retirar el último contenedor.`)
       } else {
         const r = await AlquileresModel.asignarPrecio(req.params.id, { precio: req.body.precio, metodo_pago })
         await registrarAuditoria({
@@ -668,7 +670,11 @@ const AlquileresController = {
         })
         req.flash('success', r.cobrado
           ? `Precio asignado: ${pesos(r.monto)} (${medio}). Cobro registrado.`
-          : `Precio asignado: ${pesos(r.monto)} (${medio}). El cobro se genera al retirar el contenedor.`)
+          : metodo_pago === 'a_convenir'
+            ? (r.retirado
+              ? `Precio asignado: ${pesos(r.monto)} (a convenir). Quedó en la sección A convenir hasta que elijas el método.`
+              : `Precio asignado: ${pesos(r.monto)} (a convenir). El método se elige al retirar el contenedor.`)
+            : `Precio asignado: ${pesos(r.monto)} (${medio}). El cobro se genera al retirar el contenedor.`)
       }
     } catch (err) {
       console.error(err)

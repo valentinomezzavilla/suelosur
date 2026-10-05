@@ -135,7 +135,7 @@ describe('Cobranzas → Asignar precio', () => {
     assert.doesNotMatch(sin, /value="cuenta_corriente"/)
     assert.doesNotMatch(sin, /value="saldo_a_favor"/)
     for (const m of ['efectivo', 'transferencia', 'cheque']) assert.match(sin, new RegExp(`value="${m}"`))
-    assert.doesNotMatch(sin, /value="a_convenir"/)
+    assert.match(sin, /value="a_convenir"[^>]*>A convenir una vez finalizado/)
 
     const con = await render([{ todoJunto: false, filas: [fila({ cliente_con_cc: true, saldo_favor_cliente: 5000 })] }])
     assert.match(con, /value="cuenta_corriente"/)

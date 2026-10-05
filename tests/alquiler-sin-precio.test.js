@@ -248,14 +248,45 @@ describe('alquileres sin precio', () => {
       assert.equal((await detalle(a.id)).precio_alquiler, null)
     })
 
-    it('valida el método: hay que elegir uno real ("a convenir" ya no es una opción)', async () => {
+    it('valida el método: hay que elegir uno de la lista', async () => {
       const a = await enCurso()
-      for (const metodo_pago of ['', undefined, 'a_convenir', 'bitcoin']) {
+      for (const metodo_pago of ['', undefined, 'bitcoin']) {
         await assert.rejects(AlquileresModel.asignarPrecio(a.id, { precio: '100', metodo_pago }), /Elegí un método de pago/)
       }
       assert.equal((await detalle(a.id)).precio_alquiler, null)
     })
 
+    it('"a convenir", en curso: fija el precio sin cobrar; al retirar sin método queda en A convenir', async () => {
+      const a = await enCurso({ dias: 6, plazo: 4 })
+      const r = await AlquileresModel.asignarPrecio(a.id, { precio: '777', metodo_pago: 'a_convenir' })
+      assert.deepEqual(r, { monto: 777, cobrado: false, retirado: false })
+      const d = await detalle(a.id)
+      assert.deepEqual([d.precio_alquiler, d.metodo_op, d.metodo_detalle], [777, 'a_convenir', 'a_convenir'])
+      assert.equal(await estaEnAsignar(a.id), false)
+      assert.equal((await AlquileresModel.pendientesDeCobro()).some(p => p.id === a.id), false) // todavía afuera
+
+      await AlquileresModel.devolverAPlanta(a.id)
+      assert.equal(await AlquileresModel.cobrarAlCerrar(a.id), null) // el chofer no manda método
+      assert.deepEqual(await txDe(a.id), [])
+      assert.equal((await AlquileresModel.pendientesDeCobro()).some(p => p.id === a.id), true)
+      // Se resuelve con el precio asignado, no con el cálculo por días
+      assert.equal(await AlquileresModel.cobrarAlCerrar(a.id, undefined, 'transferencia'), 777)
+      assert.deepEqual((await txDe(a.id)).map(t => [t.monto, t.metodo_pago]), [[777, 'transferencia']])
+      assert.equal((await AlquileresModel.pendientesDeCobro()).some(p => p.id === a.id), false)
+    })
+
+    it('"a convenir", ya retirado: no cobra y pasa directo a la sección A convenir', async () => {
+      const a = await retirado({ cuentaCorriente: true })
+      const r = await AlquileresModel.asignarPrecio(a.id, { precio: '1500', metodo_pago: 'a_convenir' })
+      assert.deepEqual(r, { monto: 1500, cobrado: false, retirado: true })
+      assert.deepEqual(await txDe(a.id), [])
+      assert.deepEqual(await movsDe(a.id_cliente), [])
+      assert.equal(await estaEnAsignar(a.id), false)
+      assert.equal((await AlquileresModel.pendientesDeCobro()).some(p => p.id === a.id), true)
+      assert.equal(await AlquileresModel.cobrarAlCerrar(a.id, undefined, 'cuenta_corriente'), 1500)
+      assert.deepEqual(await movsDe(a.id_cliente), [{ tipo: 'deuda', monto: -1500, id_op_encabezado: a.id }])
+    })
+
     it('cuenta corriente a un cliente que no la tiene: se rechaza con un mensaje claro y no cambia nada', async () => {
       const a = await retirado({ cuentaCorriente: false })
       await assert.rejects(AlquileresModel.asignarPrecio(a.id, { precio: '1000', metodo_pago: 'cuenta_corriente' }),
@@ -269,7 +300,7 @@ describe('alquileres sin precio', () => {
     it('cuenta corriente a un cliente que la tiene: ya retirado, registra el cargo como hoy', async () => {
       const a = await retirado({ cuentaCorriente: true })
       const r = await AlquileresModel.asignarPrecio(a.id, { precio: '1000', metodo_pago: 'cuenta_corriente' })
-      assert.deepEqual(r, { monto: 1000, cobrado: true })
+      assert.deepEqual(r, { monto: 1000, cobrado: true, retirado: true })
       assert.deepEqual((await txDe(a.id)).map(t => [t.monto, t.metodo_pago]), [[1000, 'cuenta_corriente']])
       assert.deepEqual(await movsDe(a.id_cliente), [{ tipo: 'deuda', monto: -1000, id_op_encabezado: a.id }])
       assert.equal(await saldoDe(a.id_cliente), -1000)
@@ -288,7 +319,7 @@ describe('alquileres sin precio', () => {
     it('ya retirado: se cobra en el momento con el precio cargado, sin referencia a otro precio', async () => {
       const a = await retirado()
       const r = await AlquileresModel.asignarPrecio(a.id, { precio: '155000', metodo_pago: 'efectivo' })
-      assert.deepEqual(r, { monto: 155000, cobrado: true })
+      assert.deepEqual(r, { monto: 155000, cobrado: true, retirado: true })
       const tx = await txDe(a.id)
       assert.equal(tx.length, 1)
       assert.deepEqual([tx[0].monto, tx[0].metodo_pago], [155000, 'efectivo'])
@@ -302,7 +333,7 @@ describe('alquileres sin precio', () => {
     it('en curso: se guardan precio y método y NO se cobra; al retirar se cobra el precio asignado, no el cálculo por días', async () => {
       const a = await enCurso({ dias: 6, plazo: 4 })
       const r = await AlquileresModel.asignarPrecio(a.id, { precio: '777', metodo_pago: 'transferencia' })
-      assert.deepEqual(r, { monto: 777, cobrado: false })
+      assert.deepEqual(r, { monto: 777, cobrado: false, retirado: false })
       assert.deepEqual(await txDe(a.id), [])
       const cierre = await AlquileresModel.datosCierre(a.id)
       assert.equal(cierre.precioAsignado, true)
@@ -336,7 +367,7 @@ describe('alquileres sin precio', () => {
     it('un precio cero (sin cargo) es válido: deja de estar "sin precio" y se cobra $0 al retirar', async () => {
       const a = await enCurso()
       const r = await AlquileresModel.asignarPrecio(a.id, { precio: '0', metodo_pago: 'efectivo' })
-      assert.deepEqual(r, { monto: 0, cobrado: false })
+      assert.deepEqual(r, { monto: 0, cobrado: false, retirado: false })
       assert.equal((await detalle(a.id)).precio_alquiler, 0)
       assert.equal(await estaEnAsignar(a.id), false)
       await AlquileresModel.devolverAPlanta(a.id)
@@ -406,6 +437,21 @@ describe('alquileres sin precio', () => {
       assert.deepEqual(await movsDe(g.id_cliente), [{ tipo: 'deuda', monto: -350, id_op_encabezado: g.ops[0] }])
     })
 
+    it('todo junto "a convenir": no cobra al retirar el último; queda una sola fila en A convenir y se cobra con los precios asignados', async () => {
+      const g = await grupoSinPrecio({ cuentaCorriente: true, dias: 6 })
+      const r = await AlquileresModel.asignarPrecioGrupo(g.ops[0], {
+        precios: { [g.ops[0]]: '100', [g.ops[1]]: '250' }, metodo_pago: 'a_convenir',
+      })
+      assert.deepEqual(r, { total: 350, cobrado: false })
+      for (const id of g.ops) await AlquileresModel.devolverAPlanta(id)
+      assert.equal(await AlquileresModel.cobrarAlCerrar(g.ops[1]), null)
+      const filas = (await AlquileresModel.pendientesDeCobro()).filter(p => p.id_grupo === g.id_grupo)
+      assert.equal(filas.length, 1)
+      assert.equal(await AlquileresModel.cobrarAlCerrar(g.ops[1], undefined, 'cuenta_corriente'), 350)
+      assert.deepEqual([(await txDe(g.ops[0]))[0].monto, (await txDe(g.ops[1]))[0].monto], [100, 250])
+      assert.deepEqual(await movsDe(g.id_cliente), [{ tipo: 'deuda', monto: -350, id_op_encabezado: g.ops[0] }])
+    })
+
     it('todo junto: si falta el precio de un contenedor, o es inválido, no se asigna nada', async () => {
       const g = await grupoSinPrecio()
       await assert.rejects(AlquileresModel.asignarPrecioGrupo(g.ops[0], { precios: { [g.ops[0]]: '100' }, metodo_pago: 'efectivo' }),
