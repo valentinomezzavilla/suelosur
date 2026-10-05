@@ -89,9 +89,14 @@ function tarifaPorDias(dias, cfg) {
 // cómo se paga.
 const METODOS_PAGO = ['efectivo', 'transferencia', 'cheque', 'cuenta_corriente', 'saldo_a_favor']
 
+// Al asignar el precio en Cobranzas también se puede dejar "a convenir una vez finalizado":
+// el precio queda fijado y el método se resuelve al retirar (o en Cobranzas → A convenir).
+const METODOS_ASIGNAR = [...METODOS_PAGO, 'a_convenir']
+
 const AlquileresModel = {
 
   METODOS_PAGO,
+  METODOS_ASIGNAR,
 
   // Auto-vence alquileres: los que llegaron a su fecha fin (plazo contado en DÍAS
   // HÁBILES desde la entrega) y siguen 'en_alquiler' pasan automáticamente a
@@ -1081,16 +1086,15 @@ const AlquileresModel = {
              ${nombreCompleto('cli')} AS cliente_nombre,
              GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,
              oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
-             (SELECT MIN(m.fecha_movimiento) FROM movimiento_contenedor m
-                WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible') AS fecha_retiro
+             ${SQL_FECHA_CIERRE_OP} AS fecha_retiro
       FROM op_encabezado op
       JOIN clientes cli ON cli.id = op.id_cliente
       JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id
       LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
       LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo
       WHERE op.tipo_op = 'C' AND op.estado = 'entregado' AND op.metodo_pago = 'a_convenir'
-        AND (ag.cobro_modo = 'alquiler'
-             OR EXISTS (SELECT 1 FROM movimiento_contenedor m WHERE m.id_op_contenedor = oc.id AND m.estado_paso = 'disponible'))
+        AND oc.precio_alquiler IS NOT NULL
+        AND (ag.cobro_modo = 'alquiler' OR ${SQL_FECHA_CIERRE_OP} IS NOT NULL)
         AND NOT EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
       ORDER BY fecha_retiro ASC NULLS LAST
     `)).rows
@@ -1192,7 +1196,7 @@ const AlquileresModel = {
   // ser uno de los permitidos, y cuenta corriente / saldo a favor se piden solo a clientes
   // que los tengan (la pantalla no los ofrece si no, pero el servidor no confía en eso).
   async _validarMetodoAsignar(metodo_pago, id_cliente) {
-    if (!METODOS_PAGO.includes(metodo_pago)) throw new Error('Elegí un método de pago.')
+    if (!METODOS_ASIGNAR.includes(metodo_pago)) throw new Error('Elegí un método de pago.')
     if (metodo_pago === 'cuenta_corriente') {
       const errCC = await ClientesModel.errorCuentaCorriente(id_cliente)
       if (errCC) throw new Error(errCC)
@@ -1234,12 +1238,14 @@ const AlquileresModel = {
         [monto, metodo_pago, op.id])
       await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodo_pago, op.id])
 
-      // Ya retirado no hay otro momento en que se cobre: se cobra ahora.
-      if (op.retirado) {
+      // Ya retirado no hay otro momento en que se cobre: se cobra ahora. Salvo "a convenir":
+      // el precio queda fijado y pasa a Cobranzas → A convenir hasta que se elija el método.
+      const cobrar = !!op.retirado && metodo_pago !== 'a_convenir'
+      if (cobrar) {
         const cierre = await this.datosCierre(op.id, { alRetiro: true, q })
         await this._registrarCobro({ op, cierre, monto, metodoPago: metodo_pago }, q)
       }
-      return { monto, cobrado: !!op.retirado }
+      return { monto, cobrado: cobrar, retirado: !!op.retirado }
     })
   },
 
@@ -1283,6 +1289,8 @@ const AlquileresModel = {
           [montos[o.id], metodo_pago, o.id])
         await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodo_pago, o.id])
       }
+      // "A convenir": cobrarGrupo no cobra sin método final; el grupo pasa a Cobranzas → A
+      // convenir cuando se retire el último contenedor.
       const cobrado = await this.cobrarGrupo(g.id, { montos, q })
       return { total: Object.values(montos).reduce((a, b) => a + b, 0), cobrado: cobrado != null }
     })

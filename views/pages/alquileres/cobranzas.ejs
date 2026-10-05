@@ -27,7 +27,8 @@
     <p class="small text-muted px-3 pt-3 mb-2">
       Alquileres cargados sin precio ni método de pago. Si el contenedor <strong>ya se retiró</strong>, el cobro se
       registra apenas asignás el precio; si <strong>sigue en curso</strong> (o todavía no se entregó), se cobra al retirarlo
-      y retirar sin precio nunca se bloquea.
+      y retirar sin precio nunca se bloquea. Con <strong>"A convenir una vez finalizado"</strong> el precio queda fijado
+      y el método se elige al retirar (o en la sección A convenir, si ya está retirado).
     </p>
     <% if (!sinPrecio.length) { %>
       <%- include('../../partials/empty_state', { icono: '✅', mensaje: 'No hay alquileres sin precio. Todo está asignado.' }) %>
@@ -122,8 +123,12 @@
       var precios = Array.prototype.map.call(form.querySelectorAll('input[name^="precio"]'), function (i) { return parseFloat(i.value) || 0 })
       var total = precios.reduce(function (a, b) { return a + b }, 0)
       var hayCero = precios.some(function (p) { return p === 0 })
+      var metodo = form.querySelector('select[name="metodo_pago"]')
+      var aConvenir = metodo && metodo.value === 'a_convenir'
       var texto = '¿Asignar ' + form.dataset.nombre + ' por $' + Math.round(total).toLocaleString('es-AR') + '? '
-        + (form.dataset.retirado === '1' ? 'Ya está retirado: el cobro se registra ahora.' : 'El cobro se genera al retirar el contenedor.')
+        + (aConvenir
+          ? (form.dataset.retirado === '1' ? 'Queda "a convenir": pasa a la sección A convenir hasta que elijas el método.' : 'Queda "a convenir": el método se elige al retirar el contenedor.')
+          : (form.dataset.retirado === '1' ? 'Ya está retirado: el cobro se registra ahora.' : 'El cobro se genera al retirar el contenedor.'))
       if (hayCero) texto = 'Hay un precio en $0 (sin cargo). ' + texto
       if (!confirm(texto)) e.preventDefault()
     })
