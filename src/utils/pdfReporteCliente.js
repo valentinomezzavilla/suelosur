@@ -66,42 +66,50 @@ function generarReporteClientePDF(res, { cliente, periodoLabel, resumen, filas =
   doc.fillColor(B.TINTA).fontSize(10).font('Helvetica-Bold').text('Detalle de movimientos', left, y)
   y += 18
 
-  const cFecha = left
-  const cTipo  = left + width * 0.16
-  const cDesc  = left + width * 0.34
-  const wDebito  = width * 0.80
-  const wCredito = width
+  // Columnas fijas salvo la descripción, que toma el resto
+  const PAD = 6
+  const GAP = 8
+  const col = {}
+  col.fecha   = { x: left + PAD, w: 46 }
+  col.credito = { x: right - PAD - 62, w: 62 }
+  col.debito  = { x: col.credito.x - GAP - 62, w: 62 }
+  col.tipo    = { x: col.debito.x - GAP - 56, w: 56 }
+  col.desc    = { x: col.fecha.x + col.fecha.w + GAP, w: 0 }
+  col.desc.w  = col.tipo.x - GAP - col.desc.x
 
   const drawHead = () => {
     doc.rect(left, y, width, 20).fill(B.FONDO)
     doc.fillColor(B.GRIS).fontSize(8).font('Helvetica-Bold')
-    doc.text('FECHA', cFecha + 6, y + 6)
-    doc.text('TIPO', cTipo, y + 6)
-    doc.text('DESCRIPCIÓN', cDesc, y + 6)
-    doc.text('DÉBITO', left, y + 6, { width: wDebito - 6, align: 'right' })
-    doc.text('CRÉDITO', left, y + 6, { width: wCredito - 6, align: 'right' })
+    doc.text('FECHA', col.fecha.x, y + 6, { width: col.fecha.w })
+    doc.text('DESCRIPCIÓN', col.desc.x, y + 6, { width: col.desc.w })
+    doc.text('TIPO', col.tipo.x, y + 6, { width: col.tipo.w })
+    doc.text('DÉBITO', col.debito.x, y + 6, { width: col.debito.w, align: 'right' })
+    doc.text('CRÉDITO', col.credito.x, y + 6, { width: col.credito.w, align: 'right' })
     y += 20
   }
   drawHead()
 
   if (!filas.length) {
-    doc.fillColor(B.GRIS).fontSize(9).font('Helvetica').text('Sin movimientos en el período seleccionado.', left + 6, y + 8)
+    doc.fillColor(B.GRIS).fontSize(9).font('Helvetica').text('Sin movimientos en el período seleccionado.', left + PAD, y + 8)
     y += 28
   } else {
-    doc.font('Helvetica').fontSize(8.5)
     filas.forEach((f, i) => {
-      const rowH = 18
+      // La descripción se parte en varias líneas; la fila mide lo que ella necesite
+      const desc = f.desc || ''
+      doc.font('Helvetica').fontSize(8.5)
+      const rowH = Math.max(doc.heightOfString(desc || ' ', { width: col.desc.w }), 10) + 9
       if (y + rowH > doc.page.height - doc.page.margins.bottom - 20) {
         doc.addPage(); y = doc.page.margins.top; drawHead(); doc.font('Helvetica').fontSize(8.5)
       }
       if (i % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa')
       const esCredito = Number(f.monto) > 0
       const monto = B.money(Math.abs(Number(f.monto || 0)))
-      doc.fillColor(B.TINTA).font('Helvetica').text(f.fecha || '', cFecha + 6, y + 5, { width: width * 0.16 - 8 })
-      doc.fillColor(B.GRIS).text(f.tipo || '', cTipo, y + 5, { width: width * 0.18 - 4 })
-      doc.fillColor(B.TINTA).text(f.desc || '', cDesc, y + 5, { width: width * 0.44, lineBreak: false })
-      doc.fillColor(B.ROJO).text(esCredito ? '—' : monto, left, y + 5, { width: wDebito - 6, align: 'right' })
-      doc.fillColor(B.VERDE).text(esCredito ? monto : '—', left, y + 5, { width: wCredito - 6, align: 'right' })
+      const ty = y + 5
+      doc.fillColor(B.TINTA).text(f.fecha || '', col.fecha.x, ty, { width: col.fecha.w, lineBreak: false })
+      doc.text(desc, col.desc.x, ty, { width: col.desc.w })
+      doc.fillColor(B.GRIS).text(f.tipo || '', col.tipo.x, ty, { width: col.tipo.w, lineBreak: false, ellipsis: true })
+      doc.fillColor(B.ROJO).text(esCredito ? '—' : monto, col.debito.x, ty, { width: col.debito.w, align: 'right', lineBreak: false })
+      doc.fillColor(B.VERDE).text(esCredito ? monto : '—', col.credito.x, ty, { width: col.credito.w, align: 'right', lineBreak: false })
       y += rowH
     })
   }
@@ -110,9 +118,9 @@ function generarReporteClientePDF(res, { cliente, periodoLabel, resumen, filas =
   doc.moveTo(left, y).lineTo(right, y).strokeColor(B.LINEA).lineWidth(1).stroke()
   y += 8
   doc.fillColor(B.TINTA).fontSize(11).font('Helvetica-Bold')
-     .text('Saldo actual', left, y, { width: width * 0.80, align: 'right' })
+     .text('Saldo actual', left, y, { width: col.debito.x - GAP - left, align: 'right' })
      .fillColor(saldoColor)
-     .text(saldoTxt, left, y, { width: wCredito - 6, align: 'right' })
+     .text(saldoTxt, col.debito.x, y, { width: right - PAD - col.debito.x, align: 'right' })
 
   B.drawFooter(doc, { extra: `${filas.length} movimiento(s)` })
   doc.end()

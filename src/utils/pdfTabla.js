@@ -58,25 +58,38 @@ function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [
   }
   drawHeader()
 
-  doc.font('Helvetica').fontSize(8.5)
+  // Las columnas de texto (alineadas a la izquierda) se parten en varias líneas y la
+  // fila crece a lo que necesite; montos y columnas a la derecha/centro van en una línea.
+  const envuelve = (c) => !c.money && (c.align || 'left') === 'left'
+  const textoDe = (f, c) => {
+    const v = f[c.key]
+    if (c.money) return v == null || v === '' ? '' : money(v)
+    return v == null ? '' : String(v)
+  }
+  const fuente = (f) => doc.font(f._destacar ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
+
   filas.forEach((f, idx) => {
-    const rowH = 18
-    if (y + rowH > doc.page.height - 40) { doc.addPage(); y = 40; drawHeader(); doc.font('Helvetica').fontSize(8.5) }
+    fuente(f)
+    const altoTexto = columnas.reduce((max, c, i) =>
+      envuelve(c) ? Math.max(max, doc.heightOfString(textoDe(f, c) || ' ', { width: anchos[i] - 8 })) : max, 10)
+    const rowH = altoTexto + 8
+    if (y + rowH > doc.page.height - 40) { doc.addPage(); y = 40; drawHeader(); fuente(f) }
     if (f._destacar) doc.rect(left, y, width, rowH).fill(B.FONDO)
     else if (idx % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa')
-    doc.font(f._destacar ? 'Helvetica-Bold' : 'Helvetica')
     let x = left
     columnas.forEach((c, i) => {
-      let v = f[c.key]
-      if (c.money) v = v == null || v === '' ? '' : money(v)
-      else if (v == null) v = ''
-      const texto = recortar(doc, String(v), anchos[i] - 8)
-      // width solo cuando hace falta para alinear (derecha/centro): con el texto ya
-      // recortado al ancho exacto de la celda, pdfkit puede igual partirlo en dos líneas
-      // (lineBreak:false no lo evita cuando el width queda justo al límite).
-      const opts = { align: c.align || 'left', lineBreak: false }
-      if (c.align === 'right' || c.align === 'center') opts.width = anchos[i] - 8
-      doc.fillColor(TINTA).text(texto, x + 4, y + 5, opts)
+      doc.fillColor(TINTA)
+      if (envuelve(c)) {
+        doc.text(textoDe(f, c), x + 4, y + 4, { width: anchos[i] - 8 })
+      } else {
+        const texto = recortar(doc, textoDe(f, c), anchos[i] - 8)
+        // width solo cuando hace falta para alinear (derecha/centro): con el texto ya
+        // recortado al ancho exacto de la celda, pdfkit puede igual partirlo en dos líneas
+        // (lineBreak:false no lo evita cuando el width queda justo al límite).
+        const opts = { align: c.align || 'left', lineBreak: false }
+        if (c.align === 'right' || c.align === 'center') opts.width = anchos[i] - 8
+        doc.text(texto, x + 4, y + 4, opts)
+      }
       x += anchos[i]
     })
     y += rowH

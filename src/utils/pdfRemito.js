@@ -62,20 +62,28 @@ function construirRemito(doc, r) {
   // ── Tabla de ítems ──────────────────────────────────────────
   const cols = { desc: left, cant: left + width * 0.50, unid: left + width * 0.62, pu: left + width * 0.74, sub: left }
   const wSub = width
-  doc.rect(left, y, width, 20).fill('#f3f4f6')
-  doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold')
-  doc.text('DESCRIPCIÓN', cols.desc + 6, y + 6)
-  doc.text('CANT.', cols.cant, y + 6, { width: width * 0.10, align: 'right' })
-  doc.text('UNIDAD', cols.unid, y + 6, { width: width * 0.10, align: 'center' })
-  doc.text('P. UNIT.', cols.pu, y + 6, { width: width * 0.12, align: 'right' })
-  doc.text('SUBTOTAL', cols.sub, y + 6, { width: wSub - 6, align: 'right' })
-  y += 20
+  const wDesc = width * 0.48
+  const encabezadoItems = () => {
+    doc.rect(left, y, width, 20).fill('#f3f4f6')
+    doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold')
+    doc.text('DESCRIPCIÓN', cols.desc + 6, y + 6)
+    doc.text('CANT.', cols.cant, y + 6, { width: width * 0.10, align: 'right' })
+    doc.text('UNIDAD', cols.unid, y + 6, { width: width * 0.10, align: 'center' })
+    doc.text('P. UNIT.', cols.pu, y + 6, { width: width * 0.12, align: 'right' })
+    doc.text('SUBTOTAL', cols.sub, y + 6, { width: wSub - 6, align: 'right' })
+    y += 20
+  }
+  encabezadoItems()
 
   doc.font('Helvetica').fontSize(9).fillColor(TINTA)
   r.items.forEach((it, i) => {
-    const rowH = 22
+    // La descripción se parte en varias líneas; la fila mide lo que ella necesite
+    doc.font('Helvetica-Bold').fontSize(9)
+    const rowH = Math.max(doc.heightOfString(it.descripcion || ' ', { width: wDesc }), 11) + 11
+    if (y + rowH > doc.page.height - doc.page.margins.bottom - 20) { doc.addPage(); y = doc.page.margins.top; encabezadoItems() }
+    doc.fontSize(9)
     if (i % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa').fillColor(TINTA)
-    doc.fillColor(TINTA).font('Helvetica-Bold').text(it.descripcion, cols.desc + 6, y + 6, { width: width * 0.48 })
+    doc.fillColor(TINTA).font('Helvetica-Bold').text(it.descripcion, cols.desc + 6, y + 6, { width: wDesc })
     doc.font('Helvetica')
        .text(Number(it.cantidad).toLocaleString('es-AR'), cols.cant, y + 6, { width: width * 0.10, align: 'right' })
        .text(it.unidad || '', cols.unid, y + 6, { width: width * 0.10, align: 'center' })

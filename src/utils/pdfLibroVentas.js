@@ -65,10 +65,15 @@ function generarLibroVentasPDF(res, { filas = [], total = 0, periodoLabel, clien
   }
   drawHead()
 
+  // Material, cliente y obra se parten en varias líneas; el resto va en una sola
+  const ENVUELVEN = ['material', 'cliente', 'obra']
   const cell = (c, val) => {
     if (!c) return
     const p = place(c)
-    doc.text(val == null ? '' : String(val), p.x, y + 4, { width: p.w, align: p.align, lineBreak: false, ellipsis: true })
+    const opts = ENVUELVEN.includes(c.key)
+      ? { width: p.w, align: p.align }
+      : { width: p.w, align: p.align, lineBreak: false, ellipsis: true }
+    doc.text(val == null ? '' : String(val), p.x, y + 4, opts)
   }
   const col = (key) => cols.find(c => c.key === key)
   const valores = {
@@ -83,7 +88,10 @@ function generarLibroVentasPDF(res, { filas = [], total = 0, periodoLabel, clien
     y += 24
   } else {
     filas.forEach((f, i) => {
-      const rowH = 15
+      doc.font('Helvetica').fontSize(7.5)
+      const altoTexto = cols.filter(c => ENVUELVEN.includes(c.key)).reduce((max, c) =>
+        Math.max(max, doc.heightOfString(String(valores[c.key](f) ?? '') || ' ', { width: place(c).w })), 9)
+      const rowH = altoTexto + 6
       if (y + rowH > doc.page.height - doc.page.margins.bottom - 26) {
         doc.addPage(); y = doc.page.margins.top; drawHead()
       }
