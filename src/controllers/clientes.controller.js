@@ -6,6 +6,10 @@ const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 const { generarTablaPDF } = require('../utils/pdfTabla')
 const { fmtFecha } = require('../utils/fecha')
 
+// Fecha YYYY-MM-DD válida, o null (lo mal formado se ignora)
+const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
+  && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v ? v : null
+
 const ClientesController = {
 
   async index(req, res) {
@@ -175,15 +179,24 @@ const ClientesController = {
       if (!cli) { req.flash('error', 'No encontrado.'); return res.redirect('/clientes') }
       const cliente = { ...cli, cuentaCorriente: !!cli.cuenta_corriente, telefono: cli.telefono || cli.tel_whatsapp, direccion: cli.domicilio_ppal, saldo: cli.saldo ?? 0 }
       const movimientos   = await ClientesModel.movimientos(cliente.id)
-      const transacciones = (await TransaccionesModel.filtrar({ clienteId: cliente.id, limit: 1000 })).rows
-      const alquileres    = []
+      // Desde / Hasta filtran alquileres y transacciones; sin fechas, todo el histórico
+      const desde = fechaISO(req.query.fechaDesde)
+      const hasta = fechaISO(req.query.fechaHasta)
+      const transacciones = (await TransaccionesModel.filtrar({ clienteId: cliente.id, fechaDesde: desde, fechaHasta: hasta, limit: 1000 })).rows
+      // Alquileres (contenedor y maquinaria) con detalle y estado de pago: misma consulta que Liquidaciones
+      const LiquidacionesModel = require('../models/liquidaciones.model')
+      const liq = await LiquidacionesModel.liquidacion({
+        clienteId: cliente.id, obra: null, desde: desde || '0000-01-01', hasta: hasta || '9999-12-31',
+        tipos: ['contenedor', 'maquinaria'], estadoPago: 'todas',
+      })
+      const alquileres    = liq.clientes[0] ? liq.clientes[0].operaciones.slice().reverse() : []
       // Consumos en cta. cte. = los cargos de la cuenta (existen desde que se registra la
       // venta, entregada o no), con lo que falta pagar de cada uno
       const pendientes    = await ClientesModel.pendientePorCargo(cliente.id)
       const deudasCC      = movimientos
         .filter(m => m.tipo === 'deuda' && Math.abs(Number(m.monto)) > 0.005)
         .map(m => ({ ...m, resta: pendientes[m.id] ?? Math.abs(Number(m.monto)) }))
-      res.render('pages/clientes/detalle', { titulo: `${cliente.nombre} ${cliente.apellido || ''}`.trim(), cliente, movimientos, transacciones, alquileres, deudasCC, filtros: req.query, scripts: ['/js/modalAbonar.js'] })
+      res.render('pages/clientes/detalle', { titulo: `${cliente.nombre} ${cliente.apellido || ''}`.trim(), cliente, movimientos, transacciones, alquileres, deudasCC, filtros: { ...req.query, fechaDesde: desde || '', fechaHasta: hasta || '' }, scripts: ['/js/modalAbonar.js'] })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes')
     }

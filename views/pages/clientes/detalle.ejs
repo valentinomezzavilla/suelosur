@@ -87,35 +87,39 @@
         <!-- Historial de alquileres -->
         <% if (!filtros.tipoOp || filtros.tipoOp === 'alquiler') { %>
         <div class="clientes-historial">
-            <h2 class="clientes-historial__title">Historial de alquileres</h2>
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="clientes-historial__title mb-0">Historial de alquileres</h2>
+                <a href="/liquidaciones?clienteId=<%= cliente.id %>" class="btn-sm btn-secondary">Ver liquidación de este cliente</a>
+            </div>
             <% if (alquileres.length === 0) { %>
                 <div class="clientes-historial__empty">Sin alquileres registrados</div>
             <% } else { %>
+                <% const ESTADO_TXT = { pagada: 'Pagada', parcial: 'Parcial', pendiente: 'Pendiente', a_convenir: 'Precio a convenir' } %>
                 <div class="table-wrapper">
                     <table class="data-table">
                         <thead>
                             <tr>
-                                <th>Contenedor</th>
-                                <th>Inicio</th>
-                                <th>Fin</th>
-                                <th>Direccion</th>
-                                <th>Estado</th>
-                                <th>Monto</th>
+                                <th>OP</th>
+                                <th>Fecha</th>
+                                <th>Tipo</th>
+                                <th>Detalle</th>
+                                <th>Obra</th>
+                                <th>Pago</th>
+                                <th>Total</th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             <% alquileres.forEach(a => { %>
                                 <tr>
-                                    <td>#<%= a.id %></td>
-                                    <td><%= formatFecha(a.inicioAlquiler) %></td>
-                                    <td><%= formatFecha(a.finAlquiler) %></td>
-                                    <td><%= a.direccionAlquiler %></td>
-                                    <td>
-                                        <span class="badge badge--<%= a.estado === 'Alquilado' ? 'alquilado' : 'disponible' %>">
-                                            <%= a.estado %>
-                                        </span>
-                                    </td>
-                                    <td>$<%= a.precioAlquiler?.toLocaleString('es-AR') || '—' %></td>
+                                    <td class="fw-semibold text-orange">OP-<%= String(a.nro_op).padStart(4, '0') %></td>
+                                    <td><%= formatFecha(a.fecha) %></td>
+                                    <td><%= a.tipo === 'contenedor' ? 'Contenedor' : 'Maquinaria' %></td>
+                                    <td><%= a.renglones.map(r => a.tipo === 'maquinaria' ? `${r.descripcion} · ${r.cantidad} h` : r.descripcion).join(' / ') %></td>
+                                    <td><%= a.obra || '—' %></td>
+                                    <td><span class="liq-estado liq-estado--<%= a.estado %>"><%= ESTADO_TXT[a.estado] %></span></td>
+                                    <td><%= a.estado === 'a_convenir' ? '—' : '$' + Number(a.total).toLocaleString('es-AR') %></td>
+                                    <td><a href="<%= a.tipo === 'contenedor' ? '/alquileres/contenedores/' : '/alquileres/maquinaria/' %><%= a.id %>" class="btn-sm btn-secondary">Ver</a></td>
                                 </tr>
                             <% }) %>
                         </tbody>
