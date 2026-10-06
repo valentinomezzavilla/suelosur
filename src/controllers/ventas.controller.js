@@ -10,6 +10,7 @@ const { textoDestino } = require('../utils/destino')
 const ProductosModel    = require('../models/productos.model')
 const { cotizarContenedor, MAX_CONTENEDORES_POR_OP } = require('../utils/contenedor')
 const { leerRemito, opConRemito } = require('../utils/remito')
+const { hoyISO }        = require('../utils/fecha')
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
