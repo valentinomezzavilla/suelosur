@@ -219,13 +219,21 @@ const TransaccionesModel = {
 
   // WHERE compartido por el listado, las métricas y el reporte. La fecha se compara por
   // día: guardada con hora ("2026-09-14 17:57:21") quedaba afuera del último día del rango.
-  _filtro({ id, tipo, clienteId, cliente, remito, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
+  // N° de operación escrito a mano: "308", "0308" u "OP-0308" → 308. Sin dígitos → null (sin filtro).
+  nroOpDeTexto(texto) {
+    const digitos = String(texto ?? '').replace(/\D/g, '')
+    return digitos ? Number(digitos) : null
+  },
+
+  _filtro({ id, tipo, clienteId, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
     const wheres = []
     const params = []
     if (id)         { wheres.push('id = ?');                  params.push(id) }
     if (tipo && tipo !== 'todos') { wheres.push('tipo = ?');  params.push(tipo) }
     if (clienteId)  { wheres.push('cliente_id = ?');          params.push(clienteId) }
     if (remito && String(remito).trim()) { wheres.push('nro_remito = ?'); params.push(Number(remito)) }
+    const nro = this.nroOpDeTexto(nroOp)
+    if (nro != null) { wheres.push('id_op_encabezado IN (SELECT id FROM op_encabezado WHERE nro_op = ?)'); params.push(nro) }
     // trim: un espacio de más al final (p.ej. un cliente sin apellido en el autocompletar)
     // no puede dejar el filtro sin resultados.
     const clienteTrim = (cliente || '').trim()
