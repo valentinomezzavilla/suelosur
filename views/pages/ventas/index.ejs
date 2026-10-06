@@ -107,7 +107,7 @@
       </div>
       <div class="col-md-3">
         <label class="form-label">Cliente</label>
-        <select name="id_cliente" class="form-select form-select-sm">
+        <select name="id_cliente" class="form-select form-select-sm" data-buscable>
           <option value="">Todos los clientes</option>
           <% clientes.forEach(c => { %>
             <option value="<%= c.id %>" <%= filtros.id_cliente === c.id ? 'selected' : '' %>><%= [c.nombre, c.apellido].filter(Boolean).join(' ') %></option>

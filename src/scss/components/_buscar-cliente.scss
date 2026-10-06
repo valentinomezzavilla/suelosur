@@ -123,3 +123,17 @@
   font-weight: 600;
   cursor: pointer;
 }
+
+// Select buscable (public/js/selectBuscable.js): campo de texto + desplegable filtrado
+.select-buscable {
+  position: relative;
+
+  .autocomplete-item.is-activa { background: $accent-soft; }
+}
+
+.select-buscable__vacio {
+  color: $muted;
+  cursor: default;
+
+  &:hover { background: transparent; }
+}
