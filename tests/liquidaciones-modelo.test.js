@@ -69,6 +69,8 @@ describe('LiquidacionesModel.liquidacion', () => {
     assert.equal(ajuste.importe, -100)
     assert.equal(op(c, cc).total, 900)
     assert.equal(op(c, sinPrecio).renglones[0].descripcion.includes('Precio a convenir'), true)
+    // Contenedor que sigue en la obra: "desde ... (en curso)", no "al en curso"
+    assert.match(op(c, sinPrecio).renglones[0].descripcion, /desde 04\/10\/2026 \(en curso\)/)
   })
 
   it('resumen: sin contar el alquiler a convenir', async () => {

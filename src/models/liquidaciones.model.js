@@ -97,7 +97,7 @@ function armar(r, materiales) {
   } else if (r.tipo_op === 'C') {
     const desde = r.cont_desde, hasta = r.cont_hasta
     const dias = desde && hasta ? L.diasEntre(desde, hasta) : Number(r.plazo_alquiler) || 1
-    const periodo = desde ? ` — ${fmtFecha(desde)} al ${hasta ? fmtFecha(hasta) : 'en curso'}` : ''
+    const periodo = !desde ? '' : hasta ? ` — ${fmtFecha(desde)} al ${fmtFecha(hasta)}` : ` — desde ${fmtFecha(desde)} (en curso)`
     const base = `Alquiler contenedor${r.numero_contenedor != null ? ' N° ' + r.numero_contenedor : ''}${periodo}`
     if (r.precio_alquiler == null) {
       op.aConvenir = true
