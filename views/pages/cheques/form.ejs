@@ -78,7 +78,7 @@
       <!-- Vínculo: cliente (recibido) -->
       <div class="mb-3 cond" data-cartera="recibido">
         <label class="form-label">Cliente que lo entregó</label>
-        <select name="id_cliente" class="form-select">
+        <select name="id_cliente" class="form-select" data-buscable>
           <option value="">— Sin vincular —</option>
           <% clientes.forEach(x => { %><option value="<%= x.id %>" <%= sel(c.id_cliente, x.id) %>><%= x.nombre %> <%= x.apellido || '' %></option><% }) %>
         </select>
