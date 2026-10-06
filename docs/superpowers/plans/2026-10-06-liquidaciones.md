@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Pantalla `/liquidaciones` + PDF que muestran todas las operaciones (ventas y alquileres) de un cliente —o de todos— con detalle, estado de pago y totales, para compartir con el cliente.
+**Goal:** Pantalla `/liquidaciones` + PDF que muestran todas las operaciones (ventas y alquileres) de un cliente —o de todos— con detalle, estado de pago y totales, para compartir con el cliente. Además, filtro por N° de operación en Transacciones.
 
 **Architecture:** Lógica pura en `src/utils/liquidaciones.js` (estado de pago, totales, agrupado, filtros); el modelo `src/models/liquidaciones.model.js` hace las consultas y arma la estructura con esa lógica; controlador + vista + PDF consumen la estructura. Sin migraciones. Se reutiliza: `importesVenta` (ventas.model), imputación FIFO de la cuenta corriente (clientes.model), `nombreObra` / `obraPorClave` (obras), `pdfBrand`, `buscarCliente.js`, `filtroObra.js`.
 
@@ -59,6 +59,8 @@
 | `src/routes/auth.routes.js` | Modificar | Destino del rol contable al loguearse |
 | `views/partials/sidebar.ejs` | Modificar | Cobranzas → Liquidaciones |
 | `tests/liquidaciones-vistas.test.js` | Crear | Render de la vista |
+| `src/models/transacciones.model.js`, `src/controllers/transacciones.controller.js`, `views/pages/transacciones/index.ejs` | Modificar | Filtro por N° de OP en Transacciones |
+| `tests/transacciones-filtro.test.js` | Crear | Pruebas del filtro por N° de OP |
 
 ## Estructura de datos (contrato entre tareas)
 
@@ -1774,7 +1776,136 @@ git commit -m "Liquidaciones: pantalla, PDF y menú (reemplaza Contabilidad → 
 
 ---
 
-### Task 5: Verificación en la app real
+### Task 5: Filtro por N° de operación en Transacciones
+
+**Files:**
+- Modify: `src/models/transacciones.model.js:222-237` (`_filtro`)
+- Modify: `src/controllers/transacciones.controller.js:12-22` (`leerFiltros`) y `:27` / `:41` (`index`)
+- Modify: `views/pages/transacciones/index.ejs:6-12` (`presetHref`) y el form de filtros (después del campo Remito)
+- Test: `tests/transacciones-filtro.test.js`
+
+**Interfaces:**
+- Consumes: nada de las tareas anteriores (es independiente).
+- Produces: `TransaccionesModel.nroOpDeTexto(texto) → number|null` ("308", "0308", "OP-0308", "op 308" → 308; vacío o sin dígitos → null); `_filtro({ ..., nroOp })` agrega `id_op_encabezado IN (SELECT id FROM op_encabezado WHERE nro_op = ?)`.
+
+- [ ] **Step 1: Escribir las pruebas que fallan**
+
+`tests/transacciones-filtro.test.js`. El arnés de la base va PRIMERO (los modelos copian `query` al cargarse); el primer `describe` no usa la base porque `_filtro` solo arma el WHERE:
+
+```js
+'use strict'
+const prueba = require('./helpers/db')
+const datos = require('./helpers/datos')
+const { describe, it, before, after } = require('node:test')
+const assert = require('node:assert/strict')
+const TransaccionesModel = require('../src/models/transacciones.model')
+const VentasModel = require('../src/models/ventas.model')
+
+describe('filtro por N° de operación', () => {
+  it('entiende 308, 0308 y OP-0308', () => {
+    for (const t of ['308', '0308', 'OP-0308', 'op 308', ' OP-308 ']) assert.equal(TransaccionesModel.nroOpDeTexto(t), 308)
+  })
+  it('vacío o sin números = sin filtro', () => {
+    for (const t of ['', '   ', 'OP-', 'abc', undefined, null]) assert.equal(TransaccionesModel.nroOpDeTexto(t), null)
+  })
+  it('_filtro agrega la condición por nro_op de la operación', () => {
+    const { where, params } = TransaccionesModel._filtro({ nroOp: 'OP-0308' })
+    assert.match(where, /id_op_encabezado IN \(SELECT id FROM op_encabezado WHERE nro_op = \?\)/)
+    assert.deepEqual(params, [308])
+  })
+  it('_filtro sin nroOp válido no cambia nada', () => {
+    assert.deepEqual(TransaccionesModel._filtro({ nroOp: 'abc' }), { where: '', params: [] })
+  })
+})
+
+describe('filtro por N° de operación contra la base', () => {
+  let nroOp, idOp
+  before(async () => {
+    await prueba.abrir()
+    const cliente = await datos.crearCliente()
+    const admin = await datos.idAdministrativo()
+    const producto = (await prueba.q(`SELECT id FROM productos WHERE COALESCE(es_contenedor,0)=0 ORDER BY id LIMIT 1`)).rows[0].id
+    const r = await VentasModel.crear({ id_cliente: cliente, id_administrativo: admin, tipo_op: 'M', modalidad: 'flete', metodo_pago: 'efectivo',
+      detalles: [{ id_producto: producto, cantidad_pedida: 1, precio_unitario: 100 }] })
+    idOp = r.id; nroOp = r.nro_op
+    await TransaccionesModel.crear({ tipo: 'Venta Viaje', id_op_encabezado: idOp, cliente_id: cliente, cliente: 'PRUEBA', monto: 100, metodo_pago: 'efectivo' })
+  })
+  after(() => prueba.cerrar())
+
+  it('encuentra la transacción de esa operación', async () => {
+    const r = await TransaccionesModel.filtrar({ nroOp: `OP-${String(nroOp).padStart(4, '0')}`, limit: 50 })
+    assert.equal(r.rows.length, 1)
+    assert.equal(String(r.rows[0].id_op_encabezado), String(idOp))
+  })
+})
+```
+
+- [ ] **Step 2: Correr y verificar que falla**
+
+Run: `node --test --test-concurrency=1 tests/transacciones-filtro.test.js`
+Expected: FAIL con `TransaccionesModel.nroOpDeTexto is not a function`
+
+- [ ] **Step 3: Implementar en el modelo**
+
+En `src/models/transacciones.model.js`, agregar el método dentro de `TransaccionesModel`, justo antes de `_filtro`:
+
+```js
+  // N° de operación escrito a mano: "308", "0308" u "OP-0308" → 308. Sin dígitos → null (sin filtro).
+  nroOpDeTexto(texto) {
+    const digitos = String(texto ?? '').replace(/\D/g, '')
+    return digitos ? Number(digitos) : null
+  },
+
+```
+
+En `_filtro`, sumar `nroOp` a los parámetros desestructurados:
+
+```js
+  _filtro({ id, tipo, clienteId, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}) {
+```
+
+y la condición, después de la de `remito`:
+
+```js
+    const nro = this.nroOpDeTexto(nroOp)
+    if (nro != null) { wheres.push('id_op_encabezado IN (SELECT id FROM op_encabezado WHERE nro_op = ?)'); params.push(nro) }
+```
+
+- [ ] **Step 4: Controlador y vista**
+
+En `src/controllers/transacciones.controller.js`:
+- `leerFiltros`: agregar `nroOp: q.nroOp,` junto a `remito: q.remito,` (así lo usan la tabla y el reporte).
+- `index`: agregar `nroOp` al destructuring de `req.query` (línea 27) y `nroOp: nroOp||'',` al objeto `filtros` (línea 41, junto a `remito`).
+
+En `views/pages/transacciones/index.ejs`:
+- `presetHref`: agregar `if (filtros.nroOp) o.nroOp = filtros.nroOp` debajo de la línea de `remito`.
+- En el form, después del `filtro-group` de Remito:
+
+```ejs
+                <div class="filtro-group">
+                    <label>N° de OP</label>
+                    <input type="text" name="nroOp" value="<%= filtros.nroOp %>" maxlength="10"
+                        placeholder="Ej: 308 u OP-0308" autocomplete="off">
+                </div>
+```
+
+(`qsReporte` ya arma la URL del reporte con todo `filtros`, así que el reporte filtra solo.)
+
+- [ ] **Step 5: Correr y verificar que pasa**
+
+Run: `node --test --test-concurrency=1 tests/transacciones-filtro.test.js`
+Expected: PASS (las 5 pruebas).
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/models/transacciones.model.js src/controllers/transacciones.controller.js views/pages/transacciones/index.ejs tests/transacciones-filtro.test.js
+git commit -m "Transacciones: filtro por N° de operación"
+```
+
+---
+
+### Task 6: Verificación en la app real
 
 **Files:** ninguno (solo verificación; si aparece un bug, se corrige en el archivo de la tarea dueña y se agrega su prueba).
 
@@ -1790,6 +1921,7 @@ Expected: `✅ Suelosur corriendo en puerto 3000`. No hay migraciones nuevas, as
 - Elegir una obra → desaparece la sección de pagos.
 - Filtrar por tipo y por estado de pago.
 - "Descargar PDF" con cliente y sin cliente: abrir y revisar el layout.
+- Transacciones: filtrar por N° de OP (`308` y `OP-0308`), cambiar el período con los chips y ver que el filtro se mantiene; exportar el reporte filtrado.
 - El menú muestra Contabilidad → Liquidaciones; Contenedores → Cobranzas sigue igual; `/cobranzas` sigue llevando a Cuentas corrientes.
 
 - [ ] **Step 3: Frenar el servidor** y reportar lo revisado (con capturas si se pudo).
