@@ -557,24 +557,27 @@ const VentasController = {
 
   // ── Libro de ventas (reporte a nivel de renglón) ─────────────
   async libroForm(req, res) {
-    res.render('pages/ventas/libro', { titulo: 'Libro de ventas', filtros: req.query })
+    res.render('pages/ventas/libro', { titulo: 'Libro de ventas', filtros: req.query, scripts: ['/js/buscarCliente.js', '/js/filtroObra.js'] })
   },
 
   async libroPDF(req, res) {
     try {
       const ReportesModel = require('../models/reportes.model')
+      const ClientesModel = require('../models/clientes.model')
       const { generarLibroVentasPDF } = require('../utils/pdfLibroVentas')
       const { fmtFecha, hoyISO } = require('../utils/fecha')
       const { desde, hasta, clienteId } = req.query
-      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
+      // La obra solo filtra si hay cliente: las obras se listan por cliente
+      const obra = clienteId ? await ClientesModel.obraPorClave(clienteId, req.query.obra) : null
+      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null, opIds: obra ? obra.opIds : null })
       let clienteLabel = null
       if (clienteId) {
-        const cli = await require('../models/clientes.model').obtener(clienteId)
+        const cli = await ClientesModel.obtener(clienteId)
         clienteLabel = cli ? `${cli.nombre || ''} ${cli.apellido || ''}`.trim() : null
       }
       const periodoLabel = [desde && `desde ${fmtFecha(desde)}`, hasta && `hasta ${fmtFecha(hasta)}`].filter(Boolean).join(' ') || 'Histórico completo'
       return generarLibroVentasPDF(res, {
-        filas, total, periodoLabel, clienteLabel,
+        filas, total, periodoLabel, clienteLabel, obraLabel: obra ? obra.nombre : null,
         nombreArchivo: clienteId ? `libro-ventas-cliente-${clienteId}` : 'libro-ventas',
       })
     } catch (err) { console.error(err); req.flash('error', 'Error al generar el libro de ventas.'); res.redirect('/ventas/libro') }
@@ -586,7 +589,8 @@ const VentasController = {
       const { generarExcel } = require('../utils/excel')
       const { fmtFecha, hoyISO } = require('../utils/fecha')
       const { desde, hasta, clienteId } = req.query
-      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null })
+      const obra = clienteId ? await require('../models/clientes.model').obraPorClave(clienteId, req.query.obra) : null
+      const { filas, total } = await ReportesModel.libroVentas({ desde: desde || null, hasta: hasta || null, clienteId: clienteId || null, opIds: obra ? obra.opIds : null })
       // La columna Cliente solo tiene sentido si el libro mezcla varios clientes — si ya
       // está filtrado a uno, se repite igual en las 28 filas y no aporta nada.
       const columnas = [
@@ -602,7 +606,7 @@ const VentasController = {
       ]
       const filasX = filas.map(f => ({ ...f, fecha: fmtFecha(f.fecha) }))
       filasX.push({ material: 'TOTAL', importe: total })
-      return generarExcel(res, { titulo: 'Libro de ventas', columnas, filas: filasX, nombreArchivo: clienteId ? `libro-ventas-cliente-${clienteId}` : 'libro-ventas' })
+      return generarExcel(res, { titulo: obra ? `Libro de ventas — Obra: ${obra.nombre}` : 'Libro de ventas', columnas, filas: filasX, nombreArchivo: clienteId ? `libro-ventas-cliente-${clienteId}` : 'libro-ventas' })
     } catch (err) { console.error(err); req.flash('error', 'Error al generar el Excel.'); res.redirect('/ventas/libro') }
   },
 

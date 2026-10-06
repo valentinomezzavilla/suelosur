@@ -76,7 +76,9 @@ const ClientesController = {
       const periodo = resolverPeriodo({
         preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
       })
-      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
+      const obra = await ClientesModel.obraPorClave(cli.id, req.query.obra)
+      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta, obra })
+      const obras = await ClientesModel.obras(cli.id)
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
       // Cuánto falta de cada cargo: "Saldar" solo en los que todavía deben algo
       const pendientes = await ClientesModel.pendientePorCargo(cli.id)
@@ -91,9 +93,9 @@ const ClientesController = {
       }))
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, sinCargo,
+        cliente, estado, pendientes, sinCargo, obras, obra,
         periodoLabel: etiquetaPeriodo(periodo),
-        filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
+        filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '', obra: obra ? obra.clave : '' },
         scripts: ['/js/modalAbonar.js'],
       })
     } catch (err) {
@@ -108,9 +110,10 @@ const ClientesController = {
       const periodo = resolverPeriodo({
         preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
       })
-      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta })
+      const obra = await ClientesModel.obraPorClave(cli.id, req.query.obra)
+      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta, obra })
       const { generarEstadoCuentaPDF } = require('../utils/pdfEstadoCuenta')
-      generarEstadoCuentaPDF(res, { cliente: cli, estado, periodoLabel: etiquetaPeriodo(periodo) })
+      generarEstadoCuentaPDF(res, { cliente: cli, estado, periodoLabel: etiquetaPeriodo(periodo), obraLabel: obra ? obra.nombre : null })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al generar el PDF.'); res.redirect('back')
     }
@@ -262,6 +265,16 @@ const ClientesController = {
     res.redirect('back')
   },
 
+  // API JSON: obras del cliente para el filtro por obra (libro de ventas)
+  async obrasApi(req, res) {
+    try {
+      const obras = await ClientesModel.obras(req.params.id)
+      res.json(obras.map(o => ({ clave: o.clave, nombre: o.nombre })))
+    } catch (err) {
+      console.error(err); res.status(500).json({ error: 'Error.' })
+    }
+  },
+
   // API JSON para buscar clientes desde el front (buscarCliente.js)
   async buscarApi(req, res) {
     try {
@@ -309,6 +322,7 @@ const ClientesController = {
       res.render('pages/clientes/reporte', {
         titulo: `Reporte — ${ClientesModel.nombreCompleto(cliente)}`,
         cliente,
+        obras: await ClientesModel.obras(cliente.id),
         filtros: { fechaDesde: '', fechaHasta: '', tipo: 'todos', incluir: ['transacciones','movimientos'] },
       })
     } catch (err) { console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes') }

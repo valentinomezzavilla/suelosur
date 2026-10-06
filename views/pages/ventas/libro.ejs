@@ -7,6 +7,26 @@
   <div class="card-body">
     <p class="text-muted mb-3">Reporte detallado, un renglón por venta: fecha, remito, cantidad, material, cliente, obra, precio unitario e importe. Elegí el período y descargalo en PDF o Excel.</p>
     <form method="GET">
+      <%# Cliente (opcional): al elegirlo se habilita el filtro por obra (js/filtroObra.js) %>
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-12 col-md-6 position-relative">
+          <label class="form-label" for="buscarClienteInput">Cliente (opcional)</label>
+          <input type="text" id="buscarClienteInput" class="form-control" autocomplete="off" placeholder="Nombre, apellido, N° o DNI...">
+          <ul id="buscarClienteDropdown" class="autocomplete-dropdown" style="display:none"></ul>
+          <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="display:none">
+            <span id="clienteSeleccionadoNombre"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCambiarCliente">Cambiar</button>
+          </div>
+          <input type="hidden" name="clienteId" id="inputClienteId">
+          <input type="hidden" id="inputClienteNombre">
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="filtroObra">Obra</label>
+          <select name="obra" id="filtroObra" class="form-select" disabled>
+            <option value="">Elegí un cliente para ver sus obras</option>
+          </select>
+        </div>
+      </div>
       <div class="row g-2 align-items-end">
         <div class="col-6 col-md-3">
           <label class="form-label">Desde</label>

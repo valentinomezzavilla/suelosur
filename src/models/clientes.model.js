@@ -1,6 +1,7 @@
 'use strict'
 const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
+const { agruparObras, movimientoDeObra } = require('../utils/obras')
 
 // Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
 // En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
@@ -338,20 +339,54 @@ const ClientesModel = {
     await query(`UPDATE clientes SET cuenta_corriente = 0 WHERE id = ?`, [id])
   },
 
+  // Obras del cliente (ver utils/obras): [{ clave, nombre, opIds }]. El listado para elegir
+  // deja afuera las anuladas; para filtrar se incluyen, así sus movimientos no se pierden.
+  async obras(clienteId, { incluirAnuladas = false } = {}) {
+    const { rows } = await query(`
+      SELECT op.id, op.obra, op.domicilio_calle, op.domicilio_altura,
+             oc.domicilio_calle AS cont_calle, oc.domicilio_numero AS cont_numero, oc.domicilio_entrega AS cont_entrega,
+             om.domicilio_calle AS maq_calle, om.domicilio_numero AS maq_numero, om.domicilio_entrega AS maq_entrega
+      FROM op_encabezado op
+      LEFT JOIN LATERAL (SELECT * FROM op_detalle_contenedor d WHERE d.id_orden_pedido = op.id ORDER BY d.id LIMIT 1) oc ON TRUE
+      LEFT JOIN LATERAL (SELECT * FROM op_detalle_maquinaria d WHERE d.id_orden_pedido = op.id ORDER BY d.id LIMIT 1) om ON TRUE
+      WHERE op.id_cliente = ? ${incluirAnuladas ? '' : `AND op.estado <> 'anulado'`}
+      ORDER BY op.id DESC
+    `, [clienteId])
+    return agruparObras(rows)
+  },
+
+  // Obra elegida en un filtro (por su clave) → { clave, nombre, opIds }, o null si no hay
+  // filtro. Una clave que ya no existe devuelve una obra sin operaciones.
+  async obraPorClave(clienteId, clave) {
+    if (!clave) return null
+    const obra = (await this.obras(clienteId, { incluirAnuladas: true })).find(o => o.clave === clave)
+    return obra || { clave, nombre: clave, opIds: [] }
+  },
+
   // Estado de cuenta de un período: movimientos + saldo inicial/final + totales.
   // Convención de signo: monto < 0 = débito (deuda), monto > 0 = crédito (pago/ajuste a favor).
-  async estadoCuenta(clienteId, { desde, hasta } = {}) {
+  // obra (de obraPorClave): solo los cargos de esa obra y todos los pagos del cliente.
+  async estadoCuenta(clienteId, { desde, hasta, obra } = {}) {
+    const opIds = obra ? new Set(obra.opIds.map(String)) : null
     const wheres = ['cliente_id = ?']
     const params = [clienteId]
-    if (desde) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(desde) }
+    // Con obra se traen también los anteriores al período: el saldo inicial se calcula acá
+    if (desde && !opIds) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(desde) }
     if (hasta) { wheres.push('LEFT(created_at, 10) <= ?'); params.push(hasta) }
-    const movimientos = (await query(
+    let movimientos = (await query(
       `SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`,
       params
     )).rows
 
     let saldoInicial = 0
-    if (desde) {
+    if (opIds) {
+      movimientos = movimientos.filter(m => movimientoDeObra(m, opIds))
+      if (desde) {
+        const antes = movimientos.filter(m => String(m.created_at).slice(0, 10) < desde)
+        saldoInicial = antes.reduce((s, m) => s + Number(m.monto), 0)
+        movimientos = movimientos.filter(m => String(m.created_at).slice(0, 10) >= desde)
+      }
+    } else if (desde) {
       saldoInicial = (await query(
         `SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_cuenta WHERE cliente_id = ? AND LEFT(created_at, 10) < ?`,
         [clienteId, desde]

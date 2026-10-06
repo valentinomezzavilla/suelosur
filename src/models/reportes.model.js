@@ -15,10 +15,12 @@ const FECHA = `COALESCE(op.fecha_entrega_planificada, op.fecha_emision)`
 
 const ReportesModel = {
 
-  async libroVentas({ desde, hasta, clienteId } = {}) {
+  // opIds: solo esas operaciones (filtro por obra, ver ClientesModel.obraPorClave)
+  async libroVentas({ desde, hasta, clienteId, opIds } = {}) {
     const cond = [`op.estado <> 'anulado'`]
     const params = []
     if (clienteId) { cond.push('op.id_cliente = ?'); params.push(clienteId) }
+    if (opIds)     { cond.push('op.id = ANY(?::bigint[])'); params.push(opIds.map(Number)) }
     if (desde)     { cond.push(`${FECHA} >= ?`);     params.push(desde) }
     if (hasta)     { cond.push(`${FECHA} <= ?`);     params.push(hasta) }
     const where = cond.join(' AND ')

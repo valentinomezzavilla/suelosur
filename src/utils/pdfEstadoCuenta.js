@@ -18,7 +18,7 @@ const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', che
 // Deudas = cargadas a cuenta corriente; pagos = método capturado; resto = —
 const metodoDe = (m) => m.tipo === 'deuda' ? 'Cta. corriente' : (m.metodo_pago ? (METODO_LABEL[m.metodo_pago] || m.metodo_pago) : '—')
 
-function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel }) {
+function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel, obraLabel }) {
   const doc = new PDFDocument({ size: 'A4', margin: 48 })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="estado-cuenta-${cliente.numero || 'cliente'}.pdf"`)
@@ -31,7 +31,10 @@ function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel }) {
   // Encabezado de marca (con logo)
   let y = B.drawHeader(doc, {
     titulo: 'Estado de cuenta',
-    derecha: [{ label: 'Período', valor: periodoLabel || '—' }],
+    derecha: [
+      { label: 'Período', valor: periodoLabel || '—' },
+      ...(obraLabel ? [{ label: 'Obra', valor: obraLabel, color: TINTA }] : []),
+    ],
   })
 
   // Cliente

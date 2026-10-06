@@ -12,7 +12,7 @@ const B = require('./pdfBrand')
 
 const PAD = 4
 
-function generarLibroVentasPDF(res, { filas = [], total = 0, periodoLabel, clienteLabel, nombreArchivo } = {}) {
+function generarLibroVentasPDF(res, { filas = [], total = 0, periodoLabel, clienteLabel, obraLabel, nombreArchivo } = {}) {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 36 })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="${nombreArchivo || 'libro-ventas'}.pdf"`)
@@ -23,6 +23,7 @@ function generarLibroVentasPDF(res, { filas = [], total = 0, periodoLabel, clien
   const width = right - left
 
   const derecha = [{ label: 'Período', valor: periodoLabel || 'Histórico completo' }]
+  if (obraLabel) derecha.unshift({ label: 'Obra', valor: obraLabel, color: B.TINTA })
   if (clienteLabel) derecha.unshift({ label: 'Cliente', valor: clienteLabel, color: B.TINTA, bold: true })
   let y = B.drawHeader(doc, { titulo: 'Libro de ventas', derecha })
 
