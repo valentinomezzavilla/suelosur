@@ -28,11 +28,21 @@ document.addEventListener('DOMContentLoaded', () => {
     const hoy = (() => { const d = new Date(), p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; })();
     if (fechaInput && !fechaInput.value) fechaInput.value = hoy;
 
+    // "Sin Número": el cliente no tiene teléfono, se deja confirmar sin cargarlo
+    const checkSinTel = document.getElementById('checkSinTelefono');
+    checkSinTel?.addEventListener('change', () => {
+        const telInput = document.getElementById('telefonoViaje');
+        if (!telInput) return;
+        telInput.disabled = checkSinTel.checked;
+        telInput.required = !checkSinTel.checked;
+        if (checkSinTel.checked) telInput.value = '';
+    });
+
     // cuando selecciono un cliente, le cargo el telefono y la zona automaticamente
     document.addEventListener('clienteSeleccionado', (e) => {
         const c = e.detail;
         const telInput = document.getElementById('telefonoViaje');
-        if (telInput && c.telefono) telInput.value = c.telefono;
+        if (telInput && c.telefono && !checkSinTel?.checked) telInput.value = c.telefono;
         // Zona del cliente → preseleccionar (si el select la tiene) y autocompletar tarifa
         const zonaSel = document.getElementById('zonaViaje');
         if (zonaSel && c.zona && !zonaSel.value) {
@@ -316,8 +326,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const tel = document.getElementById('telefonoViaje')?.value.trim();
-        if (!tel) {
-            alert('El telefono de contacto es obligatorio.');
+        if (!tel && !checkSinTel?.checked) {
+            alert('El telefono de contacto es obligatorio. Si no tiene, tildá "Sin Número".');
             e.preventDefault();
             return;
         }

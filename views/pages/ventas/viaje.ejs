@@ -16,7 +16,13 @@
                     <%- include('../../partials/buscar_cliente') %>
                     <div class="form-group" style="margin-top:0.75rem">
                         <label for="telefonoViaje">Telefono de contacto *</label>
-                        <input type="text" name="telefono" id="telefonoViaje" placeholder="351 000 0000" required>
+                        <div class="precio-total-row">
+                            <input type="text" name="telefono" id="telefonoViaje" placeholder="351 000 0000" required>
+                            <label class="toggle-row toggle-sm">
+                                <input type="checkbox" id="checkSinTelefono">
+                                <span>Sin Número</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
 

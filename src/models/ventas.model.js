@@ -17,6 +17,9 @@ const SQL_TOTAL = `COALESCE(op.monto_total, ${SQL_SUBTOTAL} + COALESCE(op.precio
 
 const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 
+// Altura de la calle como entero; "sn", "s/n" o cualquier texto no numérico → null (sin número)
+const alturaNum = (v) => { const n = parseInt(v, 10); return Number.isNaN(n) ? null : n }
+
 // Productos, flete y la diferencia con el total pactado (si se editó a mano).
 function importesVenta(op, subtotal) {
   const flete = Number(op.precio_flete) || 0
@@ -174,8 +177,8 @@ const VentasModel = {
       `, [id_cliente, id_administrativo, tipo_op, nro, nro_rem,
           observaciones, fecha_entrega_planificada || null, hora_planificada || null, modalidad || null,
           metodo_pago || null, dom.calle || null,
-          dom.altura ? parseInt(dom.altura) : null,
-          dom.sin_numero ? 1 : 0, zona || null, obra || null, fecha_emision || null,
+          alturaNum(dom.altura),
+          dom.sin_numero || alturaNum(dom.altura) == null ? 1 : 0, zona || null, obra || null, fecha_emision || null,
           precio_flete, monto_total])
       const id = rows[0].id
 
@@ -212,7 +215,7 @@ const VentasModel = {
     if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
 
     const calle  = (datos.calle || '').trim() || null
-    const numero = datos.numero ? parseInt(datos.numero) : null
+    const numero = alturaNum(datos.numero)
     const obra   = (datos.obra || '').trim() || null
     if (!calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
     const fecha  = datos.fecha || null
