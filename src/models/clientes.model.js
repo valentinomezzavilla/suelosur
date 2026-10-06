@@ -196,11 +196,11 @@ const ClientesModel = {
     return (await query(`SELECT * FROM movimientos_cuenta WHERE ${wheres.join(' AND ')} ORDER BY created_at ASC, id ASC`, params)).rows
   },
 
-  // Saldo pendiente de ventas puntuales a cuenta corriente (venta por venta, no el
-  // saldo global del cliente). No hay un vínculo pago↔venta explícito: los pagos se
-  // aplican en orden FIFO contra las deudas más antiguas del cliente, igual que ya
-  // refleja el saldo corrido de estadoCuenta(). Devuelve { [id_op_encabezado]: boolean saldada }.
-  async saldadaPorOperacion(opIds) {
+  // Cargo en cuenta corriente de cada operación y cuánto se le imputó: { [id_op]: { total, pagado } }.
+  // No hay un vínculo pago↔venta explícito: los pagos se aplican en orden FIFO contra las
+  // deudas más antiguas del cliente, igual que ya refleja el saldo corrido de estadoCuenta().
+  // Solo trae las operaciones que tienen cargo.
+  async pagadoPorOperacion(opIds) {
     const ids = [...new Set((opIds || []).filter(Boolean))]
     if (!ids.length) return {}
     const ph = ids.map(() => '?').join(',')
@@ -246,6 +246,18 @@ const ClientesModel = {
     const resultado = {}
     for (const id of ids) {
       const d = deudas[id]
+      if (d) resultado[id] = { total: Math.round(d.total * 100) / 100, pagado: Math.round(d.pagado * 100) / 100 }
+    }
+    return resultado
+  },
+
+  // ¿El cliente ya saldó cada operación? { [id_op_encabezado]: boolean } (sin cargo = saldada).
+  async saldadaPorOperacion(opIds) {
+    const ids = [...new Set((opIds || []).filter(Boolean))]
+    const pagos = await this.pagadoPorOperacion(ids)
+    const resultado = {}
+    for (const id of ids) {
+      const d = pagos[id]
       resultado[id] = d ? d.pagado >= d.total - 1e-6 : true
     }
     return resultado

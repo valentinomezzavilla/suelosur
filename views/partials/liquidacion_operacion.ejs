@@ -1,0 +1,44 @@
+<%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS %>
+<% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+<div class="liq-op liq-op--<%= o.estado %>">
+  <div class="liq-op__head">
+    <div class="liq-op__titulo">
+      <strong>OP-<%= String(o.nro_op).padStart(4, '0') %></strong>
+      <% if (o.nro_remito) { %><span>Remito <%= o.nro_remito %></span><% } %>
+      <span><%= formatFecha(o.fecha) %></span>
+      <span><%= o.tipoTexto %></span>
+      <% if (o.obra) { %><span>Obra: <%= o.obra %></span><% } %>
+    </div>
+    <div class="liq-op__acciones">
+      <span class="liq-estado liq-estado--<%= o.estado %>"><%= ESTADOS[o.estado] %></span>
+      <% const href = o.tipo === 'contenedor' ? '/alquileres/contenedores/' + o.id : o.tipo === 'maquinaria' ? '/alquileres/maquinaria/' + o.id : '/ventas/' + o.id %>
+      <a href="<%= href %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm liq-op__tabla mb-0">
+      <thead><tr><th>Detalle</th><th class="text-end">Cant.</th><th>Unid.</th><th class="text-end">P. unit.</th><th class="text-end">Importe</th></tr></thead>
+      <tbody>
+        <% o.renglones.forEach(r => { %>
+          <tr>
+            <td><%= r.descripcion %></td>
+            <td class="text-end"><%= Number(r.cantidad).toLocaleString('es-AR') %></td>
+            <td><%= r.unidad %></td>
+            <td class="text-end"><%= $(r.precio_unit) %></td>
+            <td class="text-end"><%= $(r.importe) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+  <div class="liq-op__pie">
+    <span class="text-muted">Pago: <%= o.metodoTexto %></span>
+    <% if (o.estado === 'a_convenir') { %>
+      <span class="text-muted">Precio a convenir</span>
+    <% } else { %>
+      <span>Total <strong><%= $(o.total) %></strong></span>
+      <span class="text-success">Pagado <strong><%= $(o.pagado) %></strong></span>
+      <span class="<%= o.resta > 0.005 ? 'text-danger' : 'text-success' %>">Resta <strong><%= $(o.resta) %></strong></span>
+    <% } %>
+  </div>
+</div>

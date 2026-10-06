@@ -89,6 +89,7 @@ app.use('/hoja-de-ruta',  require('./routes/hojaRuta.routes'))
 app.use('/circuitos',     require('./routes/circuitos.routes'))
 app.use('/zonas',         require('./routes/zonas.routes'))
 app.use('/facturacion',   require('./routes/facturacion.routes'))
+app.use('/liquidaciones', require('./routes/liquidaciones.routes'))
 
 // ── Placeholders (módulos futuros) ───────────────────────────────
 const placeholder = (titulo, icono, sprint) => (req, res) =>
@@ -103,7 +104,7 @@ app.get('/', (req, res) => {
   const destinos = {
     dueno:          '/dashboard',
     admin_ventas:   '/ventas',
-    admin_contable: '/cobranzas',
+    admin_contable: '/liquidaciones',
     chofer:         '/hoja-de-ruta',
   }
   res.redirect(destinos[req.session.user.rol] || '/ventas')

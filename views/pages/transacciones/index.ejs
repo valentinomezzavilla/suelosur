@@ -9,6 +9,7 @@
                     if (filtros.tipo && filtros.tipo !== 'todos') o.tipo = filtros.tipo
                     if (filtros.cliente) o.cliente = filtros.cliente
                     if (filtros.remito) o.remito = filtros.remito
+                    if (filtros.nroOp) o.nroOp = filtros.nroOp
                     return '/transacciones?' + new URLSearchParams(o).toString()
                 }
                 // El reporte usa los mismos filtros que la tabla (sin la página ni el orden)
@@ -80,6 +81,11 @@
                     <label>Remito</label>
                     <input type="text" name="remito" value="<%= filtros.remito %>" inputmode="numeric"
                         maxlength="8" placeholder="N° de remito..." autocomplete="off">
+                </div>
+                <div class="filtro-group">
+                    <label>N° de OP</label>
+                    <input type="text" name="nroOp" value="<%= filtros.nroOp %>" maxlength="10"
+                        placeholder="Ej: 308 u OP-0308" autocomplete="off">
                 </div>
                 <div class="filtro-group">
                     <label>Desde</label>

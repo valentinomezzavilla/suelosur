@@ -1352,3 +1352,7 @@ const AlquileresModel = {
 }
 
 module.exports = AlquileresModel
+
+// Fragmentos SQL que reusa la liquidación (usan el alias oc = op_detalle_contenedor)
+module.exports.SQL_FECHA_CIERRE_OP = SQL_FECHA_CIERRE_OP
+module.exports.SQL_MOV_ALQUILER_OP = SQL_MOV_ALQUILER_OP

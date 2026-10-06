@@ -14,7 +14,7 @@ function leerFiltros(q) {
   return {
     periodo,
     filtros: {
-      id: q.id, tipo: q.tipo, clienteId: q.idCliente, cliente: q.cliente, remito: q.remito,
+      id: q.id, tipo: q.tipo, clienteId: q.idCliente, cliente: q.cliente, remito: q.remito, nroOp: q.nroOp,
       fechaDesde: periodo.desde, fechaHasta: periodo.hasta,
       montoMin: q.montoMin, montoMax: q.montoMax,
     },
@@ -24,7 +24,7 @@ function leerFiltros(q) {
 const TransaccionesController = {
   async index(req, res) {
     try {
-      const { id, tipo, idCliente, cliente, remito, montoMin, montoMax, sortBy, sortDir } = req.query
+      const { id, tipo, idCliente, cliente, remito, nroOp, montoMin, montoMax, sortBy, sortDir } = req.query
 
       // Período: presets (hoy/semana/mes/rango). Default = mes en curso.
       const { periodo, filtros: baseFiltros } = leerFiltros(req.query)
@@ -38,7 +38,7 @@ const TransaccionesController = {
       const metricas = await TransaccionesModel.resumen(baseFiltros)
 
       const filtros = {
-        id: id||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'', remito: remito||'',
+        id: id||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'', remito: remito||'', nroOp: nroOp||'',
         fechaDesde: periodo.desde||'', fechaHasta: periodo.hasta||'', montoMin: montoMin||'',
         montoMax: montoMax||'', mes: periodo.mes||'', preset: periodo.preset||'',
         sortBy: sortBy||'created_at', sortDir: sortDir||'DESC',
