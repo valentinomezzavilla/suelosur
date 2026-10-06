@@ -133,8 +133,8 @@
     <% if (['admin_contable','dueno'].includes(user?.rol)) { %>
     <div class="nav-section">
       <div class="nav-section-label">Contabilidad</div>
-      <a href="/cobranzas" class="nav-link <%= t==='Cuentas corrientes'?'is-active':'' %>">
-        <%- ic('dollar') %><span>Cobranzas</span>
+      <a href="/liquidaciones" class="nav-link <%= t==='Liquidaciones'?'is-active':'' %>">
+        <%- ic('receipt') %><span>Liquidaciones</span>
       </a>
       <a href="/clientes" class="nav-link <%= t==='Clientes'?'is-active':'' %>">
         <%- ic('users') %><span>Clientes</span>

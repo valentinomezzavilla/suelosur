@@ -1,0 +1,147 @@
+<% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+<%
+  // Misma URL con los filtros actuales (para el PDF y el link "Ver liquidación" de cada cliente)
+  const qs = (extra = {}) => {
+    const p = new URLSearchParams()
+    const f = { ...filtros, ...extra }
+    if (f.clienteId) p.set('clienteId', f.clienteId)
+    if (f.obra) p.set('obra', f.obra)
+    p.set('desde', f.desde); p.set('hasta', f.hasta)
+    f.tipos.forEach(t => p.append('tipos', t))
+    p.set('estadoPago', f.estadoPago)
+    return p.toString()
+  }
+  const r = liquidacion.resumen
+  const conCliente = !!filtros.clienteId && liquidacion.clientes.length
+%>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Liquidaciones</h4>
+  <a href="/liquidaciones/pdf?<%= qs() %>" target="_blank" class="btn btn-naranja"><%- icon('download', { size: 15 }) %> Descargar PDF</a>
+</div>
+
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" action="/liquidaciones">
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-12 col-md-5 position-relative">
+          <label class="form-label" for="buscarClienteInput">Cliente</label>
+          <input type="text" id="buscarClienteInput" class="form-control" autocomplete="off" placeholder="Todos los clientes — escribí nombre, N° o DNI..."
+                 style="<%= clienteSel ? 'display:none' : '' %>">
+          <ul id="buscarClienteDropdown" class="autocomplete-dropdown" style="display:none"></ul>
+          <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="<%= clienteSel ? 'display:flex' : 'display:none' %>">
+            <span id="clienteSeleccionadoNombre"><%= clienteSel ? (clienteSel.numero != null ? '#' + clienteSel.numero + ' — ' : '') + clienteSel.nombreCompleto : '' %></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCambiarCliente">Cambiar</button>
+          </div>
+          <input type="hidden" name="clienteId" id="inputClienteId" value="<%= clienteSel ? clienteSel.id : '' %>">
+          <input type="hidden" id="inputClienteNombre" value="<%= clienteSel ? clienteSel.nombreCompleto : '' %>">
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="filtroObra">Obra</label>
+          <select name="obra" id="filtroObra" class="form-select" <%= clienteSel && obras.length ? '' : 'disabled' %>>
+            <% if (!clienteSel) { %>
+              <option value="">Elegí un cliente para ver sus obras</option>
+            <% } else if (!obras.length) { %>
+              <option value="">El cliente no tiene obras cargadas</option>
+            <% } else { %>
+              <option value="">Todas las obras</option>
+              <% obras.forEach(o => { %><option value="<%= o.clave %>" <%= filtros.obra === o.clave ? 'selected' : '' %>><%= o.nombre %></option><% }) %>
+            <% } %>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Estado de pago</label>
+          <select name="estadoPago" class="form-select">
+            <option value="todas" <%= filtros.estadoPago === 'todas' ? 'selected' : '' %>>Todas</option>
+            <option value="pendientes" <%= filtros.estadoPago === 'pendientes' ? 'selected' : '' %>>Solo pendientes</option>
+            <option value="pagadas" <%= filtros.estadoPago === 'pagadas' ? 'selected' : '' %>>Solo pagadas</option>
+          </select>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+          <label class="form-label">Desde</label>
+          <input type="date" name="desde" class="form-control" value="<%= filtros.desde %>">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Hasta</label>
+          <input type="date" name="hasta" class="form-control" value="<%= filtros.hasta %>">
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="form-label d-block">Operaciones</label>
+          <div class="liq-tipos">
+            <% Object.entries(TIPOS).forEach(([k, label]) => { %>
+              <label class="liq-tipo"><input type="checkbox" name="tipos" value="<%= k %>" <%= filtros.tipos.includes(k) ? 'checked' : '' %>> <%= label %></label>
+            <% }) %>
+          </div>
+        </div>
+        <div class="col-12 col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Ver</button>
+          <a href="/liquidaciones" class="btn btn-outline-secondary">Limpiar</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="liq-resumen mb-3">
+  <div class="liq-resumen__caja"><span>Total consumido</span><strong><%= $(r.consumido) %></strong></div>
+  <div class="liq-resumen__caja"><span>Pagado</span><strong class="text-success"><%= $(r.pagado) %></strong></div>
+  <div class="liq-resumen__caja"><span>Saldo pendiente</span><strong class="<%= r.saldo > 0.005 ? 'text-danger' : 'text-success' %>"><%= $(r.saldo) %></strong></div>
+  <div class="liq-resumen__caja"><span>Operaciones</span><strong><%= r.cantidad %></strong></div>
+</div>
+
+<% if (!r.cantidad) { %>
+  <div class="card shadow-sm"><div class="card-body text-center text-muted py-5">Sin operaciones en el período.</div></div>
+<% } else if (conCliente) { %>
+  <% const c = liquidacion.clientes[0] %>
+  <% c.operaciones.forEach(o => { %><%- include('../../partials/liquidacion_operacion', { o, ESTADOS }) %><% }) %>
+<% } else { %>
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-2">Resumen por cliente</h6>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Cliente</th><th class="text-end">Ops.</th><th class="text-end">Consumido</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th></th></tr></thead>
+          <tbody>
+            <% liquidacion.clientes.forEach(c => { %>
+              <tr>
+                <td><%= c.cliente.nombreCompleto %></td>
+                <td class="text-end"><%= c.resumen.cantidad %></td>
+                <td class="text-end"><%= $(c.resumen.consumido) %></td>
+                <td class="text-end"><%= $(c.resumen.pagado) %></td>
+                <td class="text-end <%= c.resumen.saldo > 0.005 ? 'text-danger' : '' %>"><%= $(c.resumen.saldo) %></td>
+                <td class="text-end"><a href="/liquidaciones?<%= qs({ clienteId: String(c.cliente.id), obra: null }) %>">Ver liquidación</a></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <% liquidacion.clientes.forEach(c => { %>
+    <h5 class="liq-cliente-titulo"><%= c.cliente.nombreCompleto %></h5>
+    <% c.operaciones.forEach(o => { %><%- include('../../partials/liquidacion_operacion', { o, ESTADOS }) %><% }) %>
+  <% }) %>
+<% } %>
+
+<% if (conCliente && liquidacion.clientes[0].pagos) { %>
+  <% const pagos = liquidacion.clientes[0].pagos %>
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <h6 class="fw-bold mb-2">Pagos recibidos del período</h6>
+      <% if (!pagos.length) { %>
+        <p class="text-muted mb-0">Sin pagos registrados en el período.</p>
+      <% } else { %>
+        <table class="table table-sm mb-0">
+          <thead><tr><th>Fecha</th><th>Método</th><th>Descripción</th><th class="text-end">Monto</th></tr></thead>
+          <tbody>
+            <% pagos.forEach(p => { %>
+              <tr><td><%= formatFecha(p.fecha) %></td><td><%= p.metodoTexto %></td><td><%= p.descripcion %></td><td class="text-end"><%= $(p.monto) %></td></tr>
+            <% }) %>
+            <tr class="fw-bold"><td colspan="3">Total</td><td class="text-end"><%= $(pagos.reduce((s, p) => s + p.monto, 0)) %></td></tr>
+          </tbody>
+        </table>
+      <% } %>
+    </div>
+  </div>
+<% } %>

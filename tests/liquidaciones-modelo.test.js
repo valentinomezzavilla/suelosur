@@ -122,4 +122,20 @@ describe('LiquidacionesModel.liquidacion', () => {
     assert.equal(r[contado], undefined)
     assert.deepEqual(await ClientesModel.saldadaPorOperacion([cc]), { [cc]: false })
   })
+
+  it('controlador: con filtros manipulados no rompe y cae en los defaults', async () => {
+    const Controller = require('../src/controllers/liquidaciones.controller')
+    const llamar = (accion, query) => new Promise((resolve, reject) => {
+      const flashes = []
+      const req = { query, session: { user: { id: admin, rol: 'dueno' } }, flash: (t, m) => flashes.push({ t, m }) }
+      const res = { render: (vista, data) => resolve({ vista, data, flashes }), redirect: (url) => resolve({ url, flashes }), status() { return this } }
+      Promise.resolve(Controller[accion](req, res)).catch(reject)
+    })
+    const a = await llamar('index', { clienteId: String(cliente), desde: 'hola', tipos: 'xxx', estadoPago: 'raro' })
+    assert.equal(a.vista, 'pages/liquidaciones/index')
+    assert.equal(a.data.filtros.estadoPago, 'todas')
+    const b = await llamar('index', { clienteId: '999999999' })
+    assert.equal(b.data.clienteSel, null)
+    assert.deepEqual(b.flashes, [{ t: 'error', m: 'Cliente no encontrado.' }])
+  })
 })
