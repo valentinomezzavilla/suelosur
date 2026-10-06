@@ -25,8 +25,7 @@
       <div class="row g-2 align-items-end mb-2">
         <div class="col-12 col-md-5 position-relative">
           <label class="form-label" for="buscarClienteInput">Cliente</label>
-          <input type="text" id="buscarClienteInput" class="form-control" autocomplete="off" placeholder="Todos los clientes — escribí nombre, N° o DNI..."
-                 style="<%= clienteSel ? 'display:none' : '' %>">
+          <input type="text" id="buscarClienteInput" class="form-control" autocomplete="off" placeholder="Todos los clientes — escribí nombre, N° o DNI...">
           <ul id="buscarClienteDropdown" class="autocomplete-dropdown" style="display:none"></ul>
           <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="<%= clienteSel ? 'display:flex' : 'display:none' %>">
             <span id="clienteSeleccionadoNombre"><%= clienteSel ? (clienteSel.numero != null ? '#' + clienteSel.numero + ' — ' : '') + clienteSel.nombreCompleto : '' %></span>

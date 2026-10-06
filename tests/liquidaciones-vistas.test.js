@@ -23,6 +23,13 @@ describe('vista liquidaciones', () => {
     assert.match(html, /Pagos recibidos/)
     assert.match(html, /\/liquidaciones\/pdf\?/)
   })
+  it('con cliente: el buscador queda visible (si no, "Cambiar" deja el campo vacío)', async () => {
+    const html = await renderVista('pages/liquidaciones/index', { ...base, filtros, clienteSel: cliente,
+      liquidacion: { clientes: [{ cliente, operaciones: [], resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 }, pagos: [], porObra: [] }],
+        resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 } } })
+    const input = html.match(/<input[^>]*id="buscarClienteInput"[^>]*>/)[0]
+    assert.doesNotMatch(input, /display:\s*none/)
+  })
   it('sin cliente: tabla resumen por cliente y obra deshabilitada', async () => {
     const html = await renderVista('pages/liquidaciones/index', { ...base, filtros: { ...filtros, clienteId: null }, clienteSel: null,
       liquidacion: { clientes: [{ cliente, operaciones: [op], resumen: { consumido: 1000, pagado: 400, saldo: 600, cantidad: 1 }, pagos: null, porObra: [] }],
