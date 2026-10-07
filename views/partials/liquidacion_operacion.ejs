@@ -3,8 +3,7 @@
 <div class="liq-op liq-op--<%= o.estado %>">
   <div class="liq-op__head">
     <div class="liq-op__titulo">
-      <strong>OP-<%= String(o.nro_op).padStart(4, '0') %></strong>
-      <% if (o.nro_remito) { %><span>Remito <%= o.nro_remito %></span><% } %>
+      <% if (o.nro_remito) { %><strong>Remito <%= o.nro_remito %></strong><% } else { %><strong>OP-<%= String(o.nro_op).padStart(4, '0') %></strong><% } %>
       <span><%= formatFecha(o.fecha) %></span>
       <span><%= o.tipoTexto %></span>
       <% if (o.obra) { %><span>Obra: <%= o.obra %></span><% } %>

@@ -17,7 +17,8 @@ describe('vista liquidaciones', () => {
       liquidacion: { clientes: [{ cliente, operaciones: [op], resumen: { consumido: 1000, pagado: 400, saldo: 600, cantidad: 1 },
         pagos: [{ fecha: '2026-10-06', metodoTexto: 'Efectivo', descripcion: 'Cobro', monto: 400 }], porObra: [] }],
         resumen: { consumido: 1000, pagado: 400, saldo: 600, cantidad: 1 } } })
-    assert.match(html, /OP-0308/)
+    assert.match(html, /Remito 1234/)
+    assert.doesNotMatch(html, /OP-0308/)
     assert.match(html, /Arena fina/)
     assert.match(html, /Parcial/)
     assert.match(html, /Pagos recibidos/)

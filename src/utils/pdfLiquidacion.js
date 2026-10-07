@@ -95,8 +95,8 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
         doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(10).text(v, left + 66, y - 1, { width: width - 66, lineBreak: false, ellipsis: true })
       } else dato(l, v, left, y + i * 15, mitad - 12)
     })
-    der.forEach(([l, v], i) => dato(l, v, left + mitad, y + (i + 1) * 15, mitad))
-    y += Math.max(izq.length, der.length + 1) * 15 + 6
+    der.forEach(([l, v], i) => dato(l, v, left + mitad, y + i * 15, mitad))
+    y += Math.max(izq.length, der.length) * 15 + 6
     linea(y)
     y += 14
   }
@@ -149,7 +149,8 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
 
     // Franja gris con los datos de la operación y su estado
     doc.rect(left, y, width, 20).fill(BANDA)
-    const titulo = [`OP-${String(o.nro_op).padStart(4, '0')}`, o.nro_remito && `Remito ${o.nro_remito}`, fmtFecha(o.fecha), o.tipoTexto,
+    // El N° mostrado es el remito cargado en el campo Remito; el N° de OP (automático) solo si no hay remito
+    const titulo = [o.nro_remito ? `Remito ${o.nro_remito}` : `OP-${String(o.nro_op).padStart(4, '0')}`, fmtFecha(o.fecha), o.tipoTexto,
       o.obra && `Obra: ${o.obra}`].filter(Boolean).join('  ·  ')
     doc.fillColor(NEGRO).fontSize(8.5).font('Helvetica-Bold').text(titulo, left + 8, y + 6, { width: width - 140, lineBreak: false, ellipsis: true })
     doc.fillColor(NEGRO).fontSize(7.5).font('Helvetica-Bold').text(ESTADOS[o.estado].toUpperCase(), right - 124, y + 6.5, { width: 116, align: 'right', lineBreak: false })
