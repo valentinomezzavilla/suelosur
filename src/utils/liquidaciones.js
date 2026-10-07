@@ -10,7 +10,7 @@ const TIPOS = {
 }
 const ESTADOS = { pagada: 'Pagada', parcial: 'Parcial', pendiente: 'Pendiente', a_convenir: 'Precio a convenir' }
 const METODOS = {
-  efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque',
+  efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq',
   cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor', a_convenir: 'A convenir',
 }
 const ESTADOS_FILTRO = ['todas', 'pendientes', 'pagadas']
