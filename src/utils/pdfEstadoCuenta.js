@@ -1,25 +1,29 @@
 'use strict'
 // ─────────────────────────────────────────────────────────────────
-// Resumen de cuenta corriente en PDF (pdfkit).
+// Estado de cuenta (liquidación al cliente) en PDF (pdfkit).
+// Diseño formal y sobrio: sin colores de acento, tabla con filetes finos,
+// saldo anterior, totales y saldo final. No muestra el método de pago de cada
+// movimiento: todo lo que figura se liquida en esta misma cuenta.
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
-const { fmtFechaHora } = require('./fecha')
+const { fmtFecha, hoyISO } = require('./fecha')
 const B = require('./pdfBrand')
 
-const AZUL = B.AZUL
-const GRIS = B.GRIS
-const TINTA = B.TINTA
-const ROJO = B.ROJO
-const VERDE = B.VERDE
+const NEGRO = '#111111'
+const GRIS_TEXTO = '#555555'
+const GRIS_LINEA = '#c8c8c8'
 
-const money = B.money
+// Importe sin símbolo (el encabezado aclara que son pesos): 1.234,50 / -1.234,50
+const num = (n) => Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-const METODO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cta. corriente' }
-// Deudas = cargadas a cuenta corriente; pagos = método capturado; resto = —
-const metodoDe = (m) => m.tipo === 'deuda' ? 'Cta. corriente' : (m.metodo_pago ? (METODO_LABEL[m.metodo_pago] || m.metodo_pago) : '—')
+function situacion(saldo) {
+  if (saldo < 0) return { titulo: 'SALDO DEUDOR', detalle: 'a abonar por el cliente' }
+  if (saldo > 0) return { titulo: 'SALDO A FAVOR', detalle: 'a favor del cliente' }
+  return { titulo: 'CUENTA SALDADA', detalle: '' }
+}
 
 function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel, obraLabel }) {
-  const doc = new PDFDocument({ size: 'A4', margin: 48 })
+  const doc = new PDFDocument({ size: 'A4', margin: 48, bufferPages: true })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="estado-cuenta-${cliente.numero || 'cliente'}.pdf"`)
   doc.pipe(res)
@@ -27,98 +31,143 @@ function generarEstadoCuentaPDF(res, { cliente, estado, periodoLabel, obraLabel 
   const left = doc.page.margins.left
   const right = doc.page.width - doc.page.margins.right
   const width = right - left
+  const limiteY = doc.page.height - doc.page.margins.bottom - 24
 
-  // Encabezado de marca (con logo)
-  let y = B.drawHeader(doc, {
-    titulo: 'Estado de cuenta',
-    derecha: [
-      { label: 'Período', valor: periodoLabel || '—' },
-      ...(obraLabel ? [{ label: 'Obra', valor: obraLabel, color: TINTA }] : []),
-    ],
-  })
+  const linea = (y, grosor = 0.5, color = GRIS_LINEA) =>
+    doc.moveTo(left, y).lineTo(right, y).lineWidth(grosor).strokeColor(color).stroke()
 
-  // Cliente
-  doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold').text('CLIENTE', left, y)
+  // ── Encabezado: empresa a la izquierda, título del documento a la derecha ──
+  const top = doc.page.margins.top
+  let textoX = left
+  if (B.HAY_LOGO) {
+    try { doc.image(B.LOGO_PATH, left, top, { width: 40, height: 40 }); textoX = left + 52 } catch (_) { /* sin logo */ }
+  }
+  doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(13).text(B.EMPRESA.razon.toUpperCase(), textoX, top + 3, { lineBreak: false })
+  doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(8)
+     .text(B.EMPRESA.rubro, textoX, top + 20, { lineBreak: false })
+     .text(B.EMPRESA.lugar, textoX, top + 31, { lineBreak: false })
+
+  doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(14)
+     .text('ESTADO DE CUENTA', left, top + 3, { width, align: 'right', lineBreak: false })
+  doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(8)
+     .text('Liquidación de cuenta corriente', left, top + 22, { width, align: 'right', lineBreak: false })
+     .text(`Fecha de emisión: ${fmtFecha(hoyISO())}`, left, top + 33, { width, align: 'right', lineBreak: false })
+
+  let y = top + 52
+  linea(y, 1.2, NEGRO)
+  y += 14
+
+  // ── Datos del cliente y del período ──
   const nombre = `${cliente.nombre} ${cliente.apellido || ''}`.trim()
-  doc.fillColor(TINTA).fontSize(13).font('Helvetica-Bold').text(nombre, left, y + 12)
-  doc.fillColor(GRIS).fontSize(9).font('Helvetica')
-  if (cliente.numero)   doc.text(`N° de cliente: ${cliente.numero}`, left, y + 30)
-  if (cliente.telefono) doc.text(`Tel: ${cliente.telefono}`, left, y + 42)
-  y += 64
+  const mitad = width / 2
+  const dato = (label, valor, x, yy, ancho, negrita = false) => {
+    doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(8).text(label, x, yy, { width: 62, lineBreak: false })
+    doc.fillColor(NEGRO).font(negrita ? 'Helvetica-Bold' : 'Helvetica').fontSize(9)
+       .text(valor, x + 66, yy - 0.5, { width: ancho - 66, lineBreak: false, ellipsis: true })
+  }
+  const izq = [['Cliente', nombre, true]]
+  if (cliente.numero)   izq.push(['N° de cliente', String(cliente.numero)])
+  if (cliente.telefono) izq.push(['Teléfono', String(cliente.telefono)])
+  const der = [['Período', periodoLabel || '—']]
+  if (obraLabel) der.push(['Obra', obraLabel])
 
-  // Resumen
-  const cajas = [
-    ['Saldo inicial', money(estado.saldoInicial), TINTA],
-    ['Débitos (cargos)', money(estado.debitos), ROJO],
-    ['Créditos (pagos)', money(estado.creditos), VERDE],
-    ['Saldo final', money(estado.saldoFinal), estado.saldoFinal < 0 ? ROJO : VERDE],
-  ]
-  const cw = (width - 18) / 4
-  cajas.forEach((c, i) => {
-    const x = left + i * (cw + 6)
-    doc.roundedRect(x, y, cw, 48, 6).fill('#f3f4f6')
-    doc.fillColor(GRIS).fontSize(7.5).font('Helvetica-Bold').text(c[0].toUpperCase(), x + 8, y + 8, { width: cw - 16 })
-    doc.fillColor(c[2]).fontSize(12).font('Helvetica-Bold').text(c[1], x + 8, y + 24, { width: cw - 16 })
-  })
-  y += 70
+  const filasDatos = Math.max(izq.length, der.length)
+  izq.forEach(([l, v, neg], i) => dato(l, v, left, y + i * 15, mitad - 12, neg))
+  der.forEach(([l, v], i) => dato(l, v, left + mitad, y + i * 15, mitad))
+  y += filasDatos * 15 + 8
+  linea(y)
+  y += 16
 
-  // Tabla de movimientos: columnas fijas salvo la descripción, que toma el resto
-  const PAD = 6
-  const GAP = 8
-  const fijas = { fecha: 64, metodo: 50, debito: 56, credito: 56, saldo: 62 }
+  // ── Tabla de movimientos ──
+  const PAD = 4
+  const GAP = 10
+  const fijas = { fecha: 56, debito: 68, credito: 68, saldo: 74 }
   const col = {}
-  col.fecha = { x: left + PAD, w: fijas.fecha }
-  col.saldo = { x: right - PAD - fijas.saldo, w: fijas.saldo }
+  col.fecha   = { x: left + PAD, w: fijas.fecha }
+  col.saldo   = { x: right - PAD - fijas.saldo, w: fijas.saldo }
   col.credito = { x: col.saldo.x - GAP - fijas.credito, w: fijas.credito }
-  col.debito = { x: col.credito.x - GAP - fijas.debito, w: fijas.debito }
-  col.metodo = { x: col.debito.x - GAP - fijas.metodo, w: fijas.metodo }
-  col.desc = { x: col.fecha.x + col.fecha.w + GAP, w: 0 }
-  col.desc.w = col.metodo.x - GAP - col.desc.x
+  col.debito  = { x: col.credito.x - GAP - fijas.debito, w: fijas.debito }
+  col.desc    = { x: col.fecha.x + col.fecha.w + GAP, w: 0 }
+  col.desc.w  = col.debito.x - GAP - col.desc.x
 
   const encabezadoTabla = () => {
-    doc.rect(left, y, width, 20).fill('#f3f4f6')
-    doc.fillColor(GRIS).fontSize(8).font('Helvetica-Bold')
-    doc.text('FECHA', col.fecha.x, y + 6, { width: col.fecha.w })
-    doc.text('DESCRIPCIÓN', col.desc.x, y + 6, { width: col.desc.w })
-    doc.text('MÉTODO', col.metodo.x, y + 6, { width: col.metodo.w })
-    doc.text('DÉBITO', col.debito.x, y + 6, { width: col.debito.w, align: 'right' })
-    doc.text('CRÉDITO', col.credito.x, y + 6, { width: col.credito.w, align: 'right' })
-    doc.text('SALDO', col.saldo.x, y + 6, { width: col.saldo.w, align: 'right' })
-    y += 20
+    linea(y, 0.8, NEGRO)
+    doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(7.5)
+    doc.text('FECHA', col.fecha.x, y + 7, { width: col.fecha.w, lineBreak: false })
+    doc.text('CONCEPTO', col.desc.x, y + 7, { width: col.desc.w, lineBreak: false })
+    doc.text('DÉBITO', col.debito.x, y + 7, { width: col.debito.w, align: 'right', lineBreak: false })
+    doc.text('CRÉDITO', col.credito.x, y + 7, { width: col.credito.w, align: 'right', lineBreak: false })
+    doc.text('SALDO', col.saldo.x, y + 7, { width: col.saldo.w, align: 'right', lineBreak: false })
+    y += 21
+    linea(y, 0.8, NEGRO)
   }
+  doc.fillColor(GRIS_TEXTO).font('Helvetica-Oblique').fontSize(7.5)
+     .text('Importes expresados en pesos argentinos ($)', left, y - 2, { width, align: 'right', lineBreak: false })
+  y += 12
   encabezadoTabla()
 
+  // Saldo anterior: punto de partida del período
+  const ALTO_MIN = 10
+  doc.fillColor(NEGRO).font('Helvetica-Oblique').fontSize(8.5)
+  doc.text('Saldo anterior', col.desc.x, y + 6, { width: col.desc.w, lineBreak: false })
+  doc.font('Helvetica').text(num(estado.saldoInicial), col.saldo.x, y + 6, { width: col.saldo.w, align: 'right', lineBreak: false })
+  y += ALTO_MIN + 12
+  linea(y)
+
   if (!estado.movimientos.length) {
-    doc.fillColor(GRIS).font('Helvetica').fontSize(8.5).text('Sin movimientos en el período.', left + PAD, y + 8)
-    y += 24
+    doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(8.5).text('Sin movimientos en el período.', col.desc.x, y + 8, { lineBreak: false })
+    y += 26
   } else {
-    estado.movimientos.forEach((m, i) => {
-      // La descripción se parte en varias líneas; la fila mide lo que ella necesite
+    estado.movimientos.forEach((m) => {
+      // El concepto se parte en varias líneas; la fila mide lo que necesite
       const desc = m.descripcion || ''
-      doc.font('Helvetica').fontSize(8)
-      const rowH = Math.max(doc.heightOfString(desc || ' ', { width: col.desc.w }), 10) + 9
-      if (y + rowH > doc.page.height - 60) { doc.addPage(); y = 56; encabezadoTabla() }
-      if (i % 2 === 1) doc.rect(left, y, width, rowH).fill('#fafafa')
-      const ty = y + 5
-      doc.fillColor(TINTA).font('Helvetica').fontSize(8)
-      doc.text(fmtFechaHora(m.created_at), col.fecha.x, ty, { width: col.fecha.w, lineBreak: false })
+      doc.font('Helvetica').fontSize(8.5)
+      const rowH = Math.max(doc.heightOfString(desc || ' ', { width: col.desc.w }), ALTO_MIN) + 12
+      if (y + rowH > limiteY - 70) { doc.addPage(); y = doc.page.margins.top; encabezadoTabla() }
+      const ty = y + 6
+      doc.fillColor(NEGRO).font('Helvetica').fontSize(8.5)
+      doc.text(fmtFecha(m.created_at), col.fecha.x, ty, { width: col.fecha.w, lineBreak: false })
       doc.text(desc, col.desc.x, ty, { width: col.desc.w })
-      doc.fillColor(GRIS).text(metodoDe(m), col.metodo.x, ty, { width: col.metodo.w, lineBreak: false, ellipsis: true })
-      doc.fillColor(ROJO).text(m.monto < 0 ? money(Math.abs(m.monto)) : '—', col.debito.x, ty, { width: col.debito.w, align: 'right', lineBreak: false })
-      doc.fillColor(VERDE).text(m.monto > 0 ? money(m.monto) : '—', col.credito.x, ty, { width: col.credito.w, align: 'right', lineBreak: false })
-      doc.fillColor(m.saldo < 0 ? ROJO : TINTA).font('Helvetica-Bold').text(money(m.saldo), col.saldo.x, ty, { width: col.saldo.w, align: 'right', lineBreak: false })
+      if (m.monto < 0) doc.text(num(Math.abs(m.monto)), col.debito.x, ty, { width: col.debito.w, align: 'right', lineBreak: false })
+      if (m.monto > 0) doc.text(num(m.monto), col.credito.x, ty, { width: col.credito.w, align: 'right', lineBreak: false })
+      doc.text(num(m.saldo), col.saldo.x, ty, { width: col.saldo.w, align: 'right', lineBreak: false })
       y += rowH
+      linea(y)
     })
   }
 
-  doc.moveTo(left, y).lineTo(right, y).strokeColor('#e5e7eb').stroke()
-  y += 8
-  doc.fillColor(TINTA).fontSize(10).font('Helvetica-Bold')
-     .text('Saldo final del período', left, y, { width: col.credito.x - left, align: 'right' })
-     .fillColor(estado.saldoFinal < 0 ? ROJO : VERDE)
-     .text(money(estado.saldoFinal), left, y, { width: width - 6, align: 'right' })
+  // ── Totales y saldo final ──
+  if (y + 64 > limiteY) { doc.addPage(); y = doc.page.margins.top }
+  linea(y, 0.8, NEGRO)
+  doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(8.5)
+  doc.text('TOTALES DEL PERÍODO', col.desc.x, y + 7, { width: col.desc.w, lineBreak: false })
+  doc.text(num(estado.debitos), col.debito.x, y + 7, { width: col.debito.w, align: 'right', lineBreak: false })
+  doc.text(num(estado.creditos), col.credito.x, y + 7, { width: col.credito.w, align: 'right', lineBreak: false })
+  y += 24
+  linea(y, 0.8, NEGRO)
+  y += 14
 
-  B.drawFooter(doc)
+  const sit = situacion(estado.saldoFinal)
+  const cajaW = 250
+  const cajaX = right - cajaW
+  doc.rect(cajaX, y, cajaW, 38).lineWidth(1).strokeColor(NEGRO).stroke()
+  doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(8.5).text(sit.titulo, cajaX + 10, y + 8, { width: cajaW - 20, lineBreak: false })
+  if (sit.detalle) {
+    doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(7.5).text(sit.detalle, cajaX + 10, y + 21, { width: cajaW - 20, lineBreak: false })
+  }
+  doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(14)
+     .text(`$ ${num(Math.abs(estado.saldoFinal))}`, cajaX + 10, y + 11, { width: cajaW - 20, align: 'right', lineBreak: false })
+
+  // ── Pie con numeración de páginas ──
+  const { start, count } = doc.bufferedPageRange()
+  for (let i = 0; i < count; i++) {
+    doc.switchToPage(start + i)
+    const fy = doc.page.height - doc.page.margins.bottom - 10
+    linea(fy - 6)
+    doc.fillColor(GRIS_TEXTO).font('Helvetica').fontSize(7)
+       .text(`${B.EMPRESA.razon} · Estado de cuenta de ${nombre}`, left, fy, { width: width - 80, align: 'left', lineBreak: false, ellipsis: true })
+       .text(`Página ${i + 1} de ${count}`, right - 80, fy, { width: 80, align: 'right', lineBreak: false })
+  }
 
   doc.end()
 }
