@@ -3,7 +3,7 @@
 
     const PAGO_LABEL = {
         efectivo: 'Efectivo', transferencia: 'Transferencia',
-        cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente',
+        cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cuenta corriente',
     };
 
     // SVGs que renderiza el servidor con el helper icon()

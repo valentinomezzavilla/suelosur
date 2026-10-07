@@ -194,7 +194,7 @@ async function initDB() {
       estado                    TEXT NOT NULL DEFAULT 'pendiente'
                                   CHECK (estado IN ('pendiente','despachado','entregado','anulado')),
       modalidad                 TEXT CHECK (modalidad IN ('deposito','flete') OR modalidad IS NULL),
-      metodo_pago               TEXT CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente') OR metodo_pago IS NULL),
+      metodo_pago               TEXT CHECK (metodo_pago IN ('efectivo','transferencia','cheque','echeq','cuenta_corriente') OR metodo_pago IS NULL),
       observaciones             TEXT DEFAULT '',
       fecha_entrega_planificada TEXT,
       domicilio_calle           TEXT,
@@ -380,7 +380,7 @@ async function initDB() {
       descripcion      TEXT DEFAULT '',
       metodo_pago      TEXT NOT NULL DEFAULT 'efectivo'
                          CHECK (metodo_pago IN (
-                           'efectivo','transferencia','cheque','cuenta_corriente'
+                           'efectivo','transferencia','cheque','echeq','cuenta_corriente'
                          )),
       fecha            TEXT DEFAULT ahora_local(),
       numero           INTEGER,
@@ -1499,7 +1499,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE op_encabezado DROP CONSTRAINT IF EXISTS op_encabezado_metodo_pago_check`).catch(() => {})
   await pool.query(`
     ALTER TABLE op_encabezado ADD CONSTRAINT op_encabezado_metodo_pago_check
-    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','a_convenir','saldo_a_favor') OR metodo_pago IS NULL)
+    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','echeq','cuenta_corriente','a_convenir','saldo_a_favor') OR metodo_pago IS NULL)
   `).catch(() => {})
 
   // Movimiento de cuenta por pagar con saldo a favor (consume crédito ya acumulado,
@@ -1515,7 +1515,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE transacciones DROP CONSTRAINT IF EXISTS transacciones_metodo_pago_check`).catch(() => {})
   await pool.query(`
     ALTER TABLE transacciones ADD CONSTRAINT transacciones_metodo_pago_check
-    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente','saldo_a_favor'))
+    CHECK (metodo_pago IN ('efectivo','transferencia','cheque','echeq','cuenta_corriente','saldo_a_favor'))
   `).catch(() => {})
 
   // transacciones.cliente es una foto de texto del nombre tomada al crear la transacción, y

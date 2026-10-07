@@ -315,7 +315,7 @@
           <div class="col-md-2"><label class="form-label">Fecha</label><input type="date" name="fecha" class="form-control form-control-sm" value="<%= hoyISO() %>"></div>
           <div class="col-md-2"><label class="form-label">Método de pago</label>
             <select name="metodo_pago" class="form-select form-select-sm">
-              <option value="">—</option><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="cheque">Cheque</option>
+              <option value="">—</option><option value="efectivo">Efectivo</option><option value="transferencia">Transferencia</option><option value="cheque">Cheque</option><option value="echeq">Echeq</option>
             </select></div>
           <div class="col-md-6"><label class="form-label">Descripción</label><input name="descripcion" class="form-control form-control-sm" placeholder="Detalle u observaciones (sale en el recibo)"></div>
         </div>
@@ -370,7 +370,7 @@
           <td><span class="badge rounded-pill px-3 <%= p.tipo==='descuento'?'badge-alerta':'badge-activo' %>"><%= tipoPagoLbl[p.tipo] || p.tipo %></span></td>
           <td><small class="text-muted"><%= p.periodo || '—' %></small></td>
           <td><small class="text-muted"><%= p.descripcion || '—' %></small></td>
-          <td><small class="text-muted"><%= ({ efectivo:'Efectivo', transferencia:'Transferencia', cheque:'Cheque' })[p.metodo_pago] || '—' %></small></td>
+          <td><small class="text-muted"><%= ({ efectivo:'Efectivo', transferencia:'Transferencia', cheque:'Cheque',echeq:'Echeq' })[p.metodo_pago] || '—' %></small></td>
           <td class="text-end fw-semibold <%= p.tipo==='descuento'?'text-danger':'' %>"><%= money(p.monto) %>
             <% if (Number(p.descuentos) > 0 || Number(p.adiciones) > 0) { %>
               <small class="d-block text-muted fw-normal">Sueldo <%= money(p.sueldo_base) %><% if (Number(p.descuentos) > 0) { %> − <%= money(p.descuentos) %><% } %><% if (Number(p.adiciones) > 0) { %> + <%= money(p.adiciones) %><% } %></small>

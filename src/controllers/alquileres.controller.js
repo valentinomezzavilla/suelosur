@@ -14,7 +14,7 @@ const { registrarAuditoria } = require('../utils/auditoria')
 // Se agrega al aviso de un alquiler recién cargado: nace sin precio ni método de pago.
 const AVISO_ASIGNAR_PRECIO = 'Falta asignarle el precio: Cobranzas → Asignar precio.'
 
-const METODO_PAGO_TEXTO = { efectivo: 'efectivo', transferencia: 'transferencia', cheque: 'cheque', cuenta_corriente: 'cuenta corriente', saldo_a_favor: 'saldo a favor', a_convenir: 'a convenir' }
+const METODO_PAGO_TEXTO = { efectivo: 'efectivo', transferencia: 'transferencia', cheque: 'cheque', echeq: 'echeq', cuenta_corriente: 'cuenta corriente', saldo_a_favor: 'saldo a favor', a_convenir: 'a convenir' }
 const pesos = (n) => '$' + Math.round(n).toLocaleString('es-AR')
 
 // Geocodifica la dirección del alquiler sin hacer esperar al usuario: si Nominatim

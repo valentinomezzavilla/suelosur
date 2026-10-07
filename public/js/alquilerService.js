@@ -268,7 +268,7 @@ function actualizarResumen() {
     if (elDir) elDir.textContent = calle && numero ? `${calle} ${numero}` : calle || '—';
 
     // método de pago
-    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor' };
+    const pagoMap = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor' };
     const elPago  = document.getElementById('res-pago');
     if (elPago) elPago.textContent = pideCobro() ? (pagoMap[metodoPagoEl?.value] || '—') : 'A definir (Cobranzas → Asignar precio)';
 }

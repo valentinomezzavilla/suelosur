@@ -5,7 +5,7 @@
     : o.tipo === 'maquinaria' ? `/alquileres/maquinaria/${o.id}` : `/ventas/${o.id}`
   const badgeMap    = { pendiente: 'badge-pendiente', despachado: 'badge-en-transito', entregado: 'badge-activo' }
   const labelEstado = { pendiente: 'Pendiente', despachado: 'Despachado', entregado: 'Entregado' }
-  const pagoLbl     = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' }
+  const pagoLbl     = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cuenta corriente' }
   const r = resumen
   const maxMes  = Math.max(0, ...r.porMes.map(m => m.total))
   const maxTipo = Math.max(0, ...r.porTipo.map(t => t.total))

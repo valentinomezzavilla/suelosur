@@ -162,7 +162,7 @@ CREATE TABLE op_encabezado (
   estado                    TEXT NOT NULL DEFAULT 'pendiente'
                               CHECK (estado IN ('pendiente','despachado','entregado','anulado')),
   modalidad                 TEXT CHECK (modalidad IN ('deposito','flete') OR modalidad IS NULL),
-  metodo_pago               TEXT CHECK (metodo_pago IN ('efectivo','transferencia','cheque','cuenta_corriente') OR metodo_pago IS NULL),
+  metodo_pago               TEXT CHECK (metodo_pago IN ('efectivo','transferencia','cheque','echeq','cuenta_corriente') OR metodo_pago IS NULL),
   observaciones             TEXT DEFAULT '',
   fecha_entrega_planificada TEXT,
   domicilio_calle           TEXT,
@@ -336,7 +336,7 @@ CREATE TABLE transacciones (
   descripcion      TEXT DEFAULT '',
   metodo_pago      TEXT NOT NULL DEFAULT 'efectivo'
                      CHECK (metodo_pago IN (
-                       'efectivo','transferencia','cheque','cuenta_corriente'
+                       'efectivo','transferencia','cheque','echeq','cuenta_corriente'
                      )),
   fecha            TEXT DEFAULT to_char(NOW() AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'),
   numero           INTEGER,

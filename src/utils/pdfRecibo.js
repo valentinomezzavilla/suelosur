@@ -16,7 +16,7 @@ const TIPO_LABEL = {
   sueldo: 'Sueldo', anticipo: 'Anticipo', viatico: 'Viático', horas_extra: 'Horas extra',
   bonificacion: 'Bonificación', descuento: 'Descuento', liquidacion: 'Liquidación',
 }
-const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque' }
+const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq' }
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 // "2026-09" → "Septiembre 2026"; cualquier otro texto se deja tal cual

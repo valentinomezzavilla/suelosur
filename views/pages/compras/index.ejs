@@ -5,7 +5,7 @@
   categorias.forEach(c => { catMap[c.clave] = c })
   const catLabel = (clave) => (catMap[clave] && catMap[clave].etiqueta) || clave
   const catBadge = (clave) => (catMap[clave] && catMap[clave].badge) || 'badge-pendiente'
-  const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque' }
+  const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq' }
   const detalleDe = (e) => e.categoria === 'material'
     ? ([e.producto_nombre, e.proveedor_nombre].filter(Boolean).join(' — ') || '—')
     : (e.proveedor_nombre || e.empleado_nombre || e.vehiculo_nombre || '—')

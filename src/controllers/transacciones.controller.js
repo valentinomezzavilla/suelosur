@@ -6,7 +6,7 @@ const { fmtFecha, hoyISO } = require('../utils/fecha')
 
 const TIPOS = ['Venta Cantera', 'Venta Viaje', 'Alquiler', 'Maquinaria', 'Ajuste']
 const POR_PAGINA = 20
-const METODOS = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cuenta corriente' }
+const METODOS = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cuenta corriente' }
 
 // Los mismos filtros para el listado y para el reporte: lo que se ve es lo que se exporta.
 function leerFiltros(q) {

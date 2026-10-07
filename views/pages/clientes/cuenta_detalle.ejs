@@ -3,7 +3,7 @@
   const nombre = `${cliente.nombre} ${cliente.apellido || ''}`.trim()
   const presetHref = (p) => '/clientes/cuentas/' + cliente.id + '?preset=' + p + (filtros.obra ? '&obra=' + encodeURIComponent(filtros.obra) : '')
   const tipoLabel = { deuda: 'Cargo', pago: 'Pago', ajuste: 'Ajuste', uso_saldo_favor: 'Uso saldo a favor' }
-  const metodoLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', cuenta_corriente: 'Cta. corriente' }
+  const metodoLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cta. corriente' }
   // Deudas = cargadas a cuenta corriente; uso de saldo a favor = pagado con crédito ya
   // acumulado (no genera deuda); pagos = método capturado; resto = —
   const metodoDe = (m) => m.tipo === 'deuda' ? 'Cta. corriente'
@@ -182,7 +182,7 @@
             <option value="">—</option>
             <option value="efectivo">Efectivo</option>
             <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option>
+            <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
           </select>
         </div>
         <div class="col-md-3">
@@ -301,7 +301,7 @@
           <select name="metodo_pago" id="inputMetodoAbonar">
             <option value="efectivo">Efectivo</option>
             <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option>
+            <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
           </select>
         </div>
         <div class="modal-actions">

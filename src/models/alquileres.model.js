@@ -87,7 +87,7 @@ function tarifaPorDias(dias, cfg) {
 // Métodos de pago reales: con ellos se asigna el precio de un alquiler sin precio y se carga
 // uno histórico ya terminado. 'a_convenir' no está: es justamente no haber resuelto todavía
 // cómo se paga.
-const METODOS_PAGO = ['efectivo', 'transferencia', 'cheque', 'cuenta_corriente', 'saldo_a_favor']
+const METODOS_PAGO = ['efectivo', 'transferencia', 'cheque', 'echeq', 'cuenta_corriente', 'saldo_a_favor']
 
 // Al asignar el precio en Cobranzas también se puede dejar "a convenir una vez finalizado":
 // el precio queda fijado y el método se resuelve al retirar (o en Cobranzas → A convenir).

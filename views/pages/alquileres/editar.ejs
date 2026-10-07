@@ -1,6 +1,6 @@
 <%
   const d = alquiler.detalle || {}
-  const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['cuenta_corriente','Cuenta corriente'],['a_convenir','A convenir una vez finalizado']]
+  const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['echeq','Echeq'],['cuenta_corriente','Cuenta corriente'],['a_convenir','A convenir una vez finalizado']]
   // El método actual se muestra aunque no esté en la lista (ej. saldo a favor): si no,
   // el select caería en "Sin especificar" y al guardar se perdería.
   const metodoActual = alquiler.metodo_pago || d.metodo_pago || ''

@@ -58,7 +58,7 @@ const TransaccionesModel = {
   //  · El método de la OP asociada (si tiene) se actualiza igual, para que el resto
   //    de la app (remito, detalle de venta) muestre lo mismo.
   async cambiarMetodoPago(id, nuevoMetodo) {
-    const METODOS = ['efectivo', 'transferencia', 'cheque', 'cuenta_corriente']
+    const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq', 'cuenta_corriente']
     if (!METODOS.includes(nuevoMetodo)) throw new Error('Método de pago inválido.')
 
     const tx = (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
