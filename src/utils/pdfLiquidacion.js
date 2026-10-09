@@ -224,6 +224,23 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     ], tituloPagina)
   }
 
+  // Operaciones del período que todavía deben algo (las "a convenir" no tienen precio)
+  function pendiente(ops, tituloPagina) {
+    if (!ops) return
+    const deben = ops.filter(o => o.estado !== 'a_convenir' && o.resta > 0)
+    const total = deben.reduce((s, o) => s + o.resta, 0)
+    tablaSimple('Saldo pendiente', [
+      { key: 'nro', header: 'Remito / OP', w: 0.14, align: 'left' }, { key: 'fecha', header: 'Fecha', w: 0.11, align: 'left' },
+      { key: 'obra', header: 'Obra', w: 0.27, align: 'left' }, { key: 'total', header: 'Total', w: 0.16, align: 'right' },
+      { key: 'pagado', header: 'Pagado', w: 0.16, align: 'right' }, { key: 'resta', header: 'Resta', w: 0.16, align: 'right' },
+    ], [
+      ...deben.map(o => ({ nro: o.nro_remito ? `Remito ${o.nro_remito}` : `OP-${String(o.nro_op).padStart(4, '0')}`, fecha: fmtFecha(o.fecha),
+        obra: o.obra || '', total: B.money(o.total), pagado: B.money(o.pagado), resta: B.money(o.resta) })),
+      ...(deben.length ? [] : [{ obra: 'Sin saldo pendiente en el período', _color: GRIS }]),
+      { obra: 'TOTAL PENDIENTE', resta: B.money(total), _bold: true },
+    ], tituloPagina)
+  }
+
   function operaciones(c, tituloPagina) {
     if (!c.operaciones.length) {
       doc.fillColor(GRIS).fontSize(10).font('Helvetica').text('Sin operaciones en el período.', left, y, { width, align: 'center' })
@@ -263,6 +280,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     operaciones(c, titulo)
     resumenPorObra(c.porObra, titulo)
     pagos(c.pagos, titulo)
+    pendiente(c.operaciones, titulo)
   }
 
   // ── Pie en todas las páginas: leyenda, página X de Y ─────────
