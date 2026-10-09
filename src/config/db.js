@@ -806,6 +806,14 @@ async function initDB() {
     `).catch(e => console.error('Backfill producto_precios_dias:', e.message))
   }
 
+  // Contenedor por unidad (2026-10): ya no se cobra por días según rangos sino cantidad ×
+  // precio por unidad (precio cantera / viaje). Unidad fija y sin stock: se alquila y vuelve.
+  // Los renglones viejos con días (op_detalle_material.dias) quedan como estaban.
+  await pool.query(`
+    UPDATE productos SET unidad_medida = 'unid.', depende_stock = 0
+    WHERE es_contenedor = 1 AND (unidad_medida IS DISTINCT FROM 'unid.' OR depende_stock IS DISTINCT FROM 0)
+  `).catch(e => console.error('Contenedor por unidad:', e.message))
+
   // Productos "servicio disfrazado de producto" (igual que el contenedor, pero genérico):
   // si depende_stock = 0, no llevan stock ni se controla disponibilidad al vender.
   await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS depende_stock INTEGER NOT NULL DEFAULT 1`).catch(() => {})

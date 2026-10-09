@@ -72,52 +72,31 @@ document.addEventListener('DOMContentLoaded', () => {
         return opt ? Number(opt.dataset.precio || 0) : 0;
     }
 
-    // ── Contenedor: cantidad fija en 1, se cargan los días y el precio por día sale
-    // del rango en que caen (el servidor recalcula igual al confirmar).
-    const grupoCantidad = document.getElementById('grupoCantidadViaje');
-    const grupoDias     = document.getElementById('grupoDiasViaje');
-    const inputDias     = document.getElementById('diasViaje');
-    const hintDias      = document.getElementById('hintDiasViaje');
-    const HINT_DIAS     = hintDias?.textContent || '';
+    // ── Contenedor: se cobra por unidad (cantidad × precio, como cualquier producto),
+    // pero la cantidad es entera y no tiene tope de stock (se alquila y vuelve).
+    const hintCantidad  = document.getElementById('hintCantidadViaje');
+    const HINT_CANTIDAD = hintCantidad?.textContent || '';
 
     function esContenedor() {
         return selectProducto?.selectedOptions[0]?.dataset.contenedor === '1';
     }
-    function rangosSeleccionados() {
-        try { return JSON.parse(selectProducto?.selectedOptions[0]?.dataset.rangos || '[]'); } catch (_) { return []; }
-    }
-    // { precioDia, subtotal } o null si no hay rango para esos días
-    function cotizarContenedor() {
-        const n = Number(inputDias?.value);
-        if (!Number.isInteger(n) || n < 1) return null;
-        const r = rangosSeleccionados().find(x => n >= Number(x.dias_desde) && (x.dias_hasta == null || n <= Number(x.dias_hasta)));
-        return r ? { precioDia: Number(r.precio_dia), subtotal: n * Number(r.precio_dia) } : null;
-    }
     function aplicarModoContenedor() {
         const cont = esContenedor();
-        if (grupoCantidad) grupoCantidad.style.display = cont ? 'none' : '';
-        if (grupoDias)     grupoDias.style.display     = cont ? '' : 'none';
-        if (inputDias)     inputDias.required = cont;
-        if (cont && inputCantidad) inputCantidad.value = 1;
+        if (inputCantidad) {
+            inputCantidad.step = cont ? '1' : 'any';
+            inputCantidad.min  = cont ? '1' : '0.01';
+        }
+        if (hintCantidad) hintCantidad.textContent = cont ? 'Cantidad de contenedores (número entero).' : HINT_CANTIDAD;
     }
 
     const redondear = (n) => Math.round(n * 100) / 100;
 
     function calcularPrecios() {
         const cont     = esContenedor();
-        const cot      = cont ? cotizarContenedor() : null;
-        // Precio unitario de lista: el de catálogo, o para el contenedor el precio por día
-        // del rango. Se multiplica por la cantidad (contenedor: por los días).
-        const precioLista = cont ? (cot ? cot.precioDia : 0) : getPrecioUnitario();
-        const cantidad = cont ? Number(inputDias?.value || 0) : Number(inputCantidad?.value || 1);
-        if (cont && hintDias) {
-            hintDias.textContent = cot
-                ? `${inputDias.value} día(s) × $${cot.precioDia.toLocaleString('es-AR')}/día. Va un solo contenedor por operación.`
-                : 'No hay precio para esa cantidad de días.';
-        } else if (hintDias) {
-            hintDias.textContent = HINT_DIAS;
-        }
-        if (labelPrecio) labelPrecio.textContent = cont ? 'Precio por día' : 'Precio unitario';
+        // Precio unitario de lista (catálogo) × cantidad — también para el contenedor
+        const precioLista = getPrecioUnitario();
+        const cantidad = Number(inputCantidad?.value || 1);
+        if (labelPrecio) labelPrecio.textContent = cont ? 'Precio por unidad' : 'Precio unitario';
 
         const flete    = Number(inputFlete?.value || 0);
         const subtotalManual = checkSubtotal?.checked;
@@ -164,7 +143,6 @@ document.addEventListener('DOMContentLoaded', () => {
         setEditarPrecio(false);
         calcularPrecios();
     });
-    inputDias?.addEventListener('input', calcularPrecios);
     inputCantidad?.addEventListener('input', () => {
         const stock = getStockDisponible();
         if (stock && Number(inputCantidad.value) > stock) {
@@ -346,10 +324,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Contenedor: tiene que haber precio para los días cargados (no mueve stock)
+        // Contenedor: cantidad entera (no mueve stock)
         if (esContenedor()) {
-            if (!cotizarContenedor()) {
-                alert('Revisá los días del contenedor: no hay precio para esa cantidad de días.');
+            if (!Number.isInteger(Number(inputCantidad?.value))) {
+                alert('La cantidad de contenedores tiene que ser un número entero.');
                 e.preventDefault();
                 return;
             }

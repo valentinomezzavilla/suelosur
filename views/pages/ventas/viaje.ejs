@@ -136,18 +136,16 @@
                             <option value="">— Seleccionar producto —</option>
                             <% productos.forEach(p => { %>
                                 <%
-                                  const sinControlStock = p.depende_stock === 0 || p.depende_stock === false
+                                  // El contenedor no mueve stock (se alquila y vuelve) y se cobra por unidad
+                                  const sinControlStock = p.depende_stock === 0 || p.depende_stock === false || !!p.es_contenedor
                                   const stock  = sinControlStock ? 999999 : Number(p.disponible_real ?? p.stock ?? 0)
                                   const precio = Number(p.precio_viaje ?? p.precio ?? 0)
                                   const nombre = p.nombre || p.producto || ''
                                 %>
                                 <% if (p.es_contenedor) { %>
-                                <%# Contenedor: no mueve stock; el precio sale de los días × rango %>
-                                <% if ((p.rangos || []).length) { %>
-                                <option value="<%= p.id %>" data-contenedor="1" data-rangos="<%= JSON.stringify(p.rangos) %>">
-                                    <%= nombre %> — por días (contenedor)
+                                <option value="<%= p.id %>" data-precio="<%= precio %>" data-stock="<%= stock %>" data-contenedor="1">
+                                    <%= nombre %> — $<%= precio.toLocaleString('es-AR') %> por unidad (contenedor)
                                 </option>
-                                <% } %>
                                 <% } else if (sinControlStock) { %>
                                 <option value="<%= p.id %>" data-precio="<%= precio %>" data-stock="<%= stock %>">
                                     <%= nombre %> — $<%= precio.toLocaleString('es-AR') %> (servicio)
@@ -163,12 +161,7 @@
                     <div class="form-group" id="grupoCantidadViaje">
                         <label for="cantidadViaje">Cantidad *</label>
                         <input type="number" name="cantidad" id="cantidadViaje" value="1" min="0.01" step="any" required>
-                        <p class="form-hint">Admite decimales (ej: 2.5).</p>
-                    </div>
-                    <div class="form-group" id="grupoDiasViaje" style="display:none">
-                        <label for="diasViaje">Días *</label>
-                        <input type="number" name="dias" id="diasViaje" value="1" min="1" step="1">
-                        <p class="form-hint" id="hintDiasViaje">Contenedor: va uno solo por operación. El precio por día depende del rango de días.</p>
+                        <p class="form-hint" id="hintCantidadViaje">Admite decimales (ej: 2.5).</p>
                     </div>
                 </div>
 

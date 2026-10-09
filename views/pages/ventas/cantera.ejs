@@ -14,39 +14,19 @@
             <ul class="ventas-lista-productos">
                 <% productos.forEach(p => { %>
                     <%
-                      const sinControlStock = p.depende_stock === 0 || p.depende_stock === false
+                      // El contenedor no mueve stock (se alquila y vuelve) y se cobra por unidad
+                      const sinControlStock = p.depende_stock === 0 || p.depende_stock === false || !!p.es_contenedor
                       const stock  = sinControlStock ? 999999 : Number(p.disponible_real ?? p.stock ?? 0)
                       const precio = Number(p.precio_cantera ?? p.precio ?? 0)
                       const nombre = p.nombre || p.producto || ''
                     %>
-                    <% if (p.es_contenedor) { %>
-                    <%# Contenedor: no mueve stock, va de a uno y se cobra por días según el rango %>
-                    <% const rs = p.rangos || []; const desdeDia = rs.length ? Math.min(...rs.map(r => Number(r.precio_dia))) : 0 %>
-                    <li>
-                        <div class="ventas-card <%= !rs.length ? 'ventas-card--sin-stock' : '' %>">
-                            <div class="ventas-card__top">
-                                <span class="ventas-card__nombre"><%= nombre %></span>
-                                <span class="badge badge--con-stock">Por días</span>
-                            </div>
-                            <div class="ventas-card__precio"><%= rs.length ? `desde $${desdeDia.toLocaleString('es-AR')}/día` : 'Sin precio' %></div>
-                            <button
-                                class="addToCart btn-primary"
-                                data-id="<%= p.id %>"
-                                data-nombre="<%= nombre %>"
-                                data-contenedor="1"
-                                data-rangos="<%= JSON.stringify(rs) %>"
-                                <%= !rs.length ? 'disabled' : '' %>
-                            >
-                                <%= !rs.length ? 'Sin precio' : '+ Agregar' %>
-                            </button>
-                        </div>
-                    </li>
-                    <% return } %>
                     <li>
                         <div class="ventas-card <%= !sinControlStock && stock <= 0 ? 'ventas-card--sin-stock' : '' %>">
                             <div class="ventas-card__top">
                                 <span class="ventas-card__nombre"><%= nombre %></span>
-                                <% if (sinControlStock) { %>
+                                <% if (p.es_contenedor) { %>
+                                <span class="badge badge--con-stock">Contenedor</span>
+                                <% } else if (sinControlStock) { %>
                                 <span class="badge badge--con-stock">Servicio</span>
                                 <% } else { %>
                                 <span class="badge badge--<%= stock > 0 ? 'con-stock' : 'sin-stock' %>">
@@ -54,13 +34,14 @@
                                 </span>
                                 <% } %>
                             </div>
-                            <div class="ventas-card__precio">$<%= precio.toLocaleString('es-AR') %></div>
+                            <div class="ventas-card__precio">$<%= precio.toLocaleString('es-AR') %><% if (p.es_contenedor) { %><small> / unid.</small><% } %></div>
                             <button
                                 class="addToCart btn-primary"
                                 data-id="<%= p.id %>"
                                 data-nombre="<%= nombre %>"
                                 data-precio="<%= precio %>"
                                 data-stock="<%= stock %>"
+                                <%- p.es_contenedor ? 'data-contenedor="1"' : '' %>
                                 <%= !sinControlStock && stock <= 0 ? 'disabled' : '' %>
                             >
                                 <%= !sinControlStock && stock <= 0 ? 'Sin stock' : '+ Agregar' %>
