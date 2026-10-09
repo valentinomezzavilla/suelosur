@@ -192,10 +192,11 @@ const TransaccionesModel = {
       //  · entregada  → ya salió de planta: vuelve a cantidad_actual
       //  · en curso   → estaba reservado: se libera lo pendiente de entregar
       //  · anulada    → el stock ya se había liberado al anularla
-      //  · contenedor (dias no nulo) → no movió stock
+      //  · contenedor o producto sin control de stock → no movió stock
       if (op && op.estado !== 'anulado') {
         const detalles = (await q(
-          `SELECT id_producto, cantidad_pedida FROM op_detalle_material WHERE id_orden_pedido = ? AND dias IS NULL`, [idOp])).rows
+          `SELECT d.id_producto, d.cantidad_pedida FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
+           WHERE d.id_orden_pedido = ? AND ${require('../utils/contenedor').SQL_MUEVE_STOCK}`, [idOp])).rows
         for (const d of detalles) {
           if (op.estado === 'entregado') {
             await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`,

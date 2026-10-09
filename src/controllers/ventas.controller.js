@@ -8,8 +8,6 @@ const AsignacionesModel = require('../models/asignaciones.model')
 const { query }         = require('../config/db')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 const { textoDestino } = require('../utils/destino')
-const ProductosModel    = require('../models/productos.model')
-const { cotizarContenedor, MAX_CONTENEDORES_POR_OP } = require('../utils/contenedor')
 const { leerRemito, opConRemito } = require('../utils/remito')
 const { hoyISO }        = require('../utils/fecha')
 
@@ -27,43 +25,30 @@ function fechaRetroactiva(fecha) {
 // relee del catálogo según el canal (cantera / viaje), así no importa qué haya llegado
 // en el POST (un precio viejo en caché, o alguien tocando el request a mano). Solo se
 // aparta de la lista cuando el usuario tildó "Editar" (precio unitario o subtotal).
-// Los contenedores traen además sus rangos de precio por día (iguales en los dos canales).
+// El contenedor se cobra por unidad, como cualquier producto (no mueve stock).
 const COLUMNA_PRECIO = { cantera: 'precio_cantera', viaje: 'precio_viaje' }
 async function catalogo(canal, idsProducto) {
   const columna = COLUMNA_PRECIO[canal]
   const ids = [...new Set(idsProducto.map(String))].filter(Boolean)
   if (!ids.length) return {}
   const rows = (await query(`SELECT id, nombre, es_contenedor, ${columna} AS precio FROM productos WHERE id = ANY(?)`, [ids])).rows
-  const rangos = await ProductosModel.rangosDe(rows.filter(r => r.es_contenedor).map(r => r.id))
   const map = {}
   rows.forEach(r => {
     map[String(r.id)] = {
       nombre: r.nombre,
       precio: Number(r.precio) || 0,
       esContenedor: !!r.es_contenedor,
-      rangos: rangos[String(r.id)] || [],
     }
   })
   return map
 }
 
-// Renglón de venta de un contenedor: siempre 1, con los días y el precio del rango.
-// Devuelve { detalle } o { error }.
-function detalleContenedor(idProducto, prod, dias) {
-  const cot = cotizarContenedor(prod.rangos, dias)
-  if (cot.error) return { error: `${prod.nombre}: ${cot.error}` }
-  return {
-    detalle: {
-      id_producto:     idProducto,
-      cantidad_pedida: 1,
-      precio_unitario: cot.subtotal,
-      dias:            cot.dias,
-      precio_dia:      cot.precio_dia,
-    },
-  }
+// Cantidad válida para un renglón: los contenedores van por unidad entera.
+function errorCantidad(prod, cantidad) {
+  if (!(cantidad > 0)) return `Cantidad inválida para ${prod.nombre}.`
+  if (prod.esContenedor && !Number.isInteger(cantidad)) return `${prod.nombre}: la cantidad de contenedores tiene que ser un número entero.`
+  return null
 }
-
-const MSG_UN_CONTENEDOR = `Solo se puede cargar ${MAX_CONTENEDORES_POR_OP} contenedor por operación.`
 
 const VentasController = {
 
@@ -139,30 +124,22 @@ const VentasController = {
       if (carrito.some(p => !cat[String(p.id)])) {
         req.flash('error', 'Hay un producto del carrito que ya no existe.'); return res.redirect('/ventas/cantera')
       }
-      // Contenedor: uno solo por operación, cantidad 1, precio por días según el rango
-      if (carrito.filter(p => cat[String(p.id)].esContenedor).length > MAX_CONTENEDORES_POR_OP) {
-        req.flash('error', MSG_UN_CONTENEDOR); return res.redirect('/ventas/cantera')
-      }
+      // Contenedor: por unidad (cantidad entera × precio), como cualquier producto
       const detalles = []
       for (const p of carrito) {
         const prod = cat[String(p.id)]
-        if (prod.esContenedor) {
-          const r = detalleContenedor(p.id, prod, Number(p.dias))
-          if (r.error) { req.flash('error', r.error); return res.redirect('/ventas/cantera') }
-          detalles.push({ ...r.detalle, nombre: prod.nombre })
-        } else {
-          const cantidad = Number(p.cantidad)
-          if (!(cantidad > 0)) { req.flash('error', `Cantidad inválida para ${prod.nombre}.`); return res.redirect('/ventas/cantera') }
-          const precioManual = p.precioManual === true && Number(p.precio) >= 0
-          const precio_unitario = precioManual ? Number(p.precio) : prod.precio
-          detalles.push({ id_producto: p.id, cantidad_pedida: cantidad, precio_unitario, nombre: prod.nombre })
-        }
+        const cantidad = Number(p.cantidad)
+        const errCant = errorCantidad(prod, cantidad)
+        if (errCant) { req.flash('error', errCant); return res.redirect('/ventas/cantera') }
+        const precioManual = p.precioManual === true && Number(p.precio) >= 0
+        const precio_unitario = precioManual ? Number(p.precio) : prod.precio
+        detalles.push({ id_producto: p.id, cantidad_pedida: cantidad, precio_unitario, nombre: prod.nombre })
       }
 
       const total  = precioTotal ? Number(precioTotal) : detalles.reduce((a, d) => a + d.precio_unitario * d.cantidad_pedida, 0)
       const nombre = clienteNombre || 'Particular'
       const obsUser = (req.body.observaciones || '').trim()
-      const detalleCarrito = detalles.map(d => d.dias != null ? `${d.nombre} (${d.dias} días) x1` : `${d.nombre} x${d.cantidad_pedida}`).join(', ')
+      const detalleCarrito = detalles.map(d => `${d.nombre} x${d.cantidad_pedida}`).join(', ')
       const desc   = obsUser ? `${detalleCarrito} — ${obsUser}` : detalleCarrito
 
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({
@@ -317,30 +294,19 @@ const VentasController = {
       // Precio viaje siempre desde el catálogo, nunca el que mandó el formulario.
       const prod = (await catalogo('viaje', [productoId]))[String(productoId)]
       if (!prod) { req.flash('error', 'Elegí un producto.'); return res.redirect('/ventas/viaje') }
-      let detalle
-      if (prod.esContenedor) {
-        // Contenedor: cantidad 1 siempre; lo que se carga son los días
-        const r = detalleContenedor(productoId, prod, Number(req.body.dias))
-        if (r.error) { req.flash('error', r.error); return res.redirect('/ventas/viaje') }
-        detalle = r.detalle
-      } else {
-        detalle = { id_producto: productoId, cantidad_pedida: Number(cantidad) || 1, precio_unitario: prod.precio }
-      }
+      const cantidadNum = Number(cantidad) || 1
+      const errCant = errorCantidad(prod, cantidadNum)
+      if (errCant) { req.flash('error', errCant); return res.redirect('/ventas/viaje') }
+      const detalle = { id_producto: productoId, cantidad_pedida: cantidadNum, precio_unitario: prod.precio }
       // Salvo que se haya tildado "Editar" en el subtotal o en el precio unitario: ahí
       // manda lo que se cargó (se edita uno u otro; si llegaran los dos, gana el subtotal).
       const subtotalEditado = Number(subtotalManual)
       const precioEditado   = Number(req.body.precioUnitarioManual)
       if (editarSubtotal === '1' && String(subtotalManual ?? '').trim() !== '' && subtotalEditado >= 0) {
         detalle.precio_unitario = subtotalEditado / detalle.cantidad_pedida
-        if (detalle.dias) detalle.precio_dia = subtotalEditado / detalle.dias
       } else if (req.body.editarPrecio === '1' && String(req.body.precioUnitarioManual ?? '').trim() !== '' && precioEditado >= 0) {
-        // Precio unitario editado: subtotal = precio × cantidad (contenedor: precio por día × días)
-        if (detalle.dias) {
-          detalle.precio_dia      = precioEditado
-          detalle.precio_unitario = precioEditado * detalle.dias
-        } else {
-          detalle.precio_unitario = precioEditado
-        }
+        // Precio unitario editado: subtotal = precio × cantidad
+        detalle.precio_unitario = precioEditado
       }
       // Total pactado: el que manda el formulario (puede estar editado a mano);
       // si no llegó, productos + flete.

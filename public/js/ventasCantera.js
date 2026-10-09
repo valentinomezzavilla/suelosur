@@ -28,23 +28,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let carrito = [];
 
-    // Contenedor: va de a UNO por operación y se cobra días × precio por día del rango
-    // en que caen esos días (el servidor recalcula igual al confirmar).
-    function rangoParaDias(rangos, dias) {
-        const n = Number(dias);
-        if (!Number.isInteger(n) || n < 1) return null;
-        return (rangos || []).find(r => n >= Number(r.dias_desde) && (r.dias_hasta == null || n <= Number(r.dias_hasta))) || null;
-    }
-    function cotizarContenedor(item) {
-        const r = rangoParaDias(item.rangos, item.dias);
-        item.precioDia = r ? Number(r.precio_dia) : 0;
-        item.precio    = r ? item.dias * item.precioDia : 0;
-        item.valido    = !!r;
-    }
-    function textoContenedor(item) {
-        if (!item.valido) return '<span class="text-danger">Sin precio para esos días</span>';
-        return `${item.dias} día${item.dias === 1 ? '' : 's'} × $${item.precioDia.toLocaleString('es-AR')} = <b>$${item.precio.toLocaleString('es-AR')}</b>`;
-    }
+    // Contenedor: se cobra por unidad como cualquier producto, pero la cantidad es entera
+    // y no tiene tope de stock (se alquila y vuelve).
 
     function actualizarContador() {
         if (!cartCount) return;
@@ -78,22 +63,6 @@ document.addEventListener('DOMContentLoaded', () => {
         carrito.forEach(producto => {
             const div = document.createElement('div');
             div.className = 'cart-item';
-            if (producto.contenedor) {
-                // Cantidad fija en 1: lo que se edita son los días
-                div.innerHTML = `
-                <div class="cart-item__info">
-                    <span class="cart-item__nombre">${producto.nombre} x1</span>
-                    <span class="cart-item__meta" data-meta-contenedor>${textoContenedor(producto)}</span>
-                </div>
-                <div class="cart-item__actions">
-                    <input type="number" class="dias-contenedor" data-id="${producto.id}" value="${producto.dias}" min="1" step="1" aria-label="Días de alquiler del contenedor">
-                    <span class="cart-item__meta">días</span>
-                    <button type="button" class="qty-btn qty-remove" data-id="${producto.id}">✕</button>
-                </div>
-            `;
-                container.appendChild(div);
-                return;
-            }
             div.innerHTML = `
                 <div class="cart-item__info">
                     <span class="cart-item__nombre">${producto.nombre}</span>
@@ -106,8 +75,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="cart-item__actions">
                     <button type="button" class="qty-btn qty-minus" data-id="${producto.id}">−</button>
                     <input type="number" class="cantidad-cantera" data-id="${producto.id}" value="${producto.cantidad}"
-                        min="0.01" max="${producto.stock}" step="any" aria-label="Cantidad de ${producto.nombre}"
-                        title="Cantidad — admite decimales (ej: 2.5)">
+                        min="${producto.entero ? 1 : 0.01}" max="${producto.stock}" step="${producto.entero ? 1 : 'any'}" aria-label="Cantidad de ${producto.nombre}"
+                        title="${producto.entero ? 'Cantidad de contenedores' : 'Cantidad — admite decimales (ej: 2.5)'}">
                     <button type="button" class="qty-btn qty-plus" data-id="${producto.id}">+</button>
                     <button type="button" class="qty-btn qty-remove" data-id="${producto.id}">✕</button>
                 </div>
@@ -150,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!p) return;
                 let val = Number(input.value);
                 if (!(val > 0)) val = 0;
+                if (p.entero) val = Math.floor(val);
                 if (val > p.stock) val = p.stock;
                 p.cantidad = val;
                 actualizarMetaProducto(p, input.closest('.cart-item'));
@@ -157,7 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             input.addEventListener('change', () => {
                 const p = carrito.find(x => x.id === input.dataset.id);
-                if (p && p.cantidad <= 0) { carrito = carrito.filter(x => x.id !== p.id); renderCarrito(); }
+                if (p && p.cantidad <= 0) { carrito = carrito.filter(x => x.id !== p.id); renderCarrito(); return; }
+                // Contenedor: el campo muestra la cantidad entera que se cuenta
+                if (p && p.entero) input.value = p.cantidad;
             });
         });
         // Precio unitario de producto: editable a mano, por defecto el de lista. Igual que
@@ -173,19 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 actualizarTotal();
             });
         });
-        // Días del contenedor: se actualiza en el lugar (sin re-render) para no perder el foco
-        container.querySelectorAll('.dias-contenedor').forEach(input => {
-            input.addEventListener('input', () => {
-                const p = carrito.find(x => x.id === input.dataset.id);
-                if (!p) return;
-                p.dias = Number(input.value);
-                cotizarContenedor(p);
-                const meta = input.closest('.cart-item').querySelector('[data-meta-contenedor]');
-                if (meta) meta.innerHTML = textoContenedor(p);
-                actualizarTotal();
-            });
-        });
-
         actualizarTotal();
     }
 
@@ -212,20 +171,6 @@ document.addEventListener('DOMContentLoaded', () => {
             if (btn.disabled) return;
             const id     = btn.dataset.id;
             const nombre = btn.dataset.nombre;
-            if (btn.dataset.contenedor === '1') {
-                // Un solo contenedor por operación
-                if (carrito.some(p => p.contenedor)) {
-                    alert('Solo se puede cargar un contenedor por operación.');
-                    return;
-                }
-                let rangos = [];
-                try { rangos = JSON.parse(btn.dataset.rangos || '[]'); } catch (_) {}
-                const item = { id, nombre, contenedor: true, rangos, dias: 1, cantidad: 1 };
-                cotizarContenedor(item);
-                carrito.push(item);
-                renderCarrito();
-                return;
-            }
             const precio = Number(btn.dataset.precio);
             const stock  = Number(btn.dataset.stock);
             const exist  = carrito.find(p => p.id === id);
@@ -233,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (exist.cantidad >= stock) return;
                 exist.cantidad++;
             } else {
-                carrito.push({ id, nombre, precio, stock, cantidad: 1 });
+                // Contenedor: cantidad entera (data-contenedor)
+                carrito.push({ id, nombre, precio, stock, cantidad: 1, entero: btn.dataset.contenedor === '1' });
             }
             renderCarrito();
         });
@@ -262,11 +208,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnConfirmar.addEventListener('click', () => {
         if (carrito.length === 0) return;
 
-        const contInvalido = carrito.find(p => p.contenedor && !p.valido);
-        if (contInvalido) {
-            alert(`Revisá los días del contenedor: no hay precio para ${contInvalido.dias || 0} día(s).`);
-            return;
-        }
+
 
         const formClienteId    = document.getElementById('formClienteId');
         const formClienteNombre = document.getElementById('formClienteNombre');

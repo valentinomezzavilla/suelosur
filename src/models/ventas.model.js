@@ -5,8 +5,7 @@ const { nombreClienteSQL } = require('../utils/nombreCliente')
 const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
-const ProductosModel = require('./productos.model')
-const { cotizarContenedor, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
+const { SQL_MUEVE_STOCK, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 const { textoDestino } = require('../utils/destino')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
@@ -36,13 +35,13 @@ const VentasModel = {
   },
 
   async listarProductos() {
-    return ProductosModel.conRangos((await query(`
+    return (await query(`
       SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje, p.es_contenedor,
              COALESCE(p.depende_stock, 1) AS depende_stock,
              (COALESCE(s.cantidad_actual,0) - COALESCE(s.cant_pendiente_entregar,0)) AS disponible_real
       FROM productos p LEFT JOIN stock s ON s.id_producto = p.id
       WHERE p.activo = 1 ORDER BY p.nombre
-    `)).rows)
+    `)).rows
   },
 
   async contarPorEstado() {
@@ -159,9 +158,9 @@ const VentasModel = {
     const { nro_rem: nroSiguiente } = (await query(`SELECT COALESCE(MAX(nro_remito), 0) + 1 AS nro_rem FROM op_encabezado`)).rows[0]
     const nro_rem = nro_remito || nroSiguiente
     const dom = domicilio || {}
-    // Productos sin control de stock (servicio disfrazado de producto): no reservan stock
+    // Contenedores y productos sin control de stock (servicios): no reservan stock
     const idsSinStock = new Set((await query(`
-      SELECT id FROM productos WHERE id = ANY(?) AND COALESCE(depende_stock, 1) = 0
+      SELECT id FROM productos WHERE id = ANY(?) AND (COALESCE(depende_stock, 1) = 0 OR COALESCE(es_contenedor, 0) = 1)
     `, [(detalles || []).map(d => d.id_producto)])).rows.map(r => String(r.id)))
 
     return await transaction(async (q) => {
@@ -183,13 +182,11 @@ const VentasModel = {
       const id = rows[0].id
 
       for (const d of (detalles || [])) {
-        // Renglón de contenedor: lleva días y precio por día, y no reserva stock
-        const dias = d.dias != null ? d.dias : null
         await q(`
-          INSERT INTO op_detalle_material (id_orden_pedido, id_producto, cantidad_pedida, precio_unitario, dias, precio_dia)
-          VALUES (?, ?, ?, ?, ?, ?)
-        `, [id, d.id_producto, d.cantidad_pedida, d.precio_unitario, dias, dias != null ? d.precio_dia : null])
-        if (dias != null || idsSinStock.has(String(d.id_producto))) continue
+          INSERT INTO op_detalle_material (id_orden_pedido, id_producto, cantidad_pedida, precio_unitario)
+          VALUES (?, ?, ?, ?)
+        `, [id, d.id_producto, d.cantidad_pedida, d.precio_unitario])
+        if (idsSinStock.has(String(d.id_producto))) continue
         await q(`UPDATE stock SET cant_pendiente_entregar = cant_pendiente_entregar + ? WHERE id_producto = ?`,
           [d.cantidad_pedida, d.id_producto])
       }
@@ -229,36 +226,23 @@ const VentasModel = {
     await transaction(async (q) => {
       // Único detalle (cantidad/precio): si no vino un campo, se conserva el valor actual
       const detalle = (await q(`
-        SELECT d.id, d.id_producto, d.cantidad_pedida, d.precio_unitario, d.dias, d.precio_dia,
-               COALESCE(p.depende_stock, 1) AS depende_stock
+        SELECT d.id, d.id_producto, d.cantidad_pedida, d.precio_unitario, d.dias,
+               COALESCE(p.depende_stock, 1) = 1 AND COALESCE(p.es_contenedor, 0) = 0 AS mueve_stock,
+               COALESCE(p.es_contenedor, 0) = 1 AS es_contenedor
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
         WHERE d.id_orden_pedido = ? LIMIT 1
       `, [id])).rows[0]
       let subtotal = 0
-      if (detalle && detalle.dias != null) {
-        // Contenedor: siempre 1. Se editan los días; el precio por día es el que se cargó
-        // o, si no vino, el del rango que corresponde a esos días.
-        const dias = vacio(datos.dias) ? detalle.dias : Number(datos.dias)
-        if (!Number.isInteger(dias) || dias < 1) throw new Error('Los días del contenedor tienen que ser un número entero, mínimo 1.')
-        let precioDia
-        if (!vacio(datos.precioDia)) {
-          precioDia = Math.max(0, Number(datos.precioDia) || 0)
-        } else {
-          const rangos = (await ProductosModel.rangosDe([detalle.id_producto]))[String(detalle.id_producto)] || []
-          const cot = cotizarContenedor(rangos, dias)
-          if (cot.error) throw new Error(cot.error)
-          precioDia = cot.precio_dia
-        }
-        subtotal = dias * precioDia
-        await q(`UPDATE op_detalle_material SET cantidad_pedida = 1, dias = ?, precio_dia = ?, precio_unitario = ? WHERE id = ?`,
-          [dias, precioDia, subtotal, detalle.id])
-      } else if (detalle) {
+      if (detalle) {
+        // Un renglón viejo de contenedor por días (cantidad 1, precio = total de los días)
+        // pasa a unidad al editarlo: 1 contenedor a ese precio, salvo que se cambie.
         const nuevaCant = Number(datos.cantidad) > 0 ? Number(datos.cantidad) : detalle.cantidad_pedida
+        if (detalle.es_contenedor && !Number.isInteger(nuevaCant)) throw new Error('La cantidad de contenedores tiene que ser un número entero.')
         const nuevoPrecio = vacio(datos.precioProducto) ? detalle.precio_unitario : Math.max(0, Number(datos.precioProducto) || 0)
         const delta = nuevaCant - detalle.cantidad_pedida
-        await q(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ? WHERE id = ?`,
+        await q(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ?, dias = NULL, precio_dia = NULL WHERE id = ?`,
           [nuevaCant, nuevoPrecio, detalle.id])
-        if (delta !== 0 && detalle.depende_stock) {
+        if (delta !== 0 && detalle.mueve_stock && detalle.dias == null) {
           await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar + ?) WHERE id_producto = ?`,
             [delta, detalle.id_producto])
         }
@@ -303,12 +287,8 @@ const VentasModel = {
       direccion: [op.domicilio_calle, op.domicilio_altura].filter(Boolean).join(' ').trim(),
       productoNombre: detalle.producto || detalle.producto_nombre || '',
       idProducto: detalle.id_producto,
-      esContenedor: detalle.dias != null,
+      esContenedor: !!detalle.es_contenedor,
       dias: detalle.dias,
-      precioDia: detalle.precio_dia,
-      rangos: detalle.dias != null
-        ? ((await ProductosModel.rangosDe([detalle.id_producto]))[String(detalle.id_producto)] || [])
-        : [],
       cantidad: detalle.cantidad_pedida || 1,
       precioProducto: detalle.precio_unitario || 0,
       subtotal,
@@ -332,12 +312,11 @@ const VentasModel = {
     if (!op) return
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ? AND estado IN ('pendiente','despachado')`, [id])
-      // Los renglones de contenedor (dias no nulo) y los de productos sin control de
-      // stock (depende_stock = 0) no mueven stock
+      // Contenedores y productos sin control de stock no mueven stock (SQL_MUEVE_STOCK)
       const detalles = (await q(`
         SELECT d.id_producto, d.cantidad_pedida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
-        WHERE d.id_orden_pedido = ? AND d.dias IS NULL AND COALESCE(p.depende_stock, 1) = 1
+        WHERE d.id_orden_pedido = ? AND ${SQL_MUEVE_STOCK}
       `, [id])).rows
       for (const d of detalles) {
         await q(`
@@ -360,12 +339,11 @@ const VentasModel = {
       await q(`UPDATE op_encabezado SET estado = 'anulado' WHERE id = ?`, [id])
       // Anulada: si era a cuenta corriente, el cargo se revierte
       await VentasModel.sincronizarCargoCC(id, q)
-      // Los renglones de contenedor (dias no nulo) y los de productos sin control de
-      // stock (depende_stock = 0) no mueven stock
+      // Contenedores y productos sin control de stock no mueven stock (SQL_MUEVE_STOCK)
       const detalles = (await q(`
         SELECT d.id_producto, d.cantidad_pedida
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
-        WHERE d.id_orden_pedido = ? AND d.dias IS NULL AND COALESCE(p.depende_stock, 1) = 1
+        WHERE d.id_orden_pedido = ? AND ${SQL_MUEVE_STOCK}
       `, [id])).rows
       for (const d of detalles) {
         await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar - ?) WHERE id_producto = ?`,
