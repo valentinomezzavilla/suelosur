@@ -245,7 +245,7 @@
                         </div>
                         <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
                         <form id="formMetodoPago" method="POST" class="tx-metodo-edit" style="display:none">
-                            <select name="metodo_pago" id="selectMetodoPagoEdit">
+                            <select name="metodo_pago" id="selectMetodoPagoEdit" data-tercero>
                                 <option value="efectivo">Efectivo</option>
                                 <option value="transferencia">Transferencia</option>
                                 <option value="cheque">Cheque</option><option value="echeq">Echeq</option>

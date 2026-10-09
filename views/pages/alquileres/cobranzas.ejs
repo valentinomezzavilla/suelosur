@@ -68,7 +68,7 @@
                              style="max-width:120px" value="<%= Math.round(f.precio_sugerido) %>">
                     </label>
                   <% }) %>
-                  <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px">
+                  <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px" data-tercero>
                     <%- include('../../partials/metodo_pago_opciones', { conCC: primera.cliente_con_cc, saldoFavor: primera.saldo_favor_cliente }) %>
                   </select>
                   <button type="submit" class="btn btn-sm btn-outline-success"><%= todosRetirados ? 'Asignar todo junto y cobrar' : 'Asignar todo junto' %></button>
@@ -100,7 +100,7 @@
                     class="d-flex flex-wrap gap-2 align-items-end" data-asignar data-nombre="<%= nroOp(f.nro_op) %>" data-retirado="<%= f.estado_asignar === 'retirado' ? 1 : 0 %>">
                 <input type="number" step="0.01" min="0" required name="precio" class="form-control form-control-sm"
                        style="max-width:130px" value="<%= Math.round(f.precio_sugerido) %>" title="Precio del alquiler">
-                <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px">
+                <select name="metodo_pago" class="form-select form-select-sm" required style="min-width:150px;max-width:220px" data-tercero>
                   <%- include('../../partials/metodo_pago_opciones', { conCC: f.cliente_con_cc, saldoFavor: f.saldo_favor_cliente }) %>
                 </select>
                 <button type="submit" class="btn btn-sm btn-outline-success"><%= f.estado_asignar === 'retirado' ? 'Asignar y cobrar' : 'Asignar' %></button>
@@ -176,7 +176,7 @@
                   class="d-flex flex-wrap gap-2 align-items-end"
                   onsubmit="return confirm('¿Registrar el cobro de OP-<%= String(p.nro_op).padStart(4,'0') %>?')">
               <div>
-                <select name="metodo_pago_final" class="form-select form-select-sm" required style="min-width:160px">
+                <select name="metodo_pago_final" class="form-select form-select-sm" required style="min-width:160px" data-tercero>
                   <option value="">Método de pago…</option>
                   <option value="efectivo">Efectivo</option>
                   <option value="transferencia">Transferencia</option>

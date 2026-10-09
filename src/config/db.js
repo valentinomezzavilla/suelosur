@@ -1548,6 +1548,13 @@ async function initDB() {
   await migrarAsignacionPrecio()
   await migrarHorasALocal()
 
+  // Transferencia destinada a tercero (ver services/tercero.service.js): los datos del
+  // tercero viajan en la operación y el egreso que genera queda atado a su cobro.
+  await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS tercero TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_op_encabezado BIGINT`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_transaccion BIGINT`).catch(() => {})
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_movimiento_cuenta BIGINT`).catch(() => {})
+
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 

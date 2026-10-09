@@ -2,6 +2,7 @@
 const AlquileresModel        = require('../models/alquileres.model')
 const { hoyISO } = require('../utils/fecha')
 const TransaccionesModel     = require('../models/transacciones.model')
+const Tercero = require('../services/tercero.service')
 const ClientesModel          = require('../models/clientes.model')
 const OperacionesModel        = require('../models/operaciones.model')
 const { plazoPorCuentaCorriente, PLAZO_CUENTA_CORRIENTE, PLAZO_ESTANDAR, calcularPlazoAlquiler } = require('../config/alquiler')
@@ -105,6 +106,8 @@ const AlquileresController = {
       }
       const remitoLeido = await leerRemito(remito)
       if (remitoLeido.error) { req.flash('error', remitoLeido.error); return res.redirect('/alquileres/contenedores/nuevo') }
+      let tercero
+      try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/alquileres/contenedores/nuevo') }
       if (metodoPago === 'cuenta_corriente') {
         const errCC = await ClientesModel.errorCuentaCorriente(clienteIdClean)
         if (errCC) { req.flash('error', errCC); return res.redirect('/alquileres/contenedores/nuevo') }
@@ -215,6 +218,7 @@ const AlquileresController = {
         const monto = parseFloat(precio_alquiler) || 0
         const destinoTxt = textoDestino({ domicilio: domicilio_entrega, obra })
         await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, monto)
+        await Tercero.guardarEnOp(result.id, tercero)
         await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
           cliente_id: clienteIdClean, cliente: result.cliente_nombre, monto,
@@ -492,6 +496,8 @@ const AlquileresController = {
         req.flash('error', 'Este alquiler quedó "a convenir": indicá un método de pago o marcá "Pendiente de pago".')
         return res.redirect(`/alquileres/contenedores/${req.params.id}`)
       }
+      // Transferencia a tercero elegida al cerrar: va antes del cobro, que genera el egreso
+      if (metodoPagoFinal) await Tercero.guardarEnOp(req.params.id, await Tercero.leer(req.body, metodoPagoFinal), { grupo: !!grupoAlq })
       await AlquileresModel.devolverAPlanta(req.params.id)
       // El alquiler termina acá: es el momento en que se cobra (salvo que haya quedado
       // explícitamente pendiente de pago, o que en un grupo falten contenedores).
@@ -650,6 +656,8 @@ const AlquileresController = {
     try {
       const { metodo_pago, cobro_modo } = req.body
       const medio = METODO_PAGO_TEXTO[metodo_pago] || metodo_pago
+      // Transferencia a tercero: antes de asignar, porque si ya se retiró se cobra en el momento
+      await Tercero.guardarEnOp(req.params.id, await Tercero.leer(req.body, metodo_pago), { grupo: cobro_modo === 'alquiler' })
       if (cobro_modo === 'alquiler') {
         const precios = leerMontosPorOp(req.body.precio)
         const r = await AlquileresModel.asignarPrecioGrupo(req.params.id, { precios, metodo_pago })
@@ -692,11 +700,12 @@ const AlquileresController = {
         req.flash('error', 'Elegí un método de pago para cerrar el cobro.')
         return res.redirect(back)
       }
+      const alquiler = await AlquileresModel.obtener(req.params.id)
       if (metodo_pago_final === 'saldo_a_favor') {
-        const alquiler = await AlquileresModel.obtener(req.params.id)
         const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
         if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
       }
+      await Tercero.guardarEnOp(req.params.id, await Tercero.leer(req.body, metodo_pago_final), { grupo: alquiler?.grupo?.cobro_modo === 'alquiler' })
       const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(precio_final), metodo_pago_final)
       if (monto == null) {
         req.flash('error', 'No se pudo cerrar el cobro (puede que ya estuviera registrado).')
