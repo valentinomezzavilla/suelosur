@@ -140,7 +140,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   ]
   const valor = (c, r) => c.money ? B.money(r[c.key]) : c.key === 'cantidad' ? Number(r.cantidad).toLocaleString('es-AR') : String(r[c.key] ?? '')
   const altoRenglon = (r) => Math.max(15, doc.font('Helvetica').fontSize(8.5).heightOfString(r.descripcion, { width: COLS[0].w * width - 8 }) + 6)
-  const altoOperacion = (o) => 22 + 18 + o.renglones.reduce((s, r) => s + altoRenglon(r), 0) + 34
+  const altoOperacion = (o) => 22 + 18 + o.renglones.reduce((s, r) => s + altoRenglon(r), 0) + 14
 
   function operacion(o, tituloPagina) {
     // Una operación no se corta entre páginas, salvo que no entre en una página entera
@@ -174,20 +174,8 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
       linea(y)
     })
 
-    // Pie de la operación: total, pagado y resta (sin método de pago)
-    y += 6
-    const pie = o.estado === 'a_convenir'
-      ? [['Precio a convenir', '', false]]
-      : [['Total', B.money(o.total), false], ['Pagado', B.money(o.pagado), false], ['Resta', B.money(o.resta), true]]
-    let xp = right
-    pie.slice().reverse().forEach(([label, monto, fuerte]) => {
-      const txt = monto ? `${label}: ${monto}` : label
-      doc.font(fuerte ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5)
-      const w = doc.widthOfString(txt) + 16
-      xp -= w
-      doc.fillColor(fuerte ? NEGRO : GRIS).text(txt, xp, y + 2, { width: w, align: 'right', lineBreak: false })
-    })
-    y += 26
+    // Sin pie por operación (total/pagado/resta): los totales van en el resumen
+    y += 14
   }
 
   function tablaSimple(titulo, columnas, filas, tituloPagina) {
