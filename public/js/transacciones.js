@@ -50,6 +50,7 @@
             if (formMetodoPago) {
                 formMetodoPago.action = '/transacciones/' + btn.dataset.realId + '/metodo-pago';
                 selectMetodoPago.value = mp || 'efectivo';
+                selectMetodoPago.dispatchEvent(new Event('tercero:reset'));
                 const puedeCC = !!(btn.dataset.opId && btn.dataset.clienteId);
                 if (optCuentaCorriente) {
                     optCuentaCorriente.disabled = !puedeCC;

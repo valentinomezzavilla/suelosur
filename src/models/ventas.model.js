@@ -316,6 +316,7 @@ const VentasModel = {
       precioTotal: op.total,
       totalManual: op.ajuste !== 0,
       metodoPago: op.metodo_pago || 'efectivo',
+      tercero: op.tercero || '',
       descripcion: op.observaciones || '',
     }
   },

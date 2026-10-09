@@ -200,7 +200,8 @@ const TransaccionesController = {
     try {
       const tx = await TransaccionesModel.obtener(req.params.id)
       if (!tx) throw new Error('La transacción no existe.')
-      await TransaccionesModel.cambiarMetodoPago(req.params.id, req.body.metodo_pago)
+      const tercero = await require('../services/tercero.service').leer(req.body, req.body.metodo_pago)
+      await TransaccionesModel.cambiarMetodoPago(req.params.id, req.body.metodo_pago, tercero)
       req.flash('success', `Método de pago de ${TransaccionesModel.codigo(tx)} actualizado.`)
     } catch (err) {
       console.error(err)

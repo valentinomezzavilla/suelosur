@@ -2,6 +2,7 @@
 const AlquileresMaquinariaModel = require('../models/alquileres_maquinaria.model')
 const MaquinariaModel           = require('../models/maquinaria.model')
 const TransaccionesModel        = require('../models/transacciones.model')
+const Tercero = require('../services/tercero.service')
 const ClientesModel             = require('../models/clientes.model')
 const ConfigMaquinariaModel     = require('../models/config_maquinaria.model')
 const OperacionesModel          = require('../models/operaciones.model')
@@ -54,6 +55,9 @@ const AlquileresMaquinariaController = {
         if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/alquileres/maquinaria/nuevo') }
       }
 
+      let tercero
+      try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/alquileres/maquinaria/nuevo') }
+
       const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
       const { id: id_op, nro_op } = await AlquileresMaquinariaModel.crear({
         id_cliente: clienteIdClean, id_administrativo: req.session.user.id,
@@ -68,6 +72,7 @@ const AlquileresMaquinariaController = {
         hora_planificada: horaEntrega || null,
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, parseFloat(precio_total) || 0)
+      await Tercero.guardarEnOp(id_op, tercero)
       req.flash('success', `Alquiler maquinaria OP-${String(nro_op).padStart(4,'0')} creado.`)
       res.redirect('/alquileres/maquinaria')
     } catch (err) {

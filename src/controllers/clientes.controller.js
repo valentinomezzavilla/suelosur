@@ -1,6 +1,7 @@
 'use strict'
 const ClientesModel = require('../models/clientes.model')
 const TransaccionesModel = require('../models/transacciones.model')
+const Tercero = require('../services/tercero.service')
 const paginar       = require('../utils/paginar')
 const { etiquetaPeriodo } = require('../utils/periodos')
 const { generarTablaPDF } = require('../utils/pdfTabla')
@@ -10,6 +11,15 @@ const { normalizarFiltros, TIPOS } = require('../utils/liquidaciones')
 // Fecha YYYY-MM-DD válida, o null (lo mal formado se ignora)
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
   && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v ? v : null
+
+// Pago de cuenta corriente por transferencia a un tercero: el egreso por el mismo monto
+async function egresoPagoCC(req, tercero, { monto, movId }) {
+  const cli = await ClientesModel.obtener(req.params.id)
+  await Tercero.crearEgreso(tercero, {
+    monto, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
+    descripcion: `Transferencia de ${ClientesModel.nombreCompleto(cli)} a tercero (pago de cuenta corriente)`,
+  })
+}
 
 const ClientesController = {
 
@@ -132,10 +142,12 @@ const ClientesController = {
       if (clase === 'pago')       { tipo = 'pago';   signed =  m; desc = descripcion || 'Pago / abono de deuda' }
       else if (clase === 'cargo') { tipo = 'deuda';  signed = -m; desc = descripcion || 'Cargo manual' }
       else                        { tipo = 'ajuste'; signed = (signo === 'neg' ? -m : m); desc = descripcion || 'Ajuste de saldo' }
-      await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null })
+      const tercero = clase === 'pago' ? await Tercero.leer(req.body, req.body.metodo_pago) : null
+      const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null })
+      if (tercero) await egresoPagoCC(req, tercero, { monto: m, movId })
       req.flash('success', 'Movimiento registrado.')
     } catch (err) {
-      console.error(err); req.flash('error', 'Error al registrar el movimiento.')
+      console.error(err); req.flash('error', err.message || 'Error al registrar el movimiento.')
     }
     res.redirect(back)
   },
@@ -269,10 +281,12 @@ const ClientesController = {
       // referencia a esa operación; si no, queda el genérico de siempre.
       const concepto = (req.body.descripcion || '').trim()
       const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
-      await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion, monto, metodo_pago: req.body.metodo_pago || null })
+      const tercero = await Tercero.leer(req.body, req.body.metodo_pago)
+      const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion, monto, metodo_pago: req.body.metodo_pago || null })
+      if (tercero) await egresoPagoCC(req, tercero, { monto, movId })
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
-      console.error(err); req.flash('error', 'Error.')
+      console.error(err); req.flash('error', err.message || 'Error.')
     }
     res.redirect('back')
   },

@@ -1,6 +1,7 @@
 'use strict'
 const VentasModel       = require('../models/ventas.model')
 const TransaccionesModel = require('../models/transacciones.model')
+const Tercero = require('../services/tercero.service')
 const ClientesModel     = require('../models/clientes.model')
 const OperacionesModel  = require('../models/operaciones.model')
 const AsignacionesModel = require('../models/asignaciones.model')
@@ -124,6 +125,8 @@ const VentasController = {
       }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/cantera') }
+      let tercero
+      try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/ventas/cantera') }
       let carrito = []
       try { carrito = JSON.parse(items || '[]') } catch (_) {}
       if (!carrito.length) { req.flash('error', 'El carrito está vacío.'); return res.redirect('/ventas/cantera') }
@@ -176,6 +179,7 @@ const VentasController = {
         nro_remito:          remito.nro,
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      await Tercero.guardarEnOp(id_op, tercero)
 
       await VentasModel.entregar(id_op)
 
@@ -303,6 +307,8 @@ const VentasController = {
       }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/viaje') }
+      let tercero
+      try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/ventas/viaje') }
 
       const esFinalizarAhora = finalizarAhora === 'true'
       const destino   = textoDestino({ calle, numero, obra })
@@ -363,6 +369,7 @@ const VentasController = {
         detalles: [detalle],
       })
       await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      await Tercero.guardarEnOp(id_op, tercero)
       // A cuenta corriente: el cargo aparece en la cuenta del cliente desde que se registra
       // la venta, aunque el viaje quede programado.
       await VentasModel.sincronizarCargoCC(id_op)
@@ -460,7 +467,9 @@ const VentasController = {
 
   async actualizarViaje(req, res) {
     try {
+      const tercero = await Tercero.leer(req.body, req.body.metodoPago)
       await VentasModel.actualizarViaje(req.params.id, req.body)
+      await Tercero.guardarEnOp(req.params.id, tercero)
       req.flash('success', 'Viaje actualizado.')
       res.redirect(`/ventas/${req.params.id}`)
     } catch (err) {

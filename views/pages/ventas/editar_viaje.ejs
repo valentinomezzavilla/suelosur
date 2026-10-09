@@ -137,7 +137,7 @@
                 <div class="form-section">
                     <h3 class="form-section__title">Metodo de pago</h3>
                     <div class="form-group">
-                        <select name="metodoPago" id="metodoPago">
+                        <select name="metodoPago" id="metodoPago" data-tercero data-tercero-valor="<%= viaje.tercero || '' %>">
                             <option value="efectivo"         <%= viaje.metodoPago === 'efectivo' ? 'selected' : '' %>>Efectivo</option>
                             <option value="transferencia"    <%= viaje.metodoPago === 'transferencia' ? 'selected' : '' %>>Transferencia</option>
                             <option value="cheque"           <%= viaje.metodoPago === 'cheque' ? 'selected' : '' %>>Cheque</option>

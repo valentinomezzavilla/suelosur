@@ -29,6 +29,8 @@
             inputMonto.value = concepto ? deudaActual : '';
             inputMonto.max   = deudaActual;
             document.getElementById('formAbonar').action = `/clientes/${btn.dataset.id}/abonar`;
+            // Transferencia a tercero: no arrastrar lo elegido en un abono anterior
+            document.getElementById('inputMetodoAbonar')?.dispatchEvent(new Event('tercero:reset'));
             modalAbonar.style.display = 'flex';
             document.body.style.overflow = 'hidden';
             inputMonto.focus();

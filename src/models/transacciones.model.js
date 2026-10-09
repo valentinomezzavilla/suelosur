@@ -35,6 +35,12 @@ const TransaccionesModel = {
       RETURNING id
     `, [tipo, n, id_op_encabezado || null, nro_remito || null, cliente_id || null,
         cliente || '', monto || 0, descripcion || '', metodo_pago || 'efectivo', fecha || null])
+    // Transferencia destinada a tercero: el egreso por el mismo monto (si la operación lo tiene)
+    if (metodo_pago === 'transferencia' && id_op_encabezado) {
+      await require('../services/tercero.service').egresoDeCobro({
+        id_transaccion: rows[0].id, id_op_encabezado, monto, fecha, cliente, tipo,
+      }, q)
+    }
     return rows[0].id
   },
 
@@ -57,14 +63,32 @@ const TransaccionesModel = {
   //  · Si entra a cuenta corriente: genera el cargo correspondiente.
   //  · El método de la OP asociada (si tiene) se actualiza igual, para que el resto
   //    de la app (remito, detalle de venta) muestre lo mismo.
-  async cambiarMetodoPago(id, nuevoMetodo) {
+  // `tercero`: datos de la transferencia a tercero (TerceroService.leer), o null.
+  async cambiarMetodoPago(id, nuevoMetodo, tercero = null) {
     const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq', 'cuenta_corriente']
     if (!METODOS.includes(nuevoMetodo)) throw new Error('Método de pago inválido.')
 
     const tx = (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
     if (!tx) throw new Error('La transacción no existe.')
     const anterior = tx.metodo_pago || 'efectivo'
-    if (anterior === nuevoMetodo) return
+    const Tercero = require('../services/tercero.service')
+    // Rehace el egreso a tercero de esta transacción según el método y el tercero nuevos
+    const rehacerTercero = async (q) => {
+      await Tercero.borrarDeTransaccion(id, q)
+      if (tx.id_op_encabezado) await Tercero.guardarEnOp(tx.id_op_encabezado, tercero, {}, q)
+      if (nuevoMetodo === 'transferencia' && tercero) {
+        if (tx.id_op_encabezado) {
+          await Tercero.egresoDeCobro({ id_transaccion: id, id_op_encabezado: tx.id_op_encabezado, monto: tx.monto, fecha: tx.fecha, cliente: tx.cliente, tipo: tx.tipo }, q)
+        } else {
+          await Tercero.crearEgreso(tercero, { monto: tx.monto, fecha: tx.fecha, id_transaccion: id, descripcion: `Transferencia de ${tx.cliente || 'cliente'} a tercero (${tx.tipo})` }, q)
+        }
+      }
+    }
+    // Mismo método: solo puede cambiar el destino de una transferencia
+    if (anterior === nuevoMetodo) {
+      if (nuevoMetodo === 'transferencia') await transaction(rehacerTercero)
+      return
+    }
 
     // Alquiler de varios contenedores cobrado "por alquiler": el cargo de cuenta corriente
     // es uno solo por el total (anclado a la OP principal), así que cambiar el método de
@@ -91,6 +115,7 @@ const TransaccionesModel = {
 
     await transaction(async (q) => {
       await q(`UPDATE transacciones SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, id])
+      await rehacerTercero(q)
       if (tx.id_op_encabezado) {
         await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
       }
@@ -156,7 +181,11 @@ const TransaccionesModel = {
 
     await transaction(async (q) => {
       await q(`DELETE FROM transacciones WHERE id = ?`, [id])
+      // El egreso de una transferencia a tercero se va con su cobro (y con la operación)
+      const Tercero = require('../services/tercero.service')
+      await Tercero.borrarDeTransaccion(id, q)
       if (!idOp) return
+      await Tercero.borrarDeOp(idOp, q)
 
       // Devolver el stock que la operación había movido, si no la operación
       // desaparece pero el material sigue descontado.
