@@ -2,9 +2,10 @@
 const ClientesModel = require('../models/clientes.model')
 const TransaccionesModel = require('../models/transacciones.model')
 const paginar       = require('../utils/paginar')
-const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
+const { etiquetaPeriodo } = require('../utils/periodos')
 const { generarTablaPDF } = require('../utils/pdfTabla')
-const { fmtFecha } = require('../utils/fecha')
+const { fmtFecha, hoyISO } = require('../utils/fecha')
+const { normalizarFiltros, TIPOS } = require('../utils/liquidaciones')
 
 // Fecha YYYY-MM-DD válida, o null (lo mal formado se ignora)
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
@@ -77,11 +78,11 @@ const ClientesController = {
     try {
       const cli = await ClientesModel.obtener(req.params.id)
       if (!cli) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes/cuentas') }
-      const periodo = resolverPeriodo({
-        preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
-      })
-      const obra = await ClientesModel.obraPorClave(cli.id, req.query.obra)
-      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta, obra })
+      // Mismos filtros que Liquidaciones (el cliente es este): los movimientos de la
+      // pantalla usan fechas y obra; el PDF es la liquidación del cliente con todos.
+      const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
+      const obra = await ClientesModel.obraPorClave(cli.id, filtros.obra)
+      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: filtros.desde, hasta: filtros.hasta, obra })
       const obras = await ClientesModel.obras(cli.id)
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
       // Cuánto falta de cada cargo: "Saldar" solo en los que todavía deben algo
@@ -97,9 +98,9 @@ const ClientesController = {
       }))
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, sinCargo, obras, obra,
-        periodoLabel: etiquetaPeriodo(periodo),
-        filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '', obra: obra ? obra.clave : '' },
+        cliente, estado, pendientes, sinCargo, obras, obra, TIPOS,
+        periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
+        filtros: { ...filtros, obra: obra ? obra.clave : null },
         scripts: ['/js/modalAbonar.js'],
       })
     } catch (err) {
@@ -111,13 +112,11 @@ const ClientesController = {
     try {
       const cli = await ClientesModel.obtener(req.params.id)
       if (!cli) { req.flash('error', 'Cliente no encontrado.'); return res.redirect('/clientes/cuentas') }
-      const periodo = resolverPeriodo({
-        preset: req.query.preset, desde: req.query.fechaDesde, hasta: req.query.fechaHasta, mes: req.query.mes,
-      })
-      const obra = await ClientesModel.obraPorClave(cli.id, req.query.obra)
-      const estado = await ClientesModel.estadoCuenta(cli.id, { desde: periodo.desde, hasta: periodo.hasta, obra })
-      const { generarEstadoCuentaPDF } = require('../utils/pdfEstadoCuenta')
-      generarEstadoCuentaPDF(res, { cliente: cli, estado, periodoLabel: etiquetaPeriodo(periodo), obraLabel: obra ? obra.nombre : null })
+      // El reporte de la cuenta corriente es la liquidación del cliente (mismo PDF que Liquidaciones)
+      const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
+      const liquidacion = await require('../models/liquidaciones.model').liquidacion(filtros)
+      const { generarLiquidacionPDF } = require('../utils/pdfLiquidacion')
+      generarLiquidacionPDF(res, { liquidacion, filtros, general: false })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al generar el PDF.'); res.redirect('back')
     }

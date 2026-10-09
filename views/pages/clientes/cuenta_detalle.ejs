@@ -1,7 +1,6 @@
 <%
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
   const nombre = `${cliente.nombre} ${cliente.apellido || ''}`.trim()
-  const presetHref = (p) => '/clientes/cuentas/' + cliente.id + '?preset=' + p + (filtros.obra ? '&obra=' + encodeURIComponent(filtros.obra) : '')
   const tipoLabel = { deuda: 'Cargo', pago: 'Pago', ajuste: 'Ajuste', uso_saldo_favor: 'Uso saldo a favor' }
   const metodoLabel = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cta. corriente' }
   // Deudas = cargadas a cuenta corriente; uso de saldo a favor = pagado con crédito ya
@@ -11,9 +10,15 @@
     : (m.metodo_pago ? (metodoLabel[m.metodo_pago] || m.metodo_pago) : '—')
   const saldoTxt = (s) => s < 0 ? `Debe ${money(Math.abs(s))}` : (s > 0 ? `A favor ${money(s)}` : 'Al día')
   const saldoCls = (s) => s < 0 ? 'text-danger' : (s > 0 ? 'text-success' : 'text-muted')
-  const qsPdf = new URLSearchParams(
-    Object.entries({ preset: filtros.preset, fechaDesde: filtros.fechaDesde, fechaHasta: filtros.fechaHasta, obra: filtros.obra }).filter(([,v]) => v)
-  ).toString()
+  // Mismos parámetros que /liquidaciones (el PDF es la liquidación del cliente)
+  const qsPdf = (() => {
+    const p = new URLSearchParams()
+    if (filtros.obra) p.set('obra', filtros.obra)
+    p.set('desde', filtros.desde); p.set('hasta', filtros.hasta)
+    filtros.tipos.forEach(t => p.append('tipos', t))
+    p.set('estadoPago', filtros.estadoPago)
+    return p.toString()
+  })()
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -24,7 +29,7 @@
     </h4>
   </div>
   <div class="d-flex gap-2">
-    <a href="/clientes/cuentas/<%= cliente.id %>/pdf<%= qsPdf ? '?' + qsPdf : '' %>" target="_blank" class="btn btn-sm btn-outline-secondary">
+    <a href="/clientes/cuentas/<%= cliente.id %>/pdf?<%= qsPdf %>" target="_blank" class="btn btn-sm btn-outline-secondary">
       <%- icon('printer', { size: 15 }) %> Descargar PDF
     </a>
     <% if (cliente.saldo < 0) { %>
@@ -103,44 +108,57 @@
 </div>
 <% } %>
 
-<!-- Período -->
-<div class="periodo-chips">
-  <a href="<%= presetHref('hoy') %>"    class="periodo-chip <%= filtros.preset==='hoy'    ? 'is-active' : '' %>">Hoy</a>
-  <a href="<%= presetHref('semana') %>" class="periodo-chip <%= filtros.preset==='semana' ? 'is-active' : '' %>">Esta semana</a>
-  <a href="<%= presetHref('mes') %>"    class="periodo-chip <%= filtros.preset==='mes'    ? 'is-active' : '' %>">Este mes</a>
-</div>
-
-<form method="GET" action="/clientes/cuentas/<%= cliente.id %>" class="card shadow-sm mb-3">
-  <div class="card-body py-2">
-    <input type="hidden" name="preset" value="rango">
-    <div class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label">Desde</label>
-        <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde || '' %>" class="form-control form-control-sm">
+<!-- Filtros: los mismos que Liquidaciones -->
+<div class="card shadow-sm mb-3">
+  <div class="card-body">
+    <form method="GET" action="/clientes/cuentas/<%= cliente.id %>">
+      <div class="row g-2 align-items-end mb-2">
+        <div class="col-12 col-md-5">
+          <label class="form-label" for="filtroObra">Obra</label>
+          <select name="obra" id="filtroObra" class="form-select" <%= obras.length ? '' : 'disabled' %>>
+            <% if (!obras.length) { %>
+              <option value="">El cliente no tiene obras cargadas</option>
+            <% } else { %>
+              <option value="">Todas las obras</option>
+              <% obras.forEach(o => { %><option value="<%= o.clave %>" <%= filtros.obra === o.clave ? 'selected' : '' %>><%= o.nombre %></option><% }) %>
+            <% } %>
+          </select>
+        </div>
+        <div class="col-6 col-md-3">
+          <label class="form-label">Estado de pago</label>
+          <select name="estadoPago" class="form-select">
+            <option value="todas" <%= filtros.estadoPago === 'todas' ? 'selected' : '' %>>Todas</option>
+            <option value="pendientes" <%= filtros.estadoPago === 'pendientes' ? 'selected' : '' %>>Solo pendientes</option>
+            <option value="pagadas" <%= filtros.estadoPago === 'pagadas' ? 'selected' : '' %>>Solo pagadas</option>
+          </select>
+        </div>
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Hasta</label>
-        <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta || '' %>" class="form-control form-control-sm">
+      <div class="row g-2 align-items-end">
+        <div class="col-6 col-md-2">
+          <label class="form-label">Desde</label>
+          <input type="date" name="desde" class="form-control" value="<%= filtros.desde %>">
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label">Hasta</label>
+          <input type="date" name="hasta" class="form-control" value="<%= filtros.hasta %>">
+        </div>
+        <div class="col-12 col-md-5">
+          <label class="form-label d-block">Operaciones</label>
+          <div class="liq-tipos">
+            <% Object.entries(TIPOS).forEach(([k, label]) => { %>
+              <label class="liq-tipo"><input type="checkbox" name="tipos" value="<%= k %>" <%= filtros.tipos.includes(k) ? 'checked' : '' %>> <%= label %></label>
+            <% }) %>
+          </div>
+        </div>
+        <div class="col-12 col-md-3 d-flex gap-2">
+          <button type="submit" class="btn btn-primary">Ver</button>
+          <a href="/clientes/cuentas/<%= cliente.id %>" class="btn btn-outline-secondary">Limpiar</a>
+        </div>
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Obra</label>
-        <select name="obra" class="form-select form-select-sm" <%= obras.length ? '' : 'disabled' %>>
-          <option value="">Todas las obras</option>
-          <% obras.forEach(o => { %>
-          <option value="<%= o.clave %>" <%= filtros.obra === o.clave ? 'selected' : '' %>><%= o.nombre %></option>
-          <% }) %>
-        </select>
-      </div>
-      <div class="col-auto">
-        <button type="submit" class="btn btn-sm btn-naranja">Filtrar</button>
-        <a href="/clientes/cuentas/<%= cliente.id %>" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a>
-      </div>
-    </div>
-    <% if (obra) { %>
-    <p class="form-text mb-0 mt-2">Obra <strong><%= obra.nombre %></strong>: se ven sus cargos y todos los pagos del cliente (los pagos no están atados a una obra).</p>
-    <% } %>
+      <p class="form-text mb-0 mt-2">Los movimientos de abajo se filtran por fechas y obra<% if (obra) { %> (con obra <strong><%= obra.nombre %></strong> se ven sus cargos y todos los pagos del cliente, que no están atados a una obra)<% } %>. Estado de pago y operaciones se aplican al PDF.</p>
+    </form>
   </div>
-</form>
+</div>
 
 <!-- Resumen del período -->
 <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
@@ -218,7 +236,7 @@
         </tr>
       </thead>
       <tbody>
-        <% if (filtros.fechaDesde) { %>
+        <% if (filtros.desde) { %>
         <tr class="table-light">
           <td colspan="6" class="text-muted small">Saldo inicial</td>
           <td class="text-end fw-semibold <%= saldoCls(estado.saldoInicial) %>"><%= money(estado.saldoInicial) %></td>
