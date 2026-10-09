@@ -299,6 +299,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const formRemito = document.getElementById('formRemito');
         if (formRemito) formRemito.value = remitoInput?.value?.trim() || '';
 
+        // Transferencia destinada a tercero: se valida y viaja con la venta
+        if (window.TerceroTransferencia && !window.TerceroTransferencia.copiarA(document.getElementById('metodoPago'), document.getElementById('formCantera'))) return;
+
         document.getElementById('formCantera').submit();
     });
 

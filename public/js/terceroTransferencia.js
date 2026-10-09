@@ -1,4 +1,4 @@
-'use strict'
+'use strict';
 // ═══════════════════════════════════════════════════════════════════
 // "Destinado a tercero" en los métodos de pago de cobro.
 // En cada <select data-tercero> (método de pago), al elegir Transferencia aparece el
@@ -10,6 +10,8 @@
 //  · data-tercero-valor='{"categoria":…}' precarga un tercero ya guardado.
 //  · Si el método se cambia por código, disparar 'change' en el select; el evento
 //    'tercero:reset' además limpia lo elegido (modales que se reutilizan).
+//  · Pantallas que envían OTRO formulario (Cantera): TerceroTransferencia.copiarA(select,
+//    form) valida lo elegido y lo copia a ese formulario como campos ocultos.
 // ═══════════════════════════════════════════════════════════════════
 (function () {
   const CAMPOS = [
@@ -21,6 +23,7 @@
     { campo: 'periodo',   col: 'periodo',      label: 'Período',     tipo: 'month' },
   ]
   let cache = null
+  const cajas = new WeakMap()   // select → su bloque
   const opciones = () => cache || (cache = fetch('/api/tercero/opciones', { credentials: 'same-origin' })
     .then(r => (r.ok ? r.json() : null)).catch(() => null))
 
@@ -66,6 +69,7 @@
     const detalle = el('div', { class: 'tercero-box__detalle' }, [grupo('Destino *', cat), ...campos.map(c => c.wrap), wrapConcepto])
     const box = el('div', { class: 'tercero-box' }, [fila, detalle])
     ubicar(select, box)
+    cajas.set(select, box)
 
     const mostrar = (n, si) => {
       n.hidden = !si
@@ -102,6 +106,8 @@
     } catch (_) {}
 
     select.addEventListener('change', sync)
+    // Otros scripts habilitan / deshabilitan el método sin disparar 'change' (alquiler nuevo)
+    new MutationObserver(sync).observe(select, { attributes: true, attributeFilter: ['disabled'] })
     chk.addEventListener('change', sync)
     cat.addEventListener('change', sync)
     select.addEventListener('tercero:reset', () => {
@@ -111,6 +117,22 @@
     })
     sync()
   }
+
+  // Valida y copia lo elegido a otro formulario. false si falta algo (ya avisó al usuario).
+  function copiarA(select, form) {
+    form.querySelectorAll('[data-tercero-copia]').forEach(n => n.remove())
+    const box = select && cajas.get(select)
+    if (!box || box.hidden) return true
+    const campos = [...box.querySelectorAll('input, select')].filter(i => !i.disabled && i.name)
+    const invalido = campos.find(i => !i.checkValidity())
+    if (invalido) { invalido.reportValidity(); invalido.focus(); return false }
+    campos.forEach(i => {
+      if (i.type === 'checkbox' && !i.checked) return
+      form.append(el('input', { type: 'hidden', name: i.name, value: i.value, 'data-tercero-copia': '' }))
+    })
+    return true
+  }
+  window.TerceroTransferencia = { copiarA }
 
   function init() { document.querySelectorAll('select[data-tercero]').forEach(armar) }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init)
