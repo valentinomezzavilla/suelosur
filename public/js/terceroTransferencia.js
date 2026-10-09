@@ -4,7 +4,8 @@
 // En cada <select data-tercero> (método de pago), al elegir Transferencia aparece el
 // check "Destinado a tercero"; al marcarlo, el desplegable "¿A qué se destinó?" con las
 // mismas categorías de Compras / Pagos, y según la categoría elegida se habilitan sus
-// campos (proveedor, vehículo, empleado…). "Otro" pide un concepto libre.
+// campos (proveedor, vehículo, empleado…). "Concepto / remito" queda para cualquier
+// categoría (obligatorio en "Otro"). Sueldo pide empleado y período.
 // El servidor registra el egreso por el mismo monto (services/tercero.service.js).
 //
 //  · data-tercero-valor='{"categoria":…}' precarga un tercero ya guardado.
@@ -15,13 +16,16 @@
 // ═══════════════════════════════════════════════════════════════════
 (function () {
   const CAMPOS = [
-    { campo: 'proveedor', col: 'id_proveedor', label: 'Proveedor *', lista: 'proveedores' },
+    { campo: 'proveedor', col: 'id_proveedor', label: 'Proveedor',   lista: 'proveedores' },
     { campo: 'vehiculo',  col: 'id_vehiculo',  label: 'Vehículo',    lista: 'vehiculos' },
     { campo: 'empleado',  col: 'id_empleado',  label: 'Empleado',    lista: 'empleados' },
     { campo: 'producto',  col: 'id_producto',  label: 'Producto',    lista: 'productos' },
     { campo: 'fletero',   col: 'fletero',      label: 'Fletero',     tipo: 'text' },
     { campo: 'periodo',   col: 'periodo',      label: 'Período',     tipo: 'month' },
   ]
+  // Campo obligatorio según la categoría elegida
+  const OBLIGATORIO = { proveedor: () => true, empleado: (cat) => cat === 'sueldo' }
+  const mesActual = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') }
   let cache = null
   const cajas = new WeakMap()   // select → su bloque
   const opciones = () => cache || (cache = fetch('/api/tercero/opciones', { credentials: 'same-origin' })
@@ -35,6 +39,7 @@
   }
   const opcion = (value, texto) => { const o = el('option', { value }); o.textContent = texto; return o }
   const grupo = (label, control) => el('div', { class: 'tercero-box__campo' }, [el('label', { class: 'form-label small mb-1' }, [label]), control])
+  const rotular = (wrap, texto, requerido) => { wrap.querySelector('label').textContent = texto + (requerido ? ' *' : '') }
 
   // Dónde va el bloque: debajo del select (o de su contenedor) sin romper filas/flex
   function ubicar(select, box) {
@@ -55,7 +60,7 @@
     const fila = el('label', { class: 'toggle-row mt-1', for: id + 'Chk' }, [chk, ' Destinado a tercero'])
 
     const cat = el('select', { name: 'tercero_categoria', class: 'form-select form-select-sm' },
-      [opcion('', '¿A qué se destinó?…'), ...op.categorias.map(c => opcion(c.clave, c.clave === 'otro' ? 'Otro (escribir concepto)' : c.etiqueta))])
+      [opcion('', '¿A qué se destinó?…'), ...op.categorias.map(c => opcion(c.clave, c.clave === 'otro' ? 'Otro (escribir concepto / remito)' : c.etiqueta))])
     const campos = CAMPOS.map(c => {
       const control = c.lista
         ? el('select', { name: 'tercero_' + c.col, class: 'form-select form-select-sm' },
@@ -63,8 +68,8 @@
         : el('input', { type: c.tipo, name: 'tercero_' + c.col, class: 'form-control form-control-sm' })
       return { ...c, control, wrap: grupo(c.label, control) }
     })
-    const concepto = el('input', { type: 'text', name: 'tercero_concepto', class: 'form-control form-control-sm', placeholder: 'Ej.: pago al flete de Juan Pérez', maxlength: '200' })
-    const wrapConcepto = grupo('Concepto *', concepto)
+    const concepto = el('input', { type: 'text', name: 'tercero_concepto', class: 'form-control form-control-sm', placeholder: 'Ej.: remito 1234, factura A 0001-0005…', maxlength: '200' })
+    const wrapConcepto = grupo('Concepto / remito', concepto)
 
     const detalle = el('div', { class: 'tercero-box__detalle' }, [grupo('Destino *', cat), ...campos.map(c => c.wrap), wrapConcepto])
     const box = el('div', { class: 'tercero-box' }, [fila, detalle])
@@ -88,10 +93,15 @@
       campos.forEach(c => {
         const si = !!def && def.campos.includes(c.campo)
         mostrar(c.wrap, si)
-        c.control.required = si && c.campo === 'proveedor'
+        c.control.required = si && !!OBLIGATORIO[c.campo] && OBLIGATORIO[c.campo](cat.value)
+        rotular(c.wrap, c.label, c.control.required)
+        // Sueldo: el período arranca en el mes en curso (como en Compras)
+        if (si && c.campo === 'periodo' && cat.value === 'sueldo' && !c.control.value) c.control.value = mesActual()
       })
-      mostrar(wrapConcepto, cat.value === 'otro')
+      // Concepto / remito: para cualquier destino; en "Otro" es lo único que lo describe
+      mostrar(wrapConcepto, !!cat.value)
       concepto.required = cat.value === 'otro'
+      rotular(wrapConcepto, 'Concepto / remito', concepto.required)
     }
 
     // Precarga (edición de una operación que ya tenía tercero)
