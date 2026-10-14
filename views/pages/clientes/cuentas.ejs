@@ -3,6 +3,7 @@
   const totalDeuda  = conCuenta.filter(c => c.saldo < 0).reduce((a, c) => a + Math.abs(c.saldo), 0)
   const totalAFavor = conCuenta.filter(c => c.saldo > 0).reduce((a, c) => a + c.saldo, 0)
   const conDeuda    = conCuenta.filter(c => c.saldo < 0).length
+  const hayFiltros  = !!(filtros.q || filtros.saldo || filtros.estado || filtros.tipo || filtros.enCurso)
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -10,7 +11,29 @@
   <a href="/clientes" class="btn btn-sm btn-outline-secondary">← Clientes</a>
 </div>
 
-<!-- Métricas -->
+<%- include('../../partials/tabla_toolbar', {
+  action: '/clientes/cuentas',
+  placeholder: 'Buscar cliente por #, nombre, DNI/CUIT o teléfono...',
+  qValue: filtros.q,
+  hiddenFilters: { sort: filtros.sort, dir: filtros.sort ? filtros.dir : '' },
+  filtros: [
+    { name: 'saldo', label: 'Saldo', selected: filtros.saldo, options: [
+      { value: 'deuda', label: 'Con deuda' },
+      { value: 'favor', label: 'Con saldo a favor' },
+      { value: 'aldia', label: 'Al día' },
+    ]},
+    { name: 'estado', label: 'Cuenta', selected: filtros.estado, options: [
+      { value: 'habilitada', label: 'Habilitada' },
+      { value: 'deshabilitada', label: 'Deshabilitada' },
+    ]},
+    { name: 'tipo', label: 'Tipo de cliente', selected: filtros.tipo, options: tiposCliente.map(t => ({ value: t, label: t })) },
+    { name: 'enCurso', label: 'Operaciones en curso', selected: filtros.enCurso, options: [
+      { value: 'si', label: 'Con alquileres en curso' },
+    ]},
+  ],
+}) %>
+
+<!-- Métricas (sobre las cuentas filtradas) -->
 <div class="stat-cards" style="grid-template-columns:repeat(3,minmax(0,1fr));max-width:760px">
   <div class="stat-card stat-card--danger">
     <div class="stat-card__icon"><%- icon('alert', { size: 20 }) %></div>
@@ -28,19 +51,24 @@
 
 <!-- Cuentas: habilitadas + cualquiera con saldo u operaciones a cta. cte. abiertas -->
 <div class="card shadow-sm mb-4">
-  <div class="card-header bg-white fw-semibold">Cuentas corrientes</div>
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+    <span>Cuentas corrientes</span>
+    <% if (hayFiltros) { %><small class="text-muted fw-normal">Mostrando <%= conCuenta.length %> de <%= totalCuentas %></small><% } %>
+  </div>
   <div class="card-body p-0">
-    <% if (!conCuenta.length) { %>
+    <% if (!conCuenta.length && hayFiltros) { %>
+      <%- include('../../partials/empty_state', { icono: '🔍', mensaje: 'Ninguna cuenta coincide con los filtros.', accionHref: '/clientes/cuentas', accionLabel: 'Limpiar filtros' }) %>
+    <% } else if (!conCuenta.length) { %>
       <%- include('../../partials/empty_state', { icono: '💳', mensaje: 'No hay cuentas corrientes habilitadas aún.', accionHref: '/clientes', accionLabel: 'Ir a clientes' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th class="col-w-50">#</th>
-          <th>Cliente</th>
+          <%- include('../../partials/th_sort', { sortKey: 'numero',      sortLabel: '#',       currentSort: filtros.sort, currentDir: filtros.dir, filtros, thClass: 'col-w-50' }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'cliente',     sortLabel: 'Cliente', currentSort: filtros.sort, currentDir: filtros.dir, filtros }) %>
           <th>Teléfono</th>
-          <th class="text-end">Saldo</th>
-          <th class="text-center">Movim.</th>
+          <%- include('../../partials/th_sort', { sortKey: 'saldo',       sortLabel: 'Saldo',   currentSort: filtros.sort, currentDir: filtros.dir, filtros, align: 'end' }) %>
+          <%- include('../../partials/th_sort', { sortKey: 'movimientos', sortLabel: 'Movim.',  currentSort: filtros.sort, currentDir: filtros.dir, filtros, align: 'center' }) %>
           <th class="text-center">Acciones</th>
         </tr>
       </thead>
@@ -91,7 +119,9 @@
     <small class="text-muted">Clientes sin cuenta habilitada</small>
   </div>
   <div class="card-body p-0">
-    <% if (!sinCuenta.length) { %>
+    <% if (!sinCuenta.length && filtros.q) { %>
+      <div class="p-4 text-center text-muted">Ningún cliente sin cuenta coincide con "<%= filtros.q %>".</div>
+    <% } else if (!sinCuenta.length) { %>
       <div class="p-4 text-center text-muted">Todos los clientes activos ya tienen cuenta corriente habilitada.</div>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">

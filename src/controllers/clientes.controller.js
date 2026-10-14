@@ -7,6 +7,7 @@ const { etiquetaPeriodo } = require('../utils/periodos')
 const { generarTablaPDF } = require('../utils/pdfTabla')
 const { fmtFecha, hoyISO } = require('../utils/fecha')
 const { normalizarFiltros, TIPOS } = require('../utils/liquidaciones')
+const { normalizarFiltrosCuentas, filtrarCuentas, coincideCliente, TIPOS_CLIENTE } = require('../utils/filtroCuentas')
 
 // Fecha YYYY-MM-DD válida, o null (lo mal formado se ignora)
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
@@ -68,16 +69,21 @@ const ClientesController = {
   // ── Submódulo Cuenta Corriente ────────────────────────────────
   async cuentas(req, res) {
     try {
+      const filtros = normalizarFiltrosCuentas(req.query)
       const cuentasRaw = await ClientesModel.listarCuentas()
-      const conCuenta = cuentasRaw.map(c => ({
+      const todas = cuentasRaw.map(c => ({
         ...c,
-        telefono: c.telefono || c.tel_whatsapp,
-        saldo: c.saldo ?? 0,
+        saldo: Number(c.saldo ?? 0),
       }))
+      const conCuenta = filtrarCuentas(todas, filtros)
+        .map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
+      // La búsqueda por cliente también aplica a la tabla de "Habilitar cuenta"
       const sinCuentaRaw = await ClientesModel.sinCuenta()
-      const sinCuenta = sinCuentaRaw.map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
+      const sinCuenta = sinCuentaRaw.filter(c => coincideCliente(c, filtros.q))
+        .map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
       res.render('pages/clientes/cuentas', {
-        titulo: 'Cuentas corrientes', conCuenta, sinCuenta, scripts: ['/js/modalAbonar.js'],
+        titulo: 'Cuentas corrientes', conCuenta, sinCuenta, filtros, totalCuentas: todas.length,
+        tiposCliente: TIPOS_CLIENTE, scripts: ['/js/modalAbonar.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes')
