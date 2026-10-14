@@ -83,7 +83,7 @@ const ClientesController = {
         .map(c => ({ ...c, telefono: c.telefono || c.tel_whatsapp }))
       res.render('pages/clientes/cuentas', {
         titulo: 'Cuentas corrientes', conCuenta, sinCuenta, filtros, totalCuentas: todas.length,
-        tiposCliente: TIPOS_CLIENTE, scripts: ['/js/modalAbonar.js'],
+        tiposCliente: TIPOS_CLIENTE, scripts: ['/js/modalAbonar.js', '/js/cuentasBusqueda.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes')
