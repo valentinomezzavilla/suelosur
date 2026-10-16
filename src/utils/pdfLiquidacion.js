@@ -140,21 +140,24 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   ]
   const valor = (c, r) => c.money ? B.money(r[c.key]) : c.key === 'cantidad' ? Number(r.cantidad).toLocaleString('es-AR') : String(r[c.key] ?? '')
   const altoRenglon = (r) => Math.max(15, doc.font('Helvetica').fontSize(8.5).heightOfString(r.descripcion, { width: COLS[0].w * width - 8 }) + 6)
-  const altoOperacion = (o) => 22 + 18 + o.renglones.reduce((s, r) => s + altoRenglon(r), 0) + 14
+  // El N° mostrado es el remito cargado en el campo Remito; el N° de OP (automático) solo si no hay remito
+  const tituloOperacion = (o) => [o.nro_remito ? `Remito ${o.nro_remito}` : `OP-${String(o.nro_op).padStart(4, '0')}`, fmtFecha(o.fecha), o.tipoTexto,
+    o.obra && `Obra: ${o.obra}`].filter(Boolean).join('  ·  ')
+  // Alto de la franja gris: crece si el título (obra larga) ocupa más de una línea
+  const altoFranja = (o) => Math.max(20, doc.font('Helvetica-Bold').fontSize(8.5).heightOfString(tituloOperacion(o), { width: width - 140 }) + 11)
+  const altoOperacion = (o) => altoFranja(o) + 2 + 18 + o.renglones.reduce((s, r) => s + altoRenglon(r), 0) + 14
 
   function operacion(o, tituloPagina) {
     // Una operación no se corta entre páginas, salvo que no entre en una página entera
     const alto = altoOperacion(o)
     if (alto < limite() - 120) asegurar(alto, tituloPagina)
 
-    // Franja gris con los datos de la operación y su estado
-    doc.rect(left, y, width, 20).fill(BANDA)
-    // El N° mostrado es el remito cargado en el campo Remito; el N° de OP (automático) solo si no hay remito
-    const titulo = [o.nro_remito ? `Remito ${o.nro_remito}` : `OP-${String(o.nro_op).padStart(4, '0')}`, fmtFecha(o.fecha), o.tipoTexto,
-      o.obra && `Obra: ${o.obra}`].filter(Boolean).join('  ·  ')
-    doc.fillColor(NEGRO).fontSize(8.5).font('Helvetica-Bold').text(titulo, left + 8, y + 6, { width: width - 140, lineBreak: false, ellipsis: true })
+    // Franja gris con los datos de la operación y su estado (más alta si el título no entra en una línea)
+    const franja = altoFranja(o)
+    doc.rect(left, y, width, franja).fill(BANDA)
+    doc.fillColor(NEGRO).fontSize(8.5).font('Helvetica-Bold').text(tituloOperacion(o), left + 8, y + 6, { width: width - 140 })
     doc.fillColor(NEGRO).fontSize(7.5).font('Helvetica-Bold').text(ESTADOS[o.estado].toUpperCase(), right - 124, y + 6.5, { width: 116, align: 'right', lineBreak: false })
-    y += 20
+    y += franja
 
     // Encabezado de la tabla
     let x = left
@@ -190,12 +193,14 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     }
     cabecera()
     filas.forEach(f => {
-      if (y + 16 > limite()) { nuevaPagina(tituloPagina); cabecera() }
+      doc.fontSize(8.5).font(f._bold ? 'Helvetica-Bold' : 'Helvetica')
+      const h = Math.max(16, ...columnas.map(c => doc.heightOfString(String(f[c.key] ?? ''), { width: c.w * width - 8 }) + 7))
+      if (y + h > limite()) { nuevaPagina(tituloPagina); cabecera() }
       if (f._bold) linea(y, 0.8, NEGRO)
       let x = left
       doc.fillColor(f._color || NEGRO).fontSize(8.5).font(f._bold ? 'Helvetica-Bold' : 'Helvetica')
-      columnas.forEach(c => { doc.text(String(f[c.key] ?? ''), x + 4, y + 4, { width: c.w * width - 8, align: c.align, lineBreak: false, ellipsis: true }); x += c.w * width })
-      y += 16
+      columnas.forEach(c => { doc.text(String(f[c.key] ?? ''), x + 4, y + 4, { width: c.w * width - 8, align: c.align }); x += c.w * width })
+      y += h
       linea(y, f._bold ? 0.8 : 0.5, f._bold ? NEGRO : LINEA)
     })
     y += 16
