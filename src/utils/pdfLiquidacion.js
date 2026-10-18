@@ -159,10 +159,18 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     doc.fillColor(NEGRO).fontSize(7.5).font('Helvetica-Bold').text(ESTADOS[o.estado].toUpperCase(), right - 124, y + 6.5, { width: 116, align: 'right', lineBreak: false })
     y += franja
 
+    // Pago parcial: la última columna muestra lo que resta de cada renglón (en proporción a
+    // lo que falta pagar de la operación) en vez del importe total
+    const parcial = o.estado === 'parcial' && Number(o.total) > 0
+    const cabecera = (c) => (parcial && c.key === 'importe' ? 'Resta' : c.header)
+    const celda = (c, r) => (parcial && c.key === 'importe'
+      ? B.money(Math.round(Number(r.importe) * Number(o.resta) / Number(o.total) * 100) / 100)
+      : valor(c, r))
+
     // Encabezado de la tabla
     let x = left
     doc.fillColor(GRIS).fontSize(7).font('Helvetica-Bold')
-    COLS.forEach(c => { doc.text(c.header.toUpperCase(), x + 4, y + 5, { width: c.w * width - 8, align: c.align, lineBreak: false }); x += c.w * width })
+    COLS.forEach(c => { doc.text(cabecera(c).toUpperCase(), x + 4, y + 5, { width: c.w * width - 8, align: c.align, lineBreak: false }); x += c.w * width })
     y += 17
     linea(y, 0.8, NEGRO)
 
@@ -172,7 +180,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
       if (y + h > limite()) { nuevaPagina(tituloPagina) }
       x = left
       doc.fillColor(NEGRO).fontSize(8.5).font('Helvetica')
-      COLS.forEach(c => { doc.text(valor(c, r), x + 4, y + 4, { width: c.w * width - 8, align: c.align }); x += c.w * width })
+      COLS.forEach(c => { doc.text(celda(c, r), x + 4, y + 4, { width: c.w * width - 8, align: c.align }); x += c.w * width })
       y += h
       linea(y)
     })
