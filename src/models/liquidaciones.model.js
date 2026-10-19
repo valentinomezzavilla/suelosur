@@ -119,7 +119,7 @@ function armar(r, materiales) {
 async function pagosDelCliente(clienteId, { desde, hasta }) {
   const cc = (await query(`
     SELECT LEFT(created_at, 10) AS fecha, metodo_pago, descripcion, monto FROM movimientos_cuenta
-    WHERE cliente_id = ? AND tipo = 'pago' AND LEFT(created_at, 10) BETWEEN ? AND ?
+    WHERE cliente_id = ? AND tipo = 'pago' AND COALESCE(anulado, 0) = 0 AND LEFT(created_at, 10) BETWEEN ? AND ?
   `, [clienteId, desde, hasta])).rows
   const contado = (await query(`
     SELECT LEFT(fecha, 10) AS fecha, metodo_pago, descripcion, monto FROM transacciones

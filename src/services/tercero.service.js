@@ -135,6 +135,7 @@ async function borrar(donde, valor, q) {
 }
 const borrarDeTransaccion = (idTransaccion, q = query) => borrar('id_transaccion', idTransaccion, q)
 const borrarDeOp = (idOp, q = query) => borrar('id_op_encabezado', idOp, q)
+const borrarDeMovimiento = (idMov, q = query) => borrar('id_movimiento_cuenta', idMov, q)
 
 // Opciones de los desplegables (mismas categorías y listas que el formulario de Compras)
 async function opciones() {
@@ -156,4 +157,4 @@ async function opciones() {
   }
 }
 
-module.exports = { leer, guardarEnOp, crearEgreso, egresoDeCobro, borrarDeTransaccion, borrarDeOp, opciones, parsear }
+module.exports = { leer, guardarEnOp, crearEgreso, egresoDeCobro, borrarDeTransaccion, borrarDeOp, borrarDeMovimiento, opciones, parsear }

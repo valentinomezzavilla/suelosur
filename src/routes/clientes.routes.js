@@ -26,5 +26,7 @@ router.post('/:id/habilitar-cuenta',    auth, acceso, ctrl.habilitarCuenta)
 router.post('/:id/deshabilitar-cuenta', auth, acceso, ctrl.deshabilitarCuenta)
 router.post('/:id/abonar',       auth, acceso, ctrl.abonar)
 router.post('/:id/cuenta/movimiento',   auth, acceso, ctrl.registrarMovimiento)
+// Anular un pago: solo dueño y administración contable
+router.post('/:id/cuenta/movimiento/:movId/anular', auth, roles('admin_contable', 'dueno'), ctrl.anularPago)
 
 module.exports = router
