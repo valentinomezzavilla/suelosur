@@ -279,6 +279,23 @@ const ClientesController = {
     res.redirect('back')
   },
 
+  // Anula un pago de la cuenta corriente (ver ClientesModel.anularPago)
+  async anularPago(req, res) {
+    try {
+      const motivo = String(req.body.motivo || '').trim().slice(0, 300)
+      if (!motivo) { req.flash('error', 'Indicá el motivo de la anulación.'); return res.redirect('back') }
+      const m = await ClientesModel.anularPago(req.params.movId, req.params.id, { usuario: req.session.user?.id, motivo })
+      await require('../utils/auditoria').registrarAuditoria({
+        entidad_tipo: 'movimiento_cuenta', entidad_id: m.id, accion: 'anular_pago', usuario: req.session.user?.id,
+        detalle: { cliente_id: m.cliente_id, monto: Number(m.monto), descripcion: m.descripcion, metodo_pago: m.metodo_pago, fecha: m.created_at, motivo },
+      })
+      req.flash('success', `Pago de ${Number(m.monto).toLocaleString('es-AR')} anulado. El saldo del cliente se actualizó.`)
+    } catch (err) {
+      console.error(err); req.flash('error', err.message || 'Error al anular el pago.')
+    }
+    res.redirect('back')
+  },
+
   async abonar(req, res) {
     try {
       const monto = Number(req.body.monto)

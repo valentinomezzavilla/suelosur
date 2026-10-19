@@ -185,11 +185,11 @@ const ClientesModel = {
   },
 
   async movimientos(clienteId) {
-    return (await query(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at DESC`, [clienteId])).rows
+    return (await query(`SELECT * FROM movimientos_cuenta WHERE cliente_id = ? AND COALESCE(anulado, 0) = 0 ORDER BY created_at DESC`, [clienteId])).rows
   },
 
   async movimientosFiltrados(clienteId, { fechaDesde, fechaHasta } = {}) {
-    const wheres = ['cliente_id = ?']
+    const wheres = ['cliente_id = ?', 'COALESCE(anulado, 0) = 0']
     const params = [clienteId]
     if (fechaDesde) { wheres.push('LEFT(created_at, 10) >= ?'); params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('LEFT(created_at, 10) <= ?'); params.push(fechaHasta) }
@@ -212,7 +212,7 @@ const ClientesModel = {
 
     const movs = (await query(
       `SELECT cliente_id, id_op_encabezado, monto, tipo FROM movimientos_cuenta
-       WHERE cliente_id IN (${clientesIds.map(() => '?').join(',')})
+       WHERE cliente_id IN (${clientesIds.map(() => '?').join(',')}) AND COALESCE(anulado, 0) = 0
        ORDER BY cliente_id, created_at ASC, id ASC`,
       clientesIds
     )).rows
@@ -268,7 +268,7 @@ const ClientesModel = {
   // regla que saldadaPorOperacion y que el saldo corrido del estado de cuenta).
   async pendientePorCargo(clienteId) {
     const movs = (await query(
-      `SELECT id, monto, tipo FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY created_at ASC, id ASC`, [clienteId]
+      `SELECT id, monto, tipo FROM movimientos_cuenta WHERE cliente_id = ? AND COALESCE(anulado, 0) = 0 ORDER BY created_at ASC, id ASC`, [clienteId]
     )).rows
     const restante = {}
     const cola = []
@@ -394,25 +394,47 @@ const ClientesModel = {
     if (opIds) {
       movimientos = movimientos.filter(m => movimientoDeObra(m, opIds))
       if (desde) {
-        const antes = movimientos.filter(m => String(m.created_at).slice(0, 10) < desde)
+        const antes = movimientos.filter(m => String(m.created_at).slice(0, 10) < desde && !Number(m.anulado))
         saldoInicial = antes.reduce((s, m) => s + Number(m.monto), 0)
         movimientos = movimientos.filter(m => String(m.created_at).slice(0, 10) >= desde)
       }
     } else if (desde) {
       saldoInicial = (await query(
-        `SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_cuenta WHERE cliente_id = ? AND LEFT(created_at, 10) < ?`,
+        `SELECT COALESCE(SUM(monto),0) AS s FROM movimientos_cuenta WHERE cliente_id = ? AND LEFT(created_at, 10) < ? AND COALESCE(anulado, 0) = 0`,
         [clienteId, desde]
       )).rows[0]?.s || 0
     }
 
     let debitos = 0, creditos = 0
     let saldo = saldoInicial
+    // Un pago anulado se sigue viendo en el historial, pero no suma
     const filas = movimientos.map(m => {
+      if (Number(m.anulado)) return { ...m, saldo }
       if (m.monto < 0) debitos += -m.monto; else creditos += m.monto
       saldo += m.monto
       return { ...m, saldo }
     })
     return { movimientos: filas, saldoInicial, debitos, creditos, saldoFinal: saldo }
+  },
+
+  // Anula un pago de la cuenta corriente: queda en el historial marcado (quién, cuándo,
+  // motivo), se descuenta del saldo del cliente y deja de imputarse a las operaciones.
+  // Si era una transferencia a tercero, el egreso que generó se borra con él.
+  async anularPago(movId, clienteId, { usuario, motivo }) {
+    const { transaction } = require('../config/db')
+    return await transaction(async (q) => {
+      const m = (await q(`SELECT * FROM movimientos_cuenta WHERE id = ? AND cliente_id = ? FOR UPDATE`, [movId, clienteId])).rows[0]
+      if (!m) throw new Error('El movimiento no existe.')
+      if (m.tipo !== 'pago') throw new Error('Solo se pueden anular pagos.')
+      if (Number(m.anulado)) throw new Error('Ese pago ya estaba anulado.')
+      const cheque = (await q(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [movId])).rows[0]
+      if (cheque) throw new Error('Este pago es de un cheque: anulalo desde Cheques (deshabilitando el cheque).')
+      await q(`UPDATE movimientos_cuenta SET anulado = 1, anulado_en = ahora_local(), anulado_por = ?, anulado_motivo = ? WHERE id = ?`,
+        [usuario || null, motivo, movId])
+      await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(m.monto), clienteId])
+      await require('../services/tercero.service').borrarDeMovimiento(movId, q)
+      return m
+    })
   },
 
   nombreCompleto(c) {

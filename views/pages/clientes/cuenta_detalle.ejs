@@ -10,6 +10,8 @@
     : (m.metodo_pago ? (metodoLabel[m.metodo_pago] || m.metodo_pago) : '—')
   const saldoTxt = (s) => s < 0 ? `Debe ${money(Math.abs(s))}` : (s > 0 ? `A favor ${money(s)}` : 'Al día')
   const saldoCls = (s) => s < 0 ? 'text-danger' : (s > 0 ? 'text-success' : 'text-muted')
+  // Anular pagos: solo dueño y administración contable
+  const puedeAnular = !!user && ['dueno', 'admin_contable'].includes(user.rol)
   // Mismos parámetros que /liquidaciones (el PDF es la liquidación del cliente)
   const qsPdf = (() => {
     const p = new URLSearchParams()
@@ -244,20 +246,32 @@
         </tr>
         <% } %>
         <% estado.movimientos.forEach(m => { %>
-        <tr>
+        <% const anulado = !!Number(m.anulado) %>
+        <tr class="<%= anulado ? 'mov-anulado' : '' %>">
           <td><small class="text-muted"><%= formatFechaHora(m.created_at) %></small></td>
           <td>
-            <% if (m.tipo === 'deuda') { %><span class="badge rounded-pill px-3 badge-alerta">Cargo</span>
+            <% if (anulado) { %><span class="badge rounded-pill px-3 badge-alerta" title="Anulado el <%= formatFechaHora(m.anulado_en) %>: <%= m.anulado_motivo %>">Pago anulado</span>
+            <% } else if (m.tipo === 'deuda') { %><span class="badge rounded-pill px-3 badge-alerta">Cargo</span>
             <% } else if (m.tipo === 'pago') { %><span class="badge rounded-pill px-3 badge-activo">Pago</span>
             <% } else if (m.tipo === 'uso_saldo_favor') { %><span class="badge rounded-pill px-3 badge-en-transito">Uso saldo a favor</span>
             <% } else { %><span class="badge rounded-pill px-3 badge-pendiente">Ajuste</span><% } %>
           </td>
-          <td><%= m.descripcion %></td>
+          <td>
+            <%= m.descripcion %>
+            <% if (anulado) { %><div class="small text-danger">Anulado el <%= formatFechaHora(m.anulado_en) %> — <%= m.anulado_motivo %></div><% } %>
+          </td>
           <td><small class="text-muted"><%= metodoDe(m) %></small></td>
-          <td class="text-end text-danger"><%= m.monto < 0 ? money(Math.abs(m.monto)) : '—' %></td>
-          <td class="text-end text-success"><%= m.monto > 0 ? money(m.monto) : '—' %></td>
-          <td class="text-end fw-semibold <%= saldoCls(m.saldo) %>"><%= money(m.saldo) %></td>
+          <td class="text-end text-danger"><span class="<%= anulado ? 'text-decoration-line-through' : '' %>"><%= m.monto < 0 ? money(Math.abs(m.monto)) : '—' %></span></td>
+          <td class="text-end text-success"><span class="<%= anulado ? 'text-decoration-line-through text-muted' : '' %>"><%= m.monto > 0 ? money(m.monto) : '—' %></span></td>
+          <td class="text-end fw-semibold <%= anulado ? 'text-muted' : saldoCls(m.saldo) %>"><%= anulado ? '—' : money(m.saldo) %></td>
           <td class="text-center">
+            <% if (m.tipo === 'pago' && !anulado && puedeAnular) { %>
+              <form action="/clientes/<%= cliente.id %>/cuenta/movimiento/<%= m.id %>/anular" method="POST" class="d-inline form-anular-pago"
+                    data-monto="<%= money(m.monto) %>">
+                <input type="hidden" name="motivo">
+                <button type="submit" class="btn btn-sm btn-outline-danger" title="Anular este pago">Anular</button>
+              </form>
+            <% } %>
             <% if (m.tipo === 'deuda') { %>
               <%# Pagos aplicados FIFO: "Saldar" solo si a este cargo le falta algo,
                   y por lo que le falta (evita pagar dos veces lo mismo) %>
@@ -330,3 +344,16 @@
     </div>
   </div>
 </div>
+
+<script>
+// Anular pago: confirma y pide el motivo (queda registrado en el historial)
+document.querySelectorAll('.form-anular-pago').forEach(function (form) {
+  form.addEventListener('submit', function (e) {
+    var motivo = prompt('¿Anular el pago de ' + form.dataset.monto + '? Se descuenta del saldo del cliente y las operaciones que cubría vuelven a quedar pendientes.\n\nMotivo de la anulación:')
+    if (motivo === null) { e.preventDefault(); return }
+    motivo = motivo.trim()
+    if (!motivo) { e.preventDefault(); alert('Tenés que indicar el motivo.'); return }
+    form.querySelector('[name=motivo]').value = motivo
+  })
+})
+</script>

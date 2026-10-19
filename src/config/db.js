@@ -1563,6 +1563,13 @@ async function initDB() {
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_transaccion BIGINT`).catch(() => {})
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_movimiento_cuenta BIGINT`).catch(() => {})
 
+  // Anulación de pagos de cuenta corriente: el pago queda en el historial marcado como
+  // anulado (quién, cuándo y por qué) y deja de contar para saldo, imputación y liquidación.
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado INTEGER NOT NULL DEFAULT 0`).catch(() => {})
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado_en TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado_por BIGINT`).catch(() => {})
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado_motivo TEXT`).catch(() => {})
+
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 
