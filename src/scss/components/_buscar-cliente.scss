@@ -78,6 +78,10 @@
 }
 
 // ── Dropdown de autocomplete ───────────────────────────────────
+// Filtro por cliente (partials/filtro_cliente_obra): con un cliente elegido se ve solo el
+// cliente con su botón "Cambiar"; el buscador vuelve al cambiarlo.
+.filtro-cliente:has(#clienteSeleccionado[style*="flex"]) #buscarClienteInput { display: none; }
+
 .autocomplete-dropdown {
   position: absolute;
   z-index: 30;

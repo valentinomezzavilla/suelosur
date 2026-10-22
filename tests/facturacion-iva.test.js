@@ -152,3 +152,65 @@ describe('PDF de detalle de facturación', () => {
     assert.match(nombreArchivoFacturacion({ cliente: { nombre: 'José Pérez' } }), /^detalle-facturar-jose-perez-/)
   })
 })
+
+describe('Facturación: filtro por cliente y obra', () => {
+  const fila = (id, cliente_id) => F.mapear({ id, nro_op: id, tipo_op: 'M', modalidad: 'deposito', estado: 'entregado',
+    fecha_emision: '2026-10-20', para_facturar: 1, facturado: 0, cliente_id, iva_alicuota: 21, neto_base: 100, monto_final: 100 }, '2026-10-22')
+  const rows = [fila(1, 7), fila(2, 7), fila(3, 8)]
+  it('por cliente', () => {
+    assert.deepEqual(F.filtrar(rows, { estado: 'pendiente', clienteId: '7' }).map(r => r.id), [1, 2])
+  })
+  it('por obra: solo sus operaciones', () => {
+    assert.deepEqual(F.filtrar(rows, { estado: 'pendiente', clienteId: '7', opIds: [2] }).map(r => r.id), [2])
+  })
+  it('sin filtro, todas', () => {
+    assert.equal(F.filtrar(rows, { estado: 'pendiente' }).length, 3)
+  })
+})
+
+// Posición (y) de cada texto que escribe el PDF
+async function posicionesDelPDF(generar, args) {
+  const PDFDocument = require('pdfkit')
+  const original = PDFDocument.prototype.text
+  const pos = []
+  PDFDocument.prototype.text = function (t, x, y, ...resto) {
+    if (typeof y === 'number') pos.push({ t: String(t), y, alto: this.heightOfString(String(t), (resto[0] && resto[0].width) ? { width: resto[0].width } : {}) })
+    return original.call(this, t, x, y, ...resto)
+  }
+  const res = resFalso()
+  try { generar(res, args); await res.terminado } finally { PDFDocument.prototype.text = original }
+  return pos
+}
+
+describe('PDF: datos del cliente largos no se superponen', () => {
+  const largo = 'CONSTRUCTORA GOMEZ FERNANDEZ HERMANOS SOCIEDAD ANONIMA'
+  it('Facturación: el contacto y el CUIT van debajo de una razón social de varias líneas', async () => {
+    const pos = await posicionesDelPDF(generarFacturacionPDF, {
+      cliente: { nombre: 'NICOLAS ALEJANDRO GOMEZ FERNANDEZ', razonSocial: largo, cuit: '30712345678', condicion: 'Responsable Inscripto',
+        domicilio: 'Av. Rafael Núñez 4521, Barrio Cerro de las Rosas, Córdoba Capital' },
+      operaciones: [], totales: { neto: 0, iva: 0, total: 0, alicuota: 21 },
+    })
+    const razon = pos.find(p => p.t === largo)
+    const contacto = pos.find(p => p.t === 'Contacto')
+    const cuit = pos.find(p => p.t === 'CUIT')
+    assert.ok(razon.alto > 15, 'la razón social ocupa más de una línea')
+    assert.ok(contacto.y >= razon.y + razon.alto, 'Contacto debajo de la razón social')
+    assert.ok(cuit.y > contacto.y + 10)
+  })
+  it('Liquidación: el N° de cliente va debajo de un nombre de varias líneas', async () => {
+    const { generarLiquidacionPDF } = require('../src/utils/pdfLiquidacion')
+    const pos = await posicionesDelPDF(generarLiquidacionPDF, {
+      liquidacion: { clientes: [{ cliente: { id: 1, numero: 42, nombreCompleto: largo, dni: '30712345678', telefono: '351',
+        direccion: 'Av. Rafael Núñez 4521, Barrio Cerro de las Rosas, Córdoba Capital', email: 'administracion@constructora.com.ar' },
+        operaciones: [], resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 }, pagos: [], porObra: [] }],
+        resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 }, obra: null },
+      filtros: { clienteId: '1', desde: '2026-10-01', hasta: '2026-10-31', estadoPago: 'todas' }, general: false,
+    })
+    const nombre = pos.find(p => p.t === largo)
+    const nro = pos.find(p => p.t === 'N° de cliente')
+    const domicilio = pos.find(p => p.t.startsWith('Av. Rafael'))
+    const email = pos.find(p => p.t === 'E-mail')
+    assert.ok(nro.y >= nombre.y + nombre.alto)
+    assert.ok(email.y >= domicilio.y + domicilio.alto - 1)
+  })
+})

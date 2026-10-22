@@ -78,10 +78,21 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   const asegurar = (alto, titulo) => { if (y + alto > limite()) nuevaPagina(titulo) }
 
   // ── Bloques ────────────────────────────────────────────────────
+  // Ficha del cliente en dos columnas. Cada dato ocupa lo que mide su texto: un nombre,
+  // domicilio o e-mail largos pasan a otra línea sin pisar el dato de abajo ni la otra columna.
   function ficha(c) {
-    const dato = (label, valor, x, yy, ancho) => {
-      doc.fillColor(GRIS).font('Helvetica').fontSize(8).text(label, x, yy, { width: 62, lineBreak: false })
-      doc.fillColor(NEGRO).font('Helvetica').fontSize(9).text(valor, x + 66, yy - 0.5, { width: ancho - 66, lineBreak: false, ellipsis: true })
+    const columna = (filas, x, ancho) => {
+      let yy = y
+      filas.forEach(([label, valor], i) => {
+        const fuerte = x === left && i === 0
+        const fuente = fuerte ? 'Helvetica-Bold' : 'Helvetica'
+        const tam = fuerte ? 10 : 9
+        const alto = doc.font(fuente).fontSize(tam).heightOfString(valor, { width: ancho - 66 })
+        doc.fillColor(GRIS).font('Helvetica').fontSize(8).text(label, x, yy + 1, { width: 62, lineBreak: false })
+        doc.fillColor(NEGRO).font(fuente).fontSize(tam).text(valor, x + 66, yy, { width: ancho - 66 })
+        yy += Math.max(15, alto + 4)
+      })
+      return yy
     }
     const mitad = width / 2
     const izq = [['Cliente', c.nombreCompleto]]
@@ -91,14 +102,8 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     if (c.telefono) der.push(['Teléfono', String(c.telefono)])
     if (c.direccion) der.push(['Domicilio', String(c.direccion)])
     if (c.email) der.push(['E-mail', String(c.email)])
-    izq.forEach(([l, v], i) => {
-      if (i === 0) {
-        doc.fillColor(GRIS).font('Helvetica').fontSize(8).text(l, left, y, { width: 62, lineBreak: false })
-        doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(10).text(v, left + 66, y - 1, { width: width - 66, lineBreak: false, ellipsis: true })
-      } else dato(l, v, left, y + i * 15, mitad - 12)
-    })
-    der.forEach(([l, v], i) => dato(l, v, left + mitad, y + i * 15, mitad))
-    y += Math.max(izq.length, der.length) * 15 + 6
+    // Sin datos de contacto el nombre usa todo el ancho
+    y = Math.max(columna(izq, left, der.length ? mitad - 12 : width), columna(der, left + mitad, mitad)) + 6
     linea(y)
     y += 14
   }

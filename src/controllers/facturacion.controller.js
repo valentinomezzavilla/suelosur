@@ -21,13 +21,32 @@ const destinoSeguro = (v, porDefecto) => {
   return s.startsWith('/') && !s.startsWith('//') ? s : porDefecto
 }
 
-const leerFiltros = (q) => ({
-  q:     q.q || '',
-  tipo:  FacturacionModel.TIPOS[q.tipo] ? q.tipo : '',
-  desde: q.desde || '',
-  hasta: q.hasta || '',
-  nc:    q.nc === '1' ? '1' : '',
-})
+const leerFiltros = (q) => {
+  const clienteId = /^\d+$/.test(String(q.clienteId || '').trim()) ? String(q.clienteId).trim() : ''
+  return {
+    q:     q.q || '',
+    clienteId,
+    obra:  clienteId && String(q.obra || '').trim() ? String(q.obra).trim() : '',
+    tipo:  FacturacionModel.TIPOS[q.tipo] ? q.tipo : '',
+    desde: q.desde || '',
+    hasta: q.hasta || '',
+    nc:    q.nc === '1' ? '1' : '',
+  }
+}
+
+// Cliente y obra elegidos en el filtro (mismo filtro que Liquidaciones). La obra se traduce
+// a sus operaciones con obraPorClave. Un cliente que no existe se ignora.
+async function filtroCliente(filtros) {
+  if (!filtros.clienteId) return { clienteSel: null, obras: [], opIds: null }
+  const c = await ClientesModel.obtener(filtros.clienteId)
+  if (!c) { filtros.clienteId = ''; filtros.obra = ''; return { clienteSel: null, obras: [], opIds: null } }
+  const obra = filtros.obra ? await ClientesModel.obraPorClave(c.id, filtros.obra) : null
+  return {
+    clienteSel: { id: c.id, numero: c.numero, nombreCompleto: ClientesModel.nombreCompleto(c) },
+    obras: await ClientesModel.obras(c.id, { incluirAnuladas: true }),
+    opIds: obra ? obra.opIds : null,
+  }
+}
 
 const mensajeError = (err, porDefecto) => {
   if (err.usuario || /^AFIP/.test(err.message)) return err.message
@@ -78,12 +97,13 @@ module.exports = {
       const tab = req.query.tab === 'facturado' ? 'facturado' : 'pendiente'
       const filtros = leerFiltros(req.query)
       const cfg     = await ConfigFacturacion.obtener()
+      const { clienteSel, obras, opIds } = await filtroCliente(filtros)
       const rows    = await FacturacionModel.todos()
       const resumen = FacturacionModel.resumen(rows)
-      const lista   = FacturacionModel.filtrar(rows, { estado: tab, ...filtros })
+      const lista   = FacturacionModel.filtrar(rows, { estado: tab, ...filtros, opIds })
       res.render('pages/facturacion/index', {
         titulo: 'Facturación',
-        tab, filtros, lista, resumen,
+        tab, filtros, lista, resumen, clienteSel, obras,
         tipos: FacturacionModel.TIPOS,
         condiciones: FacturacionModel.CONDICIONES_IVA,
         alicuotas: FacturacionModel.ALICUOTAS,
@@ -91,7 +111,7 @@ module.exports = {
         afipHabilitado: await Afip.habilitado(),
         afipEntorno: cfg.entorno,
         hoy: hoyISO(),
-        scripts: ['/js/facturacion.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/facturacion.js'],
       })
     } catch (err) {
       console.error(err)
@@ -264,9 +284,11 @@ module.exports = {
       const formato = req.params.formato === 'pdf' ? 'pdf' : 'excel'
       const tab = req.query.tab === 'facturado' ? 'facturado' : 'pendiente'
       const filtros = leerFiltros(req.query)
-      const lista = FacturacionModel.filtrar(await FacturacionModel.todos(), { estado: tab, ...filtros })
+      const { clienteSel, opIds } = await filtroCliente(filtros)
+      const lista = FacturacionModel.filtrar(await FacturacionModel.todos(), { estado: tab, ...filtros, opIds })
       const esFact = tab === 'facturado'
-      const titulo = esFact ? 'Operaciones facturadas' : 'Operaciones pendientes de facturar'
+      const titulo = (esFact ? 'Operaciones facturadas' : 'Operaciones pendientes de facturar')
+        + (clienteSel ? ` — ${clienteSel.nombreCompleto}${filtros.obra ? ' · ' + filtros.obra : ''}` : '')
       const estadoFact = (r) => r.requiereNC ? 'Anulada — requiere NC' : (r.nc_numero ? `Anulada — NC ${r.nc_numero}` : 'Vigente')
 
       const columnas = esFact
