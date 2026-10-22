@@ -23,30 +23,8 @@
   <div class="card-body">
     <form method="GET" action="/liquidaciones">
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-12 col-md-5 position-relative">
-          <label class="form-label" for="buscarClienteInput">Cliente</label>
-          <input type="text" id="buscarClienteInput" class="form-control" autocomplete="off" placeholder="Todos los clientes — escribí nombre, N° o DNI...">
-          <ul id="buscarClienteDropdown" class="autocomplete-dropdown" style="display:none"></ul>
-          <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="<%= clienteSel ? 'display:flex' : 'display:none' %>">
-            <span id="clienteSeleccionadoNombre"><%= clienteSel ? (clienteSel.numero != null ? '#' + clienteSel.numero + ' — ' : '') + clienteSel.nombreCompleto : '' %></span>
-            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCambiarCliente">Cambiar</button>
-          </div>
-          <input type="hidden" name="clienteId" id="inputClienteId" value="<%= clienteSel ? clienteSel.id : '' %>">
-          <input type="hidden" id="inputClienteNombre" value="<%= clienteSel ? clienteSel.nombreCompleto : '' %>">
-        </div>
-        <div class="col-12 col-md-4">
-          <label class="form-label" for="filtroObra">Obra</label>
-          <select name="obra" id="filtroObra" class="form-select" <%= clienteSel && obras.length ? '' : 'disabled' %>>
-            <% if (!clienteSel) { %>
-              <option value="">Elegí un cliente para ver sus obras</option>
-            <% } else if (!obras.length) { %>
-              <option value="">El cliente no tiene obras cargadas</option>
-            <% } else { %>
-              <option value="">Todas las obras</option>
-              <% obras.forEach(o => { %><option value="<%= o.clave %>" <%= filtros.obra === o.clave ? 'selected' : '' %>><%= o.nombre %></option><% }) %>
-            <% } %>
-          </select>
-        </div>
+        <%- include('../../partials/filtro_cliente_obra', { clienteSel, obras, obraSel: filtros.obra,
+              claseCliente: 'col-12 col-md-5', claseObra: 'col-12 col-md-4' }) %>
         <div class="col-6 col-md-3">
           <label class="form-label">Estado de pago</label>
           <select name="estadoPago" class="form-select">

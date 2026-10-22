@@ -147,7 +147,11 @@
   }
 }
 
-.fact-filtro-q { flex: 1 1 220px; }
+.fact-filtro-q { flex: 1 1 180px; }
+.fact-filtro-cliente { flex: 1 1 240px; }
+.fact-filtro-obra { flex: 1 1 200px; }
+// Corte de fila en la barra de filtros: arriba cliente, obra y búsqueda; abajo tipo y fechas
+.fact-filtro-salto { flex-basis: 100%; height: 0; }
 
 // Aviso de operaciones anuladas que requieren nota de crédito
 // (no usa .alert: main.js cierra solas las .alert a los 4 segundos)

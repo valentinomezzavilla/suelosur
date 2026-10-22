@@ -1,0 +1,43 @@
+<%#
+  Filtro por cliente (buscador con autocompletado, js/buscarCliente.js) y por obra de ese
+  cliente (js/filtroObra.js: al elegir un cliente carga sus obras). La página tiene que
+  cargar los dos scripts. Envía clienteId y obra (la clave de la obra).
+  Locals:
+    clienteSel   → { id, numero, nombreCompleto } o null
+    obras        → obras del cliente elegido ([{ clave, nombre }])
+    obraSel      → clave de la obra elegida
+    claseCliente / claseObra → clases del contenedor de cada campo (grilla o barra de filtros)
+    claseInput / claseSelect → clases de los campos (por defecto las de Bootstrap)
+%>
+<%
+  const _cli = typeof clienteSel !== 'undefined' ? clienteSel : null
+  const _obras = typeof obras !== 'undefined' ? obras : []
+  const _obraSel = typeof obraSel !== 'undefined' ? obraSel : null
+  const _claseInput = typeof claseInput !== 'undefined' ? claseInput : 'form-control'
+  const _claseSelect = typeof claseSelect !== 'undefined' ? claseSelect : 'form-select'
+  const _claseLabel = typeof claseLabel !== 'undefined' ? claseLabel : 'form-label'
+%>
+<div class="<%= typeof claseCliente !== 'undefined' ? claseCliente : '' %> filtro-cliente position-relative">
+  <label class="<%= _claseLabel %>" for="buscarClienteInput">Cliente</label>
+  <input type="text" id="buscarClienteInput" class="<%= _claseInput %>" autocomplete="off" placeholder="Todos los clientes — escribí nombre, N° o DNI...">
+  <ul id="buscarClienteDropdown" class="autocomplete-dropdown" style="display:none"></ul>
+  <div id="clienteSeleccionado" class="buscar-cliente__seleccionado" style="<%= _cli ? 'display:flex' : 'display:none' %>">
+    <span id="clienteSeleccionadoNombre"><%= _cli ? (_cli.numero != null ? '#' + _cli.numero + ' — ' : '') + _cli.nombreCompleto : '' %></span>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCambiarCliente">Cambiar</button>
+  </div>
+  <input type="hidden" name="clienteId" id="inputClienteId" value="<%= _cli ? _cli.id : '' %>">
+  <input type="hidden" id="inputClienteNombre" value="<%= _cli ? _cli.nombreCompleto : '' %>">
+</div>
+<div class="<%= typeof claseObra !== 'undefined' ? claseObra : '' %>">
+  <label class="<%= _claseLabel %>" for="filtroObra">Obra</label>
+  <select name="obra" id="filtroObra" class="<%= _claseSelect %>" <%= _cli && _obras.length ? '' : 'disabled' %>>
+    <% if (!_cli) { %>
+      <option value="">Elegí un cliente para ver sus obras</option>
+    <% } else if (!_obras.length) { %>
+      <option value="">El cliente no tiene obras cargadas</option>
+    <% } else { %>
+      <option value="">Todas las obras</option>
+      <% _obras.forEach(o => { %><option value="<%= o.clave %>" <%= _obraSel === o.clave ? 'selected' : '' %>><%= o.nombre %></option><% }) %>
+    <% } %>
+  </select>
+</div>

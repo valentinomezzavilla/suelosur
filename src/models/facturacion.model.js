@@ -284,11 +284,16 @@ module.exports = {
     return { factura, ops: rows.map(r => mapear(r, hoy)).sort((a, b) => Number(a.nro_op) - Number(b.nro_op)) }
   },
 
-  filtrar(rows, { estado, q, tipo, desde, hasta, nc }) {
+  // clienteId: solo ese cliente; opIds: solo esas operaciones (las de una obra, ver
+  // ClientesModel.obraPorClave)
+  filtrar(rows, { estado, q, tipo, desde, hasta, nc, clienteId, opIds }) {
     const facturado = estado === 'facturado'
     const texto = String(q || '').trim().toLowerCase()
+    const deLaObra = opIds ? new Set(opIds.map(String)) : null
     return rows.filter(r => {
       if (facturado ? !r.facturado : (r.facturado || r.anulada)) return false
+      if (clienteId && String(r.cliente_id) !== String(clienteId)) return false
+      if (deLaObra && !deLaObra.has(String(r.id))) return false
       if (facturado && nc && !r.requiereNC) return false
       if (tipo && r.tipo !== tipo) return false
       const fecha = String((facturado ? r.fecha_factura : r.fecha_emision) || '').slice(0, 10)

@@ -59,13 +59,16 @@ function generarFacturacionPDF(res, { cliente, operaciones, totales, comprobante
     if (B.HAY_LOGO) {
       try { doc.image(B.LOGO_PATH, left, top, { width: 40, height: 40 }); textoX = left + 52 } catch (_) { /* sin logo */ }
     }
-    doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(13).text(B.EMPRESA.razon.toUpperCase(), textoX, top + 3, { lineBreak: false })
+    const izqAncho = width / 2 - (textoX - left) - 8
+    doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(13).text(B.EMPRESA.razon.toUpperCase(), textoX, top + 3, { width: izqAncho, lineBreak: false })
     const datosEmpresa = [B.EMPRESA.rubro, B.EMPRESA.lugar]
     if (empresa.cuit) datosEmpresa.push(`CUIT ${empresa.cuit}${empresa.condicion ? ' · ' + empresa.condicion : ''}`)
     doc.fillColor(GRIS).font('Helvetica').fontSize(8)
-    datosEmpresa.forEach((t, i) => doc.text(t, textoX, top + 20 + i * 11, { lineBreak: false }))
+    datosEmpresa.forEach((t, i) => doc.text(t, textoX, top + 20 + i * 11, { width: izqAncho, lineBreak: false }))
 
-    doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(14).text(titulo.toUpperCase(), left, top + 3, { width, align: 'right', lineBreak: false })
+    // El lado derecho usa solo su mitad: no puede montarse sobre los datos de la empresa
+    const derX = left + width / 2, derAncho = width / 2
+    doc.fillColor(NEGRO).font('Helvetica-Bold').fontSize(14).text(titulo.toUpperCase(), derX, top + 3, { width: derAncho, align: 'right', lineBreak: false })
     const lineas = comprobante
       ? [`N° ${comprobante.numero}`, `Fecha: ${fmtFecha(comprobante.fecha)}`]
       : [`Fecha: ${fmtFecha(hoy)}`]
@@ -73,7 +76,7 @@ function generarFacturacionPDF(res, { cliente, operaciones, totales, comprobante
     let yd = top + 22
     lineas.forEach((t, i) => {
       doc.fillColor(i === 0 ? NEGRO : GRIS).font(i === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(8)
-         .text(t, left, yd, { width, align: 'right', lineBreak: false })
+         .text(t, derX, yd, { width: derAncho, align: 'right', lineBreak: false })
       yd += 11
     })
     const yFin = Math.max(top + 20 + datosEmpresa.length * 11, yd) + 2
@@ -90,12 +93,21 @@ function generarFacturacionPDF(res, { cliente, operaciones, totales, comprobante
     y += 8
   }
 
-  // Datos del cliente (receptor)
+  // Datos del cliente (receptor), en dos columnas. Cada dato ocupa lo que mide su texto:
+  // una razón social o un domicilio largos pasan a otra línea sin pisar el dato de abajo.
   function ficha() {
-    const dato = (label, valor, x, yy, ancho, fuerte = false) => {
-      doc.fillColor(GRIS).font('Helvetica').fontSize(8).text(label, x, yy, { width: 70, lineBreak: false })
-      doc.fillColor(NEGRO).font(fuerte ? 'Helvetica-Bold' : 'Helvetica').fontSize(fuerte ? 10 : 9)
-         .text(valor, x + 74, yy - (fuerte ? 1 : 0.5), { width: ancho - 74, lineBreak: false, ellipsis: true })
+    const columna = (filas, x, ancho) => {
+      let yy = y
+      filas.forEach(([label, valor], i) => {
+        const fuerte = x === left && i === 0
+        const fuente = fuerte ? 'Helvetica-Bold' : 'Helvetica'
+        const tam = fuerte ? 10 : 9
+        const alto = doc.font(fuente).fontSize(tam).heightOfString(valor, { width: ancho - 74 })
+        doc.fillColor(GRIS).font('Helvetica').fontSize(8).text(label, x, yy + 1, { width: 70, lineBreak: false })
+        doc.fillColor(NEGRO).font(fuente).fontSize(tam).text(valor, x + 74, yy, { width: ancho - 74 })
+        yy += Math.max(15, alto + 4)
+      })
+      return yy
     }
     const mitad = width / 2
     const izq = [['Cliente', cliente.razonSocial || cliente.nombre]]
@@ -104,9 +116,7 @@ function generarFacturacionPDF(res, { cliente, operaciones, totales, comprobante
     else if (cliente.dni) izq.push(['DNI', String(cliente.dni)])
     const der = [['Condición IVA', cliente.condicion || 'Sin cargar']]
     if (cliente.domicilio) der.push(['Domicilio', String(cliente.domicilio)])
-    izq.forEach(([l, v], i) => dato(l, v, left, y + i * 15, mitad - 12, i === 0))
-    der.forEach(([l, v], i) => dato(l, v, left + mitad, y + i * 15, mitad))
-    y += Math.max(izq.length, der.length) * 15 + 6
+    y = Math.max(columna(izq, left, mitad - 12), columna(der, left + mitad, mitad)) + 6
     linea(y)
     y += 14
   }
