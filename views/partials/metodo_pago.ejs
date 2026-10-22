@@ -39,7 +39,8 @@
     </label>
     <p class="form-hint" id="avisoIvaFacturar" hidden
        data-fuente="<%= typeof ivaFuente !== 'undefined' ? ivaFuente : '' %>">
-        El precio cargado es el neto: se le suma el IVA 21% y el cliente paga el total con IVA.<span data-iva-total></span>
+        El precio cargado es el neto: se le suma el IVA 21% y el cliente paga el total con IVA.
+        <span class="d-block mt-1" data-iva-total hidden>Total con IVA: <strong class="text-dark-title"></strong></span>
     </p>
     <script>
     (() => {
@@ -66,8 +67,9 @@
       const actualizar = () => {
         aviso.hidden = !check.checked
         const n = check.checked ? neto() : 0
-        salida.textContent = n > 0
-          ? ` Total con IVA: $${(Math.round(n * 121) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}.`
+        salida.hidden = !(n > 0)
+        salida.querySelector('strong').textContent = n > 0
+          ? `$${(Math.round(n * 121) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}`
           : ''
       }
       ;['change', 'input', 'click'].forEach(ev => document.addEventListener(ev, () => setTimeout(actualizar, 0)))
