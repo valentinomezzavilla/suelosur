@@ -197,7 +197,7 @@
   <% if (!esFact && lista.length) { %>
     <div class="fact-sel-bar">
       <span id="selInfo">Tildá operaciones de un mismo cliente para emitir una sola factura.</span>
-      <div class="d-flex gap-2">
+      <div class="fact-sel-acciones">
         <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPdfSel" disabled><%- icon('fileText', { size: 14 }) %> PDF de la selección</button>
         <button type="button" class="btn btn-naranja btn-sm" id="btnFacturarSel" disabled>Facturar seleccionadas</button>
       </div>
@@ -213,11 +213,11 @@
       </div>
     <% } else if (!esFact) { %>
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 fact-tabla">
           <thead>
             <tr>
               <th class="fact-col-sel"><span class="visually-hidden">Seleccionar</span></th>
-              <th>OP</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Pago</th>
+              <th>OP</th><th>Fecha</th><th>Cliente</th><th>Estado</th>
               <th class="text-end">Neto</th><th class="text-end">IVA 21%</th><th class="text-end">Total</th><th class="text-end">Acciones</th>
             </tr>
           </thead>
@@ -233,47 +233,55 @@
                          data-razon="<%= o.razon_social || '' %>" data-cond="<%= o.condicion_iva || '' %>"
                          data-op="<%= nroOp(o.nro_op) %>">
                 </td>
-                <td><a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a></td>
+                <td class="text-nowrap">
+                  <a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a>
+                  <div class="small text-muted"><%= o.tipo_label %></div>
+                </td>
                 <td class="text-nowrap">
                   <%= formatFecha(o.fecha_emision) %>
-                  <% if (o.dias > 30) { %><span class="badge badge-alerta ms-1" title="Pendiente hace <%= o.dias %> días">+30 días</span><% } %>
+                  <% if (o.dias > 30) { %><div><span class="badge badge-alerta mt-1" title="Pendiente hace <%= o.dias %> días">+30 días</span></div><% } %>
                 </td>
-                <td>
-                  <%= o.cliente %>
-                  <div class="small text-muted">
-                    <%= o.condicion_iva_label || 'Condición IVA sin cargar' %><% if (o.cuit) { %> · CUIT <%= o.cuit %><% } %>
-                  </div>
+                <td class="fact-cliente">
+                  <span class="fw-semibold"><%= o.cliente %></span>
+                  <div class="small text-muted"><%= o.condicion_iva_label || 'Condición IVA sin cargar' %></div>
+                  <% if (o.cuit) { %><div class="small text-muted text-nowrap">CUIT <%= o.cuit %></div><% } %>
                 </td>
-                <td><small class="text-muted"><%= o.tipo_label %></small></td>
-                <td><span class="badge <%= badgeMap[o.estado] || '' %>"><%= labelEstado[o.estado] || o.estado %></span></td>
-                <td><small><%= pagoLbl[o.metodo_pago] || '—' %></small></td>
+                <td class="text-nowrap">
+                  <span class="badge <%= badgeMap[o.estado] || '' %>"><%= labelEstado[o.estado] || o.estado %></span>
+                  <div class="small text-muted mt-1"><%= pagoLbl[o.metodo_pago] || 'Pago sin definir' %></div>
+                </td>
                 <% if (o.sin_precio) { %>
-                  <td colspan="3" class="text-end"><span class="badge badge-alerta" title="Asignale el precio en Cobranzas de Contenedores">Sin precio</span></td>
+                  <td colspan="3" class="text-end">
+                    <span class="badge badge-alerta">Sin precio</span>
+                    <div class="small mt-1"><a href="/alquileres/contenedores/cobranzas" class="text-decoration-none">Asignalo en Cobranzas →</a></div>
+                  </td>
                 <% } else { %>
-                  <td class="text-end"><%= money(o.neto) %></td>
-                  <td class="text-end"><%= money(o.iva) %></td>
-                  <td class="text-end fw-semibold">
+                  <td class="text-end text-nowrap fact-num"><%= money(o.neto) %></td>
+                  <td class="text-end text-nowrap fact-num"><%= money(o.iva) %></td>
+                  <td class="text-end text-nowrap fact-num fw-semibold">
                     <%= money(o.monto) %>
                     <% if (!o.con_iva) { %><div class="small text-muted fw-normal" title="Operación cargada antes de sumar el IVA al neto: su precio ya incluía el IVA">IVA incluido</div><% } %>
                   </td>
                 <% } %>
                 <td class="text-end text-nowrap">
+                  <div class="fact-acciones">
                   <a href="/facturacion/pdf?ops=<%= o.id %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" title="PDF con el detalle y el importe" aria-label="PDF de <%= nroOp(o.nro_op) %>"><%- icon('fileText', { size: 14 }) %></a>
                   <button type="button" class="btn btn-naranja btn-sm js-facturar-uno" data-id="<%= o.id %>" <%= o.sin_precio ? 'disabled title="Asignale el precio antes de facturar"' : '' %>>Facturar</button>
                   <form method="POST" action="/facturacion/<%= o.id %>/quitar" class="d-inline"
                         onsubmit="return confirm('¿Quitar esta operación de la lista para facturar?<%= o.con_iva ? ' Se le descuenta el IVA a lo que debe el cliente.' : '' %>')">
-                    <button type="submit" class="btn btn-outline-secondary btn-sm">Quitar</button>
+                    <button type="submit" class="btn btn-outline-secondary btn-sm" title="Quitar de la lista para facturar" aria-label="Quitar <%= nroOp(o.nro_op) %> de la lista para facturar"><%- icon('x', { size: 14 }) %></button>
                   </form>
+                  </div>
                 </td>
               </tr>
             <% }) %>
           </tbody>
           <tfoot>
             <tr class="total-row">
-              <td colspan="7" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
-              <td class="text-end fw-bold"><%= money(suma('neto')) %></td>
-              <td class="text-end fw-bold"><%= money(suma('iva')) %></td>
-              <td class="text-end fw-bold"><%= money(suma('monto')) %></td>
+              <td colspan="5" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('neto')) %></td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('iva')) %></td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('monto')) %></td>
               <td></td>
             </tr>
           </tfoot>
@@ -281,10 +289,10 @@
       </div>
     <% } else { %>
       <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
+        <table class="table table-hover align-middle mb-0 fact-tabla">
           <thead>
             <tr>
-              <th>OP</th><th>Comprobante</th><th>Fecha</th><th>Cliente</th><th>Tipo</th>
+              <th>OP</th><th>Comprobante</th><th>Fecha</th><th>Cliente</th>
               <th class="text-end">Neto</th><th class="text-end">IVA</th><th class="text-end">Total</th>
               <th>Registrada por</th><th class="text-end">Acciones</th>
             </tr>
@@ -292,7 +300,10 @@
           <tbody>
             <% lista.forEach(o => { %>
               <tr>
-                <td><a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a></td>
+                <td class="text-nowrap">
+                  <a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a>
+                  <div class="small text-muted"><%= o.tipo_label %></div>
+                </td>
                 <td class="text-nowrap">
                   <span class="fw-semibold"><%= o.comprobante %></span>
                   <% if (o.cae) { %><div class="small text-muted">CAE <%= o.cae %></div><% } %>
@@ -307,12 +318,12 @@
                   <%= o.razon_social || o.cliente %>
                   <% if (o.cuit) { %><div class="small text-muted">CUIT <%= o.cuit %></div><% } %>
                 </td>
-                <td><small class="text-muted"><%= o.tipo_label %></small></td>
-                <td class="text-end"><%= money(o.neto) %></td>
-                <td class="text-end"><%= money(o.iva) %></td>
-                <td class="text-end fw-semibold"><%= money(o.monto) %></td>
+                <td class="text-end text-nowrap fact-num"><%= money(o.neto) %></td>
+                <td class="text-end text-nowrap fact-num"><%= money(o.iva) %></td>
+                <td class="text-end text-nowrap fact-num fw-semibold"><%= money(o.monto) %></td>
                 <td><small class="text-muted"><%= o.facturado_por_nombre || '—' %></small></td>
                 <td class="text-end text-nowrap">
+                  <div class="fact-acciones">
                   <a href="/facturacion/<%= o.id %>/factura-pdf" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" title="PDF con el detalle de la factura" aria-label="PDF de la factura <%= o.comprobante %>"><%- icon('fileText', { size: 14 }) %></a>
                   <% if (o.requiereNC) { %>
                     <button type="button" class="btn btn-outline-danger btn-sm js-nc"
@@ -324,16 +335,17 @@
                       <button type="submit" class="btn btn-outline-secondary btn-sm">Revertir</button>
                     </form>
                   <% } %>
+                  </div>
                 </td>
               </tr>
             <% }) %>
           </tbody>
           <tfoot>
             <tr class="total-row">
-              <td colspan="5" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
-              <td class="text-end fw-bold"><%= money(suma('neto')) %></td>
-              <td class="text-end fw-bold"><%= money(suma('iva')) %></td>
-              <td class="text-end fw-bold"><%= money(suma('monto')) %></td>
+              <td colspan="4" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('neto')) %></td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('iva')) %></td>
+              <td class="text-end text-nowrap fact-num fw-bold"><%= money(suma('monto')) %></td>
               <td colspan="2"></td>
             </tr>
           </tfoot>

@@ -80,6 +80,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Los extremos del gráfico abren el globito hacia adentro: centrado se saldría de la tarjeta
+.fact-col:first-child .fact-tip { left: 0; transform: none; }
+.fact-col:last-child .fact-tip { left: auto; right: 0; transform: none; }
+
 .fact-axis {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -177,7 +181,40 @@
   color: $ink-soft;
 }
 
+.fact-sel-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+
+  .btn { white-space: nowrap; }
+
+  // En el celular los botones van en su propia fila y se reparten el ancho
+  @media (max-width: 575.98px) {
+    width: 100%;
+    .btn { flex: 1 1 auto; }
+  }
+}
+
 .fact-col-sel { width: 40px; }
+
+// Importes alineados por dígito y cliente con un ancho mínimo legible
+.fact-num { font-variant-numeric: tabular-nums; }
+.fact-cliente { min-width: 9.5rem; }
+
+// Tablas de Facturación: 8-10 columnas; con menos aire lateral entran en una notebook
+.fact-tabla {
+  thead th, tbody td, tfoot td { padding-left: 0.6rem; padding-right: 0.6rem; }
+  thead th:first-child, tbody td:first-child, tfoot td:first-child { padding-left: 1rem; }
+  thead th:last-child, tbody td:last-child, tfoot td:last-child { padding-right: 1rem; }
+}
+
+.fact-acciones {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+
+  form { margin: 0; }
+}
 
 .fact-sel {
   width: 18px;
