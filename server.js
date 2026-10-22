@@ -18,6 +18,12 @@ process.on('unhandledRejection', (reason) => {
 
 initDB()
   .then(async () => {
+    // Facturación: las OP pendientes de facturar marcadas antes de sumar el IVA al neto pasan
+    // al criterio nuevo (una sola vez). Antes de sincronizar los cargos de cuenta corriente.
+    try {
+      const nros = await require('./src/models/facturacion.model').sumarIvaAPendientesViejas()
+      if (nros) console.log(!nros.length ? '🧾 IVA sobre el neto: no había operaciones pendientes de facturar viejas' : `🧾 IVA 21% sumado a ${nros.length} operación(es) pendientes de facturar: ${nros.map(n => 'OP-' + String(n).padStart(4, '0')).join(', ')}`)
+    } catch (e) { console.error('Sumar IVA a las operaciones pendientes de facturar (se reintenta en el próximo arranque):', e.message) }
     // Cuenta corriente: cada venta a cta. cte. no anulada con exactamente un cargo por su
     // total (completa los que faltan, corrige importes, quita los de anuladas). Idempotente.
     try {
