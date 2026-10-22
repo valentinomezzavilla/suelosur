@@ -22,6 +22,8 @@ const subirCredenciales = (req, res, next) => uploadCredenciales(req, res, (err)
 
 router.get('/',                        auth, contable,  ctrl.index)
 router.get('/exportar/:formato',       auth, contable,  ctrl.exportar)
+router.get('/pdf',                     auth, contable,  ctrl.pdf)
+router.get('/:id/factura-pdf',         auth, contable,  ctrl.pdfFactura)
 router.get('/configuracion',           auth, soloDueno, ctrl.configuracion)
 router.post('/configuracion',          auth, soloDueno, subirCredenciales, ctrl.guardarConfiguracion)
 router.post('/configuracion/probar',   auth, soloDueno, ctrl.probarConexion)

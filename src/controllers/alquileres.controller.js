@@ -11,6 +11,7 @@ const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { diasHabilesEntre } = require('../utils/diasHabiles')
 const { leerRemito } = require('../utils/remito')
 const { registrarAuditoria } = require('../utils/auditoria')
+const { conIva } = require('../utils/iva')
 
 // Se agrega al aviso de un alquiler recién cargado: nace sin precio ni método de pago.
 const AVISO_ASIGNAR_PRECIO = 'Falta asignarle el precio: Cobranzas → Asignar precio.'
@@ -215,9 +216,10 @@ const AlquileresController = {
           fecha_inicio: fechaInicio || null, fecha_fin: fechaFinReal,
           nro_remito: remitoLeido.nro,
         })
-        const monto = parseFloat(precio_alquiler) || 0
+        const neto = parseFloat(precio_alquiler) || 0
         const destinoTxt = textoDestino({ domicilio: domicilio_entrega, obra })
-        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, monto)
+        // Para facturar: se cobra el neto + IVA
+        const monto = conIva(neto, await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, neto))
         await Tercero.guardarEnOp(result.id, tercero)
         await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
@@ -636,8 +638,15 @@ const AlquileresController = {
         for (const o of (p.esGrupo ? p.ops : [p])) {
           const cierre = await AlquileresModel.datosCierre(o.id, { alRetiro: !!p.esGrupo })
           o.montoEstimado = cierre ? cierre.precioACobrar : (o.precio_alquiler || 0)
+          // Para facturar: lo que se va a cobrar es el neto + IVA
+          if (cierre) o.iva_alicuota = cierre.ivaAlicuota
+          o.montoConIva = conIva(o.montoEstimado, o.iva_alicuota)
         }
-        if (p.esGrupo) p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)
+        if (p.esGrupo) {
+          p.montoEstimado = p.ops.reduce((suma, o) => suma + o.montoEstimado, 0)
+          p.montoConIva = p.ops.reduce((suma, o) => suma + o.montoConIva, 0)
+          p.iva_alicuota = p.ops.some(o => Number(o.iva_alicuota)) ? p.ops.find(o => Number(o.iva_alicuota)).iva_alicuota : null
+        }
       }
       res.render('pages/alquileres/cobranzas', { titulo: 'Cobranzas de Contenedores', sinPrecio, pendientes })
     } catch (err) {

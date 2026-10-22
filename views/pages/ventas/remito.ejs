@@ -123,6 +123,13 @@
         <td class="text-end fw-bold"><%= op.ajuste < 0 ? '-' : '' %>$<%= Math.abs(op.ajuste).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
       </tr>
       <% } %>
+      <% if (op.iva) { %>
+      <tr>
+        <td class="text-muted"></td>
+        <td class="fw-semibold" colspan="4">IVA <%= op.iva_alicuota %>%</td>
+        <td class="text-end fw-bold">$<%= op.iva.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+      </tr>
+      <% } %>
       <tr class="remito-total-row remito-total">
         <td colspan="5" class="text-end fw-bold">TOTAL</td>
         <td class="text-end fw-bold">

@@ -11,6 +11,7 @@
   // ── Selección de operaciones (todas del mismo cliente) ──────────
   const seleccionadas = () => [...document.querySelectorAll('.js-sel:checked')]
   const btnSel = $('btnFacturarSel')
+  const btnPdf = $('btnPdfSel')
   const selInfo = $('selInfo')
   const textoBase = selInfo ? selInfo.textContent : ''
 
@@ -21,7 +22,8 @@
     selInfo.textContent = aviso || (s.length
       ? `${s.length} seleccionada${s.length === 1 ? '' : 's'} de ${s[0].dataset.cliente} · ${money(total)}`
       : textoBase)
-    btnSel.disabled = !s.length
+    btnSel.disabled = !s.length || s.some(c => c.dataset.sinPrecio === '1')
+    if (btnPdf) btnPdf.disabled = !s.length
   }
 
   document.addEventListener('change', (e) => {
@@ -38,15 +40,21 @@
     actualizarBarra(aviso)
   })
 
+  btnPdf?.addEventListener('click', () => {
+    const ids = seleccionadas().map(c => c.dataset.id)
+    if (ids.length) window.open(`/facturacion/pdf?ops=${ids.join(',')}`, '_blank', 'noopener')
+  })
+
   // ── Modal de factura ────────────────────────────────────────────
   const modalFact = $('modalFacturar')
   let totalModal = 0
+  let netoModal = 0
 
+  // Neto e IVA salen de cada operación (al neto cargado se le sumó el IVA); en factura C no hay IVA
   function actualizarPreview() {
     const tipo = $('fTipo').value
-    const alic = tipo === 'C' ? 0 : Number($('fAlicuota').value)
     $('wrapAlicuota').hidden = tipo === 'C'
-    const neto = alic ? redondear(totalModal / (1 + alic / 100)) : totalModal
+    const neto = tipo === 'C' ? totalModal : netoModal
     $('pvNeto').textContent = money(neto)
     $('pvIva').textContent = money(redondear(totalModal - neto))
     $('pvTotal').textContent = money(totalModal)
@@ -62,6 +70,7 @@
     if (!checks.length || !modalFact) return
     const d = checks[0].dataset
     totalModal = redondear(checks.reduce((a, c) => a + Number(c.dataset.monto), 0))
+    netoModal = redondear(checks.reduce((a, c) => a + Number(c.dataset.neto), 0))
     $('facturarIds').value = checks.map(c => c.dataset.id).join(',')
     $('facturarResumen').innerHTML = ''
     const strong = document.createElement('strong')
@@ -99,7 +108,6 @@
       actualizarPreview()
     })
     $('fTipo').addEventListener('change', actualizarPreview)
-    $('fAlicuota').addEventListener('change', actualizarPreview)
     $('formFacturar').addEventListener('change', (e) => {
       if (e.target.name === 'modo') actualizarModo($('formFacturar'), 'camposManual', 'fNumero')
     })

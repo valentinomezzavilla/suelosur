@@ -912,6 +912,8 @@ async function initDB() {
     'fecha_factura TEXT',
     'facturado_por BIGINT',
     'facturado_en TEXT',
+    // IVA sumado al neto cargado (21) o NULL: sin IVA sumado (ver utils/iva.js)
+    'iva_alicuota REAL',
   ]) {
     await pool.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS ${col}`).catch(() => {})
   }

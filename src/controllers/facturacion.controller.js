@@ -5,6 +5,7 @@ const ClientesModel     = require('../models/clientes.model')
 const Afip              = require('../services/afip.service')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { fmtFecha } = require('../utils/fecha')
+const { generarFacturacionPDF } = require('../utils/pdfFacturacion')
 
 const ENTIDAD = 'operacion'
 const volver = (tab, extra = '') => `/facturacion?tab=${tab}${extra}`
@@ -32,6 +33,43 @@ const mensajeError = (err, porDefecto) => {
   if (err.usuario || /^AFIP/.test(err.message)) return err.message
   console.error(err)
   return porDefecto
+}
+
+// Arma y envía el PDF de detalle: el detalle de cada operación sale de Liquidaciones (los
+// mismos renglones); el neto y el IVA, del cálculo de Facturación.
+async function enviarPDF(res, ops, { tipo, comprobante = null, totales = null, receptor = {}, cfg = {} }) {
+  const LiquidacionesModel = require('../models/liquidaciones.model')
+  const armadas = await LiquidacionesModel.operacionesPorIds(ops.map(o => o.id))
+  const operaciones = ops.map(o => {
+    const a = armadas[o.id]
+    const neto = o.con_iva ? o.neto_op : o.monto
+    let renglones = a ? a.renglones.filter(x => !x.esIva) : []
+    // Alquiler de un renglón cobrado por otro importe (monto ajustado al retirar): manda lo cobrado
+    if (o.tipo_op !== 'M' && renglones.length === 1 && Math.abs(renglones[0].importe - neto) > 0.005) {
+      const r = renglones[0]
+      renglones = [{ ...r, importe: neto, precio_unit: r.cantidad ? FacturacionModel.redondear(neto / r.cantidad) : neto }]
+    }
+    if (!renglones.length) renglones = [{ descripcion: o.tipo_label, cantidad: 1, unidad: '', precio_unit: neto, importe: neto }]
+    return {
+      nro_op: o.nro_op, nro_remito: a?.nro_remito, fecha: a?.fecha || o.fecha_emision,
+      tipoTexto: o.tipo_label, obra: a?.obra || '', renglones, neto,
+    }
+  })
+  const partes = ops.map(o => FacturacionModel.desgloseOp(o, tipo))
+  const total = FacturacionModel.redondear(ops.reduce((s, o) => s + o.monto, 0))
+  const neto = FacturacionModel.redondear(partes.reduce((s, p) => s + p.neto, 0))
+  const c = ops[0]
+  return generarFacturacionPDF(res, {
+    cliente: {
+      nombre: c.cliente, razonSocial: receptor.razonSocial || c.razon_social, cuit: receptor.cuit || c.cuit, dni: c.dni,
+      condicion: FacturacionModel.CONDICIONES_IVA[receptor.condicion || c.condicion_iva] || null, domicilio: c.domicilio_ppal,
+    },
+    operaciones,
+    totales: totales || { neto, iva: FacturacionModel.redondear(total - neto), total, alicuota: tipo === 'C' ? 0 : FacturacionModel.ALICUOTA_FACTURAR },
+    comprobante,
+    ivaIncluido: tipo !== 'C' && ops.some(o => !o.con_iva),
+    empresa: { cuit: cfg.cuit, condicion: ConfigFacturacion.CONDICIONES_EMPRESA[cfg.condicion_iva] },
+  })
 }
 
 module.exports = {
@@ -91,10 +129,13 @@ module.exports = {
       if (cuit && !FacturacionModel.cuitValido(cuit)) throw errorUsuario('El CUIT ingresado no es válido.')
       if (tipo === 'A' && !cuit) throw errorUsuario('La factura A requiere el CUIT del cliente.')
 
-      const alicuota = tipo === 'C' ? 0
-        : (FacturacionModel.ALICUOTAS.includes(Number(req.body.alicuota)) ? Number(req.body.alicuota) : 21)
+      if (sel.some(r => r.sin_precio)) throw errorUsuario('Hay alquileres sin precio todavía: asignales el precio en Cobranzas antes de facturar.')
+
+      // Neto + IVA de cada operación (al neto cargado se le sumó el 21%)
+      const alicuota = tipo === 'C' ? 0 : FacturacionModel.ALICUOTA_FACTURAR
       const total = FacturacionModel.redondear(sel.reduce((a, r) => a + r.monto, 0))
-      const { neto, iva } = FacturacionModel.desglose(total, tipo, alicuota)
+      const neto = FacturacionModel.redondear(sel.reduce((a, r) => a + FacturacionModel.desgloseOp(r, tipo).neto, 0))
+      const iva = FacturacionModel.redondear(total - neto)
       const fecha = fechaValida(req.body.fecha)
 
       // Los datos fiscales cargados al facturar quedan guardados en la ficha del cliente
@@ -191,7 +232,9 @@ module.exports = {
         if (op.factura_origen !== 'afip') throw errorUsuario('La factura original no se emitió con AFIP: registrá la nota de crédito manualmente.')
         if (!(await Afip.habilitado())) throw errorUsuario('La facturación electrónica con AFIP no está configurada.')
         const alicuota = Number(op.alicuota_iva) || 0
-        const { neto, iva } = FacturacionModel.desglose(op.monto, op.tipo_comprobante, alicuota)
+        const { neto, iva } = op.con_iva
+          ? FacturacionModel.desgloseOp(op, op.tipo_comprobante)
+          : FacturacionModel.desglose(op.monto, op.tipo_comprobante, alicuota)
         const doc = FacturacionModel.documentoReceptor({ cuit: op.cuit, dni: op.dni })
         const r = await Afip.emitir({
           tipoLetra: op.tipo_comprobante, notaCredito: true, concepto: FacturacionModel.conceptoAfip([op]),
@@ -248,7 +291,9 @@ module.exports = {
             { header: 'Tipo', key: 'tipo', width: 18 },
             { header: 'Estado', key: 'estado', width: 12 },
             { header: 'Días', key: 'dias', width: 8, align: 'right' },
-            { header: 'Monto', key: 'total', width: 14, money: true, align: 'right' },
+            { header: 'Neto', key: 'neto', width: 14, money: true, align: 'right' },
+            { header: 'IVA', key: 'iva', width: 12, money: true, align: 'right' },
+            { header: 'Total', key: 'total', width: 14, money: true, align: 'right' },
           ]
       const filas = lista.map(r => ({
         op: nroOp(r.nro_op),
@@ -263,9 +308,7 @@ module.exports = {
         dias: r.dias,
       }))
       const sum = (k) => FacturacionModel.redondear(filas.reduce((a, f) => a + (Number(f[k]) || 0), 0))
-      filas.push(esFact
-        ? { cliente: 'TOTAL', neto: sum('neto'), iva: sum('iva'), total: sum('total') }
-        : { cliente: 'TOTAL', total: sum('total') })
+      filas.push({ cliente: 'TOTAL', neto: sum('neto'), iva: sum('iva'), total: sum('total') })
 
       const nombreArchivo = `facturacion-${tab}-${hoyISO()}`
       if (formato === 'pdf') {
@@ -279,6 +322,47 @@ module.exports = {
       console.error(err)
       req.flash('error', 'Error al exportar.')
       res.redirect(volver('pendiente'))
+    }
+  },
+
+  // PDF con el detalle y el importe (neto, IVA y total) de operaciones pendientes de un mismo
+  // cliente: ?ops=1,2,3
+  async pdf(req, res) {
+    try {
+      const ids = String(req.query.ops || '').split(',').map(v => parseInt(v, 10)).filter(Boolean)
+      if (!ids.length) throw errorUsuario('Elegí al menos una operación.')
+      const ops = await FacturacionModel.porIds(ids)
+      if (!ops.length) throw errorUsuario('No se encontraron las operaciones.')
+      if (new Set(ops.map(r => r.cliente_id)).size > 1) throw errorUsuario('El PDF es para operaciones de un mismo cliente.')
+      const cfg = await ConfigFacturacion.obtener()
+      const tipo = FacturacionModel.tipoSugerido(ops[0].condicion_iva, cfg.condicion_iva)
+      return await enviarPDF(res, ops, { tipo, cfg })
+    } catch (err) {
+      req.flash('error', mensajeError(err, 'Error al generar el PDF.'))
+      res.redirect(volver('pendiente'))
+    }
+  },
+
+  // PDF de una factura registrada: todas las operaciones que cubre, con su comprobante
+  async pdfFactura(req, res) {
+    try {
+      const r = await FacturacionModel.deFactura(req.params.id)
+      if (!r) throw errorUsuario('La operación no está facturada.')
+      const op = r.ops.find(o => String(o.id) === String(req.params.id)) || r.ops[0]
+      const f = r.factura
+      const tipo = f?.tipo_comprobante || op.tipo_comprobante || 'B'
+      const comprobante = {
+        tipo, numero: f?.numero || op.nro_factura, fecha: f?.fecha || op.fecha_factura,
+        cae: f?.cae || null, caeVto: f?.cae_vto || null, origen: f?.origen || 'manual',
+      }
+      const totales = f
+        ? { neto: Number(f.neto) || 0, iva: Number(f.iva) || 0, total: Number(f.total) || 0, alicuota: Number(f.alicuota_iva) || 0 }
+        : null
+      const receptor = f ? { razonSocial: f.receptor_nombre, cuit: f.receptor_cuit, condicion: f.receptor_condicion_iva } : {}
+      return await enviarPDF(res, r.ops, { tipo, comprobante, totales, receptor, cfg: await ConfigFacturacion.obtener() })
+    } catch (err) {
+      req.flash('error', mensajeError(err, 'Error al generar el PDF.'))
+      res.redirect(volver('facturado'))
     }
   },
 

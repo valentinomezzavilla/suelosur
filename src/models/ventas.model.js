@@ -7,24 +7,30 @@ const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
 const { SQL_MUEVE_STOCK, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 const { textoDestino } = require('../utils/destino')
+const { ivaDe, sqlFactorIva } = require('../utils/iva')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
-// Es la misma cuenta en listados, detalle, remito y al generar la transacción.
+// Es el NETO; si la venta es para facturar se le suma el IVA (iva_alicuota) y eso es lo que
+// se cobra. Es la misma cuenta en listados, detalle, remito y al generar la transacción.
 const SQL_SUBTOTAL = `(SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario),0)
                        FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)`
-const SQL_TOTAL = `COALESCE(op.monto_total, ${SQL_SUBTOTAL} + COALESCE(op.precio_flete, 0))`
+const SQL_NETO  = `COALESCE(op.monto_total, ${SQL_SUBTOTAL} + COALESCE(op.precio_flete, 0))`
+const SQL_TOTAL = `ROUND(CAST(${SQL_NETO} * ${sqlFactorIva('op')} AS NUMERIC), 2)`
 
 const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 
 // Altura de la calle como entero; "sn", "s/n" o cualquier texto no numérico → null (sin número)
 const alturaNum = (v) => { const n = parseInt(v, 10); return Number.isNaN(n) ? null : n }
 
-// Productos, flete y la diferencia con el total pactado (si se editó a mano).
+// Productos, flete, la diferencia con el total pactado (si se editó a mano) y el IVA
+// (venta para facturar). neto = lo pactado; total = neto + IVA, lo que se cobra.
 function importesVenta(op, subtotal) {
   const flete = Number(op.precio_flete) || 0
-  const total = op.monto_total != null ? Number(op.monto_total) : subtotal + flete
-  const ajuste = redondear(total - subtotal - flete)
-  return { subtotal, flete, total, ajuste: Math.abs(ajuste) < 0.01 ? 0 : ajuste }
+  const neto = op.monto_total != null ? Number(op.monto_total) : subtotal + flete
+  const ajuste = redondear(neto - subtotal - flete)
+  const alicuota = Number(op.iva_alicuota) || 0
+  const iva = ivaDe(neto, alicuota)
+  return { subtotal, flete, neto, alicuota, iva, total: redondear(neto + iva), ajuste: Math.abs(ajuste) < 0.01 ? 0 : ajuste }
 }
 
 const VentasModel = {
@@ -140,6 +146,9 @@ const VentasModel = {
     op.subtotal_productos = imp.subtotal
     op.precio_flete = imp.flete
     op.ajuste = imp.ajuste
+    op.neto = imp.neto
+    op.iva_alicuota = imp.alicuota
+    op.iva = imp.iva
     op.total = imp.total
     return op
   },
@@ -293,7 +302,9 @@ const VentasModel = {
       precioProducto: detalle.precio_unitario || 0,
       subtotal,
       precioFlete: op.precio_flete,
-      precioTotal: op.total,
+      // El total que se edita es el neto (el IVA se suma solo)
+      precioTotal: op.neto,
+      ivaAlicuota: op.iva_alicuota,
       totalManual: op.ajuste !== 0,
       metodoPago: op.metodo_pago || 'efectivo',
       tercero: op.tercero || '',

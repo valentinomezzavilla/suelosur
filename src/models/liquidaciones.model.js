@@ -12,21 +12,25 @@ const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/conten
 const { nombreObra, claveObra } = require('../utils/obras')
 const { fmtFecha } = require('../utils/fecha')
 const L = require('../utils/liquidaciones')
+const { ivaDe, conIva, etiqueta: etiquetaIva } = require('../utils/iva')
 
 // Fecha de la operación: la de entrega planificada; si falta, la de emisión (= Libro de ventas)
 const FECHA = `LEFT(COALESCE(op.fecha_entrega_planificada, op.fecha_emision), 10)`
 const TIPO_OP = { cantera: 'M', viaje: 'M', contenedor: 'C', maquinaria: 'MA' }
 
-async function operacionesBase({ clienteId, desde, hasta, tipos, opIds }) {
-  const cond = [`op.estado <> 'anulado'`, `op.id_cliente IS NOT NULL`, `${FECHA} >= ?`, `${FECHA} <= ?`,
-    `op.tipo_op = ANY(?)`]
-  const params = [desde, hasta, [...new Set(tipos.map(t => TIPO_OP[t]))]]
+async function operacionesBase({ clienteId, desde, hasta, tipos, opIds, conAnuladas = false }) {
+  // Sin desde / hasta (búsqueda por id): sin filtro de fecha
+  const cond = [`op.id_cliente IS NOT NULL`, `op.tipo_op = ANY(?)`]
+  const params = [[...new Set(tipos.map(t => TIPO_OP[t]))]]
+  if (!conAnuladas) cond.push(`op.estado <> 'anulado'`)
+  if (desde) { cond.push(`${FECHA} >= ?`); params.push(desde) }
+  if (hasta) { cond.push(`${FECHA} <= ?`); params.push(hasta) }
   if (clienteId) { cond.push('op.id_cliente = ?'); params.push(clienteId) }
   if (opIds)     { cond.push('op.id = ANY(?::bigint[])'); params.push(opIds.map(Number)) }
   return (await query(`
     SELECT op.id, op.nro_op, op.nro_remito, op.tipo_op, op.modalidad, op.id_cliente, op.id_grupo,
            ${FECHA} AS fecha, op.obra, op.domicilio_calle, op.domicilio_altura,
-           op.precio_flete, op.monto_total,
+           op.precio_flete, op.monto_total, op.iva_alicuota,
            COALESCE(op.metodo_pago, oc.metodo_pago, om.metodo_pago) AS metodo_pago,
            (ag.cobro_modo = 'alquiler') AS grupo_todo_junto,
            oc.id AS oc_id, oc.precio_alquiler, oc.domicilio_entrega AS cont_entrega,
@@ -90,10 +94,11 @@ function armar(r, materiales) {
   if (r.tipo_op === 'M') {
     op.renglones = [...(materiales[r.id] || [])]
     const subtotal = op.renglones.reduce((s, x) => s + x.importe, 0)
-    const { flete, ajuste, total } = importesVenta(r, subtotal)
+    // Neto: el IVA (para facturar) se agrega abajo, igual que en los alquileres
+    const { flete, ajuste, neto } = importesVenta(r, subtotal)
     if (flete)  op.renglones.push({ descripcion: 'Flete', unidad: '', cantidad: 1, precio_unit: flete, importe: flete })
     if (ajuste) op.renglones.push({ descripcion: 'Ajuste de precio', unidad: '', cantidad: 1, precio_unit: ajuste, importe: ajuste })
-    op.total = total
+    op.total = neto
   } else if (r.tipo_op === 'C') {
     const desde = r.cont_desde, hasta = r.cont_hasta
     const dias = desde && hasta ? L.diasEntre(desde, hasta) : Number(r.plazo_alquiler) || 1
@@ -112,6 +117,13 @@ function armar(r, materiales) {
     op.renglones = [{ descripcion: r.maquina || 'Maquinaria', unidad: 'h', cantidad: Number(r.horas_pactadas) || 0,
       precio_unit: Number(r.precio_por_hora) || 0, importe: total }]
     op.total = total
+  }
+  // Para facturar: el IVA sumado al neto va como un renglón más y forma parte del total
+  op.neto = op.total
+  op.iva = op.aConvenir ? 0 : ivaDe(op.neto, r.iva_alicuota)
+  if (op.iva) {
+    op.renglones.push({ descripcion: etiquetaIva(r.iva_alicuota), unidad: '', cantidad: 1, precio_unit: op.iva, importe: op.iva, esIva: true })
+    op.total = Math.round((op.neto + op.iva) * 100) / 100
   }
   return op
 }
@@ -144,6 +156,15 @@ async function datosClientes(ids) {
 }
 
 const LiquidacionesModel = {
+  // Operaciones armadas (detalle, neto, IVA y total) por id, sin filtro de fecha ni de
+  // estado de pago. Lo usa el PDF de Facturación. Devuelve { [id]: op }.
+  async operacionesPorIds(ids) {
+    if (!ids || !ids.length) return {}
+    const filas = await operacionesBase({ tipos: Object.keys(L.TIPOS), opIds: ids, conAnuladas: true })
+    const materiales = await renglonesMaterial(filas.filter(r => r.tipo_op === 'M').map(r => r.id))
+    return Object.fromEntries(filas.map(r => [r.id, armar(r, materiales)]))
+  },
+
   // filtros: salida de normalizarFiltros (utils/liquidaciones)
   async liquidacion({ clienteId, obra, desde, hasta, tipos, estadoPago }) {
     if (clienteId) {
@@ -169,7 +190,7 @@ const LiquidacionesModel = {
       op._sinRegistroPago = !registro
       if (op.grupoTodoJunto && registro) {
         op._pagadoGrupo = registro.pagado
-        op._totalGrupo = registro.total != null ? registro.total : pedidas.filter(x => String(x.id_grupo) === String(op.id_grupo)).reduce((s, x) => s + (Number(x.precio_alquiler) || 0), 0)
+        op._totalGrupo = registro.total != null ? registro.total : pedidas.filter(x => String(x.id_grupo) === String(op.id_grupo)).reduce((s, x) => s + conIva(Number(x.precio_alquiler) || 0, x.iva_alicuota), 0)
       }
       return op
     })

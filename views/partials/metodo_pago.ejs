@@ -37,5 +37,46 @@
         <input type="checkbox" name="paraFacturar" id="paraFacturar" value="1">
         Operación para Facturar
     </label>
+    <p class="form-hint" id="avisoIvaFacturar" hidden
+       data-fuente="<%= typeof ivaFuente !== 'undefined' ? ivaFuente : '' %>">
+        El precio cargado es el neto: se le suma el IVA 21% y el cliente paga el total con IVA.<span data-iva-total></span>
+    </p>
+    <script>
+    (() => {
+      // "Para facturar": avisa que se suma el 21% y, si el formulario muestra un total, el total con IVA
+      const check = document.getElementById('paraFacturar')
+      const aviso = document.getElementById('avisoIvaFacturar')
+      if (!check || !aviso) return
+      const salida = aviso.querySelector('[data-iva-total]')
+      const fuentes = (aviso.dataset.fuente || '').split(',').map(s => s.trim()).filter(Boolean)
+      const numero = (el) => {
+        if ('value' in el && el.type === 'number') return Number(el.value)
+        let t = String(el.value || el.textContent || '').replace(/[^\d.,-]/g, '')
+        if (t.includes(',')) t = t.replace(/\./g, '').replace(',', '.')
+        else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, '')
+        return Number(t)
+      }
+      const neto = () => {
+        for (const sel of fuentes) {
+          const el = document.querySelector(sel)
+          if (el && el.offsetParent !== null) { const n = numero(el); if (n > 0) return n }
+        }
+        return 0
+      }
+      const actualizar = () => {
+        aviso.hidden = !check.checked
+        const n = check.checked ? neto() : 0
+        salida.textContent = n > 0
+          ? ` Total con IVA: $${(Math.round(n * 121) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2 })}.`
+          : ''
+      }
+      ;['change', 'input', 'click'].forEach(ev => document.addEventListener(ev, () => setTimeout(actualizar, 0)))
+      fuentes.forEach(sel => {
+        const el = document.querySelector(sel)
+        if (el) new MutationObserver(actualizar).observe(el, { childList: true, characterData: true, subtree: true })
+      })
+      actualizar()
+    })()
+    </script>
     <% } %>
 </div>
