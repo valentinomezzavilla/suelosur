@@ -70,6 +70,57 @@ describe('generarLiquidacionPDF', () => {
   })
 })
 
+// Textos que escribe el PDF (el contenido va comprimido: se capturan en PDFDocument#text)
+async function textosDelPDF(args) {
+  const PDFDocument = require('pdfkit')
+  const original = PDFDocument.prototype.text
+  const textos = []
+  PDFDocument.prototype.text = function (t, ...resto) { textos.push(String(t)); return original.call(this, t, ...resto) }
+  try {
+    const res = resFalso()
+    generarLiquidacionPDF(res, args)
+    await res.terminado
+  } finally {
+    PDFDocument.prototype.text = original
+  }
+  return textos
+}
+
+describe('generarLiquidacionPDF — solo pendientes', () => {
+  const ops = [op(1, { estado: 'pendiente', pagado: 0, resta: 1200 }), op(2, { estado: 'parcial', pagado: 700, resta: 500 })]
+  const resumen = { consumido: 2400, pagado: 700, saldo: 1700, cantidad: 2 }
+  const liquidacion = {
+    clientes: [{ cliente, operaciones: ops, resumen,
+      pagos: [{ fecha: '2026-10-05', metodoTexto: 'Efectivo', descripcion: 'Cobro', monto: 700 }],
+      porObra: [{ nombre: 'Colón 100', resumen }, { nombre: 'Vélez 10', resumen }] }],
+    resumen, obra: null,
+  }
+
+  it('no muestra lo pagado ni los pagos del período', async () => {
+    const textos = await textosDelPDF({ liquidacion, filtros: { ...filtros, estadoPago: 'pendientes' }, general: false })
+    const todo = textos.join('\n').toUpperCase()
+    assert.ok(!todo.includes('PAGADO'), 'no debe figurar "Pagado"')
+    assert.ok(!todo.includes('TOTAL CONSUMIDO'))
+    assert.ok(!todo.includes('PAGOS RECIBIDOS'))
+    assert.ok(todo.includes('SALDO PENDIENTE'))
+    assert.ok(textos.includes('2 operaciones con saldo pendiente'))
+  })
+
+  it('con "Todas" sigue mostrando pagado y pagos', async () => {
+    const todo = (await textosDelPDF({ liquidacion, filtros, general: false })).join('\n').toUpperCase()
+    assert.ok(todo.includes('PAGADO'))
+    assert.ok(todo.includes('PAGOS RECIBIDOS'))
+  })
+
+  it('general: el resumen por cliente queda solo con el saldo', async () => {
+    const general = { clientes: liquidacion.clientes.map(c => ({ ...c, pagos: null, porObra: [] })), resumen, obra: null }
+    const todo = (await textosDelPDF({ liquidacion: general, filtros: { ...filtros, clienteId: null, estadoPago: 'pendientes' }, general: true }))
+      .join('\n').toUpperCase()
+    assert.ok(!todo.includes('PAGADO'))
+    assert.ok(!todo.includes('CONSUMIDO'))
+  })
+})
+
 describe('nombreArchivoLiquidacion', () => {
   it('normaliza el nombre del cliente', () => {
     assert.equal(nombreArchivoLiquidacion({ clientes: [{ cliente: { nombreCompleto: 'José Pérez S.A.' } }] }, filtros), 'liquidacion-jose-perez-s-a-2026-10-01-2026-10-31')
