@@ -212,6 +212,35 @@ module.exports = {
     })
   },
 
+  // Una sola vez (migraciones_aplicadas): las OP marcadas para facturar antes de que el IVA
+  // se sumara al neto, y todavía sin facturar, pasan al criterio nuevo: su importe se toma
+  // como neto y se les suma el 21% a lo que debe el cliente (igual que marcarlas hoy). Las
+  // ya facturadas no se tocan: su comprobante salió con el IVA incluido. Guarda en
+  // bkp_iva_sobre_neto cada OP con su importe anterior. Devuelve los N° de OP o null si ya corrió.
+  async sumarIvaAPendientesViejas() {
+    return transaction(async (q) => {
+      await q(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (nombre TEXT PRIMARY KEY, aplicada_en TEXT DEFAULT ahora_local())`)
+      const r = await q(`INSERT INTO migraciones_aplicadas (nombre) VALUES ('iva_sobre_neto_pendientes') ON CONFLICT DO NOTHING RETURNING nombre`)
+      if (!r.rows.length) return null
+      await q(`CREATE TABLE IF NOT EXISTS bkp_iva_sobre_neto (op_id BIGINT, nro_op BIGINT, monto_facturar REAL, cobrado REAL, cargo REAL, migrado_en TEXT DEFAULT ahora_local())`)
+      const ops = (await q(`
+        SELECT op.id, op.nro_op, op.monto_facturar,
+               (SELECT SUM(monto) FROM transacciones t WHERE t.id_op_encabezado = op.id) AS cobrado,
+               (SELECT SUM(monto) FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo IN ('deuda','uso_saldo_favor') AND COALESCE(m.anulado, 0) = 0) AS cargo
+        FROM op_encabezado op
+        WHERE op.para_facturar = 1 AND COALESCE(op.facturado, 0) = 0 AND op.estado <> 'anulado' AND op.iva_alicuota IS NULL
+        ORDER BY op.id FOR UPDATE
+      `)).rows
+      for (const op of ops) {
+        await q(`INSERT INTO bkp_iva_sobre_neto (op_id, nro_op, monto_facturar, cobrado, cargo) VALUES (?, ?, ?, ?, ?)`,
+          [op.id, op.nro_op, op.monto_facturar, op.cobrado, op.cargo])
+        await q(`UPDATE op_encabezado SET iva_alicuota = ? WHERE id = ?`, [ALICUOTA_FACTURAR, op.id])
+        await ajustarDeudaIva(q, op.id, 0, ALICUOTA_FACTURAR)
+      }
+      return ops.map(o => o.nro_op)
+    })
+  },
+
   // Saca una OP pendiente de la lista (tildada por error) y le descuenta el IVA sumado.
   // Las ya facturadas no se tocan.
   async quitar(id) {
