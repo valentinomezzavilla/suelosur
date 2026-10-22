@@ -86,7 +86,8 @@
               <% if (f.id_grupo && f.grupo_cant > 1) { %><br><span class="badge rounded-pill px-2 badge-en-transito text-wrap">Grupo · <%= f.grupo_cant %> contenedores</span><% } %>
             </td>
             <td>
-              <small class="fw-semibold"><%= f.cliente_nombre %></small><br>
+              <small class="fw-semibold"><%= f.cliente_nombre %></small>
+              <% if (Number(f.iva_alicuota)) { %><span class="badge badge-pendiente ms-1" title="Para facturar: al precio se le suma el IVA">+ IVA <%= f.iva_alicuota %>%</span><% } %><br>
               <small class="text-muted"><%= f.domicilio_entrega || (f.obra ? 'Obra: ' + f.obra : '—') %></small>
             </td>
             <td>
@@ -170,7 +171,10 @@
           </td>
           <td><small class="text-muted"><%= p.domicilio_entrega || '—' %></small></td>
           <td><small class="text-muted"><%= p.fecha_retiro ? formatFecha(p.fecha_retiro) : '—' %></small></td>
-          <td class="text-end fw-semibold"><%= money(p.montoEstimado) %></td>
+          <td class="text-end fw-semibold">
+            <%= money(p.montoEstimado) %>
+            <% if (Number(p.iva_alicuota)) { %><div class="small text-muted fw-normal">+ IVA: <%= money(p.montoConIva) %></div><% } %>
+          </td>
           <td>
             <form action="/alquileres/contenedores/cobranzas/<%= p.id %>/resolver" method="POST"
                   class="d-flex flex-wrap gap-2 align-items-end"

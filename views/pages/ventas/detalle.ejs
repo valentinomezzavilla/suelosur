@@ -190,6 +190,12 @@
                 <td class="text-end fw-bold"><%= op.ajuste < 0 ? '-' : '' %>$<%= Math.abs(op.ajuste).toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
               </tr>
               <% } %>
+              <% if (op.iva) { %>
+              <tr>
+                <td class="fw-semibold" colspan="4">IVA <%= op.iva_alicuota %>% <small class="text-muted fw-normal">(para facturar, sobre $<%= op.neto.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>)</small></td>
+                <td class="text-end fw-bold">$<%= op.iva.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></td>
+              </tr>
+              <% } %>
             </tbody>
             <tfoot>
               <tr class="total-row">

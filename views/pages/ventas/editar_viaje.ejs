@@ -116,7 +116,7 @@
                         <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="any">
                     </div>
                     <div class="form-group">
-                        <label for="precioTotal">Total</label>
+                        <label for="precioTotal"><%= viaje.ivaAlicuota ? `Total neto (+ IVA ${viaje.ivaAlicuota}%)` : 'Total' %></label>
                         <div class="precio-total-row">
                             <input type="number" name="precioTotal" id="precioTotal" value="<%= viaje.precioTotal %>" min="0" step="any"
                                    <%= viaje.totalManual ? '' : 'readonly' %>>

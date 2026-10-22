@@ -1,5 +1,6 @@
 'use strict'
 const { query, transaction } = require('../config/db')
+const { ALICUOTA_FACTURAR, ivaDe, conIva, sinIva } = require('../utils/iva')
 
 const TIPOS = {
   cantera:    'Venta cantera',
@@ -15,7 +16,7 @@ const CONDICIONES_IVA = {
   CF: 'Consumidor final',
 }
 
-const ALICUOTAS = [21, 10.5, 27, 0]
+const ALICUOTAS = [ALICUOTA_FACTURAR]
 
 const MESES       = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const MESES_LARGO = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
@@ -31,12 +32,21 @@ const tipoDe = (op) => op.tipo_op === 'C' ? 'contenedor'
 const tipoSugerido = (condCliente, empresa = 'RI') => empresa === 'MT' ? 'C'
   : (['RI', 'MT'].includes(condCliente) ? 'A' : 'B')
 
-// Los montos de las operaciones son finales (IVA incluido).
+// Importe final (IVA incluido) → neto + IVA. Para las operaciones marcadas antes de que el
+// IVA se sumara al neto (iva_alicuota NULL): su monto era el final.
 function desglose(total, tipo, alicuota) {
   const t = redondear(total)
   if (tipo === 'C' || !Number(alicuota)) return { neto: t, iva: 0 }
-  const neto = redondear(t / (1 + Number(alicuota) / 100))
+  const neto = sinIva(t, alicuota)
   return { neto, iva: redondear(t - neto) }
+}
+
+// Neto e IVA de una operación para el comprobante `tipo` (A/B/C). Las que llevan el IVA
+// sumado (con_iva) ya traen su neto e IVA; las viejas se desglosan de su monto final.
+function desgloseOp(op, tipo) {
+  if (tipo === 'C') return { neto: redondear(op.monto), iva: 0 }
+  if (op.con_iva) return { neto: op.neto_op, iva: op.iva_op }
+  return desglose(op.monto, tipo, ALICUOTA_FACTURAR)
 }
 
 function cuitValido(valor) {
@@ -65,15 +75,22 @@ function conceptoAfip(ops) {
   return prod && serv ? 3 : serv ? 2 : 1
 }
 
-// Monto: lo cobrado (transacciones) si ya existe; si no, el total pactado de la venta o el cargado al crear;
-// si no, lo estimado desde el detalle de la operación.
+// Monto (operaciones viejas, sin IVA sumado): lo cobrado (transacciones) si ya existe; si no,
+// el total pactado de la venta o el cargado al crear; si no, lo estimado desde el detalle.
+// Neto (con IVA sumado): venta → el total pactado (o productos + flete); alquiler → el neto
+// cobrado (monto_facturar, se guarda al cobrar) o el precio. NULL = alquiler sin precio todavía.
 const selectBase = (where) => `
   SELECT op.id, op.nro_op, op.tipo_op, op.modalidad, op.estado, op.metodo_pago, op.fecha_emision,
          op.para_facturar, op.facturado, op.nro_factura, op.fecha_factura, op.facturado_en, op.factura_id,
-         op.nc_numero, op.nc_fecha, op.nc_cae,
-         cli.id AS cliente_id, cli.dni, cli.cuit, cli.razon_social, cli.condicion_iva,
+         op.nc_numero, op.nc_fecha, op.nc_cae, op.iva_alicuota,
+         cli.id AS cliente_id, cli.dni, cli.cuit, cli.razon_social, cli.condicion_iva, cli.domicilio_ppal,
          TRIM(cli.nombre || ' ' || COALESCE(cli.apellido, '')) AS cliente,
-         COALESCE(tx.monto, op.monto_total, op.monto_facturar, mat.monto + COALESCE(op.precio_flete, 0), dc.precio, dm.precio, 0) AS monto,
+         COALESCE(tx.monto, op.monto_total, op.monto_facturar, mat.monto + COALESCE(op.precio_flete, 0), dc.precio, dm.precio, 0) AS monto_final,
+         CASE op.tipo_op
+           WHEN 'M' THEN COALESCE(op.monto_total, mat.monto + COALESCE(op.precio_flete, 0), 0)
+           WHEN 'C' THEN COALESCE(op.monto_facturar, dc.precio)
+           ELSE COALESCE(op.monto_facturar, dm.precio, 0)
+         END AS neto_base,
          f.tipo_comprobante, f.alicuota_iva, f.origen AS factura_origen, f.cae, f.cae_vto,
          f.punto_venta, f.nro_cbte, f.fecha AS factura_fecha,
          u.nombre AS facturado_por_nombre
@@ -97,11 +114,19 @@ function mapear(r, hoy) {
   const tipo = tipoDe(r)
   const facturado = Number(r.facturado) === 1
   const anulada = r.estado === 'anulado'
-  const monto = Number(r.monto) || 0
+  const alicuota = Number(r.iva_alicuota) || 0
+  const con_iva = alicuota > 0
+  const sin_precio = con_iva && r.neto_base == null
+  const neto_op = con_iva ? redondear(r.neto_base) : null
+  const iva_op = con_iva ? ivaDe(neto_op, alicuota) : null
+  const monto = con_iva ? conIva(neto_op, alicuota) : (Number(r.monto_final) || 0)
   const emision = String(r.fecha_emision || '').slice(0, 10)
-  const { neto, iva } = facturado
-    ? desglose(monto, r.tipo_comprobante, Number(r.alicuota_iva) || 0)
-    : { neto: null, iva: null }
+  const op = { con_iva, neto_op, iva_op, monto }
+  // Facturada: según su comprobante (las viejas, con la alícuota con que se facturaron);
+  // pendiente: como factura A/B (neto + IVA)
+  const { neto, iva } = facturado && !con_iva
+    ? desglose(op.monto, r.tipo_comprobante, Number(r.alicuota_iva) || 0)
+    : desgloseOp(op, facturado ? r.tipo_comprobante : 'A')
   return {
     ...r,
     tipo,
@@ -109,7 +134,9 @@ function mapear(r, hoy) {
     para_facturar: Number(r.para_facturar) === 1,
     facturado,
     anulada,
-    monto,
+    ...op,
+    alicuota: con_iva ? alicuota : ALICUOTA_FACTURAR,
+    sin_precio,
     neto,
     iva,
     comprobante: r.nro_factura ? `${r.tipo_comprobante ? r.tipo_comprobante + ' ' : ''}${r.nro_factura}` : null,
@@ -121,27 +148,79 @@ function mapear(r, hoy) {
 
 const errorUsuario = (msg) => Object.assign(new Error(msg), { usuario: true })
 
-module.exports = {
-  TIPOS, CONDICIONES_IVA, ALICUOTAS,
-  tipoSugerido, desglose, cuitValido, documentoReceptor, conceptoAfip, redondear,
+// Se sumó o se quitó el IVA de una OP ya creada (marcar / quitar "para facturar"): lo que
+// debe el cliente acompaña.
+//  - Venta: el cargo en cuenta corriente se recalcula con la regla única (sincronizarCargoCC).
+//    Si ya se cobró de contado, la diferencia queda como saldo de la operación.
+//  - Alquiler ya cobrado: el cobro registrado pasa a neto + IVA nuevo. A cuenta corriente o
+//    con saldo a favor, la diferencia va como movimiento en la cuenta del cliente y la
+//    transacción (que no es plata cobrada) se ajusta. De contado no se toca lo cobrado: la
+//    diferencia queda como saldo. Sin cobro todavía no hay nada que ajustar: el cobro se
+//    genera después con el IVA que tenga.
+async function ajustarDeudaIva(q, id, alicAnterior, alicNueva) {
+  const op = (await q(`SELECT id, nro_op, tipo_op, metodo_pago, id_cliente FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+  if (!op) return
+  if (op.tipo_op === 'M') {
+    await require('./ventas.model').sincronizarCargoCC(id, q)
+    return
+  }
+  const txs = (await q(`SELECT id, monto, metodo_pago FROM transacciones WHERE id_op_encabezado = ? ORDER BY id`, [id])).rows
+  if (!txs.length) return
+  const registrado = redondear(txs.reduce((a, t) => a + (Number(t.monto) || 0), 0))
+  const neto = sinIva(registrado, alicAnterior)
+  const diff = redondear(conIva(neto, alicNueva) - registrado)
+  await q(`UPDATE op_encabezado SET monto_facturar = ? WHERE id = ?`, [neto, id])
+  if (Math.abs(diff) < 0.005) return
 
-  // Se llama al crear cualquier venta/alquiler: marca la OP si se tildó "Operación para Facturar".
+  const ultima = txs[txs.length - 1]
+  const metodo = ultima.metodo_pago || op.metodo_pago
+  const enCuenta = { cuenta_corriente: 'deuda', saldo_a_favor: 'uso_saldo_favor' }[metodo]
+  if (!enCuenta || !op.id_cliente) return
+  const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
+  const tipo = diff > 0 ? enCuenta : 'ajuste'
+  const descripcion = diff > 0 ? `IVA ${ALICUOTA_FACTURAR}% ${nro} (para facturar)` : `Se quita el IVA de ${nro} (no se factura)`
+  await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?)`,
+    [op.id_cliente, tipo, descripcion, -diff, null, id])
+  await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [-diff, op.id_cliente])
+  await q(`UPDATE transacciones SET monto = ? WHERE id = ?`, [redondear(Number(ultima.monto) + diff), ultima.id])
+}
+
+module.exports = {
+  TIPOS, CONDICIONES_IVA, ALICUOTAS, ALICUOTA_FACTURAR,
+  tipoSugerido, desglose, desgloseOp, cuitValido, documentoReceptor, conceptoAfip, redondear, mapear,
+
+  // Se llama al crear cualquier venta/alquiler: marca la OP si se tildó "Operación para Facturar"
+  // y le suma el IVA al neto cargado. Devuelve la alícuota sumada (0 si no es para facturar):
+  // quien crea el cobro en el alta lo hace por conIva(neto, alícuota).
   // `monto` null = todavía sin importe (un alquiler sin precio): se guarda NULL, no 0, para
   // que el monto salga del precio que se le asigne después en vez de quedar tapado por un 0.
   async marcarAlCrear(id_op, flag, monto) {
-    if (!id_op || !esVerdadero(flag)) return
-    await query(`UPDATE op_encabezado SET para_facturar = 1, monto_facturar = ? WHERE id = ?`,
-      [monto === null ? null : (Number(monto) || 0), id_op])
+    if (!id_op || !esVerdadero(flag)) return 0
+    const sinMonto = monto === null || monto === undefined || String(monto).trim() === ''
+    await query(`UPDATE op_encabezado SET para_facturar = 1, monto_facturar = ?, iva_alicuota = ? WHERE id = ?`,
+      [sinMonto ? null : (Number(monto) || 0), ALICUOTA_FACTURAR, id_op])
+    return ALICUOTA_FACTURAR
   },
 
-  // Marcar una OP ya existente (desde su detalle)
+  // Marcar una OP ya existente (desde su detalle): también se le suma el IVA a lo que debe.
   async marcar(id) {
-    await query(`UPDATE op_encabezado SET para_facturar = 1 WHERE id = ? AND estado <> 'anulado'`, [id])
+    return transaction(async (q) => {
+      const op = (await q(`SELECT id, estado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
+      if (!op || op.estado === 'anulado' || Number(op.para_facturar) === 1) return
+      await q(`UPDATE op_encabezado SET para_facturar = 1, iva_alicuota = ? WHERE id = ?`, [ALICUOTA_FACTURAR, id])
+      await ajustarDeudaIva(q, id, Number(op.iva_alicuota) || 0, ALICUOTA_FACTURAR)
+    })
   },
 
-  // Saca una OP pendiente de la lista (tildada por error). Las ya facturadas no se tocan.
+  // Saca una OP pendiente de la lista (tildada por error) y le descuenta el IVA sumado.
+  // Las ya facturadas no se tocan.
   async quitar(id) {
-    await query(`UPDATE op_encabezado SET para_facturar = 0 WHERE id = ? AND COALESCE(facturado, 0) = 0`, [id])
+    return transaction(async (q) => {
+      const op = (await q(`SELECT id, facturado, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
+      if (!op || Number(op.facturado) === 1) return
+      await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL WHERE id = ?`, [id])
+      if (Number(op.iva_alicuota)) await ajustarDeudaIva(q, id, Number(op.iva_alicuota), 0)
+    })
   },
 
   // Todas las OP para facturar; las anuladas solo si ya estaban facturadas (necesitan nota de crédito).
@@ -155,6 +234,25 @@ module.exports = {
   async estadoOp(id) {
     const { rows } = await query(selectBase('op.id = ?'), [id])
     return rows[0] ? mapear(rows[0], hoyISO()) : null
+  },
+
+  // Operaciones para el PDF de detalle (las anuladas también: una facturada puede estarlo)
+  async porIds(ids) {
+    if (!ids.length) return []
+    const hoy = hoyISO()
+    const { rows } = await query(selectBase('op.id = ANY(?::bigint[])'), [ids.map(Number)])
+    return rows.map(r => mapear(r, hoy)).sort((a, b) => Number(a.nro_op) - Number(b.nro_op))
+  },
+
+  // Factura registrada de una OP: la factura y todas las OP que cubre. null si no está facturada.
+  async deFactura(opId) {
+    const op = await this.estadoOp(opId)
+    if (!op || !op.facturado) return null
+    if (!op.factura_id) return { factura: null, ops: [op] }
+    const hoy = hoyISO()
+    const { rows } = await query(selectBase('op.factura_id = ?'), [op.factura_id])
+    const factura = (await query(`SELECT * FROM facturas WHERE id = ?`, [op.factura_id])).rows[0] || null
+    return { factura, ops: rows.map(r => mapear(r, hoy)).sort((a, b) => Number(a.nro_op) - Number(b.nro_op)) }
   },
 
   filtrar(rows, { estado, q, tipo, desde, hasta, nc }) {

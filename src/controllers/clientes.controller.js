@@ -110,6 +110,8 @@ const ClientesController = {
         let estimado = null
         if (o.tipo_op === 'C') estimado = (await AlquileresModel.datosCierre(o.id))?.precioACobrar ?? (Number(o.precio_alquiler) || null)
         else if (o.tipo_op === 'MA') estimado = Number(o.precio_maquinaria) || null
+        // Para facturar: el cargo va a ser el neto + IVA
+        if (estimado != null) estimado = require('../utils/iva').conIva(estimado, o.iva_alicuota)
         return { ...o, estimado }
       }))
       res.render('pages/clientes/cuenta_detalle', {

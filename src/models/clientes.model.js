@@ -229,7 +229,11 @@ const ClientesModel = {
       if (monto < 0 && m.tipo !== 'uso_saldo_favor') {
         const entrada = { idOp: m.id_op_encabezado, restante: -monto }
         cola.push(entrada)
-        if (m.id_op_encabezado) deudas[m.id_op_encabezado] = { total: entrada.restante, pagado: 0 }
+        // Una OP puede tener más de un cargo (p. ej. el IVA sumado al marcarla para facturar)
+        if (m.id_op_encabezado) {
+          const d = deudas[m.id_op_encabezado] ||= { total: 0, pagado: 0 }
+          d.total += entrada.restante
+        }
       } else if (monto > 0) {
         let disponible = monto
         while (disponible > 1e-6 && cola.length) {
@@ -334,7 +338,7 @@ const ClientesModel = {
   // iniciar el trabajo. Las ventas generan el cargo apenas se registran.
   async operacionesSinCargo(clienteId) {
     return (await query(`
-      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
+      SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra, op.iva_alicuota,
              oc.precio_alquiler, dm.precio_total AS precio_maquinaria, maq.nombre AS maquinaria_nombre,
              cont.numero_contenedor
       FROM op_encabezado op

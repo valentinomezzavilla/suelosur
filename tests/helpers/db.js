@@ -57,6 +57,8 @@ async function abrir() {
   const hayPrecioAsignado = (await cliente.query(
     `SELECT 1 FROM information_schema.columns WHERE table_name = 'op_detalle_contenedor' AND column_name = 'precio_asignado_en'`)).rowCount
   if (!hayPrecioAsignado && typeof db.migrarAsignacionPrecio === 'function') await db.migrarAsignacionPrecio()
+  // IVA sumado al neto (para facturar): sin desplegar, la columna se agrega dentro de la prueba
+  await cliente.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS iva_alicuota REAL`)
 }
 
 async function cerrar() {

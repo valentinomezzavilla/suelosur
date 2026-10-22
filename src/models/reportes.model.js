@@ -9,6 +9,7 @@ const { query } = require('../config/db')
 const { codigoMaterial } = require('../utils/codigosMaterial')
 const { importesVenta } = require('./ventas.model')
 const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
+const { ivaDe, etiqueta: etiquetaIva } = require('../utils/iva')
 
 // Fecha del renglón: la de entrega planificada; si falta, la de emisión.
 const FECHA = `COALESCE(op.fecha_entrega_planificada, op.fecha_emision)`
@@ -82,7 +83,28 @@ const ReportesModel = {
       WHERE ${where} AND op.tipo_op = 'MA'
     `, params)).rows
 
-    const filas = [...materiales, ...extras, ...contenedores, ...maquinaria].map(f => ({
+    // ── IVA de las operaciones para facturar (se suma al neto: es parte de lo que se cobra) ──
+    const conIva = (await query(`
+      SELECT ${FECHA} AS fecha, op.nro_remito, op.nro_op, op.obra, op.iva_alicuota,
+             COALESCE(NULLIF(TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')), ''), 'Particular') AS cliente,
+             CASE op.tipo_op
+               WHEN 'M' THEN COALESCE(op.monto_total,
+                 (SELECT COALESCE(SUM(d.cantidad_pedida * d.precio_unitario), 0) FROM op_detalle_material d WHERE d.id_orden_pedido = op.id)
+                 + COALESCE(op.precio_flete, 0))
+               WHEN 'C'  THEN (SELECT MAX(oc.precio_alquiler) FROM op_detalle_contenedor oc WHERE oc.id_orden_pedido = op.id)
+               WHEN 'MA' THEN (SELECT MAX(dm.precio_total) FROM op_detalle_maquinaria dm WHERE dm.id_orden_pedido = op.id)
+             END AS neto
+      FROM op_encabezado op
+      LEFT JOIN clientes c ON c.id = op.id_cliente
+      WHERE ${where} AND COALESCE(op.iva_alicuota, 0) > 0
+    `, params)).rows
+    const ivas = conIva.filter(v => v.neto != null).map(v => {
+      const iva = ivaDe(v.neto, v.iva_alicuota)
+      return { fecha: v.fecha, nro_remito: v.nro_remito, nro_op: v.nro_op, obra: v.obra, cliente: v.cliente,
+        unidad: '', cantidad: 1, material: etiquetaIva(v.iva_alicuota), precio_unit: iva, importe: iva }
+    }).filter(v => v.importe)
+
+    const filas = [...materiales, ...extras, ...contenedores, ...maquinaria, ...ivas].map(f => ({
       fecha:       f.fecha,
       nro_remito:  f.nro_remito,
       nro_op:      f.nro_op,

@@ -6,6 +6,8 @@ const Tercero = require('../services/tercero.service')
 const ClientesModel             = require('../models/clientes.model')
 const ConfigMaquinariaModel     = require('../models/config_maquinaria.model')
 const OperacionesModel          = require('../models/operaciones.model')
+const { query }                 = require('../config/db')
+const { conIva }                = require('../utils/iva')
 
 const AlquileresMaquinariaController = {
 
@@ -162,13 +164,17 @@ const AlquileresMaquinariaController = {
       }
       await AlquileresMaquinariaModel.entregar(req.params.id)
       if (alquiler && !await TransaccionesModel.existePorOperacion(alquiler.id)) {
+        // Para facturar: se cobra el neto + IVA (el neto queda guardado para facturar)
+        const neto = Number(alquiler.detalle?.precio_total) || 0
+        const monto = conIva(neto, alquiler.iva_alicuota)
+        await query(`UPDATE op_encabezado SET monto_facturar = ? WHERE id = ?`, [neto, alquiler.id])
         await TransaccionesModel.crear({
           tipo: 'Maquinaria',
           id_op_encabezado: alquiler.id,
           nro_remito: alquiler.nro_remito,
           cliente_id: alquiler.id_cliente,
           cliente: alquiler.cliente_nombre,
-          monto: alquiler.detalle?.precio_total || 0,
+          monto,
           descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} — ${alquiler.detalle?.domicilio_entrega || ''}`,
           metodo_pago: alquiler.metodo_pago || 'efectivo',
         })
@@ -177,7 +183,7 @@ const AlquileresMaquinariaController = {
           await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'deuda',
             descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')}`,
-            monto: -(alquiler.detalle?.precio_total || 0),
+            monto: -monto,
             id_op_encabezado: alquiler.id,
           })
         }
@@ -185,7 +191,7 @@ const AlquileresMaquinariaController = {
           await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
             tipo: 'uso_saldo_favor',
             descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
-            monto: -(alquiler.detalle?.precio_total || 0),
+            monto: -monto,
             id_op_encabezado: alquiler.id,
           })
         }

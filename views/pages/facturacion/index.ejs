@@ -197,7 +197,10 @@
   <% if (!esFact && lista.length) { %>
     <div class="fact-sel-bar">
       <span id="selInfo">Tildá operaciones de un mismo cliente para emitir una sola factura.</span>
-      <button type="button" class="btn btn-naranja btn-sm" id="btnFacturarSel" disabled>Facturar seleccionadas</button>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPdfSel" disabled><%- icon('fileText', { size: 14 }) %> PDF de la selección</button>
+        <button type="button" class="btn btn-naranja btn-sm" id="btnFacturarSel" disabled>Facturar seleccionadas</button>
+      </div>
     </div>
   <% } %>
   <div class="card-body p-0">
@@ -215,7 +218,7 @@
             <tr>
               <th class="fact-col-sel"><span class="visually-hidden">Seleccionar</span></th>
               <th>OP</th><th>Fecha</th><th>Cliente</th><th>Tipo</th><th>Estado</th><th>Pago</th>
-              <th class="text-end">Monto</th><th class="text-end">Acciones</th>
+              <th class="text-end">Neto</th><th class="text-end">IVA 21%</th><th class="text-end">Total</th><th class="text-end">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -224,7 +227,9 @@
                 <td>
                   <input type="checkbox" class="fact-sel js-sel" aria-label="Seleccionar <%= nroOp(o.nro_op) %>"
                          data-id="<%= o.id %>" data-cliente-id="<%= o.cliente_id %>" data-cliente="<%= o.cliente %>"
-                         data-monto="<%= o.monto %>" data-cuit="<%= o.cuit || '' %>" data-dni="<%= o.dni || '' %>"
+                         data-monto="<%= o.monto %>" data-neto="<%= o.neto %>" data-iva="<%= o.iva %>"
+                         data-con-iva="<%= o.con_iva ? 1 : 0 %>" data-sin-precio="<%= o.sin_precio ? 1 : 0 %>"
+                         data-cuit="<%= o.cuit || '' %>" data-dni="<%= o.dni || '' %>"
                          data-razon="<%= o.razon_social || '' %>" data-cond="<%= o.condicion_iva || '' %>"
                          data-op="<%= nroOp(o.nro_op) %>">
                 </td>
@@ -242,11 +247,21 @@
                 <td><small class="text-muted"><%= o.tipo_label %></small></td>
                 <td><span class="badge <%= badgeMap[o.estado] || '' %>"><%= labelEstado[o.estado] || o.estado %></span></td>
                 <td><small><%= pagoLbl[o.metodo_pago] || '—' %></small></td>
-                <td class="text-end fw-semibold"><%= money(o.monto) %></td>
+                <% if (o.sin_precio) { %>
+                  <td colspan="3" class="text-end"><span class="badge badge-alerta" title="Asignale el precio en Cobranzas de Contenedores">Sin precio</span></td>
+                <% } else { %>
+                  <td class="text-end"><%= money(o.neto) %></td>
+                  <td class="text-end"><%= money(o.iva) %></td>
+                  <td class="text-end fw-semibold">
+                    <%= money(o.monto) %>
+                    <% if (!o.con_iva) { %><div class="small text-muted fw-normal" title="Operación cargada antes de sumar el IVA al neto: su precio ya incluía el IVA">IVA incluido</div><% } %>
+                  </td>
+                <% } %>
                 <td class="text-end text-nowrap">
-                  <button type="button" class="btn btn-naranja btn-sm js-facturar-uno" data-id="<%= o.id %>">Facturar</button>
+                  <a href="/facturacion/pdf?ops=<%= o.id %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" title="PDF con el detalle y el importe" aria-label="PDF de <%= nroOp(o.nro_op) %>"><%- icon('fileText', { size: 14 }) %></a>
+                  <button type="button" class="btn btn-naranja btn-sm js-facturar-uno" data-id="<%= o.id %>" <%= o.sin_precio ? 'disabled title="Asignale el precio antes de facturar"' : '' %>>Facturar</button>
                   <form method="POST" action="/facturacion/<%= o.id %>/quitar" class="d-inline"
-                        onsubmit="return confirm('¿Quitar esta operación de la lista para facturar?')">
+                        onsubmit="return confirm('¿Quitar esta operación de la lista para facturar?<%= o.con_iva ? ' Se le descuenta el IVA a lo que debe el cliente.' : '' %>')">
                     <button type="submit" class="btn btn-outline-secondary btn-sm">Quitar</button>
                   </form>
                 </td>
@@ -256,6 +271,8 @@
           <tfoot>
             <tr class="total-row">
               <td colspan="7" class="text-end fw-semibold">Total (<%= lista.length %>)</td>
+              <td class="text-end fw-bold"><%= money(suma('neto')) %></td>
+              <td class="text-end fw-bold"><%= money(suma('iva')) %></td>
               <td class="text-end fw-bold"><%= money(suma('monto')) %></td>
               <td></td>
             </tr>
@@ -296,6 +313,7 @@
                 <td class="text-end fw-semibold"><%= money(o.monto) %></td>
                 <td><small class="text-muted"><%= o.facturado_por_nombre || '—' %></small></td>
                 <td class="text-end text-nowrap">
+                  <a href="/facturacion/<%= o.id %>/factura-pdf" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener" title="PDF con el detalle de la factura" aria-label="PDF de la factura <%= o.comprobante %>"><%- icon('fileText', { size: 14 }) %></a>
                   <% if (o.requiereNC) { %>
                     <button type="button" class="btn btn-outline-danger btn-sm js-nc"
                             data-id="<%= o.id %>" data-origen="<%= o.factura_origen || 'manual' %>"
@@ -305,8 +323,6 @@
                           onsubmit="return confirm('¿Revertir la factura <%= o.comprobante %>? Todas las operaciones que cubre vuelven a Pendiente Facturar.')">
                       <button type="submit" class="btn btn-outline-secondary btn-sm">Revertir</button>
                     </form>
-                  <% } else { %>
-                    <span class="text-muted small">—</span>
                   <% } %>
                 </td>
               </tr>
@@ -390,7 +406,7 @@
             <div><span>IVA</span><strong id="pvIva">$0</strong></div>
             <div><span>Total</span><strong id="pvTotal">$0</strong></div>
           </div>
-          <p class="form-hint">Los montos de las operaciones son finales (IVA incluido).</p>
+          <p class="form-hint">Al neto de cada operación se le suma el IVA 21%: el total es lo que paga el cliente.</p>
         </div>
 
         <div class="form-section">

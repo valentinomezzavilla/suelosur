@@ -83,7 +83,7 @@
                         <span>Cliente particular (sin datos)</span>
                     </label>
                 </div>
-                <%- include('../../partials/metodo_pago') %>
+                <%- include('../../partials/metodo_pago', { ivaFuente: '#cartTotalValor' }) %>
 
                 <div class="carrito-seccion">
                     <label class="form-label" for="remitoCantera">Remito</label>

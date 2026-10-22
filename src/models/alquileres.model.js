@@ -5,6 +5,7 @@ const FlotaModel = require('./flota.model')
 const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
 const ClientesModel = require('./clientes.model')
+const { conIva } = require('../utils/iva')
 const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { sumarDiasHabiles } = require('../utils/diasHabiles')
 
@@ -855,7 +856,7 @@ const AlquileresModel = {
   // precioSugerido es lo que se propone al asignar el precio.
   async datosCierre(id_op, { alRetiro = false, q = query } = {}) {
     const op = (await q(`
-      SELECT op.fecha_entrega_planificada, op.obra, oc.precio_alquiler, oc.precio_asignado_en, oc.plazo_alquiler,
+      SELECT op.fecha_entrega_planificada, op.obra, op.iva_alicuota, oc.precio_alquiler, oc.precio_asignado_en, oc.plazo_alquiler,
              oc.domicilio_entrega, oc.domicilio_calle, oc.domicilio_numero, cont.numero_contenedor,
              ${SQL_FECHA_CIERRE_OP} AS fecha_cierre
       FROM op_encabezado op
@@ -895,6 +896,8 @@ const AlquileresModel = {
       precioInicial, precioActual, dias, inicio, mesInicio,
       sinPrecio, precioAsignado, precioSugerido, plazo: op.plazo_alquiler,
       precioACobrar: precioAsignado ? precioInicial : precioActual,
+      // Para facturar: al neto a cobrar se le suma el IVA (en _registrarCobro / cobrarGrupo)
+      ivaAlicuota: Number(op.iva_alicuota) || 0,
       numero_contenedor: op.numero_contenedor, domicilio_entrega: op.domicilio_entrega,
       destino: textoDestino({ domicilio: op.domicilio_entrega, calle: op.domicilio_calle, numero: op.domicilio_numero, obra: op.obra }),
       // Distinto = conviene mostrar el precio de referencia entre paréntesis. Un precio
@@ -929,7 +932,7 @@ const AlquileresModel = {
     const cobrar = async (q) => {
       await q(`SELECT id FROM alquiler_grupos WHERE id = ? FOR UPDATE`, [id_grupo])
       const ops = (await q(`
-        SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.metodo_pago,
+        SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.metodo_pago, op.iva_alicuota,
                ${nombreCompleto('cli')} AS cliente_nombre,
                ${SQL_OP_ABIERTA} AS abierta,
                (oc.precio_alquiler IS NULL) AS sin_precio,
@@ -960,7 +963,10 @@ const AlquileresModel = {
         const cierre = await this.datosCierre(o.id, { alRetiro: true, q })
         const valor = montos[o.id]
         const manual = valor != null && String(valor).trim() !== ''
-        const monto = manual ? (parseFloat(valor) || 0) : cierre.precioACobrar
+        const neto = manual ? (parseFloat(valor) || 0) : cierre.precioACobrar
+        // Para facturar: se cobra el neto + IVA; el neto queda guardado para facturar
+        const monto = conIva(neto, o.iva_alicuota)
+        await q(`UPDATE op_encabezado SET monto_facturar = ? WHERE id = ?`, [neto, o.id])
         total += monto
         numeros.push(`#${cierre.numero_contenedor || '?'}`)
         await TransaccionesModel.crear({
@@ -992,7 +998,11 @@ const AlquileresModel = {
   // corriente o saldo a favor, el movimiento en la cuenta del cliente. Lo usan el cierre
   // del alquiler (cobrarAlCerrar) y la asignación de precio de uno ya retirado
   // (asignarPrecio). Con `q` corre dentro de la transacción de quien llama.
-  async _registrarCobro({ op, cierre, monto, metodoPago }, q = query) {
+  // `monto` es el NETO: si la OP es para facturar se cobra neto + IVA. Devuelve lo cobrado.
+  async _registrarCobro({ op, cierre, monto: neto, metodoPago }, q = query) {
+    const { iva_alicuota } = (await q(`SELECT iva_alicuota FROM op_encabezado WHERE id = ?`, [op.id])).rows[0] || {}
+    const monto = conIva(neto, iva_alicuota)
+    await q(`UPDATE op_encabezado SET monto_facturar = ? WHERE id = ?`, [neto, op.id])
     // Si el alquiler arrancó con otro precio, se deja la referencia en la descripción
     const referencia = (cierre.cambioDePrecio && cierre.mesInicio)
       ? ` (Precio inicial ${cierre.mesInicio}: $${Math.round(cierre.precioInicial).toLocaleString('es-AR')})`
@@ -1021,6 +1031,7 @@ const AlquileresModel = {
         id_op_encabezado: op.id,
       }, q)
     }
+    return monto
   },
 
   // Genera el ingreso del alquiler al cerrarlo (cuando se retira el contenedor).
@@ -1072,8 +1083,7 @@ const AlquileresModel = {
       const manual = montoManual != null && String(montoManual).trim() !== ''
       const monto = manual ? (parseFloat(montoManual) || 0) : cierre.precioACobrar
 
-      await this._registrarCobro({ op, cierre, monto, metodoPago }, q)
-      return monto
+      return await this._registrarCobro({ op, cierre, monto, metodoPago }, q)
     })
   },
 
@@ -1082,7 +1092,7 @@ const AlquileresModel = {
   // de pago real: pendientes de cobro. Alimenta el submódulo de Cobranzas.
   async pendientesDeCobro() {
     const filas = (await query(`
-      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, ag.cobro_modo,
+      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, ag.cobro_modo, op.iva_alicuota,
              ${nombreCompleto('cli')} AS cliente_nombre,
              GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,
              oc.precio_alquiler, oc.plazo_alquiler, oc.domicilio_entrega, cont.numero_contenedor,
@@ -1137,7 +1147,7 @@ const AlquileresModel = {
   // cliente tiene cuenta corriente y su saldo a favor).
   async sinPrecio() {
     const filas = (await query(`
-      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, op.estado, op.obra,
+      SELECT op.id, op.nro_op, op.nro_remito, op.id_cliente, op.id_grupo, op.estado, op.obra, op.iva_alicuota,
              ${nombreCompleto('cli')} AS cliente_nombre,
              (COALESCE(cli.cuenta_corriente, 0) = 1) AS cliente_con_cc,
              GREATEST(0, COALESCE(cli.saldo, 0)) AS saldo_favor_cliente,

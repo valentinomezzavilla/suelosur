@@ -10,6 +10,7 @@ const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 const { textoDestino } = require('../utils/destino')
 const { leerRemito, opConRemito } = require('../utils/remito')
 const { hoyISO }        = require('../utils/fecha')
+const { conIva }        = require('../utils/iva')
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
@@ -155,7 +156,8 @@ const VentasController = {
         monto_total:         total,
         nro_remito:          remito.nro,
       })
-      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      // Para facturar: se cobra el neto + IVA
+      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
       await Tercero.guardarEnOp(id_op, tercero)
 
       await VentasModel.entregar(id_op)
@@ -166,7 +168,7 @@ const VentasController = {
         nro_remito,
         cliente_id:      clienteIdClean,
         cliente:         nombre,
-        monto:           total,
+        monto:           conIva(total, alicuota),
         descripcion:     desc,
         metodo_pago:     metodoPago || 'efectivo',
         fecha:           fechaRetro,
@@ -334,7 +336,8 @@ const VentasController = {
         nro_remito:          remito.nro,
         detalles: [detalle],
       })
-      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      // Para facturar: se cobra el neto + IVA
+      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
       await Tercero.guardarEnOp(id_op, tercero)
       // A cuenta corriente: el cargo aparece en la cuenta del cliente desde que se registra
       // la venta, aunque el viaje quede programado.
@@ -363,7 +366,7 @@ const VentasController = {
           nro_remito,
           cliente_id:      clienteId || null,
           cliente:         clienteNombre || 'Sin nombre',
-          monto:           total,
+          monto:           conIva(total, alicuota),
           descripcion:     `Viaje a ${destino}`,
           metodo_pago:     metodoPago || 'efectivo',
           fecha:           fechaRetroactiva(fecha),

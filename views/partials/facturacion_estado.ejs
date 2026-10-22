@@ -26,13 +26,23 @@
         </div>
       <% } else if (_f.para_facturar) { %>
         <span class="badge badge-pendiente">Para facturar</span>
+        <% if (_f.con_iva && _f.sin_precio) { %>
+          <div class="small text-muted mt-1">Al precio que se le asigne se le suma el IVA <%= _f.alicuota %>%.</div>
+        <% } else if (_f.con_iva) { %>
+          <div class="small text-muted mt-1">
+            Neto $<%= _f.neto_op.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+            + IVA <%= _f.alicuota %>% $<%= _f.iva_op.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
+            = <strong>$<%= _f.monto.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %></strong> a cobrar.
+          </div>
+        <% } %>
         <div class="small text-muted mt-1">Aparece en Facturación → Pendiente Facturar.</div>
       <% } else { %>
         <span class="badge badge--anulado">No marcada para facturar</span>
       <% } %>
     </div>
     <% if (_puede && !_f.facturado && !_f.anulada) { %>
-      <form method="POST" action="/facturacion/<%= opId %>/<%= _f.para_facturar ? 'quitar' : 'marcar' %>">
+      <form method="POST" action="/facturacion/<%= opId %>/<%= _f.para_facturar ? 'quitar' : 'marcar' %>"
+            onsubmit="return confirm('<%= _f.para_facturar ? (_f.con_iva ? '¿Quitarla de facturación? Se le descuenta el IVA a lo que debe el cliente.' : '¿Quitarla de facturación?') : '¿Marcarla para facturar? Se le suma el IVA 21% a lo que debe el cliente.' %>')">
         <input type="hidden" name="volver" value="<%= volver %>">
         <button type="submit" class="btn btn-sm <%= _f.para_facturar ? 'btn-outline-secondary' : 'btn-naranja' %>">
           <%= _f.para_facturar ? 'Quitar de facturación' : 'Marcar para facturar' %>

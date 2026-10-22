@@ -8,6 +8,7 @@ const { query, transaction } = require('../config/db')
 const { textoDestino } = require('../utils/destino')
 const { importesVenta } = require('./ventas.model')
 const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
+const { ivaDe, etiqueta: etiquetaIva } = require('../utils/iva')
 
 const TIPO_LABEL = { M: 'Venta de áridos', C: 'Alquiler de contenedor', MA: 'Alquiler de maquinaria' }
 
@@ -118,8 +119,12 @@ const RemitosModel = {
       }
     }
 
-    r.total = r.items.reduce((s, i) => s + (i.subtotal || 0), 0)
     r.sinPrecio = r.items.some(i => i.sinPrecio)
+    // Para facturar: el IVA sumado al neto, como un renglón más (el remito suma lo que se cobra)
+    const neto = r.items.reduce((s, i) => s + (i.subtotal || 0), 0)
+    const iva = r.sinPrecio ? 0 : ivaDe(neto, op.iva_alicuota)
+    if (iva) r.items.push({ descripcion: etiquetaIva(op.iva_alicuota), unidad: '', cantidad: 1, precioUnit: iva, subtotal: iva })
+    r.total = r.items.reduce((s, i) => s + (i.subtotal || 0), 0)
     return r
   },
 

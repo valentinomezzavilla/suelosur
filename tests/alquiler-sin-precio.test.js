@@ -605,11 +605,15 @@ describe('alquileres sin precio', () => {
       await FacturacionModel.marcarAlCrear(a.id, '1', null)
       assert.equal((await prueba.q(`SELECT monto_facturar FROM op_encabezado WHERE id = ?`, [a.id])).rows[0].monto_facturar, null)
       assert.equal((await FacturacionModel.estadoOp(a.id)).monto, 0)
+      // El precio asignado es el neto: para facturar se le suma el IVA 21%
       await AlquileresModel.asignarPrecio(a.id, { precio: '777', metodo_pago: 'efectivo' })
-      assert.equal((await FacturacionModel.estadoOp(a.id)).monto, 777)
+      let f = await FacturacionModel.estadoOp(a.id)
+      assert.deepEqual([f.neto, f.monto], [777, 940.17])
       await AlquileresModel.devolverAPlanta(a.id)
       await AlquileresModel.cobrarAlCerrar(a.id)
-      assert.equal((await FacturacionModel.estadoOp(a.id)).monto, 777)
+      f = await FacturacionModel.estadoOp(a.id)
+      assert.deepEqual([f.neto, f.monto], [777, 940.17])
+      assert.equal((await prueba.q(`SELECT monto FROM transacciones WHERE id_op_encabezado = ?`, [a.id])).rows[0].monto, 940.17)
     })
 
     it('facturación: con un monto cargado se guarda como siempre', async () => {
