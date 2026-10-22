@@ -5,6 +5,7 @@
 // Sin cliente ("Liquidación general"): resumen por cliente y cada cliente en página nueva.
 // Diseño formal y sobrio: blanco, negro y grises, filetes finos, sin colores de acento.
 // No muestra el método de pago de cada operación: todo lo que figura se liquida junto.
+// Con el filtro "Solo pendientes" muestra solo lo que se debe: sin lo pagado ni los pagos del período.
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
 const B = require('./pdfBrand')
@@ -37,6 +38,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   const width = right - left
   const limite = () => doc.page.height - doc.page.margins.bottom - PIE
   const hoy = hoyISO()
+  const soloPendiente = filtros.estadoPago === 'pendientes'
   const periodo = `${fmtFecha(filtros.desde)} al ${fmtFecha(filtros.hasta)}`
   let y
 
@@ -101,14 +103,16 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     y += 14
   }
 
-  // Resumen: una franja con tres columnas separadas por filetes
+  // Resumen: una franja con tres columnas separadas por filetes (solo pendientes: solo el saldo)
   function tarjetasResumen(r) {
     const cajas = [
-      { label: 'TOTAL CONSUMIDO', valor: B.money(r.consumido) },
-      { label: 'PAGADO', valor: B.money(r.pagado) },
+      ...(soloPendiente ? [] : [
+        { label: 'TOTAL CONSUMIDO', valor: B.money(r.consumido) },
+        { label: 'PAGADO', valor: B.money(r.pagado) },
+      ]),
       { label: 'SALDO PENDIENTE', valor: B.money(r.saldo), fuerte: true },
     ]
-    const w = width / 3, h = 44
+    const w = width / cajas.length, h = 44
     doc.rect(left, y, width, h).lineWidth(0.8).strokeColor(NEGRO).stroke()
     cajas.forEach((c, i) => {
       const x = left + i * w
@@ -118,7 +122,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     })
     y += h + 8
     doc.fillColor(GRIS).fontSize(8).font('Helvetica')
-       .text(`${r.cantidad} ${r.cantidad === 1 ? 'operación' : 'operaciones'} en el período`, left, y, { lineBreak: false })
+       .text(`${r.cantidad} ${r.cantidad === 1 ? 'operación' : 'operaciones'} ${soloPendiente ? 'con saldo pendiente' : 'en el período'}`, left, y, { lineBreak: false })
     y += 20
   }
 
@@ -214,18 +218,25 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     y += 16
   }
 
+  // Resumen por obra o por cliente: consumido / pagado / saldo (solo pendientes: solo el saldo)
+  function tablaResumen(titulo, encabezado, filas, tituloPagina) {
+    const columnas = soloPendiente
+      ? [{ key: 'nombre', header: encabezado, w: 0.62, align: 'left' }, { key: 'cantidad', header: 'Ops.', w: 0.12, align: 'right' },
+         { key: 'saldo', header: 'Saldo', w: 0.26, align: 'right' }]
+      : [{ key: 'nombre', header: encabezado, w: 0.4, align: 'left' }, { key: 'cantidad', header: 'Ops.', w: 0.09, align: 'right' },
+         { key: 'consumido', header: 'Consumido', w: 0.17, align: 'right' }, { key: 'pagado', header: 'Pagado', w: 0.17, align: 'right' },
+         { key: 'saldo', header: 'Saldo', w: 0.17, align: 'right' }]
+    tablaSimple(titulo, columnas, filas.map(f => ({ nombre: f.nombre, cantidad: f.resumen.cantidad, consumido: B.money(f.resumen.consumido),
+      pagado: B.money(f.resumen.pagado), saldo: B.money(f.resumen.saldo) })), tituloPagina)
+  }
+
   function resumenPorObra(porObra, tituloPagina) {
     if (!porObra || !porObra.length) return
-    tablaSimple('Resumen por obra', [
-      { key: 'nombre', header: 'Obra', w: 0.4, align: 'left' }, { key: 'cantidad', header: 'Ops.', w: 0.09, align: 'right' },
-      { key: 'consumido', header: 'Consumido', w: 0.17, align: 'right' }, { key: 'pagado', header: 'Pagado', w: 0.17, align: 'right' },
-      { key: 'saldo', header: 'Saldo', w: 0.17, align: 'right' },
-    ], porObra.map(o => ({ nombre: o.nombre, cantidad: o.resumen.cantidad, consumido: B.money(o.resumen.consumido),
-      pagado: B.money(o.resumen.pagado), saldo: B.money(o.resumen.saldo) })), tituloPagina)
+    tablaResumen('Resumen por obra', 'Obra', porObra, tituloPagina)
   }
 
   function pagos(lista, tituloPagina) {
-    if (!lista) return
+    if (!lista || soloPendiente) return
     const total = lista.reduce((s, p) => s + p.monto, 0)
     tablaSimple('Pagos recibidos del período', [
       { key: 'fecha', header: 'Fecha', w: 0.14, align: 'left' }, { key: 'metodo', header: 'Forma de pago', w: 0.18, align: 'left' },
@@ -242,11 +253,13 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     if (!ops) return
     const deben = ops.filter(o => o.estado !== 'a_convenir' && o.resta > 0)
     const total = deben.reduce((s, o) => s + o.resta, 0)
-    tablaSimple('Saldo pendiente', [
-      { key: 'nro', header: 'Remito / OP', w: 0.14, align: 'left' }, { key: 'fecha', header: 'Fecha', w: 0.11, align: 'left' },
-      { key: 'obra', header: 'Obra', w: 0.27, align: 'left' }, { key: 'total', header: 'Total', w: 0.16, align: 'right' },
-      { key: 'pagado', header: 'Pagado', w: 0.16, align: 'right' }, { key: 'resta', header: 'Resta', w: 0.16, align: 'right' },
-    ], [
+    const columnas = soloPendiente
+      ? [{ key: 'nro', header: 'Remito / OP', w: 0.18, align: 'left' }, { key: 'fecha', header: 'Fecha', w: 0.14, align: 'left' },
+         { key: 'obra', header: 'Obra', w: 0.44, align: 'left' }, { key: 'resta', header: 'Pendiente', w: 0.24, align: 'right' }]
+      : [{ key: 'nro', header: 'Remito / OP', w: 0.14, align: 'left' }, { key: 'fecha', header: 'Fecha', w: 0.11, align: 'left' },
+         { key: 'obra', header: 'Obra', w: 0.27, align: 'left' }, { key: 'total', header: 'Total', w: 0.16, align: 'right' },
+         { key: 'pagado', header: 'Pagado', w: 0.16, align: 'right' }, { key: 'resta', header: 'Resta', w: 0.16, align: 'right' }]
+    tablaSimple('Saldo pendiente', columnas, [
       ...deben.map(o => ({ nro: o.nro_remito ? `Remito ${o.nro_remito}` : `OP-${String(o.nro_op).padStart(4, '0')}`, fecha: fmtFecha(o.fecha),
         obra: o.obra || '', total: B.money(o.total), pagado: B.money(o.pagado), resta: B.money(o.resta) })),
       ...(deben.length ? [] : [{ obra: 'Sin saldo pendiente en el período', _color: GRIS }]),
@@ -269,12 +282,8 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     const titulo = 'Liquidación general'
     encabezado(titulo)
     tarjetasResumen(liquidacion.resumen)
-    tablaSimple('Resumen por cliente', [
-      { key: 'nombre', header: 'Cliente', w: 0.4, align: 'left' }, { key: 'cantidad', header: 'Ops.', w: 0.09, align: 'right' },
-      { key: 'consumido', header: 'Consumido', w: 0.17, align: 'right' }, { key: 'pagado', header: 'Pagado', w: 0.17, align: 'right' },
-      { key: 'saldo', header: 'Saldo', w: 0.17, align: 'right' },
-    ], liquidacion.clientes.map(c => ({ nombre: c.cliente.nombreCompleto, cantidad: c.resumen.cantidad, consumido: B.money(c.resumen.consumido),
-      pagado: B.money(c.resumen.pagado), saldo: B.money(c.resumen.saldo) })), titulo)
+    tablaResumen('Resumen por cliente', 'Cliente',
+      liquidacion.clientes.map(c => ({ nombre: c.cliente.nombreCompleto, resumen: c.resumen })), titulo)
     if (!liquidacion.clientes.length) {
       doc.fillColor(GRIS).fontSize(10).font('Helvetica').text('Sin operaciones en el período.', left, y, { width, align: 'center' })
     }
