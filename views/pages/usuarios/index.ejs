@@ -40,17 +40,18 @@
       <tbody>
         <%
           const rolLabels = {
-            dueno: '👑 Dueño',
-            admin_ventas: '📋 Admin Ventas',
-            admin_contable: '💰 Admin Contable',
-            chofer: '🚛 Chofer'
+            dueno: 'Dueño',
+            admin_ventas: 'Admin Ventas',
+            admin_contable: 'Admin Contable',
+            chofer: 'Chofer'
           }
+          const rolIconos = { dueno: 'key', admin_ventas: 'clipboard', admin_contable: 'dollar', chofer: 'truck' }
         %>
         <% usuarios.forEach(u => { %>
         <tr class="<%= !u.activo ? 'text-muted' : '' %>">
           <td class="fw-semibold"><%= u.nombre %></td>
           <td><code><%= u.usuario %></code></td>
-          <td><small><%= rolLabels[u.rol] || u.rol %></small></td>
+          <td><span class="rol-chip rol-chip--<%= u.rol %>"><%- icon(rolIconos[u.rol] || 'user', { size: 13 }) %><%= rolLabels[u.rol] || u.rol %></span></td>
           <td class="text-center">
             <% if (u.activo) { %>
               <span class="badge rounded-pill px-3 badge-activo">Activo</span>

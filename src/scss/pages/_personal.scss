@@ -1,0 +1,39 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Personal y accesos (usuarios, empleados, choferes)
+// ═══════════════════════════════════════════════════════════════
+
+// Rol del usuario: ícono + nombre en una pastilla neutra (antes: emoji + texto)
+.rol-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem 0.2rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid $border;
+  background: $gray-50;
+  color: $ink-soft;
+  font-size: $fs-xs;
+  font-weight: 500;
+  white-space: nowrap;
+
+  .ic { color: $muted; }
+
+  &--dueno {
+    background: $accent-soft;
+    border-color: $accent-border;
+    color: $accent-dark;
+    .ic { color: $accent; }
+  }
+}
+
+// Usuario de acceso (code): misma mono del sistema, discreta
+.table td > code {
+  font-family: $font-mono;
+  font-size: 0.8125rem;
+  color: $ink-soft;
+  background: $gray-100;
+  border-radius: $radius-xs;
+  padding: 0.1rem 0.4rem;
+}
