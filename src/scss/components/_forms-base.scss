@@ -327,3 +327,20 @@
 
   > input { flex: 1; }
 }
+
+// Secciones dentro de una tarjeta: planas y separadas por un divisor
+// (sin esto se veían tarjetas dentro de la tarjeta)
+.card-body > .form-section,
+.card > .form-section {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+
+  & + .form-section {
+    padding-top: 1.25rem;
+    border-top: 1px solid $border-soft;
+  }
+}
