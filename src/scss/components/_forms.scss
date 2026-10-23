@@ -90,6 +90,15 @@ textarea.form-control { line-height: 1.5; }
   }
   &:hover:not(:disabled)::file-selector-button { background: $gray-100; }
 }
+// Chico: misma altura que los demás .form-control-sm de la fila
+.form-control-sm[type="file"] {
+  padding: 0.2rem 0.35rem;
+
+  &::file-selector-button {
+    margin: -0.2rem 0.6rem -0.2rem -0.35rem;
+    padding: 0.3rem 0.7rem;
+  }
+}
 
 .input-group-text {
   background: $gray-50;
