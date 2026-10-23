@@ -1,5 +1,6 @@
 @use '../abstracts/variables' as *;
 
+// Página de error (404 / 500 / sin permiso)
 .error-wrapper {
   min-height: 60vh;
   display: flex;
@@ -7,14 +8,34 @@
   justify-content: center;
   padding: 1rem;
   text-align: center;
+
+  > div { max-width: 440px; animation: confirmacion-in 0.4s $ease-out both; }
+
+  // El título de página es flex en todo el sistema: acá va centrado
+  h4.fw-bold { justify-content: center; }
+  p { margin-bottom: 1.5rem; }
 }
 
-.error-icon { font-size: 4rem; }
+.error-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: $radius-xl;
+  background: $warning-soft;
+  color: $warning;
+  border: 1px solid $warning-border;
+  box-shadow: 0 0 0 8px rgba(255, 250, 235, 0.7);
+  font-size: 1.75rem;
+}
 
 .error-back-btn {
-  background: $accent;
-  color: #fff;
-  border-radius: $radius-md;
-
-  &:hover { background: $accent-dark; color: #fff; }
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #{$accent};
+  --bs-btn-border-color: #{$accent-dark};
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #{$accent-dark};
+  --bs-btn-hover-border-color: #{$accent-darker};
+  --btn-shadow: 0 1px 2px rgba(16, 24, 40, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }

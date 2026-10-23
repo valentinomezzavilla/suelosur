@@ -14,7 +14,7 @@
     </h4>
     <small class="text-muted">
       <%= c.chofer_nombre && c.chofer_nombre.trim() ? c.chofer_nombre : 'Sin chofer' %>
-      <% if (c.camion_nombre || c.camion_patente) { %> · 🚚 <%= [c.camion_nombre, c.camion_patente].filter(Boolean).join(' ') %><% } %>
+      <% if (c.camion_nombre || c.camion_patente) { %> · <%- icon('truck', { size: 14, class: 'ic-dato' }) %><%= [c.camion_nombre, c.camion_patente].filter(Boolean).join(' ') %><% } %>
     </small>
   </div>
   <form action="/circuitos/<%= c.id %>/estado" method="POST" class="d-flex gap-2 align-items-end">

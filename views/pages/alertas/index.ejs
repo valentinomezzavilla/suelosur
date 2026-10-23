@@ -49,7 +49,7 @@
 <div class="card shadow-sm mb-4">
   <div class="card-body p-0">
     <% if (!alertas.length) { %>
-      <div class="p-5 text-center text-muted">Sin alertas activas. 🎉</div>
+      <%- include('../../partials/empty_state', { icono: '✅', mensaje: 'Sin alertas activas. 🎉' }) %>
     <% } else { %>
     <table class="table table-hover align-middle mb-0">
       <thead><tr><th>Severidad</th><th>Módulo</th><th>Tipo</th><th>Entidad</th><th>Vence</th><th></th></tr></thead>
