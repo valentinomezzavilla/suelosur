@@ -214,7 +214,7 @@ describe('parciales del alquiler', () => {
     assert.match(html, /no tiene precio todavía/)
     assert.match(html, /href="\/alquileres\/contenedores\/cobranzas#op-101"/)
     assert.doesNotMatch(html, /precio_final|metodo_pago_final|pendiente_pago/)
-    assert.match(html, /🏠 Registrar retiro<\/button>/)
+    assert.match(html, / Registrar retiro<\/button>/) // el botón dice solo "Registrar retiro" (sin "y cobrar")
     assert.match(html, /El alquiler no tiene precio: el cobro se genera cuando se lo asignes en Cobranzas/)
   })
 

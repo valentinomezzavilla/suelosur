@@ -9,13 +9,13 @@
 %>
 
 <div class="page-header mb-4">
-  <h4 class="page-title"><%- icon('truck', { size: 18 }) %> Alquileres de Maquinaria</h4>
+  <h4 class="page-title"><%- icon('tool', { size: 18 }) %> Alquileres de Maquinaria</h4>
   <a href="/alquileres/maquinaria/nuevo" class="btn btn-primary-modern btn-sm">+ Nuevo alquiler</a>
 </div>
 
 <!-- Por finalizar -->
 <div class="card-modern mb-3">
-  <div class="card-modern-header d-flex justify-content-between align-items-center" style="background:#fef9e7;">
+  <div class="card-modern-header card-modern-header--atencion d-flex justify-content-between align-items-center">
     <span class="card-modern-title">Finalizando hoy o mañana</span>
     <span class="badge badge-pendiente rounded-pill px-3"><%= grupos.porFinalizar.length %></span>
   </div>

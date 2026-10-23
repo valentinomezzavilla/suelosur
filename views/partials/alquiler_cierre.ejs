@@ -80,7 +80,7 @@
         <span>Pendiente de pago</span>
       </label>
     <% } %>
-    <button class="btn btn-sm btn-outline-success"><%= soloRetiro ? '🏠 Registrar retiro' : '🏠 Registrar retiro y cobrar' %></button>
+    <button class="btn btn-sm btn-outline-success"><%- icon('home', { size: 15 }) %> <%= soloRetiro ? 'Registrar retiro' : 'Registrar retiro y cobrar' %></button>
   </form>
   <% if (pideMetodo) { %>
     <p class="form-hint mb-0 mt-1">Este alquiler quedó "a convenir": elegí un método de pago o marcá "Pendiente de pago" (queda en Cobranzas).</p>

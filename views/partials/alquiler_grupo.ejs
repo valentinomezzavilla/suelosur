@@ -14,7 +14,7 @@
   const cobroSinDefinir = grupo.ops.filter(o => o.estado !== 'anulado').every(o => o.precio_alquiler == null)
 %>
 <div class="card shadow-sm mb-3" id="grupo">
-  <div class="card-header-orange px-3 py-2">🧩 Alquiler agrupado — <%= activas %> contenedor<%= activas === 1 ? '' : 'es' %> · <%= cobroSinDefinir ? 'cobro a definir al asignar el precio' : 'cobro por ' + grupo.cobro_modo %></div>
+  <div class="card-header-orange px-3 py-2"><%- icon('layers', { size: 15 }) %> Alquiler agrupado — <%= activas %> contenedor<%= activas === 1 ? '' : 'es' %> · <%= cobroSinDefinir ? 'cobro a definir al asignar el precio' : 'cobro por ' + grupo.cobro_modo %></div>
   <div class="card-body p-0">
     <table class="table-modern mb-0">
       <thead>
@@ -49,7 +49,7 @@
     <% if (grupo.ops.some(o => o.estado === 'pendiente' || o.estado === 'despachado')) { %>
       <form action="/alquileres/contenedores/<%= opActualId %>/anular-grupo" method="POST" class="px-3 pb-3"
             onsubmit="return confirm('¿Anular todos los contenedores de este alquiler que todavía no se entregaron?')">
-        <button class="btn btn-sm btn-outline-danger">❌ Anular alquiler completo</button>
+        <button class="btn btn-sm btn-outline-danger"><%- icon('x', { size: 15 }) %> Anular alquiler completo</button>
       </form>
     <% } %>
   </div>

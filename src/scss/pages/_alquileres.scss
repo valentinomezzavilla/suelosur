@@ -1,6 +1,14 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins' as *;
 
+// ═══════════════════════════════════════════════════════════════
+// Alquileres (contenedores y maquinaria)
+// Clases usadas por public/js/alquilerService.js: .alquiler-card, .alquiler-card--selected,
+// .btn-seleccionar-cont, .cont-tab, .is-active, .multi-cont-fila (no renombrar).
+// ═══════════════════════════════════════════════════════════════
+
+$sticky-top: calc(#{$navbar-h} + 1rem);
+
 .alquiler-form-layout {
   display: grid;
   grid-template-columns: 1fr 400px;
@@ -15,6 +23,8 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
+
+  .form-section { margin-bottom: 0; }
 }
 
 .alquiler-form-aside {
@@ -22,49 +32,108 @@
   flex-direction: column;
   gap: 1rem;
   position: sticky;
-  top: 1rem;
+  top: $sticky-top;
+
+  .form-section { margin-bottom: 0; }
 
   @include md-down { position: static; }
 }
 
-// contenedor cards grid
+// ── Selección de contenedores (Nuevo alquiler) ─────────────────
 .alquiler-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 0.6rem;
 }
 
 .alquiler-card {
-  border: 2px solid $border;
-  border-radius: $radius-md;
-  padding: 0.75rem;
+  position: relative;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 0.85rem 0.75rem 0.75rem;
   text-align: center;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  background: #fff;
+  box-shadow: $shadow-xs;
+  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease, transform $dur $ease-out;
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
   align-items: center;
 
-  &:hover { border-color: $accent; }
+  &:hover { border-color: $border-input; box-shadow: $shadow-md; transform: translateY(-1px); }
+
+  // "Seleccionar": contorno en reposo, lleno al pasar el mouse (como "+ Agregar" en cantera)
+  .btn-seleccionar-cont {
+    width: 100%;
+    margin-top: 0.15rem;
+    --bs-btn-color: #{$accent-dark};
+    --bs-btn-bg: #fff;
+    --bs-btn-border-color: #{$accent-border};
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: #{$accent-dark};
+    --bs-btn-hover-border-color: #{$accent-darker};
+    --btn-shadow: #{$shadow-xs};
+  }
+
+  &:hover:not(.alquiler-card--selected) .btn-seleccionar-cont {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: #{$accent};
+    --bs-btn-border-color: #{$accent-dark};
+  }
+
+  &__numero {
+    font-family: $font-mono;
+    font-weight: 600;
+    font-size: 1.15rem;
+    color: $ink;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+  }
+
+  // Elegido: borde y fondo de marca + tilde en la esquina
   &--selected {
     border-color: $accent;
     background: $accent-soft;
+    box-shadow: inset 0 0 0 1px $accent, $shadow-xs;
+
+    &::after {
+      content: '';
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: $accent url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='20 6 9 17 4 12'/%3e%3c/svg%3e") center / 11px no-repeat;
+      animation: alquiler-check 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .btn-seleccionar-cont {
+      --bs-btn-color: #{$accent-dark};
+      --bs-btn-bg: #fff;
+      --bs-btn-border-color: #{$accent-border};
+      --bs-btn-hover-color: #{$accent-dark};
+      --bs-btn-hover-bg: #{$accent-soft};
+      --bs-btn-hover-border-color: #{$accent};
+      --btn-shadow: #{$shadow-xs};
+    }
   }
+
   &--por-liberar {
-    border-color: $warning;
-    background: #fef9e7;
-    opacity: 0.9;
-  }
-  &__numero {
-    font-weight: 600;
-    font-size: 0.9rem;
-    color: $dark;
-    letter-spacing: 0.2px;
+    border-style: dashed;
+    border-color: $warning-border;
+    background: $warning-soft;
+    box-shadow: none;
   }
 }
 
-// Selección múltiple en "Nuevo alquiler": barra con los elegidos + filas por contenedor
+@keyframes alquiler-check {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+// Selección múltiple: barra flotante con los elegidos y "Continuar"
 .seleccion-bar {
   position: sticky;
   bottom: 0.75rem;
@@ -74,13 +143,29 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-top: 1rem;
-  padding: 0.6rem 0.9rem;
-  background: #fff;
-  border: 1px solid $accent;
-  border-radius: $radius-md;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  padding: 0.6rem 0.6rem 0.6rem 1rem;
+  background: $sidebar-bg;
+  color: #fff;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-xl;
+  animation: seleccion-bar-in 0.25s $ease-out;
 
-  #seleccionTexto { font-weight: 600; margin-right: auto; }
+  #seleccionTexto { font-weight: 500; margin-right: auto; font-size: $fs-sm; }
+
+  .btn-secondary {
+    --bs-btn-color: #fff;
+    --bs-btn-bg: rgba(255, 255, 255, 0.08);
+    --bs-btn-border-color: rgba(255, 255, 255, 0.18);
+    --bs-btn-hover-color: #fff;
+    --bs-btn-hover-bg: rgba(255, 255, 255, 0.14);
+    --bs-btn-hover-border-color: rgba(255, 255, 255, 0.28);
+    --btn-shadow: none;
+  }
+}
+
+@keyframes seleccion-bar-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .multi-cont-lista { display: flex; flex-direction: column; gap: 0.4rem; }
@@ -90,48 +175,19 @@
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 0.6rem;
-  padding: 0.45rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid $border;
   border-radius: $radius-md;
+  background: #fff;
 
-  &__num { font-weight: 700; min-width: 3.5rem; align-self: center; }
+  &__num { font-family: $font-mono; font-weight: 600; min-width: 3.5rem; align-self: center; color: $ink; }
 
-  label { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; }
+  label { display: flex; flex-direction: column; gap: 0.2rem; font-size: $fs-xs; color: $ink-soft; font-weight: 500; }
 }
 
-// resumen sidebar
+// Resumen (alquiler nuevo, maquinaria, empleados): tarjeta gris en la columna lateral
 .alquiler-resumen {
-  background: $bg-card-alt;
-  border-radius: $radius-md;
-  padding: 1rem;
-}
-
-.resumen-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.35rem 0.75rem;
-  font-size: $fs-sm;
-}
-
-.resumen-label {
-  color: $muted;
-  font-weight: 500;
-}
-
-.resumen-valor {
-  font-weight: 600;
-  color: $dark;
-}
-
-.resumen-total {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid $border;
-  font-size: 1.05rem;
-  font-weight: 700;
+  background: $gray-50 !important;
 }
 
 // confirm button
@@ -146,7 +202,7 @@
   to   { box-shadow: 0 0 0 8px rgba($accent, 0); }
 }
 
-// modalidad radio group
+// modalidad radio group (alquiler de maquinaria)
 .modalidad-group {
   display: flex;
   gap: 1rem;
@@ -160,14 +216,14 @@
   cursor: pointer;
 }
 
-// ── Pestañas: Disponibles / Próximos a finalizar ──────────────
+// ── Pestañas: Disponibles / Próximos a finalizar (control segmentado) ──
 .cont-tabs {
   display: inline-flex;
-  gap: 0.35rem;
-  background: $bg-app;
-  border: 1px solid $border;
-  border-radius: 999px;
-  padding: 0.25rem;
+  gap: 2px;
+  background: $gray-100;
+  border: 1px solid $border-soft;
+  border-radius: 10px;
+  padding: 3px;
   margin-top: 0.5rem;
   flex-wrap: wrap;
 }
@@ -175,44 +231,45 @@
 .cont-tab {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.45rem;
+  min-height: 30px;
   border: 0;
   background: transparent;
-  color: $muted;
-  font-weight: 600;
+  color: $gray-600;
+  font-weight: 500;
   font-size: $fs-sm;
-  padding: 0.4rem 0.9rem;
-  border-radius: 999px;
+  padding: 0 0.8rem;
+  border-radius: 7px;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease, box-shadow $dur-fast $ease;
 
-  &:hover { color: $ink; }
+  &:hover { color: $ink; background: rgba(255, 255, 255, 0.6); }
 
   &.is-active {
-    background: $accent;
-    color: #fff;
-    box-shadow: $shadow-xs;
+    background: #fff;
+    color: $ink;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1), 0 0 0 1px rgba(16, 24, 40, 0.05);
   }
-
-  &--warn.is-active { background: $orange; }
 
   &__count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 1.4em;
-    padding: 0 0.35em;
-    height: 1.4em;
+    min-width: 1.5em;
+    padding: 0 0.4em;
+    height: 1.5em;
     border-radius: 999px;
-    background: rgba(0, 0, 0, 0.12);
+    background: rgba(16, 24, 40, 0.07);
     font-size: 0.78em;
-    font-weight: 700;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
   }
 
-  &.is-active &__count { background: rgba(255, 255, 255, 0.28); }
+  &.is-active &__count { background: $accent-soft; color: $accent-dark; }
+  &--warn.is-active &__count { background: $warning-soft; color: $warning-text; }
 }
 
-// Fila: pestañas + acción "Cargar alquiler finalizado"
+// Fila: pestañas + acción "Cargar alquiler histórico"
 .cont-tabs-row {
   display: flex;
   align-items: center;
@@ -222,4 +279,166 @@
   margin-top: 0.5rem;
 
   .cont-tabs { margin-top: 0; }
+}
+
+// ── Cabecera "de atención" (por finalizar, sin ubicar): tinte cálido ──
+.card-modern-header--atencion {
+  background: linear-gradient(180deg, $warning-soft, #fff) !important;
+  border-bottom-color: $warning-border !important;
+
+  .card-modern-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+
+    &::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: $orange;
+      box-shadow: 0 0 0 3px rgba(232, 145, 42, 0.2);
+    }
+  }
+}
+
+// ── Por finalizar: tarjetas (listado de alquileres) ────────────
+.finalizar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.75rem;
+}
+
+.finalizar-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 0.9rem 1rem 0.95rem 1.15rem;
+  background: #fff;
+  box-shadow: $shadow-xs;
+  overflow: hidden;
+  // .dias-* también pinta texto en tablas: acá solo define el color del estrato lateral
+  color: $dark;
+  font-weight: 400;
+  transition: box-shadow $dur $ease, transform $dur $ease-out;
+
+  &:hover { box-shadow: $shadow-md; transform: translateY(-1px); }
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: $orange;
+  }
+  &.dias-rojo::before   { background: $danger; }
+  &.dias-alerta::before { background: $orange; }
+  &.dias-ok::before     { background: $success; }
+
+  &__top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+  }
+
+  &__cont {
+    font-family: $font-mono;
+    font-weight: 600;
+    color: $ink;
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+  }
+
+  &__cliente { font-weight: 600; color: $ink; line-height: 1.3; }
+  &__dom { font-size: $fs-sm; color: $muted; margin: 0.15rem 0 0.75rem; }
+
+  &__fecha {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding-top: 0.65rem;
+    border-top: 1px solid $border-line;
+  }
+
+  &__fecha-val { font-weight: 600; color: $ink; font-variant-numeric: tabular-nums; }
+
+  &__dr {
+    font-size: $fs-xs;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+
+    &.dias-rojo   { color: $danger-text;  background: $danger-soft; }
+    &.dias-alerta { color: $warning-text; background: $warning-soft; }
+    &.dias-ok     { color: $success-text; background: $success-soft; }
+  }
+}
+
+// ── Detalle del alquiler: estado del contenedor ────────────────
+.cont-estado {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: $radius-lg;
+  background: $accent-soft;
+  color: $accent;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(28, 91, 173, 0.1);
+
+  &--disponible        { background: $success-soft; color: $success; box-shadow: inset 0 0 0 1px $success-border; }
+  &--pendiente_despacho { background: $gray-100; color: $gray-600; box-shadow: inset 0 0 0 1px $border; }
+  &--pendiente_retiro  { background: $warning-soft; color: $warning; box-shadow: inset 0 0 0 1px $warning-border; }
+}
+
+// Cierre del alquiler (retiro + cobro) dentro de la tarjeta del contenedor
+.cierre-alquiler {
+  padding: 0.9rem 1rem;
+  background: $gray-50;
+  border: 1px solid $border-soft;
+  border-radius: $radius-md;
+}
+
+// ── Línea de tiempo de movimientos ─────────────────────────────
+.timeline-item:last-child { margin-bottom: 0 !important; }
+
+.timeline-dot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+
+  &__punto {
+    width: 10px;
+    height: 10px;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: $accent;
+    box-shadow: 0 0 0 3px $accent-soft;
+    flex-shrink: 0;
+  }
+
+  &__linea {
+    width: 2px;
+    flex: 1;
+    min-height: 20px;
+    margin-top: 6px;
+    border-radius: 1px;
+    background: $gray-150;
+  }
+}
+
+// Los movimientos vienen del más viejo al más nuevo: el último es el estado actual
+.timeline-item:last-child .timeline-dot__punto {
+  background: $orange;
+  box-shadow: 0 0 0 3px $orange-soft;
 }

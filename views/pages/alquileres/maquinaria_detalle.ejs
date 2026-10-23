@@ -7,7 +7,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 class="fw-bold mb-0 text-dark-title">
-      🚜 Alquiler Maq. OP-<%= String(alquiler.nro_op).padStart(4,'0') %>
+      <%- icon('tool', { size: 18 }) %> Alquiler Maq. OP-<%= String(alquiler.nro_op).padStart(4,'0') %>
       <span class="badge rounded-pill ms-2 <%= badgeOP[alquiler.estado] %>"><%= alquiler.estado %></span>
     </h4>
     <small class="text-muted">Emitido: <%= formatFecha(alquiler.fecha_emision) %> · <%= alquiler.administrativo_nombre %></small>
@@ -15,7 +15,7 @@
   <div class="d-flex gap-2">
     <% if (!estaAnulado) { %>
       <a href="/alquileres/maquinaria/<%= alquiler.id %>/editar" class="btn btn-sm btn-secondary-yellow"><%- icon('edit', { size: 14 }) %> Editar</a>
-      <a href="/remitos/<%= alquiler.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary">📄 Remito PDF</a>
+      <a href="/remitos/<%= alquiler.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 14 }) %> Remito PDF</a>
     <% } %>
     <a href="/alquileres/maquinaria" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
@@ -26,10 +26,10 @@
   <!-- Info cliente -->
   <div class="col-md-5">
     <div class="card shadow-sm h-100">
-      <div class="card-header-orange px-3 py-2">👤 Cliente y Domicilio</div>
+      <div class="card-header-orange px-3 py-2"><%- icon('user', { size: 15 }) %> Cliente y Domicilio</div>
       <div class="card-body">
         <p class="fw-bold mb-1"><%= alquiler.cliente_nombre %></p>
-        <% if (alquiler.tel_whatsapp) { %><p class="text-muted small mb-2">📱 <%= alquiler.tel_whatsapp %></p><% } %>
+        <% if (alquiler.tel_whatsapp) { %><p class="text-muted small mb-2"><%- icon('smartphone', { size: 14, class: 'ic-dato' }) %><%= alquiler.tel_whatsapp %></p><% } %>
         <hr class="my-2">
         <p class="mb-1"><strong>Domicilio:</strong> <%= alquiler.detalle?.domicilio_entrega || '—' %></p>
         <p class="mb-1"><strong>Zona:</strong> <%= alquiler.detalle?.zona_entrega || '—' %></p>
@@ -45,7 +45,7 @@
   <!-- Info maquinaria + acciones -->
   <div class="col-md-7">
     <div class="card shadow-sm h-100">
-      <div class="card-header-orange px-3 py-2">🚜 Maquinaria y Estado</div>
+      <div class="card-header-orange px-3 py-2"><%- icon('tool', { size: 15 }) %> Maquinaria y Estado</div>
       <div class="card-body">
         <% if (!alquiler.detalle?.id_maquinaria) { %>
           <p class="text-muted fst-italic mb-3">Sin maquinaria asignada.</p>
@@ -65,25 +65,25 @@
             <div class="d-flex flex-wrap gap-2 mt-3">
               <% if (alquiler.estado === 'pendiente') { %>
                 <form action="/alquileres/maquinaria/<%= alquiler.id %>/despachar" method="POST">
-                  <button class="btn btn-sm btn-naranja">🚛 Registrar salida</button>
+                  <button class="btn btn-sm btn-naranja"><%- icon('truck', { size: 15 }) %> Registrar salida</button>
                 </form>
               <% } %>
               <% if (alquiler.estado === 'despachado') { %>
                 <form action="/alquileres/maquinaria/<%= alquiler.id %>/entregar" method="POST">
-                  <button class="btn btn-sm btn-naranja">⚒️ Confirmar inicio trabajo</button>
+                  <button class="btn btn-sm btn-naranja"><%- icon('tool', { size: 15 }) %> Confirmar inicio trabajo</button>
                 </form>
               <% } %>
               <% if (alquiler.estado === 'entregado') { %>
                 <form action="/alquileres/maquinaria/<%= alquiler.id %>/retirar" method="POST">
-                  <button class="btn btn-sm btn-outline-secondary">⚠️ Trabajo finalizado</button>
+                  <button class="btn btn-sm btn-outline-secondary"><%- icon('alert', { size: 15 }) %> Trabajo finalizado</button>
                 </form>
                 <form action="/alquileres/maquinaria/<%= alquiler.id %>/devolver" method="POST">
-                  <button class="btn btn-sm btn-outline-success">🏠 Devolver a planta</button>
+                  <button class="btn btn-sm btn-outline-success"><%- icon('home', { size: 15 }) %> Devolver a planta</button>
                 </form>
               <% } %>
               <% if (['pendiente','despachado'].includes(alquiler.estado)) { %>
                 <form action="/alquileres/maquinaria/<%= alquiler.id %>/anular" method="POST" onsubmit="return confirm('¿Anular este alquiler?')">
-                  <button class="btn btn-sm btn-outline-danger">❌ Anular</button>
+                  <button class="btn btn-sm btn-outline-danger"><%- icon('x', { size: 15 }) %> Anular</button>
                 </form>
               <% } %>
             </div>
@@ -97,11 +97,12 @@
 <!-- Timeline -->
 <% if (alquiler.movimientos?.length) { %>
 <div class="card shadow-sm">
-  <div class="card-header-light px-3 py-2 fw-semibold">📋 Historial de movimientos</div>
+  <div class="card-header-light px-3 py-2 fw-semibold"><%- icon('clipboard', { size: 15 }) %> Historial de movimientos</div>
   <div class="card-body py-3">
+    <div class="timeline">
     <% alquiler.movimientos.forEach((m, i) => { %>
-    <div class="d-flex gap-3 mb-3">
-      <div class="flex-shrink-0"><div class="bg-orange rounded-circle" style="width:10px;height:10px;margin-top:5px;"></div></div>
+    <div class="timeline-item d-flex gap-3 mb-3">
+      <div class="timeline-dot flex-shrink-0"><div class="timeline-dot__punto"></div><% if (i < alquiler.movimientos.length - 1) { %><div class="timeline-dot__linea"></div><% } %></div>
       <div class="flex-grow-1 pb-2">
         <div class="d-flex justify-content-between">
           <span class="fw-semibold"><%= labelMaq[m.estado_paso] || m.estado_paso %></span>
@@ -113,6 +114,7 @@
       </div>
     </div>
     <% }) %>
+    </div>
   </div>
 </div>
 <% } %>

@@ -6,7 +6,7 @@
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title">🚜 Editar Alquiler Maq. OP-<%= String(alquiler.nro_op).padStart(4,'0') %></h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('tool', { size: 18 }) %> Editar Alquiler Maq. OP-<%= String(alquiler.nro_op).padStart(4,'0') %></h4>
   <a href="/alquileres/maquinaria/<%= alquiler.id %>" class="btn btn-sm btn-outline-secondary">← Volver</a>
 </div>
 
