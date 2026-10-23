@@ -179,3 +179,16 @@ td:has(> form ~ form) {
   scrollbar-width: thin;
   scrollbar-color: $gray-300 transparent;
 }
+
+// Código como link al detalle (OP-0264 en alquileres): mismo estilo mono que los códigos
+:is(.table, .table-modern) td > a.text-orange:first-child {
+  font-family: $font-mono;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+
+  &:hover { text-decoration: underline !important; text-underline-offset: 2px; }
+}
+// Dato secundario dentro de una celda en negrita (N° de remito bajo el código)
+:is(.table, .table-modern) td.fw-bold > small { font-weight: 500; }
