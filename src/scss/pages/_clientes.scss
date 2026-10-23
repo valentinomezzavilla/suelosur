@@ -1,0 +1,21 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Clientes (detalle, estado de cuenta)
+// ═══════════════════════════════════════════════════════════════
+
+// Filtros del historial: la barra va plana dentro de su tarjeta (no tarjeta dentro de tarjeta)
+.historial-filtros-card > .filtros-bar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+// Estado de cuenta: pago anulado (la fila queda como registro, apagada)
+.table tbody tr.mov-anulado > td {
+  color: $muted;
+  box-shadow: inset 0 0 0 9999px rgba(242, 244, 247, 0.6);
+}

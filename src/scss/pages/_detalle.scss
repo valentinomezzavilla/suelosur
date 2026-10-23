@@ -52,6 +52,18 @@
   &:last-child { border-bottom: none; }
 }
 
+// Dentro de una grilla de varias columnas: etiqueta arriba, valor abajo (no se aprietan)
+.info-grid .info-row {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0.2rem;
+  padding: 0.6rem 0;
+
+  .info-label { font-size: $fs-xs; }
+  .info-value { text-align: left; }
+}
+
 .info-label {
   color: $muted;
   font-size: $fs-sm;

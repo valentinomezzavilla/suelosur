@@ -7,11 +7,11 @@
                   <% if (cliente.numero) { %><span class="text-orange">#<%= cliente.numero %></span> — <% } %><%= cliente.nombre %> <%= cliente.apellido %>
                 </h1>
             </div>
-            <div style="display:flex; gap:0.5rem">
-                <a href="/clientes/<%= cliente.id %>/editar" class="btn-secondary-yellow">Editar</a>
+            <div class="d-flex gap-2 align-items-center">
+                <a href="/clientes/<%= cliente.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 15 }) %> Editar</a>
                 <form action="/clientes/<%= cliente.id %>/toggle" method="POST" class="cliente-eliminar-form"
                       onsubmit="return confirm('¿Dar de baja a <%= cliente.nombre %> <%= cliente.apellido %>?')">
-                    <button type="submit" class="btn-danger">Dar de baja</button>
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Dar de baja</button>
                 </form>
             </div>
         </div>
