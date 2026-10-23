@@ -4,7 +4,7 @@
 .buscar-cliente {
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.75rem;
   align-items: flex-start;
 
   &__search {
@@ -28,53 +28,65 @@
 
     // El botón principal de búsqueda con contorno de marca (visible)
     #btnBuscarCliente {
-      background: #fff;
-      color: $accent;
-      border: 1.5px solid $accent;
-
-      &:hover { background: $accent; color: #fff; border-color: $accent; }
+      --bs-btn-color: #{$accent};
+      --bs-btn-border-color: #{$accent-border};
+      --bs-btn-hover-color: #{$accent-dark};
+      --bs-btn-hover-bg: #{$accent-soft};
+      --bs-btn-hover-border-color: #{$accent};
     }
   }
 
   &__resultado {
-    background: $bg-card-alt;
+    background: $gray-50;
     border: 1px solid $border;
     border-radius: $radius-md;
-    padding: 0.65rem 0.85rem;
+    padding: 0.5rem 0.75rem;
     font-size: $fs-sm;
 
     .resultado-item {
-      padding: 0.4rem 0;
+      padding: 0.45rem 0.5rem;
+      border-radius: $radius-sm;
       border-bottom: 1px solid $border-line;
       cursor: pointer;
+      transition: background-color $dur-fast $ease;
 
       &:last-child { border-bottom: none; }
       &:hover { background: $accent-soft; }
     }
   }
 
+  // Cliente elegido: tarjeta compacta con acción "Cambiar"
   &__seleccionado {
     display: flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.6rem;
+    width: 100%;
     background: $accent-soft;
-    border: 1px solid $accent;
+    border: 1px solid $accent-border;
     border-radius: $radius-md;
-    padding: 0.55rem 0.75rem;
-    font-size: $fs-sm;
+    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+    font-size: $fs-base;
+    font-weight: 500;
     color: $accent-dark;
     flex-wrap: wrap;
+    animation: buscar-cliente-in 0.2s $ease-out;
 
     > .btn-sm { margin-left: auto; }
   }
 
   &__crear {
-    background: $bg-card-alt;
-    border: 1px dashed $border;
+    background: $gray-50;
+    border: 1px dashed $border-input;
     border-radius: $radius-md;
-    padding: 0.85rem;
+    padding: 0.875rem;
     width: 100%;
+    animation: buscar-cliente-in 0.2s $ease-out;
   }
+}
+
+@keyframes buscar-cliente-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to   { opacity: 1; transform: none; }
 }
 
 // ── Dropdown de autocomplete ───────────────────────────────────
@@ -85,18 +97,26 @@
 .autocomplete-dropdown {
   position: absolute;
   z-index: 30;
-  top: calc(100% + 2px);
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
   margin: 0;
-  padding: 0.25rem;
+  padding: 0.3rem;
   list-style: none;
   background: $bg-card;
   border: 1px solid $border;
-  border-radius: $radius-md;
-  box-shadow: $shadow-md;
-  max-height: 260px;
+  border-radius: 10px;
+  box-shadow: $shadow-lg;
+  max-height: 280px;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  animation: autocomplete-in 0.14s $ease-out;
+}
+
+@keyframes autocomplete-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .autocomplete-item {
@@ -106,15 +126,16 @@
   padding: 0.5rem 0.6rem;
   border-radius: $radius-sm;
   cursor: pointer;
+  transition: background-color 0.08s $ease;
 
-  &:hover { background: $accent-soft; }
+  &:hover { background: $gray-100; }
 
-  &__nombre { font-weight: 600; color: $dark; font-size: $fs-sm; }
+  &__nombre { font-weight: 500; color: $ink; font-size: $fs-base; }
   &__meta   { font-size: $fs-xs; color: $muted; }
 }
 
 .autocomplete-empty {
-  padding: 0.6rem;
+  padding: 0.75rem 0.6rem;
   font-size: $fs-sm;
   color: $muted;
   text-align: center;
@@ -126,13 +147,16 @@
   color: $accent;
   font-weight: 600;
   cursor: pointer;
+  border-radius: $radius-xs;
+
+  &:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 
 // Select buscable (public/js/selectBuscable.js): campo de texto + desplegable filtrado
 .select-buscable {
   position: relative;
 
-  .autocomplete-item.is-activa { background: $accent-soft; }
+  .autocomplete-item.is-activa { background: $accent-soft; color: $accent-dark; }
 }
 
 .select-buscable__vacio {

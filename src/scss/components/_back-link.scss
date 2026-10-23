@@ -3,12 +3,15 @@
 .back-link {
   display: inline-flex;
   align-items: center;
-  font-size: 0.82rem;
-  color: $accent;
+  gap: 0.25rem;
+  font-size: $fs-sm;
+  color: $muted;
   text-decoration: none;
   font-weight: 500;
-  margin-bottom: 0.25rem;
-  transition: color 0.12s;
+  margin-bottom: 0.35rem;
+  padding: 0.15rem 0.35rem 0.15rem 0;
+  border-radius: $radius-xs;
+  transition: color $dur-fast $ease;
 
-  &:hover { color: $accent-dark; text-decoration: underline; }
+  &:hover { color: $ink; }
 }

@@ -5,17 +5,27 @@
 .text-orange      { color: $orange-text !important; } // texto: el naranja de marca no llega a 4.5:1
 .text-orange-dark { color: $orange-dark !important; }
 .text-accent      { color: $accent      !important; }
-.text-dark-title  { color: $dark        !important; }
-.text-green       { color: $success     !important; }
-.text-blue        { color: $info        !important; }
+.text-dark-title  { color: $ink         !important; }
+.text-green       { color: $success-text !important; }
+.text-blue        { color: $accent      !important; }
 .text-muted-soft  { color: $muted-soft  !important; }
 .text-muted-light { color: $muted-light !important; }
+
+// Bootstrap: mismos tonos que el sistema (contraste AA sobre blanco)
+.text-muted     { color: $muted !important; }
+.text-secondary { color: $gray-600 !important; }
+.text-success   { color: $success-text !important; }
+.text-danger    { color: $danger-text !important; }
+.text-warning   { color: $warning-text !important; }
+.text-primary   { color: $accent !important; }
+.text-info      { color: $info-text !important; }
 
 .bg-dark-custom   { background: $dark       !important; }
 .bg-mid           { background: $dark-2     !important; }
 .bg-light-soft    { background: $bg-app     !important; }
 .bg-orange        { background: $accent     !important; }
 .bg-orange-soft   { background: $accent-soft!important; }
+.bg-light         { background-color: $gray-50 !important; }
 
 // ── Iconos SVG inline (heredan color del texto) ────────────────
 .ic {
@@ -69,7 +79,7 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 .maxw-600 { max-width: 600px; }
 
 // ── Bordes ─────────────────────────────────────────────────────
-.border-divider { border-top: 1px solid #eee; }
+.border-divider { border-top: 1px solid $border-soft; }
 .border-sidebar { border-color: $dark-2 !important; }
 
 // Permite que un hijo flex se encoja (clave para que las tablas no desborden)
@@ -80,7 +90,7 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 // ═══════════════════════════════════════════════════════════════
 @include md-down {
   // Navbar fija para que el botón de menú esté siempre accesible
-  .app-navbar { position: sticky; top: 0; z-index: 90; }
+  .app-navbar { position: sticky; top: 0; z-index: $z-navbar; }
 
   // Tablas: scroll horizontal dentro de su contenedor (sin romper el layout)
   .card-body.p-0,
@@ -98,11 +108,11 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 
 @include sm-down {
   // Tablas un poco más compactas en pantallas chicas
-  .table { font-size: 0.84rem; }
+  .table { font-size: $fs-sm; }
   .table thead th,
   .table tbody td,
   .data-table thead th,
-  .data-table tbody td { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .data-table tbody td { padding-left: 0.6rem; padding-right: 0.6rem; }
 
   // Botones de acción a lo ancho en headers que envuelven
   .page-header .d-flex.gap-2 { width: 100%; }
@@ -111,33 +121,51 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
   .stat-cards.stat-cards--5 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 }
 
-// ── Pestañas de contenido (nav-tabs) — alto contraste ─────────
+// ── Pestañas de contenido (nav-tabs): subrayado de marca ───────
 .nav-tabs {
-  border-bottom: 2px solid $border;
-  gap: 0.15rem;
+  border-bottom: 1px solid $border;
+  gap: 0.25rem;
 
   .nav-link {
-    color: $ink-soft;
-    font-weight: 600;
-    font-size: 0.88rem;
+    color: $muted;
+    font-weight: 500;
+    font-size: $fs-base;
     border: none;
     border-bottom: 2px solid transparent;
-    margin-bottom: -2px;
-    padding: 0.55rem 1rem;
+    margin-bottom: -1px;
+    padding: 0.55rem 0.85rem;
     background: transparent;
-    transition: color 0.12s, border-color 0.12s, background 0.12s;
+    border-radius: $radius-sm $radius-sm 0 0;
+    transition: color $dur-fast $ease, border-color $dur-fast $ease, background-color $dur-fast $ease;
 
     &:hover {
-      color: $accent;
-      border-bottom-color: rgba(28, 91, 173, 0.4);
-      background: $accent-soft;
+      color: $ink;
+      border-bottom-color: $border-input;
+      background: transparent;
     }
 
     &.active {
-      color: $accent-dark;
+      color: $ink;
+      font-weight: 600;
       background: transparent;
       border-bottom-color: $accent;
     }
+  }
+}
+
+// Pestañas en píldoras (Bootstrap .nav-pills)
+.nav-pills {
+  --bs-nav-pills-link-active-bg: #{$accent-soft};
+  --bs-nav-pills-link-active-color: #{$accent-dark};
+  --bs-nav-pills-border-radius: #{$radius-md};
+  gap: 0.25rem;
+
+  .nav-link {
+    color: $gray-600;
+    font-weight: 500;
+    font-size: $fs-sm;
+    &:hover { color: $ink; background: $gray-100; }
+    &.active { box-shadow: inset 0 0 0 1px $accent-border; }
   }
 }
 
@@ -145,15 +173,15 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
 .recurso-box {
   border: 1px solid $border;
   border-radius: $radius-md;
-  padding: 0.75rem 0.85rem;
+  padding: 0.75rem 0.875rem;
   background: $bg-card;
   height: 100%;
 
   &__top {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
+    font-size: $fs-xs;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
     color: $muted;
     margin-bottom: 0.5rem;
     display: flex;
@@ -172,23 +200,24 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
   justify-content: space-between;
   align-items: baseline;
   gap: 1rem;
-  padding: 0.55rem 0;
+  padding: 0.6rem 0;
   border-bottom: 1px solid $border-line;
 
   &:last-child { border-bottom: none; }
 }
 .ficha-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: $fs-sm;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   color: $muted;
   flex-shrink: 0;
 }
 .ficha-value {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: $dark;
+  font-size: $fs-base;
+  font-weight: 500;
+  color: $ink;
   text-align: right;
   word-break: break-word;
+  font-variant-numeric: tabular-nums;
 }
