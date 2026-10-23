@@ -177,6 +177,7 @@
     flex-direction: column-reverse; // etiqueta arriba, cifra abajo
     gap: 0.35rem;
     min-width: 0;
+    margin-right: auto; // con row-reverse: el cuerpo siempre a la izquierda, haya ícono o no
   }
 
   &__value {
