@@ -44,9 +44,16 @@
 
 .fact-bar {
   width: min(44px, 70%);
-  background: $accent;
-  border-radius: 4px 4px 0 0;
-  transition: background $dur-fast $ease;
+  background: linear-gradient(180deg, #2a6cc4, $accent);
+  border-radius: 5px 5px 0 0;
+  transition: background $dur-fast $ease, filter $dur-fast $ease;
+  animation: fact-bar-in 0.6s $ease-out both;
+  transform-origin: bottom center;
+}
+
+@keyframes fact-bar-in {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
 }
 
 .fact-val {
@@ -92,11 +99,11 @@
 
   span {
     text-align: center;
-    font-size: 0.72rem;
-    font-weight: 600;
+    font-size: $fs-xs;
+    font-weight: 500;
     color: $muted;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    text-transform: none;
+    letter-spacing: 0;
   }
 }
 
@@ -237,8 +244,8 @@
   border-radius: $radius-md;
   font-variant-numeric: tabular-nums;
 
-  span { display: block; font-size: 0.7rem; color: $muted; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
-  strong { font-size: 0.95rem; color: $ink; }
+  span { display: block; font-size: $fs-xs; color: $muted; text-transform: none; letter-spacing: 0; font-weight: 500; }
+  strong { font-size: 1rem; font-weight: 600; color: $ink; letter-spacing: -0.01em; }
 }
 
 .fact-modo {
