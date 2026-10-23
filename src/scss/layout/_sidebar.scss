@@ -1,20 +1,27 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// ═══════════════════════════════════════════════════════════════
+// Sidebar — azul marino de marca, compacta y de lectura rápida.
+// Clases usadas por public/js/main.js: .app-sidebar, .is-open, .nav-link,
+// .sidebar-logout, .sidebar-backdrop (no renombrar).
+// ═══════════════════════════════════════════════════════════════
+
 .app-sidebar {
   width: $sidebar-w;
   min-width: $sidebar-w;
   height: 100vh;
   background:
-    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 7px),
+    radial-gradient(120% 60% at 0% 0%, rgba(28, 91, 173, 0.18), transparent 60%),
     linear-gradient(180deg, $sidebar-bg 0%, $sidebar-bg-2 100%);
   border-right: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
   position: sticky;
   top: 0;
   display: flex;
   flex-direction: column;
-  font-size: 0.875rem;
-  z-index: 100;
+  font-size: 0.84375rem;
+  z-index: $z-sidebar;
 
   @include md-down {
     position: fixed;
@@ -26,23 +33,28 @@
     height: 100dvh; // viewport dinámico para mobile (descuenta barras del navegador)
     min-height: 0;
     transform: translateX(-100%);
-    transition: transform 0.25s $ease;
-    box-shadow: 8px 0 24px rgba(0, 0, 0, 0.25);
+    transition: transform 0.28s $ease-out, visibility 0s linear 0.28s;
+    visibility: hidden;
+    box-shadow: 16px 0 40px rgba(2, 8, 20, 0.35);
 
-    &.is-open { transform: translateX(0); }
+    &.is-open {
+      transform: translateX(0);
+      visibility: visible;
+      transition: transform 0.28s $ease-out, visibility 0s;
+    }
   }
 }
 
 // Desktop: el botón ☰ del navbar oculta/muestra el panel (estado en <html>)
 @include md-up {
   .app-sidebar {
-    transition: margin-left 0.25s $ease, visibility 0s linear 0s;
+    transition: margin-left 0.26s $ease, visibility 0s linear 0s;
   }
 
   .sidebar-collapsed .app-sidebar {
     margin-left: -$sidebar-w;
     visibility: hidden; // saca los links del orden de tabulación
-    transition: margin-left 0.25s $ease, visibility 0s linear 0.25s;
+    transition: margin-left 0.26s $ease, visibility 0s linear 0.26s;
   }
 }
 
@@ -54,31 +66,36 @@
       display: block;
       position: fixed;
       inset: 0;
-      background: rgba(8, 15, 30, 0.5);
+      background: rgba(6, 14, 30, 0.48);
       -webkit-backdrop-filter: blur(2px);
       backdrop-filter: blur(2px);
-      z-index: 99;
+      z-index: $z-sidebar - 1;
+      animation: sidebar-fade 0.2s $ease-out;
     }
   }
 }
 
+@keyframes sidebar-fade { from { opacity: 0; } to { opacity: 1; } }
+
+// ── Marca ──────────────────────────────────────────────────────
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 1.15rem 1.25rem 1.1rem;
+  gap: 0.7rem;
+  padding: 1rem 1rem 1.05rem 1.1rem;
   position: relative;
 
-  // Firma "estratos" bajo la marca
+  // Firma "estratos": tres capas cortas bajo el nombre
   &::after {
     content: '';
     position: absolute;
-    left: 1.25rem;
-    bottom: 0.35rem;
-    width: 38px;
-    height: 3px;
+    left: calc(1.1rem + 34px + 0.7rem);
+    bottom: 0.55rem;
+    width: 30px;
+    height: 2px;
     border-radius: 2px;
     background: $strata;
+    opacity: 0.9;
   }
 
   .brand-logo-link {
@@ -86,16 +103,17 @@
     align-items: center;
     flex-shrink: 0;
     text-decoration: none;
-    border-radius: 10px;
-    transition: transform $dur-fast $ease, opacity $dur-fast;
+    border-radius: 9px;
+    transition: transform $dur $ease-out, box-shadow $dur $ease;
 
-    &:hover { opacity: 0.9; }
+    &:hover { transform: translateY(-1px); }
+    &:active { transform: translateY(0) scale(0.97); }
   }
 
   .brand-logo-wrap {
-    width: 38px;
-    height: 38px;
-    border-radius: 10px;
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
     background: #fff;
     display: flex;
     align-items: center;
@@ -103,7 +121,7 @@
     overflow: hidden;
     flex-shrink: 0;
     padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.12), 0 6px 14px -6px rgba(0, 0, 0, 0.5);
   }
 
   .brand-logo-img {
@@ -115,163 +133,176 @@
 
   .brand-name {
     color: #fff;
-    font-weight: 700;
-    font-size: 1rem;
-    letter-spacing: -0.01em;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: -0.012em;
     line-height: 1.2;
   }
 
   .brand-sub {
     color: $sidebar-muted;
-    font-size: $fs-xxs;
-    letter-spacing: 0.02em;
-    margin-top: 2px;
+    font-size: $fs-xs;
+    letter-spacing: 0;
+    margin-top: 1px;
+    line-height: 1.3;
   }
 }
 
-// Tarjeta del usuario logueado
+// ── Usuario logueado ───────────────────────────────────────────
 .sidebar-user {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  margin: 0 0.75rem 0.5rem;
-  padding: 0.6rem 0.7rem;
-  background: rgba(255, 255, 255, 0.045);
+  gap: 0.6rem;
+  margin: 0.15rem 0.75rem 0.6rem;
+  padding: 0.5rem 0.6rem;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid $sidebar-border;
-  border-radius: $radius-lg;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .user-avatar {
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  background: linear-gradient(135deg, $orange 0%, $orange-dark 100%);
+  background: linear-gradient(140deg, #f0a649 0%, $orange 45%, $orange-dark 100%);
   color: #fff;
-  font-weight: 700;
-  font-size: 0.72rem;
+  font-weight: 600;
+  font-size: 0.6875rem;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  letter-spacing: 0.03em;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+  letter-spacing: 0.02em;
+  box-shadow: 0 0 0 2px rgba(11, 26, 51, 1), 0 0 0 3px rgba(232, 145, 42, 0.35);
 }
 
 .user-info { min-width: 0; }
 
 .user-name {
   color: #fff;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: $fs-sm;
+  font-weight: 500;
   line-height: 1.25;
   @include truncate;
 }
 
 .user-role {
   color: $sidebar-muted;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: 0.65625rem;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   margin-top: 2px;
 }
 
+// ── Navegación ─────────────────────────────────────────────────
 .sidebar-nav {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0.35rem 0 0.75rem;
+  overscroll-behavior: contain;
+  padding: 0.15rem 0 1rem;
   // Los ítems se desvanecen al llegar al pie, en vez de quedar cortados contra "Cerrar sesión"
-  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
-  mask-image: linear-gradient(180deg, #000 calc(100% - 28px), transparent 100%);
-  @include scrollbar(4px, rgba(255,255,255,0.08), transparent, rgba(255,255,255,0.16));
+  -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(180deg, #000 calc(100% - 24px), transparent 100%);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+  @include scrollbar(4px, rgba(255,255,255,0.1), transparent, rgba(255,255,255,0.2));
 }
 
 .nav-section {
-  padding: 0.4rem 0 0.5rem;
+  padding: 0.35rem 0 0.25rem;
 
-  & + .nav-section {
-    position: relative;
-    margin-top: 0.35rem;
-    padding-top: 0.75rem;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 1.35rem;
-      right: 1.35rem;
-      height: 1px;
-      background: $sidebar-border;
-    }
-  }
+  & + .nav-section { margin-top: 0.4rem; }
 }
 
 .nav-section-label {
-  color: $sidebar-muted;
-  font-size: 0.64rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  padding: 0.25rem 1.35rem 0.45rem;
-}
-
-.nav-group-label {
-  color: rgba(255, 255, 255, 0.34);
-  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0.55rem 1.35rem 0.25rem 1.35rem;
+  padding: 0.55rem 1.35rem 0.4rem;
+}
+
+// Subgrupo (Ventas, Alquileres, Stock): rótulo discreto + ítems colgados de una guía
+.nav-group-label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  padding: 0.5rem 1.35rem 0.2rem;
 }
 
 .app-sidebar .nav-link {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  margin: 1px 0.6rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: $radius-md;
+  gap: 0.65rem;
+  min-height: 32px;
+  margin: 1px 0.625rem;
+  padding: 0.375rem 0.7rem;
+  border-radius: $radius-sm;
   color: $sidebar-text;
   text-decoration: none;
-  font-size: 0.84rem;
+  font-size: 0.84375rem;
   font-weight: 500;
+  line-height: 1.25;
   position: relative;
-  transition: background $dur-fast $ease, color $dur-fast $ease;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease;
+
+  > span:not(.badge) { @include truncate; }
 
   &:hover {
     background: $sidebar-hover;
     color: #fff;
+
+    .nav-icon { opacity: 1; }
   }
 
+  &:active { background: rgba(255, 255, 255, 0.09); }
+
   &:focus-visible {
-    outline: 2px solid rgba(232, 145, 42, 0.8);
+    outline: 2px solid rgba(232, 145, 42, 0.85);
     outline-offset: -2px;
   }
 
-  // Ítem activo: fondo claro + indicador naranja a la izquierda
+  // Ítem activo: fondo claro + indicador de marca a la izquierda
   &.is-active {
     background: $sidebar-active;
     color: #fff;
-    font-weight: 600;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
 
     &::before {
       content: '';
       position: absolute;
-      left: -0.6rem;
-      top: 22%;
-      bottom: 22%;
+      left: -0.625rem;
+      top: 7px;
+      bottom: 7px;
       width: 3px;
       border-radius: 0 3px 3px 0;
-      background: linear-gradient(180deg, $orange 0 50%, $sand 50% 100%);
+      background: linear-gradient(180deg, $orange 0 55%, $sand 55% 100%);
     }
 
     .nav-icon { color: $orange; opacity: 1; }
   }
 
+  // Ítem de un subgrupo: sangría + guía vertical que une los ítems del grupo
   &.is-indent {
-    padding-left: 1.35rem;
-    font-size: 0.82rem;
+    margin-left: 1.45rem;
+    padding-left: 0.7rem;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: -0.5rem;
+      top: -2px;
+      bottom: -2px;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    &.is-active::before { left: -0.6rem; width: 2px; border-radius: 2px; top: 6px; bottom: 6px; }
   }
 
   &.text-muted-nav { opacity: 0.55; }
@@ -279,42 +310,68 @@
 
 .nav-icon {
   flex-shrink: 0;
-  opacity: 0.8;
+  width: 16px;
+  height: 16px;
+  opacity: 0.72;
   color: currentColor;
+  transition: opacity $dur-fast $ease, color $dur-fast $ease;
 }
 
+// ── Cerrar sesión ──────────────────────────────────────────────
 .sidebar-logout {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  margin: 0.25rem 0.6rem 0.75rem;
-  padding: 0.6rem 0.75rem;
-  box-shadow: 0 -12px 0 -11px $sidebar-border;
-  border-radius: $radius-md;
-  color: rgba(255, 255, 255, 0.7);
+  gap: 0.65rem;
+  min-height: 34px;
+  margin: 0.35rem 0.625rem 0.75rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: $radius-sm;
+  color: rgba(255, 255, 255, 0.62);
   text-decoration: none;
-  font-size: 0.84rem;
+  font-size: 0.84375rem;
   font-weight: 500;
-  border: 1px solid $sidebar-border;
-  transition: color $dur-fast $ease, background $dur-fast $ease, border-color $dur-fast $ease;
+  border: 1px solid transparent;
+  transition: color $dur-fast $ease, background-color $dur-fast $ease, border-color $dur-fast $ease;
   margin-top: auto;
   flex-shrink: 0; // que no se reduzca en mobile
+  position: relative;
 
-  &:hover {
-    color: #ffb4ad;
-    background: rgba(220, 58, 47, 0.12);
-    border-color: rgba(220, 58, 47, 0.3);
+  // Divisor sutil sobre el pie
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0.15rem;
+    right: 0.15rem;
+    top: -0.45rem;
+    height: 1px;
+    background: $sidebar-border;
   }
 
+  .nav-icon { opacity: 0.75; }
+
+  &:hover {
+    color: #ffc3bd;
+    background: rgba(217, 45, 32, 0.14);
+    border-color: rgba(217, 45, 32, 0.28);
+
+    .nav-icon { opacity: 1; }
+  }
+
+  &:focus-visible {
+    outline: 2px solid rgba(232, 145, 42, 0.85);
+    outline-offset: -2px;
+  }
+
+  // En el celular se ve siempre como acción de salida (no hay hover)
   @include md-down {
-    background: rgba(220, 58, 47, 0.12);
-    color: #ffb4ad;
+    background: rgba(217, 45, 32, 0.12);
+    color: #ffc3bd;
     font-weight: 600;
-    border-color: rgba(220, 58, 47, 0.3);
+    border-color: rgba(217, 45, 32, 0.28);
 
     &:hover, &:active {
       color: #fff;
-      background: rgba(220, 58, 47, 0.25);
+      background: rgba(217, 45, 32, 0.24);
     }
   }
 }
@@ -323,15 +380,26 @@
 .app-sidebar .badge {
   text-transform: none;
   letter-spacing: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  text-align: center;
+  font-weight: 600;
+  line-height: 18px;
+  border: 0;
+  box-shadow: none;
   &::before { display: none !important; }
+
+  &.badge-alerta    { background: $danger; color: #fff; }
+  &.badge-pendiente { background: rgba(255, 255, 255, 0.14); color: #fff; }
 }
 
 .badge-sprint {
   background: $accent-soft;
-  color: $accent;
-  border: 1px solid $accent;
-  font-size: 0.6rem;
-  padding: 0.15em 0.45em;
-  border-radius: 4px;
-  font-weight: 700;
+  color: $accent-dark;
+  border: 1px solid $accent-border;
+  font-size: $fs-xxs;
+  padding: 0.2em 0.55em;
+  border-radius: $radius-xs;
+  font-weight: 600;
 }

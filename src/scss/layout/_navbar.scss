@@ -1,36 +1,24 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// Barra superior: título de la pantalla + fecha. Translúcida sobre el contenido al scrollear.
 .app-navbar {
   position: sticky;
   top: 0;
-  z-index: 90;
-  background: rgba(255, 255, 255, 0.88);
-  -webkit-backdrop-filter: saturate(160%) blur(10px);
-  backdrop-filter: saturate(160%) blur(10px);
+  z-index: $z-navbar;
+  background: rgba(255, 255, 255, 0.82);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid $border;
-  padding: 0.75rem 2rem;
+  padding: 0 2rem 0 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
   min-height: $navbar-h;
 
-  // Firma "estratos": tres capas cortas sobre el borde inferior
-  &::after {
-    content: '';
-    position: absolute;
-    left: 2rem;
-    bottom: -1px;
-    width: 72px;
-    height: 3px;
-    border-radius: 0 0 2px 2px;
-    background: $strata;
-  }
-
   @include md-down {
-    padding: 0.6rem 1rem;
-    &::after { left: 1rem; }
+    padding: 0 1rem 0 0.75rem;
   }
 
   .nav-title {
@@ -39,49 +27,42 @@
     gap: 0.6rem;
     color: $ink;
     margin: 0;
-    font-weight: 700;
-    font-size: 1.02rem;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: -0.012em;
     min-width: 0;
     @include truncate;
-
   }
 
   .nav-date {
-    color: $ink-soft;
-    font-size: 0.76rem;
+    display: inline-block; // ::first-letter no aplica a contenedores flex
+    color: $muted;
+    font-size: $fs-sm;
     font-weight: 500;
-    display: inline-block;
-    &::first-letter { text-transform: uppercase; }
-    background: $bg-app;
-    border: 1px solid $border;
-    border-radius: $radius-sm;
-    padding: 0.3rem 0.7rem;
-    font-size: 0.76rem;
     white-space: nowrap;
+    &::first-letter { text-transform: uppercase; }
 
     @include sm-down { display: none; }
   }
 }
 
-// ── Botón hamburguesa (visible solo en mobile) ─────────────────
+// ── Botón ☰ (muestra/oculta el menú) ───────────────────────────
 .navbar-toggle {
   @include reset-button;
   display: inline-flex;
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: $radius-md;
   align-items: center;
   justify-content: center;
-  color: $ink;
-  border: 1px solid $border;
-  background: #fff;
-  transition: background $dur-fast $ease, border-color $dur-fast $ease;
+  color: $gray-600;
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease, border-color $dur-fast $ease;
 
-  &:hover { background: $bg-app; border-color: $border-input; }
+  &:hover { background: $gray-100; color: $ink; }
+  &:active { background: $gray-150; }
 
-  @include md-down { display: inline-flex; }
-
-  svg { width: 20px; height: 20px; }
+  svg { width: 18px; height: 18px; }
 }

@@ -4,15 +4,16 @@
 .app-wrapper {
   display: flex;
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .main-content {
   flex: 1;
   min-width: 0;
-  padding: $content-pad 2rem 2.5rem;
+  padding: 1.75rem 2rem 3rem;
   background: $bg-app;
 
   @include md-down {
-    padding: $content-pad-mob $content-pad-mob 2rem;
+    padding: 1.1rem $content-pad-mob 2.5rem;
   }
 }
