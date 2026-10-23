@@ -96,7 +96,6 @@
   }
 
   &:disabled,
-  &.is-disabled,
   &.disabled {
     opacity: var(--bs-btn-disabled-opacity);
     cursor: not-allowed;
@@ -107,14 +106,11 @@
 
 .btn-primary,
 .btn-secondary,
-.btn-outline-accent,
 .btn-secondary-yellow,
 .btn-primary-green,
 .btn-danger,
 .btn-finalizar,
 .btn-primary-modern,
-.btn-secondary-modern,
-.btn-ghost,
 .btn-whatsapp { @extend %btn-base; }
 
 // Acción de cierre de un flujo (Finalizar venta, Confirmar alquiler): ancho completo y protagonista

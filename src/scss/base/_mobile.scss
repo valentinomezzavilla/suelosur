@@ -45,7 +45,7 @@
 
   // ── Botones e íconos táctiles ────────────────────────────────
   .btn,
-  .btn-primary, .btn-secondary, .btn-danger, .btn-primary-green, .btn-secondary-yellow, .btn-outline-accent {
+  .btn-primary, .btn-secondary, .btn-danger, .btn-primary-green, .btn-secondary-yellow {
     min-height: 42px;
   }
   .btn-sm,
@@ -54,11 +54,6 @@
     min-height: 38px;
   }
   .tabla-toolbar__btn-icon { width: $control-h-lg; height: $control-h-lg; }
-  .btn-icon-danger {
-    width: 40px;
-    height: 40px;
-    font-size: 1.25rem;
-  }
   .periodo-chip  { min-height: 36px; padding: 0 0.95rem; }
   .navbar-toggle { width: 40px; height: 40px; }
   .page-link     { min-width: 36px; height: 36px; }
@@ -102,8 +97,6 @@
 @include sm-down {
   .stat-card__value { font-size: 1.15rem; }
   .page-title       { font-size: 1.15rem; }
-  .total-display    { font-size: 1.65rem; }
-  .rs-total-value   { font-size: 1.3rem; }
   // Números de dinero grandes que no deben cortar
   .detalle-precio   { font-size: 1rem; }
 }

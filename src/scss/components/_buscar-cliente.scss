@@ -12,49 +12,6 @@
     width: 100%;
   }
 
-  &__inputs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 0.75rem;
-
-    @include sm-down { grid-template-columns: 1fr; }
-  }
-
-  &__btns {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-
-    // El botón principal de búsqueda con contorno de marca (visible)
-    #btnBuscarCliente {
-      --bs-btn-color: #{$accent};
-      --bs-btn-border-color: #{$accent-border};
-      --bs-btn-hover-color: #{$accent-dark};
-      --bs-btn-hover-bg: #{$accent-soft};
-      --bs-btn-hover-border-color: #{$accent};
-    }
-  }
-
-  &__resultado {
-    background: $gray-50;
-    border: 1px solid $border;
-    border-radius: $radius-md;
-    padding: 0.5rem 0.75rem;
-    font-size: $fs-sm;
-
-    .resultado-item {
-      padding: 0.45rem 0.5rem;
-      border-radius: $radius-sm;
-      border-bottom: 1px solid $border-line;
-      cursor: pointer;
-      transition: background-color $dur-fast $ease;
-
-      &:last-child { border-bottom: none; }
-      &:hover { background: $accent-soft; }
-    }
-  }
-
   // Cliente elegido: tarjeta compacta con acción "Cambiar"
   &__seleccionado {
     display: flex;

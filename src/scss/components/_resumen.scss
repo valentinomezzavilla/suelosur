@@ -1,16 +1,6 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
-.total-display {
-  font-size: 2rem;
-  font-weight: 600;
-  color: $ink;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
-  margin: 0.5rem 0;
-  font-variant-numeric: tabular-nums;
-}
-
 // Resumen etiqueta / valor en dos columnas (alquiler nuevo, maquinaria, empleados)
 .resumen-grid {
   display: grid;
@@ -33,39 +23,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.rs-label {
-  font-size: $fs-xs;
-  text-transform: none;
-  letter-spacing: 0;
-  color: $muted;
-  font-weight: 500;
-}
-
-.rs-value {
-  font-size: $fs-base;
-  color: $ink;
-  font-weight: 500;
-}
-
-.resumen-items {
-  border-top: 1px dashed $border;
-  padding-top: 0.75rem;
-
-  .rs-item {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.4rem 0;
-    font-size: $fs-sm;
-    border-bottom: 1px solid $border-line;
-    font-variant-numeric: tabular-nums;
-
-    &:last-child { border-bottom: none; }
-  }
-
-  .rs-item-sub { font-weight: 600; color: $ink; }
-}
-
 .resumen-total {
   display: flex;
   align-items: baseline;
@@ -80,82 +37,11 @@
   flex-wrap: wrap;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), $shadow-sm;
 
-  > span:first-child:not(.rs-total-label) { font-size: $fs-sm; font-weight: 500; opacity: 0.8; }
-  > span:last-child:not(.rs-total-value) {
+  > span:first-child { font-size: $fs-sm; font-weight: 500; opacity: 0.8; }
+  > span:last-child {
     font-size: 1.2rem;
     font-weight: 600;
     letter-spacing: -0.02em;
     font-variant-numeric: tabular-nums;
   }
-
-  .rs-total-label {
-    font-size: $fs-xs;
-    letter-spacing: 0.06em;
-    font-weight: 600;
-    text-transform: uppercase;
-    opacity: 0.8;
-  }
-
-  .rs-total-value {
-    font-size: 1.5rem;
-    font-weight: 600;
-    letter-spacing: -0.025em;
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-.por-finalizar-list {
-  border: 1px solid $border;
-  border-radius: $radius-md;
-  padding: 0.4rem;
-  background: $gray-50;
-  max-height: 280px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-}
-
-.por-finalizar-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.65rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: $radius-sm;
-  cursor: pointer;
-  transition: background-color $dur-fast $ease;
-  margin: 0;
-
-  &:hover { background: #fff; }
-
-  input[type=radio] {
-    margin-top: 4px;
-    flex-shrink: 0;
-    accent-color: $accent;
-  }
-
-  &:has(input[type=radio]:checked) {
-    background: $accent-soft;
-    box-shadow: inset 0 0 0 1px $accent;
-  }
-}
-
-.por-finalizar-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: $fs-sm;
-}
-
-.por-finalizar-num  { font-weight: 600; color: $ink; }
-.por-finalizar-fecha{ color: $accent-dark; font-weight: 500; }
-.por-finalizar-dir  { color: $muted; font-size: $fs-xs; }
-
-.map-container {
-  height: 360px;
-  width: 100%;
-  border-radius: $radius-lg;
-  border: 1px solid $border;
-  overflow: hidden;
-  position: relative;
-  z-index: 0;
-  box-shadow: $shadow-xs;
 }

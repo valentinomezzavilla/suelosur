@@ -162,19 +162,6 @@ td:has(> form ~ form) {
   &.is-active { color: $accent-dark; font-weight: 600; }
 }
 
-// ── Wrapper responsive para cualquier tabla ────────────────────
-.table-wrap {
-  width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-
-  @include md-down {
-    margin: 0 (-$content-pad-mob);
-    border-radius: 0;
-    padding: 0 $content-pad-mob;
-  }
-}
-
 .table-responsive {
   scrollbar-width: thin;
   scrollbar-color: $gray-300 transparent;

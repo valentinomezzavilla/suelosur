@@ -84,24 +84,10 @@
 // ── Secundarios ────────────────────────────────────────────────
 .btn-outline-secondary,
 .btn-secondary,
-.btn-secondary-modern,
 .btn-light { @extend %btn-tone-secondary; }
 
-// Fantasma: sin borde hasta el hover (acciones terciarias)
-.btn-ghost {
-  @extend %btn-tone-secondary;
-  --bs-btn-bg: transparent;
-  --bs-btn-border-color: transparent;
-  --bs-btn-hover-bg: #{$gray-100};
-  --bs-btn-hover-border-color: transparent;
-  --bs-btn-active-bg: #{$gray-150};
-  --bs-btn-active-border-color: transparent;
-  --btn-shadow: none;
-}
-
 // ── Contornos con significado ──────────────────────────────────
-.btn-outline-primary,
-.btn-outline-accent { @include btn-tone-outline($accent, $accent-border, $accent-soft, $accent); }
+.btn-outline-primary { @include btn-tone-outline($accent, $accent-border, $accent-soft, $accent); }
 .btn-outline-success { @include btn-tone-outline($success-text, $success-border, $success-soft, $success); }
 .btn-outline-danger  { @include btn-tone-outline($danger-text, #f6c4bf, $danger-soft, $danger); }
 .btn-outline-warning { @include btn-tone-outline($warning-text, $warning-border, $warning-soft, $warning); }
@@ -135,36 +121,12 @@
   &:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 
-.btn-logout {
-  @extend %btn-tone-secondary;
-}
-
 // ── Botón WhatsApp (link click-to-chat) ────────────────────────
 .btn-whatsapp {
   @include btn-tone-solid(#25d366, #1fb457, #1fb457, #189c4a, rgba(37, 211, 102, 0.4));
   --bs-btn-padding-x: 0.875rem;
 
   svg { flex-shrink: 0; }
-}
-
-// Ícono rojo sin caja (quitar renglón)
-.btn-icon-danger {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  color: $danger;
-  font-size: 1.1rem;
-  line-height: 1;
-  width: 30px;
-  height: 30px;
-  border-radius: $radius-sm;
-  cursor: pointer;
-  transition: background-color $dur-fast $ease, color $dur-fast $ease;
-
-  &:hover { background: $danger-soft; color: $danger-dark; }
-  &:active { transform: scale(0.94); }
 }
 
 // Acciones por renglón dentro de tablas: alineadas al centro de la fila

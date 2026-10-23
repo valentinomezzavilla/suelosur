@@ -190,18 +190,6 @@ $sticky-top: calc(#{$navbar-h} + 1rem);
   background: $gray-50 !important;
 }
 
-// confirm button
-.btn-confirmar-alquiler {
-  &--ready {
-    animation: pulse-confirm 1s ease-in-out infinite alternate;
-  }
-}
-
-@keyframes pulse-confirm {
-  from { box-shadow: 0 0 0 0 rgba($accent, 0.3); }
-  to   { box-shadow: 0 0 0 8px rgba($accent, 0); }
-}
-
 // modalidad radio group (alquiler de maquinaria)
 .modalidad-group {
   display: flex;

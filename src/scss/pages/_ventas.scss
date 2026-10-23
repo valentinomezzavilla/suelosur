@@ -412,16 +412,7 @@ $sticky-top: calc(#{$navbar-h} + 1rem);
   }
 }
 
-.qty-display {
-  min-width: 22px;
-  text-align: center;
-  font-weight: 600;
-  color: $ink;
-  font-size: $fs-sm;
-}
-
-// Cantidad dentro del stepper (días de contenedor / cantidad de producto)
-.dias-contenedor,
+// Cantidad dentro del stepper (cantidad de producto)
 .cantidad-cantera {
   width: 3.4rem;
   min-height: 28px;

@@ -180,21 +180,6 @@
   text-align: right;
 }
 
-.total-mes-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.75rem 1.1rem;
-  margin: 0 0 1rem;
-  background: $accent-soft;
-  border: 1px solid $accent-border;
-  border-radius: $radius-md;
-  font-weight: 600;
-  color: $accent-dark;
-  font-variant-numeric: tabular-nums;
-}
-
 // Badges de tipo de transacción (dinámicos: badge--tipo-xxx)
 .badge[class*="--tipo-"] {
   background: $accent-soft;

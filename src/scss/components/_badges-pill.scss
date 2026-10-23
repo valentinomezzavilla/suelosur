@@ -28,8 +28,7 @@
   &.px-3, &.px-2 { padding-left: 0.62em !important; padding-right: 0.62em !important; }
   &.text-wrap { white-space: normal; text-align: left; }
 
-  &--con-stock,
-  &--disponible {
+  &--con-stock {
     background: $success-soft;
     color: $success-text;
     border-color: $success-border;
@@ -46,13 +45,6 @@
     background: $warning-soft;
     color: $warning-text;
     border-color: $warning-border;
-  }
-
-  &--en-transito,
-  &--despachado {
-    background: $info-soft;
-    color: $info-text;
-    border-color: $info-border;
   }
 
   &--anulado {

@@ -80,9 +80,6 @@
 
 .detalle-precio { color: $ink; font-weight: 600; font-size: 1.15rem; letter-spacing: -0.015em; }
 
-.saldo-negativo { color: $danger-text; }
-.saldo-positivo { color: $success-text; }
-
 // ── Filtros de historial + secciones de historial ────────────
 .historial-filtros-card {
   background: $bg-card;
@@ -113,52 +110,6 @@
     border: 1px dashed $border-input;
     border-radius: $radius-lg;
   }
-}
-
-// ── Secciones genéricas (cuentas) ─────────────────────────────
-.cuentas-section { margin-bottom: 2rem; }
-
-.section-header-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.85rem;
-}
-
-.section-title {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  color: $ink;
-  letter-spacing: -0.015em;
-  margin: 0 0 0.75rem;
-}
-
-.section-subtitle { font-size: $fs-sm; color: $muted; }
-
-// ── Filas de resumen en modal de transacción ──────────────────
-.alquiler-resumen__rows {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.alquiler-resumen__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.6rem 0;
-  border-bottom: 1px solid $border-soft;
-
-  &:last-child { border-bottom: none; }
-}
-
-.alquiler-resumen__label {
-  color: $muted;
-  font-size: $fs-sm;
-  font-weight: 500;
 }
 
 // ── Pantalla de confirmación de venta ─────────────────────────

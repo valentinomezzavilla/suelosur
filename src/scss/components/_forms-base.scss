@@ -182,13 +182,6 @@
   color: $danger-text;
 }
 
-// ── Form-group con un solo botón en lugar de input ────────────
-.form-group--action {
-  align-self: end;
-  justify-content: flex-end;
-  margin-bottom: 0.9rem;
-}
-
 // Botón "Buscar en mapa" — misma altura que los inputs hermanos, contorno de marca
 .btn-buscar-mapa {
   align-self: stretch;

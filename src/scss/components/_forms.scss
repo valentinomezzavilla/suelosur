@@ -198,72 +198,9 @@ textarea.form-control { line-height: 1.5; }
 
   input[type=radio] { display: none; }
 
-  input[type=radio]:checked + .modalidad-label .modalidad-title {
-    color: $accent-dark;
-  }
-
   &:has(input[type=radio]:checked) {
     border-color: $accent;
     background: $accent-soft;
     box-shadow: inset 0 0 0 1px $accent;
   }
-}
-
-.modalidad-label {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.modalidad-title {
-  font-weight: 600;
-  font-size: $fs-base;
-  color: $ink;
-}
-
-.modalidad-sub {
-  font-size: $fs-xs;
-  color: $muted;
-}
-
-// ── Selección de pago ─────────────────────────────────────────
-.pago-group {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.5rem;
-
-  @include md-down { grid-template-columns: 1fr 1fr; }
-}
-
-.pago-option {
-  display: block;
-  border: 1px solid $border-input;
-  border-radius: $radius-md;
-  padding: 0.6rem 0.75rem;
-  cursor: pointer;
-  text-align: center;
-  background: #fff;
-  box-shadow: $shadow-xs;
-  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease;
-  margin: 0;
-
-  input[type=radio] { display: none; }
-
-  &:hover { border-color: $border-input-hover; background: $gray-50; }
-
-  &:has(input[type=radio]:checked) {
-    border-color: $accent;
-    background: $accent-soft;
-    box-shadow: inset 0 0 0 1px $accent;
-
-    .pago-label { color: $accent-dark; font-weight: 600; }
-  }
-
-  &:has(input:focus-visible) { box-shadow: $focus-ring; }
-}
-
-.pago-label {
-  font-size: $fs-sm;
-  font-weight: 500;
-  color: $ink;
 }

@@ -103,9 +103,7 @@ strong, b { font-weight: 600; }
 .table-modern,
 .data-table,
 .stat-card__value,
-.total-display,
 .transaccion-monto,
-.rs-total-value,
 .input-total,
 .text-end,
 .fact-num {
@@ -115,7 +113,6 @@ strong, b { font-weight: 600; }
 // ── Mono: códigos ──────────────────────────────────────────────
 // Los códigos de las tablas (OP-0041, VIA-000014, N° de cliente…) se marcan en
 // todas las vistas como <td class="fw-semibold text-orange">.
-.mono,
 td.fw-semibold.text-orange {
   font-family: $font-mono;
   letter-spacing: -0.01em;

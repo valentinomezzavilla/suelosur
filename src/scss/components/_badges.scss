@@ -12,8 +12,7 @@
 // El punto solo en tablas (estado de cada fila); los contadores numéricos quedan limpios.
 // Se dibuja como fondo (no con ::before) para que ::first-letter siga funcionando.
 :is(.table, .table-modern, .data-table) :is(.badge-en-transito, .badge-alerta, .badge-activo, .badge-pendiente,
-  .badge--con-stock, .badge--disponible, .badge--sin-stock, .badge--alquilado, .badge--pendiente,
-  .badge--en-transito, .badge--despachado, .badge--anulado) {
+  .badge--con-stock, .badge--sin-stock, .badge--alquilado, .badge--pendiente, .badge--anulado) {
   padding-left: calc(0.6em + 6px + 0.4em) !important;
   background-image: radial-gradient(circle at center, currentColor 0 2.6px, transparent 3.1px);
   background-size: 6px 6px;
@@ -53,8 +52,6 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
-.badge-rol-lg { background-color: $accent; color: #fff; border-color: $accent; }
 
 .dias-ok     { color: $success-text; font-weight: 600; }
 .dias-alerta { color: $warning-text; font-weight: 600; }
