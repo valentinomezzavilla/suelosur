@@ -1,0 +1,42 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// "Desarrollado por" + logo de Vezza: pie del login, de la app y del remito.
+// La leyenda va arriba y el logo abajo, centrados.
+// ═══════════════════════════════════════════════════════════════
+.desarrollado-por {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  text-align: center;
+}
+
+.desarrollado-por-texto {
+  font-size: $fs-xs;
+  color: $muted;
+  letter-spacing: 0.04em;
+}
+
+.desarrollado-por-logo {
+  width: 72px;
+  height: auto;
+  display: block;
+}
+
+// Pie de la app: debajo del contenido, con el mismo fondo
+.app-footer {
+  padding: 0.5rem 2rem 1.5rem;
+  background: $bg-app;
+}
+
+// Login: separado del "¿Problemas para acceder?" por una línea
+.login-card .desarrollado-por {
+  margin-top: 1.25rem;
+}
+
+// Remito: cierra la hoja, también al imprimir
+.remito-body .desarrollado-por {
+  margin-top: 2rem;
+  break-inside: avoid;
+}

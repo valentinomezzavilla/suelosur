@@ -24,6 +24,8 @@ const FONDO  = '#f3f4f6'
 // la versión PNG generada a partir de él.
 const LOGO_PATH = path.join(__dirname, '..', '..', 'public', 'img', 'logo.png')
 const HAY_LOGO = fs.existsSync(LOGO_PATH)
+const VEZZA_PATH = path.join(__dirname, '..', '..', 'public', 'img', 'vezza.png')
+const HAY_VEZZA = fs.existsSync(VEZZA_PATH)
 
 const EMPRESA = {
   nombre: 'SUELOSUR',
@@ -98,10 +100,29 @@ function drawFooter(doc, { extra = '' } = {}) {
   const y = doc.page.height - doc.page.margins.bottom - 10
   doc.fillColor(GRIS).fontSize(7).font('Helvetica')
      .text(txt, left, y, { width, align: 'center', lineBreak: false })
+  drawDesarrolladoPor(doc)
+}
+
+// ── "Desarrollado por" + logo de Vezza ─────────────────────────
+// Va en el margen inferior de la página, centrado, debajo del pie: la leyenda arriba y el
+// logo abajo. El texto se escribe sin margen inferior para que pdfkit no agregue una página.
+function drawDesarrolladoPor(doc) {
+  const mb = doc.page.margins.bottom
+  const centro = doc.page.width / 2
+  const yTexto = doc.page.height - mb + 2
+  const logo = Math.min(28, mb - 14)
+  const margenOriginal = doc.page.margins.bottom
+  doc.page.margins.bottom = 0
+  doc.fillColor(GRIS).fontSize(6).font('Helvetica')
+     .text('Desarrollado por', 0, yTexto, { width: doc.page.width, align: 'center', lineBreak: false })
+  doc.page.margins.bottom = margenOriginal
+  if (HAY_VEZZA) {
+    try { doc.image(VEZZA_PATH, centro - logo / 2, yTexto + 8, { fit: [logo, logo] }) } catch (_) { /* sin logo, queda la leyenda */ }
+  }
 }
 
 module.exports = {
   AZUL, NARANJA, GRIS, TINTA, ROJO, VERDE, LINEA, FONDO,
   LOGO_PATH, HAY_LOGO, EMPRESA, money,
-  drawHeader, drawFooter,
+  drawHeader, drawFooter, drawDesarrolladoPor,
 }
