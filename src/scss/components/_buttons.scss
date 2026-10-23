@@ -172,3 +172,12 @@ td > .btn-sm,
 td > form.d-inline > .btn-sm {
   vertical-align: middle;
 }
+
+// Dentro de tablas, las acciones llenas (verde / azul) van en contorno de su color:
+// una columna de botones llenos repetidos compite con los datos. Al pasar el mouse se llenan.
+:is(.table, .table-modern, .data-table) td .btn-sm:is(.btn-success, .btn-primary-green) {
+  @include btn-tone-outline($success-text, $success-border, $success-soft, $success);
+}
+:is(.table, .table-modern, .data-table) td .btn-sm:is(.btn-naranja, .btn-primary) {
+  @include btn-tone-outline($accent-dark, $accent-border, $accent-soft, $accent);
+}

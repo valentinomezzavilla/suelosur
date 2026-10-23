@@ -64,7 +64,8 @@
     background: $accent-soft;
     border: 1px solid $accent-border;
     border-radius: $radius-md;
-    padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+    min-height: $control-h;
+    padding: 0.2rem 0.25rem 0.2rem 0.75rem; // misma altura que los campos vecinos
     font-size: $fs-base;
     font-weight: 500;
     color: $accent-dark;
