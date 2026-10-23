@@ -4,6 +4,7 @@
   const pendientes = (typeof hoy !== 'undefined' ? hoy : tareas).filter(t => t.fase !== 'en_servicio')
   const enServicio = (typeof hoy !== 'undefined' ? hoy : tareas).filter(t => t.fase === 'en_servicio')
   const proximosList = typeof proximos !== 'undefined' ? proximos : []
+  const tareaIcono = { viaje: 'truck', contenedor_entrega: 'box', contenedor_retiro: 'arrowUp' }
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -19,7 +20,7 @@
 
 <% if (!empleado) { %>
   <div class="card shadow-sm"><div class="card-body text-center py-5">
-    <div style="font-size:2rem">🪪</div>
+    <div class="empty-state__icon mx-auto mb-3" aria-hidden="true"><%- icon('user', { size: 22 }) %></div>
     <p class="fw-semibold mb-1">Tu usuario no está vinculado a un empleado</p>
     <p class="text-muted small mb-0">Pedile al administrador que vincule tu cuenta con tu legajo para ver tus tareas.</p>
   </div></div>
@@ -27,16 +28,16 @@
 
   <% if (hayEnCurso) { %>
     <div class="alert alert-warning d-flex align-items-center gap-2 mb-3">
-      <span style="font-size:1.2rem">⏳</span>
+      <%- icon('clock', { size: 18 }) %>
       <span>Tenés una <strong>tarea en curso</strong>. Finalizala antes de iniciar otra.</span>
     </div>
   <% } %>
 
   <!-- ── HOY ─────────────────────────────────────────────────── -->
-  <h5 class="fw-bold mb-2 mt-3">📅 Hoy</h5>
+  <h5 class="ruta-seccion"><%- icon('calendar', { size: 16 }) %> Hoy</h5>
   <% if (!pendientes.length) { %>
-    <div class="card shadow-sm mb-3"><div class="card-body text-center py-4">
-      <div style="font-size:2rem">✅</div>
+    <div class="card shadow-sm mb-3"><div class="card-body text-center py-4 empty-state--ok">
+      <div class="empty-state__icon mx-auto mb-3" aria-hidden="true"><%- icon('checkCircle', { size: 22 }) %></div>
       <p class="fw-semibold mb-1">No tenés tareas para hoy</p>
       <p class="text-muted small mb-0">Cuando te asignen viajes o contenedores para hoy, van a aparecer acá.</p>
     </div></div>
@@ -47,19 +48,19 @@
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
-              <span style="font-size:1.1rem"><%= t.icono %></span>
+              <span class="tarea-icono tarea-icono--<%= t.tipo %>" aria-hidden="true"><%- icon(tareaIcono[t.tipo] || 'truck', { size: 15 }) %></span>
               <span class="fw-bold ms-1"><%= t.titulo %></span>
               <span class="badge rounded-pill px-3 <%= faseBadge[t.fase] %> ms-2"><%= t.detalleFase %></span>
-              <span class="text-muted ms-2">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
+              <span class="text-muted ms-2 text-nowrap">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
             </div>
             <% if (t.fecha) { %><small class="text-muted"><%- icon('clock',{size:13}) %> <%= formatFecha(t.fecha) %></small><% } %>
           </div>
 
           <p class="fw-semibold mb-1 mt-2"><%= t.cliente %><% if (t.tel) { %> <small class="text-muted">· <%= t.tel %></small><% } %></p>
-          <p class="mb-1">📍 <%= t.domicilio || 'Domicilio a coordinar' %></p>
+          <p class="mb-1"><%- icon('mapPin', { size: 14, class: 'ic-dato' }) %><%= t.domicilio || 'Domicilio a coordinar' %></p>
           <% if (t.contenedor) { %><p class="text-muted small mb-1">Contenedor N° <%= t.contenedor %></p><% } %>
-          <% if (t.camion) { %><p class="text-muted small mb-1">🚚 <%= t.camion %></p><% } %>
-          <% if (t.sinContenedor) { %><p class="text-danger small mb-1">⚠️ Sin contenedor asignado todavía.</p><% } %>
+          <% if (t.camion) { %><p class="text-muted small mb-1"><%- icon('truck', { size: 13, class: 'ic-dato' }) %><%= t.camion %></p><% } %>
+          <% if (t.sinContenedor) { %><p class="text-danger small mb-1"><%- icon('alert', { size: 13, class: 'me-1' }) %>Sin contenedor asignado todavía.</p><% } %>
           <% if (t.observaciones) { %><p class="text-muted small mb-1"><%= t.observaciones %></p><% } %>
 
           <!-- Ver remito (siempre disponible para revisarlo antes/durante el viaje) -->
@@ -107,17 +108,17 @@
 
   <!-- ── PRÓXIMOS VIAJES (planificados para otro día) ──────────── -->
   <% if (proximosList.length) { %>
-    <h5 class="fw-bold mb-2 mt-4">🗓️ Próximos viajes</h5>
+    <h5 class="ruta-seccion mt-4"><%- icon('calendar', { size: 16 }) %> Próximos viajes</h5>
     <div class="d-flex flex-column gap-2 mb-3">
       <% proximosList.forEach(t => { %>
       <div class="card shadow-sm" style="opacity:0.92">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
             <div>
-              <span style="font-size:1.1rem"><%= t.icono %></span>
+              <span class="tarea-icono tarea-icono--<%= t.tipo %>" aria-hidden="true"><%- icon(tareaIcono[t.tipo] || 'truck', { size: 15 }) %></span>
               <span class="fw-bold ms-1"><%= t.titulo %></span>
               <span class="badge rounded-pill px-3 badge-pendiente ms-2">Programado</span>
-              <span class="text-muted ms-2">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
+              <span class="text-muted ms-2 text-nowrap">OP-<%= String(t.nro_op).padStart(4,'0') %></span>
             </div>
             <% if (t.fecha) { %>
               <small class="text-muted fw-semibold"><%- icon('clock',{size:13}) %> <%= formatFecha(t.fecha) %></small>
@@ -125,15 +126,15 @@
           </div>
 
           <p class="fw-semibold mb-1 mt-2"><%= t.cliente %><% if (t.tel) { %> <small class="text-muted">· <%= t.tel %></small><% } %></p>
-          <p class="mb-1">📍 <%= t.domicilio || 'Domicilio a coordinar' %></p>
+          <p class="mb-1"><%- icon('mapPin', { size: 14, class: 'ic-dato' }) %><%= t.domicilio || 'Domicilio a coordinar' %></p>
           <% if (t.contenedor) { %><p class="text-muted small mb-1">Contenedor N° <%= t.contenedor %></p><% } %>
-          <% if (t.camion) { %><p class="text-muted small mb-1">🚚 <%= t.camion %></p><% } %>
+          <% if (t.camion) { %><p class="text-muted small mb-1"><%- icon('truck', { size: 13, class: 'ic-dato' }) %><%= t.camion %></p><% } %>
           <% if (t.observaciones) { %><p class="text-muted small mb-1"><%= t.observaciones %></p><% } %>
 
           <div class="mt-2 d-flex gap-2 flex-wrap">
             <form action="/hoja-de-ruta/<%= t.id %>/realizar-hoy" method="POST" class="d-inline"
                   onsubmit="return confirm('¿Reprogramar esta tarea para hoy? Va a quedar disponible para iniciarla ahora.')">
-              <button class="btn btn-naranja btn-sm">📅 Realizar hoy</button>
+              <button class="btn btn-naranja btn-sm"><%- icon('calendar', { size: 14 }) %> Realizar hoy</button>
             </form>
             <% if (t.tipo === 'viaje' || t.tipo === 'contenedor_entrega') { %>
               <a href="/ventas/<%= t.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">
