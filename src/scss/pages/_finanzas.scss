@@ -1,0 +1,16 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Finanzas (cheques, compras)
+// ═══════════════════════════════════════════════════════════════
+
+// Cheques: el estado se cambia con un select que se ve como su badge de estado
+.estado-select {
+  font-weight: 500;
+  font-size: $fs-sm;
+  box-shadow: none;
+
+  &.estado-habilitado    { border-color: $success-border; color: $success-text; background-color: $success-soft; }
+  &.estado-en_espera     { border-color: $warning-border; color: $warning-text; background-color: $warning-soft; }
+  &.estado-deshabilitado { border-color: $danger-border;  color: $danger-text;  background-color: $danger-soft; }
+}
