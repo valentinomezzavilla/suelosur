@@ -1,33 +1,118 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
-// Controles Bootstrap: borde visible, radio y hover consistentes
+// ═══════════════════════════════════════════════════════════════
+// Controles Bootstrap (.form-control, .form-select, checks) con el lenguaje del sistema
+// ═══════════════════════════════════════════════════════════════
+
+$select-caret: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23667085' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='m4 6 4 4 4-4'/%3e%3c/svg%3e");
+
 .form-control,
 .form-select {
+  font-size: $fs-base;
+  line-height: 1.45;
   border-color: $border-input;
   border-radius: $radius-md;
   color: $ink;
+  background-color: #fff;
   box-shadow: $shadow-xs;
-  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease, background-color $dur-fast $ease;
 
   &:hover:not(:focus):not(:disabled):not([readonly]) { border-color: $border-input-hover; }
-  &::placeholder { color: #94a3b8; }
-  // Igual que :disabled — un campo readonly también tiene que leerse como bloqueado
-  // (si no, se ve idéntico a uno editable y el check de "Editar" pierde sentido visual).
-  &:disabled, &[readonly] { background-color: $bg-card-alt; }
+  &::placeholder { color: $placeholder; opacity: 1; }
+
+  &:focus {
+    border-color: $accent;
+    box-shadow: $focus-ring;
+  }
+
+  // Deshabilitado: apagado y sin interacción
+  &:disabled {
+    background-color: $gray-100;
+    color: $muted;
+    border-color: $gray-200;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  // Solo lectura: se lee bien pero se nota que no se edita (distinto de deshabilitado)
+  &[readonly] {
+    background-color: $gray-50;
+    border-color: $gray-200;
+    box-shadow: none;
+  }
+
+  // Validación nativa de Bootstrap
+  &.is-invalid {
+    border-color: $danger;
+    &:focus { box-shadow: $focus-ring-danger; }
+  }
+  &.is-valid { border-color: $success; }
+}
+
+.form-select {
+  --bs-form-select-bg-img: #{$select-caret};
+  background-size: 16px 16px;
+  background-position: right 0.6rem center;
+  padding-right: 2.1rem;
 }
 
 .form-control-sm,
-.form-select-sm { border-radius: 7px; }
+.form-select-sm {
+  font-size: $fs-sm;
+  border-radius: $radius-sm;
+  min-height: $control-h-sm;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+.form-select-sm { padding-right: 1.9rem; background-position: right 0.5rem center; }
 
-.input-group-text {
-  background: $bg-card-alt;
-  border-color: $border-input;
-  color: $muted;
+.form-control-lg,
+.form-select-lg {
+  font-size: 1rem;
+  min-height: $control-h-lg;
+  border-radius: $radius-md;
 }
 
+textarea.form-control { line-height: 1.5; }
+
+.form-control[type="file"] {
+  padding: 0.3rem 0.4rem;
+
+  &::file-selector-button {
+    margin: -0.3rem 0.75rem -0.3rem -0.4rem;
+    padding: 0.45rem 0.85rem;
+    border: 0;
+    border-right: 1px solid $border-input;
+    background: $gray-50;
+    color: $gray-700;
+    font-weight: 500;
+    transition: background-color $dur-fast $ease;
+  }
+  &:hover:not(:disabled)::file-selector-button { background: $gray-100; }
+}
+
+.input-group-text {
+  background: $gray-50;
+  border-color: $border-input;
+  color: $muted;
+  font-size: $fs-base;
+  border-radius: $radius-md;
+}
+.input-group-sm > .input-group-text { font-size: $fs-sm; }
+
+// ── Checkbox / radio / switch ──────────────────────────────────
 .form-check-input {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.18em;
   border-color: $border-input-hover;
+  box-shadow: $shadow-xs;
+  cursor: pointer;
+  transition: background-color $dur-fast $ease, border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  &[type="checkbox"] { border-radius: $radius-xs; }
+
+  &:hover:not(:disabled) { border-color: $gray-500; }
 
   &:checked {
     background-color: $accent;
@@ -36,7 +121,22 @@
   &:focus { box-shadow: $focus-ring; border-color: $accent; }
 }
 
-.form-text { color: $muted; }
+.form-check-label { cursor: pointer; }
+
+.form-switch .form-check-input {
+  width: 2rem;
+  height: 1.1rem;
+  margin-top: 0.12em;
+  border-radius: 999px;
+}
+
+.form-text {
+  color: $muted;
+  font-size: $fs-xs;
+  margin-top: 0.35rem;
+}
+
+.invalid-feedback { font-size: $fs-xs; color: $danger-text; }
 
 // Wrapper para inputs de contraseña con botón ver/ocultar
 .pwd-input-wrap {
@@ -45,34 +145,36 @@
 }
 .pwd-toggle-btn {
   position: absolute;
-  right: 0.5rem;
+  right: 0.3rem;
   top: 50%;
   transform: translateY(-50%);
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
-  padding: 0.25rem 0.5rem;
+  border-radius: $radius-sm;
+  padding: 0;
   cursor: pointer;
   font-size: 1.1rem;
   line-height: 1;
   color: $muted;
-  &:hover { color: $ink; }
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: $accent;
-  box-shadow: $focus-ring;
+  transition: color $dur-fast $ease, background-color $dur-fast $ease;
+  &:hover { color: $ink; background: $gray-100; }
 }
 
 .form-label {
-  font-weight: 600;
-  font-size: 0.8rem;
+  font-weight: 500;
+  font-size: $fs-sm;
   color: $ink-soft;
-  margin-bottom: 0.35rem;
-  letter-spacing: 0.01em;
+  margin-bottom: 0.375rem;
+  letter-spacing: 0;
 }
+.form-label-sm { font-size: $fs-xs; }
 
-// ── Selección de modalidad (radio styled) ──────────────────────
+// ── Selección de modalidad (radio como tarjeta) ────────────────
 .modalidad-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -88,10 +190,11 @@
   padding: 0.85rem 1rem;
   cursor: pointer;
   background: #fff;
-  transition: border-color $dur-fast $ease, background $dur-fast $ease, box-shadow $dur-fast $ease;
+  box-shadow: $shadow-xs;
+  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease;
   margin: 0;
 
-  &:hover { border-color: $border-input-hover; background: $bg-card-alt; }
+  &:hover { border-color: $border-input-hover; background: $gray-50; }
 
   input[type=radio] { display: none; }
 
@@ -114,7 +217,7 @@
 
 .modalidad-title {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: $fs-base;
   color: $ink;
 }
 
@@ -127,7 +230,7 @@
 .pago-group {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 0.65rem;
+  gap: 0.5rem;
 
   @include md-down { grid-template-columns: 1fr 1fr; }
 }
@@ -136,16 +239,17 @@
   display: block;
   border: 1px solid $border-input;
   border-radius: $radius-md;
-  padding: 0.65rem 0.9rem;
+  padding: 0.6rem 0.75rem;
   cursor: pointer;
   text-align: center;
   background: #fff;
-  transition: border-color $dur-fast $ease, background $dur-fast $ease, box-shadow $dur-fast $ease;
+  box-shadow: $shadow-xs;
+  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease;
   margin: 0;
 
   input[type=radio] { display: none; }
 
-  &:hover { border-color: $border-input-hover; background: $bg-card-alt; }
+  &:hover { border-color: $border-input-hover; background: $gray-50; }
 
   &:has(input[type=radio]:checked) {
     border-color: $accent;
@@ -154,6 +258,8 @@
 
     .pago-label { color: $accent-dark; font-weight: 600; }
   }
+
+  &:has(input:focus-visible) { box-shadow: $focus-ring; }
 }
 
 .pago-label {
