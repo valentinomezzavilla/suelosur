@@ -174,33 +174,50 @@ textarea.form-control { line-height: 1.5; }
 }
 .form-label-sm { font-size: $fs-xs; }
 
-// ── Selección de modalidad (radio como tarjeta) ────────────────
+// ── Selección de modalidad (radio como tarjeta: Por horas / Por día) ──
 .modalidad-group {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-
-  @include md-down { grid-template-columns: 1fr; }
+  gap: 0.5rem;
 }
 
 .modalidad-option {
-  display: block;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: $control-h;
   border: 1px solid $border-input;
-  border-radius: $radius-lg;
-  padding: 0.85rem 1rem;
+  border-radius: $radius-md;
+  padding: 0.45rem 0.75rem;
   cursor: pointer;
   background: #fff;
   box-shadow: $shadow-xs;
-  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease;
+  font-size: $fs-sm;
+  font-weight: 500;
+  color: $gray-700;
+  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease, color $dur-fast $ease;
   margin: 0;
 
   &:hover { border-color: $border-input-hover; background: $gray-50; }
 
-  input[type=radio] { display: none; }
+  // Oculto a la vista pero alcanzable con el teclado (con display:none no se podía elegir con Tab)
+  input[type=radio] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
 
   &:has(input[type=radio]:checked) {
     border-color: $accent;
     background: $accent-soft;
+    color: $accent-dark;
     box-shadow: inset 0 0 0 1px $accent;
   }
+
+  // Misma especificidad que la regla de "elegida" y va después: el foco se ve también sobre la opción marcada
+  &:has(input[type=radio]:focus-visible) { box-shadow: $focus-ring; }
 }

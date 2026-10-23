@@ -190,20 +190,6 @@ $sticky-top: calc(#{$navbar-h} + 1rem);
   background: $gray-50 !important;
 }
 
-// modalidad radio group (alquiler de maquinaria)
-.modalidad-group {
-  display: flex;
-  gap: 1rem;
-}
-
-.modalidad-option {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: $fs-sm;
-  cursor: pointer;
-}
-
 // ── Pestañas: Disponibles / Próximos a finalizar (control segmentado) ──
 .cont-tabs {
   display: inline-flex;
