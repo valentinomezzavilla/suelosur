@@ -1,0 +1,191 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Mapa de contenedores (views/pages/alquileres/mapa + public/js/mapaContenedores.js)
+// Clases que arma el JS: .pin-cont, .pin-cont--<estado>, .pin-cont--aprox, .popup-cont*,
+// .sin-ubicar-item*, .mapa-cont-picking (no renombrar).
+// ═══════════════════════════════════════════════════════════════
+
+$pin-pendiente:     $gray-500;
+$pin-en-curso:      $success;
+$pin-por-finalizar: $orange;
+$pin-a-retirar:     $danger;
+
+.mapa-cont-wrap { position: relative; }
+
+#mapaContenedores {
+  width: 100%;
+  height: calc(100vh - 230px);
+  min-height: 360px;
+  border-radius: $radius-lg;
+  border: 1px solid $border;
+  box-shadow: $shadow-xs;
+  z-index: 0;
+
+  @include sm-down { height: calc(100vh - 260px); }
+}
+
+.mapa-cont-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 500;
+  padding: 1rem;
+}
+
+.mapa-cont-overlay__msg {
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  padding: 0.85rem 1.1rem;
+  font-weight: 500;
+  color: $ink-soft;
+  text-align: center;
+  box-shadow: $shadow-lg;
+  max-width: 320px;
+}
+
+// Aviso flotante mientras se elige la ubicación de un contenedor
+.mapa-cont-aviso {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 600;
+  background: $sidebar-bg;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.6rem 0.45rem 1rem;
+  font-size: $fs-sm;
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  white-space: nowrap;
+  max-width: calc(100% - 20px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: $shadow-lg;
+
+  button {
+    background: rgba(255, 255, 255, 0.1);
+    border: 0;
+    border-radius: 999px;
+    color: #ffc078;
+    font-weight: 600;
+    padding: 0.2rem 0.65rem;
+    transition: background-color $dur-fast $ease;
+
+    &:hover { background: rgba(255, 255, 255, 0.18); }
+  }
+}
+
+.mapa-cont-picking #mapaContenedores { cursor: crosshair; }
+
+// Leyenda de colores (mismos que los pines)
+.mapa-leyenda {
+  display: flex;
+  gap: 0.4rem 1rem;
+  flex-wrap: wrap;
+  font-size: $fs-sm;
+  color: $gray-600;
+
+  > span { display: inline-flex; align-items: center; }
+}
+
+.mapa-leyenda__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+
+  &--pendiente     { background: $pin-pendiente; }
+  &--en_curso      { background: $pin-en-curso; }
+  &--por_finalizar { background: $pin-por-finalizar; }
+  &--a_retirar     { background: $pin-a-retirar; }
+  &--aprox         { background: #fff; border: 2px dashed $gray-600; }
+}
+
+// ── Pines del mapa ─────────────────────────────────────────────
+.pin-cont {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+
+  span {
+    transform: rotate(45deg);
+    color: #fff;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.pin-cont--pendiente     { background: $pin-pendiente; }
+.pin-cont--en_curso      { background: $pin-en-curso; }
+.pin-cont--por_finalizar { background: $pin-por-finalizar; }
+.pin-cont--a_retirar     { background: $pin-a-retirar; }
+.pin-cont--aprox         { border: 2px dashed #fff; opacity: 0.82; }
+
+// ── Popup del pin ──────────────────────────────────────────────
+.popup-cont {
+  font-family: $font-base;
+  font-size: $fs-sm;
+  line-height: 1.45;
+  min-width: 190px;
+  color: $dark;
+}
+.popup-cont__titulo { font-weight: 600; font-size: $fs-base; color: $ink; margin-bottom: 0.25rem; }
+.popup-cont__fila b { color: $ink-soft; font-weight: 600; }
+.popup-cont__acciones { display: flex; gap: 0.5rem; margin-top: 0.55rem; flex-wrap: wrap; }
+.popup-cont__aprox {
+  margin-top: 0.35rem;
+  font-size: $fs-xs;
+  color: $warning-text;
+  background: $warning-soft;
+  border: 1px solid $warning-border;
+  border-radius: $radius-sm;
+  padding: 0.25rem 0.5rem;
+}
+
+// Popups de Leaflet con el lenguaje del sistema
+.leaflet-popup-content-wrapper {
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+}
+.leaflet-container { font-family: $font-base; }
+
+// ── Contenedores sin ubicar ────────────────────────────────────
+.sin-ubicar-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.1rem;
+  border-bottom: 1px solid $border-line;
+  flex-wrap: wrap;
+
+  &:last-child { border-bottom: 0; }
+
+  &__info { min-width: 0; flex: 1 1 220px; }
+  &__dir { font-size: $fs-sm; color: $muted; word-break: break-word; }
+  &__acciones { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+
+  @include sm-down {
+    &__acciones { width: 100%; }
+    &__acciones .btn { flex: 1; }
+  }
+}
