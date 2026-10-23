@@ -1,69 +1,116 @@
 @use '../abstracts/variables' as *;
 
 // ═══════════════════════════════════════════════════════════════
-// Loader con logo animado — reemplaza el spinner clásico.
-// Uso: overlay a pantalla completa durante cargas (login, navegación).
-//   <div class="app-loader" id="appLoader"> ... </div>
-//   .app-loader.is-active  → visible
+// Loader global (partials/loader + public/js/appLoader.js).
+//   .app-loader.is-active → visible
+// Al navegar o enviar un formulario:
+//   1) al instante: barra de progreso arriba (franja "estratos") y la pantalla deja de
+//      aceptar clics (evita doble envío, como antes);
+//   2) recién si tarda más de ~450 ms: velo azul con el logo. Las cargas rápidas no
+//      parpadean con un overlay oscuro en cada clic.
 // ═══════════════════════════════════════════════════════════════
 
 .app-loader {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: $z-loader;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 1.1rem;
-  background: rgba(13, 27, 53, 0.82);   // mismo azul del fondo de login
-  backdrop-filter: blur(4px);
-  opacity: 0;
+  background: rgba(11, 26, 51, 0);
   visibility: hidden;
-  transition: opacity 0.25s ease, visibility 0.25s ease;
+  pointer-events: none;
+
+  // Barra de progreso indeterminada (avanza rápido y se frena cerca del final)
+  &::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: $strata;
+    background-size: 100% 100%;
+    box-shadow: 0 0 10px rgba(232, 145, 42, 0.45);
+    transform-origin: left center;
+    transform: scaleX(0);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .app-loader__core,
+  .app-loader__text {
+    opacity: 0;
+    transform: translateY(4px) scale(0.97);
+  }
 
   &.is-active {
-    opacity: 1;
     visibility: visible;
+    pointer-events: auto;
+    cursor: progress;
+    animation: app-loader-veil 0.3s ease 0.45s forwards;
+
+    &::before { animation: app-loader-bar 10s cubic-bezier(0.08, 0.6, 0.2, 1) forwards; }
+
+    .app-loader__core,
+    .app-loader__text { animation: app-loader-reveal 0.3s $ease-out 0.45s forwards; }
   }
 }
 
 // ── Núcleo: logo + anillo girando ──────────────────────────────
 .app-loader__core {
   position: relative;
-  width: 84px;
-  height: 84px;
+  width: 76px;
+  height: 76px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-// Anillo naranja que gira alrededor del logo
 .app-loader__ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 3px solid rgba(232, 145, 42, 0.18);
+  border: 2.5px solid rgba(255, 255, 255, 0.12);
   border-top-color: $orange;
-  animation: app-loader-spin 0.9s linear infinite;
+  border-right-color: $sand;
+  animation: app-loader-spin 0.85s linear infinite;
 }
 
-// Logo con pulso suave
 .app-loader__logo {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
   border-radius: 10px;
+  background: #fff;
+  padding: 4px;
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.45);
   animation: app-loader-pulse 1.6s ease-in-out infinite;
 }
 
 .app-loader__text {
   color: #fff;
-  font-size: 0.9rem;
+  font-size: $fs-base;
   font-weight: 500;
-  letter-spacing: 0.2px;
-  opacity: 0.85;
-  animation: app-loader-fade 1.6s ease-in-out infinite;
+  letter-spacing: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes app-loader-bar {
+  0%   { transform: scaleX(0); }
+  8%   { transform: scaleX(0.28); }
+  30%  { transform: scaleX(0.62); }
+  60%  { transform: scaleX(0.82); }
+  100% { transform: scaleX(0.94); }
+}
+
+@keyframes app-loader-veil {
+  to { background: rgba(11, 26, 51, 0.62); }
+}
+
+@keyframes app-loader-reveal {
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes app-loader-spin {
@@ -71,25 +118,17 @@
 }
 
 @keyframes app-loader-pulse {
-  0%, 100% { transform: scale(1);    opacity: 1;   }
-  50%      { transform: scale(0.88); opacity: 0.7; }
+  0%, 100% { transform: scale(1);    }
+  50%      { transform: scale(0.92); }
 }
 
-@keyframes app-loader-fade {
-  0%, 100% { opacity: 0.85; }
-  50%      { opacity: 0.45; }
-}
+// Reducir movimiento: sin barra que avanza ni giro; el velo y el texto alcanzan
+@media (prefers-reduced-motion: reduce) {
+  .app-loader.is-active {
+    background: rgba(11, 26, 51, 0.62);
 
-// Variante embebida (no pantalla completa) para usar dentro de tarjetas/contenedores
-.app-loader--inline {
-  position: static;
-  background: transparent;
-  backdrop-filter: none;
-  opacity: 1;
-  visibility: visible;
-  padding: 2rem 0;
-
-  .app-loader__core { width: 64px; height: 64px; }
-  .app-loader__logo { width: 36px; height: 36px; }
-  .app-loader__text { color: $muted; }
+    &::before { transform: scaleX(0.6); }
+    .app-loader__core,
+    .app-loader__text { opacity: 1; transform: none; }
+  }
 }
