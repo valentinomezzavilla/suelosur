@@ -1,19 +1,32 @@
 @use '../abstracts/variables' as *;
 
-// ── Badges con sintaxis BEM (badge--variant) usadas en vistas custom
+// ═══════════════════════════════════════════════════════════════
+// Badge base (Bootstrap .badge + variantes BEM badge--xxx de las vistas propias)
+// Píldora suave: fondo tenue + texto con contraste AA + borde del mismo tono.
+// ═══════════════════════════════════════════════════════════════
 .badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.3em 0.62em;
-  font-size: 0.7rem;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0.03em;
+  --bs-badge-font-weight: 500;
+  --bs-badge-color: #{$gray-700};
+  // inline-block (no flex): así ::first-letter pone en mayúscula la inicial de valores
+  // que llegan en minúscula desde la base ("vencido", "critico"), sin forzar MAYÚSCULAS
+  display: inline-block;
+  padding: 0.28em 0.62em;
+  font-size: $fs-xs;
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: 0;
   border-radius: 999px;
   border: 1px solid transparent;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+
+  &::first-letter { text-transform: uppercase; }
+
+  // Las vistas agregan px-2/px-3 a casi todos los badges: el aire lo define el badge
+  &.px-3, &.px-2 { padding-left: 0.62em !important; padding-right: 0.62em !important; }
+  &.text-wrap { white-space: normal; text-align: left; }
 
   &--con-stock,
   &--disponible {
@@ -43,8 +56,18 @@
   }
 
   &--anulado {
-    background: #f1f5f9;
-    color: $muted;
-    border-color: $border-input;
+    background: $neutral-soft;
+    color: $neutral-text;
+    border-color: $neutral-border;
   }
 }
+
+// Badges con colores de Bootstrap (bg-*): la misma familia suave
+.badge.bg-success   { background-color: $success-soft !important; color: $success-text !important; border-color: $success-border; }
+.badge.bg-danger    { background-color: $danger-soft  !important; color: $danger-text  !important; border-color: $danger-border; }
+.badge.bg-warning   { background-color: $warning-soft !important; color: $warning-text !important; border-color: $warning-border; }
+.badge.bg-info      { background-color: $info-soft    !important; color: $info-text    !important; border-color: $info-border; }
+.badge.bg-primary   { background-color: $accent-soft  !important; color: $accent-dark  !important; border-color: $accent-border; }
+.badge.bg-secondary,
+.badge.bg-light     { background-color: $neutral-soft !important; color: $neutral-text !important; border-color: $neutral-border; }
+.badge.bg-dark      { background-color: $gray-800 !important; color: #fff !important; }

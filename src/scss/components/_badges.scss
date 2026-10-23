@@ -5,22 +5,24 @@
 .badge-alerta,
 .badge-activo,
 .badge-pendiente {
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: $fs-xs;
+  font-weight: 500;
 }
 
 // El punto solo en tablas (estado de cada fila); los contadores numéricos quedan limpios
-:is(.table, .table-modern, .data-table) :is(.badge-en-transito, .badge-alerta, .badge-activo, .badge-pendiente) {
+:is(.table, .table-modern, .data-table) :is(.badge-en-transito, .badge-alerta, .badge-activo, .badge-pendiente,
+  .badge--con-stock, .badge--disponible, .badge--sin-stock, .badge--alquilado, .badge--pendiente,
+  .badge--en-transito, .badge--despachado, .badge--anulado) {
   &::before {
     content: '';
     display: inline-block;
     width: 6px;
     height: 6px;
+    margin-right: 0.4em;
+    vertical-align: 0.1em;
     border-radius: 50%;
     background: currentColor;
-    margin-right: 0.35em;
-    opacity: 0.85;
-    flex-shrink: 0;
+    opacity: 0.9;
   }
 }
 
@@ -51,12 +53,14 @@
 .badge-rol {
   background: $accent-soft;
   color: $accent-dark;
-  border: 1px solid rgba(28, 91, 173, 0.3);
-  font-size: 0.65rem;
+  border: 1px solid $accent-border;
+  font-size: $fs-xxs;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.badge-rol-lg { background: $accent; color: #fff; }
+.badge-rol-lg { background: $accent; color: #fff; border-color: $accent; }
 
-.dias-ok     { color: $success; font-weight: 700; }
-.dias-alerta { color: $warning-text; font-weight: 700; }
-.dias-rojo   { color: $danger;  font-weight: 700; }
+.dias-ok     { color: $success-text; font-weight: 600; }
+.dias-alerta { color: $warning-text; font-weight: 600; }
+.dias-rojo   { color: $danger-text;  font-weight: 600; }

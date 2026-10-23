@@ -21,8 +21,8 @@
 @use 'components/tables';
 @use 'components/forms';
 @use 'components/forms-base';
+@use 'components/badges-pill'; // base .badge primero: los estados la refinan
 @use 'components/badges';
-@use 'components/badges-pill';
 @use 'components/alerts';
 @use 'components/modals';
 @use 'components/pagination';
