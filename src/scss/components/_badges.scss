@@ -59,3 +59,4 @@
 .dias-ok     { color: $success-text; font-weight: 600; }
 .dias-alerta { color: $warning-text; font-weight: 600; }
 .dias-rojo   { color: $danger-text;  font-weight: 600; }
+span:is(.dias-ok, .dias-alerta, .dias-rojo) { white-space: nowrap; } // "5 / 4" no se corta en dos renglones
