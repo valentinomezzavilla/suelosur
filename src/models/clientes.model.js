@@ -2,6 +2,7 @@
 const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 const { agruparObras, movimientoDeObra } = require('../utils/obras')
+const { hoyISO } = require('../utils/fecha')
 
 // Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
 // En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
@@ -167,10 +168,24 @@ const ClientesModel = {
     return null
   },
 
+  // Fecha en que cae el cargo de una operación en la cuenta corriente: la de la operación
+  // (la misma que usa la Liquidación), no la del día en que se cobró o se corrigió. Una
+  // operación de septiembre cobrada en octubre sigue siendo de septiembre. Si la operación
+  // es de hoy o futura, null: el cargo lleva la hora real de carga.
+  async fechaCargoDeOperacion(idOp, q = query) {
+    const op = (await q(`SELECT tipo_op, fecha_emision, fecha_entrega_planificada FROM op_encabezado WHERE id = ?`, [idOp])).rows[0]
+    if (!op) return null
+    // Las ventas se fechan por su emisión (ver VentasModel.sincronizarCargoCC); el resto, como la Liquidación
+    const fecha = String((op.tipo_op === 'M' ? op.fecha_emision : (op.fecha_entrega_planificada || op.fecha_emision)) || '').slice(0, 10)
+    return fecha && fecha < hoyISO() ? `${fecha} 12:00:00` : null
+  },
+
   // `q` permite registrarlo dentro de una transacción (cobro de un alquiler agrupado).
+  // Un cargo o ajuste de una operación va en la fecha de la operación; un pago, en el momento.
   async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }, q = query) {
-    const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
-      [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null])
+    const creadoEn = id_op_encabezado && tipo !== 'pago' ? await this.fechaCargoDeOperacion(id_op_encabezado, q) : null
+    const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado, created_at) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local())) RETURNING id`,
+      [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null, creadoEn])
     await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
     return rows[0].id
   },

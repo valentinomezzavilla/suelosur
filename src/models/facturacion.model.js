@@ -179,9 +179,8 @@ async function ajustarDeudaIva(q, id, alicAnterior, alicNueva) {
   const nro = `OP-${String(op.nro_op).padStart(4, '0')}`
   const tipo = diff > 0 ? enCuenta : 'ajuste'
   const descripcion = diff > 0 ? `IVA ${ALICUOTA_FACTURAR}% ${nro} (para facturar)` : `Se quita el IVA de ${nro} (no se factura)`
-  await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado) VALUES (?, ?, ?, ?, ?, ?)`,
-    [op.id_cliente, tipo, descripcion, -diff, null, id])
-  await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [-diff, op.id_cliente])
+  // El IVA de una operación vieja va en el día de la operación, no en el de hoy
+  await require('./clientes.model').agregarMovimiento(op.id_cliente, { tipo, descripcion, monto: -diff, id_op_encabezado: id }, q)
   await q(`UPDATE transacciones SET monto = ? WHERE id = ?`, [redondear(Number(ultima.monto) + diff), ultima.id])
 }
 
