@@ -201,3 +201,10 @@
   color: $accent-dark;
   border-color: $accent-border;
 }
+
+// Tabla standalone dentro de una tarjeta: el borde lo pone la tarjeta (sin doble borde)
+.card-body.p-0 > .table-wrapper {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
