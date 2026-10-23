@@ -1,158 +1,174 @@
 @use '../abstracts/variables' as *;
 
-// Acción principal de cabeceras ("+ Nueva venta", "Guardar", etc.)
-.btn-naranja {
-  background: $accent;
-  color: #fff;
-  border: 1px solid $accent;
-  border-radius: $radius-md;
-  font-weight: 600;
-  box-shadow: 0 1px 2px rgba(28, 91, 173, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+// ═══════════════════════════════════════════════════════════════
+// Botones — variantes (solo colores; las métricas están en _buttons-base)
+// Jerarquía: primario (azul de marca) > secundario (blanco con borde) > fantasma.
+// ═══════════════════════════════════════════════════════════════
 
-  &:hover,
-  &:focus-visible { background: $accent-dark; border-color: $accent-dark; color: #fff; box-shadow: 0 4px 12px -2px rgba(28, 91, 173, 0.4); }
-  &:active { background: $accent-dark; color: #fff; }
+// Primario de marca. "naranja" por historia: hoy es el azul corporativo.
+%btn-tone-primary {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #{$accent};
+  --bs-btn-border-color: #{$accent-dark};
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #{$accent-dark};
+  --bs-btn-hover-border-color: #{$accent-darker};
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #{$accent-darker};
+  --bs-btn-active-border-color: #{$accent-darker};
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: #{$accent};
+  --bs-btn-disabled-border-color: #{$accent-dark};
+  --btn-shadow: 0 1px 2px rgba(16, 24, 40, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --btn-shadow-hover: 0 2px 6px -1px rgba(28, 91, 173, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+// Secundario: blanco con borde, para acciones de apoyo
+%btn-tone-secondary {
+  --bs-btn-color: #{$gray-700};
+  --bs-btn-bg: #fff;
+  --bs-btn-border-color: #d0d5dd;
+  --bs-btn-hover-color: #{$ink};
+  --bs-btn-hover-bg: #{$gray-50};
+  --bs-btn-hover-border-color: #{$border-input-hover};
+  --bs-btn-active-color: #{$ink};
+  --bs-btn-active-bg: #{$gray-100};
+  --bs-btn-active-border-color: #{$border-input-hover};
+  --bs-btn-disabled-color: #{$gray-700};
+  --bs-btn-disabled-bg: #fff;
+  --bs-btn-disabled-border-color: #d0d5dd;
+  --btn-shadow: #{$shadow-xs};
+}
+
+// Contorno de color (acción con significado: azul, verde, rojo)
+@mixin btn-tone-outline($text, $border, $soft, $strong) {
+  --bs-btn-color: #{$text};
+  --bs-btn-bg: #fff;
+  --bs-btn-border-color: #{$border};
+  --bs-btn-hover-color: #{$text};
+  --bs-btn-hover-bg: #{$soft};
+  --bs-btn-hover-border-color: #{$strong};
+  --bs-btn-active-color: #{$text};
+  --bs-btn-active-bg: #{$soft};
+  --bs-btn-active-border-color: #{$strong};
+  --bs-btn-disabled-color: #{$text};
+  --bs-btn-disabled-bg: #fff;
+  --bs-btn-disabled-border-color: #{$border};
+  --btn-shadow: #{$shadow-xs};
+}
+
+// Lleno de color (confirmar = verde, destruir = rojo)
+@mixin btn-tone-solid($bg, $border, $hover, $active, $glow) {
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #{$bg};
+  --bs-btn-border-color: #{$border};
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #{$hover};
+  --bs-btn-hover-border-color: #{$active};
+  --bs-btn-active-color: #fff;
+  --bs-btn-active-bg: #{$active};
+  --bs-btn-active-border-color: #{$active};
+  --bs-btn-disabled-color: #fff;
+  --bs-btn-disabled-bg: #{$bg};
+  --bs-btn-disabled-border-color: #{$border};
+  --btn-shadow: 0 1px 2px rgba(16, 24, 40, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --btn-shadow-hover: 0 2px 6px -1px #{$glow}, inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+// ── Primarios ──────────────────────────────────────────────────
+.btn-naranja,
+.btn-primary,
+.btn-primary-modern,
+.btn-finalizar { @extend %btn-tone-primary; }
+
+// ── Secundarios ────────────────────────────────────────────────
+.btn-outline-secondary,
+.btn-secondary,
+.btn-secondary-modern,
+.btn-light { @extend %btn-tone-secondary; }
+
+// Fantasma: sin borde hasta el hover (acciones terciarias)
+.btn-ghost {
+  @extend %btn-tone-secondary;
+  --bs-btn-bg: transparent;
+  --bs-btn-border-color: transparent;
+  --bs-btn-hover-bg: #{$gray-100};
+  --bs-btn-hover-border-color: transparent;
+  --bs-btn-active-bg: #{$gray-150};
+  --bs-btn-active-border-color: transparent;
+  --btn-shadow: none;
+}
+
+// ── Contornos con significado ──────────────────────────────────
+.btn-outline-primary,
+.btn-outline-accent { @include btn-tone-outline($accent, $accent-border, $accent-soft, $accent); }
+.btn-outline-success { @include btn-tone-outline($success-text, $success-border, $success-soft, $success); }
+.btn-outline-danger  { @include btn-tone-outline($danger-text, #f6c4bf, $danger-soft, $danger); }
+.btn-outline-warning { @include btn-tone-outline($warning-text, $warning-border, $warning-soft, $warning); }
+
+// ── Llenos con significado ─────────────────────────────────────
+.btn-success,
+.btn-primary-green { @include btn-tone-solid($success, #067f49, #067647, #05603a, rgba(7, 148, 85, 0.38)); }
+.btn-danger        { @include btn-tone-solid($danger, $danger-dark, $danger-dark, #912018, rgba(217, 45, 32, 0.38)); }
+
+// Naranja de marca para acciones de "atención" (cobrar, revisar)
+.btn-warning,
+.btn-secondary-yellow {
+  @include btn-tone-solid($orange, $orange-dark, #f0a040, $orange-dark, rgba(232, 145, 42, 0.4));
+  --bs-btn-color: #{$ink};
+  --bs-btn-hover-color: #{$ink};
+  --bs-btn-active-color: #{$ink};
+  --bs-btn-disabled-color: #{$ink};
+}
+
+.btn-dark {
+  @include btn-tone-solid($gray-900, $gray-900, $gray-800, #000, rgba(16, 24, 40, 0.35));
+}
+
+.btn-link {
+  --bs-btn-color: #{$accent};
+  --bs-btn-hover-color: #{$accent-dark};
+  --bs-btn-active-color: #{$accent-darker};
+  --bs-btn-font-weight: 500;
+  min-height: 0;
+  text-decoration: none;
+  &:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
 
 .btn-logout {
-  background: $dark-2;
-  color: $accent;
-  border: 1px solid $accent;
-}
-
-.btn-primary-modern {
-  background: $accent;
-  color: #fff;
-  border: 1px solid $accent;
-  border-radius: $radius-md;
-  font-weight: 600;
-  font-size: $fs-sm;
-  padding: 0.5rem 1rem;
-  transition: background $dur-fast $ease, transform 0.05s;
-
-  &:hover  { background: $accent-dark; border-color: $accent-dark; color: #fff; }
-  &:active { transform: translateY(1px); }
-}
-
-.btn-secondary-modern {
-  background: #fff;
-  color: $ink-soft;
-  border: 1px solid $border-input;
-  border-radius: $radius-md;
-  font-weight: 600;
-  font-size: $fs-sm;
-  padding: 0.5rem 1rem;
-  transition: background $dur-fast $ease, border-color $dur-fast $ease;
-
-  &:hover { background: $bg-card-alt; border-color: $border-input-hover; color: $ink; }
-}
-
-.btn-ghost {
-  background: #fff;
-  color: $ink-soft;
-  border: 1px solid $border-input;
-  font-weight: 600;
-  font-size: $fs-sm;
-  padding: 0.4rem 0.9rem;
-  border-radius: $radius-md;
-  transition: color $dur-fast $ease, background $dur-fast $ease, border-color $dur-fast $ease;
-
-  &:hover { color: $ink; background: $bg-card-alt; border-color: $border-input-hover; }
-}
-
-// ── Botones Bootstrap de contorno: visibles y con hover suave ──
-.btn-outline-secondary {
-  --bs-btn-color: #{$ink-soft};
-  --bs-btn-border-color: #{$border-input};
-  --bs-btn-bg: #fff;
-  --bs-btn-hover-color: #{$accent-dark};
-  --bs-btn-hover-bg: #{$accent-soft};
-  --bs-btn-hover-border-color: #{$accent};
-  --bs-btn-active-color: #{$accent-dark};
-  --bs-btn-active-bg: #{$accent-soft};
-  --bs-btn-active-border-color: #{$accent};
-  --bs-btn-font-weight: 600;
-  box-shadow: $shadow-xs;
-}
-
-.btn-outline-primary {
-  --bs-btn-color: #{$accent};
-  --bs-btn-border-color: #{$accent};
-  --bs-btn-hover-bg: #{$accent};
-  --bs-btn-hover-border-color: #{$accent};
-  --bs-btn-active-bg: #{$accent-dark};
-  --bs-btn-active-border-color: #{$accent-dark};
-}
-
-.btn-outline-success {
-  --bs-btn-color: #{$success};
-  --bs-btn-border-color: #{$success};
-  --bs-btn-hover-bg: #{$success};
-  --bs-btn-hover-border-color: #{$success};
-  --bs-btn-active-bg: #157a40;
-  --bs-btn-active-border-color: #157a40;
-  --bs-btn-font-weight: 600;
-}
-
-.btn-outline-danger {
-  --bs-btn-color: #{$danger};
-  --bs-btn-border-color: #{$danger};
-  --bs-btn-hover-bg: #{$danger};
-  --bs-btn-hover-border-color: #{$danger};
-  --bs-btn-active-bg: #bf2e24;
-  --bs-btn-active-border-color: #bf2e24;
-  --bs-btn-font-weight: 600;
-}
-
-.btn-success {
-  --bs-btn-bg: #{$success};
-  --bs-btn-border-color: #{$success};
-  --bs-btn-hover-bg: #157a40;
-  --bs-btn-hover-border-color: #157a40;
-  --bs-btn-active-bg: #136b38;
-  --bs-btn-active-border-color: #136b38;
-}
-
-.btn-warning {
-  --bs-btn-bg: #{$orange};
-  --bs-btn-border-color: #{$orange};
-  --bs-btn-color: #{$ink};
-  --bs-btn-hover-bg: #f0a444;
-  --bs-btn-hover-border-color: #{$orange-dark};
-  --bs-btn-hover-color: #{$ink};
+  @extend %btn-tone-secondary;
 }
 
 // ── Botón WhatsApp (link click-to-chat) ────────────────────────
 .btn-whatsapp {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: #25d366;
-  color: #fff;
-  border: 1px solid #25d366;
-  border-radius: $radius-md;
-  font-weight: 600;
-  font-size: $fs-sm;
-  padding: 0.4rem 0.9rem;
-  transition: background $dur-fast $ease, border-color $dur-fast $ease;
-
-  &:hover  { background: #1da851; border-color: #1da851; color: #fff; }
-  &:active { transform: translateY(1px); }
+  @include btn-tone-solid(#25d366, #1fb457, #1fb457, #189c4a, rgba(37, 211, 102, 0.4));
+  --bs-btn-padding-x: 0.875rem;
 
   svg { flex-shrink: 0; }
 }
 
+// Ícono rojo sin caja (quitar renglón)
 .btn-icon-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   border: none;
   color: $danger;
   font-size: 1.1rem;
   line-height: 1;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: $radius-sm;
   cursor: pointer;
-  transition: background $dur-fast $ease;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease;
 
-  &:hover { background: $danger-soft; }
+  &:hover { background: $danger-soft; color: $danger-dark; }
+  &:active { transform: scale(0.94); }
+}
+
+// Acciones por renglón dentro de tablas: alineadas al centro de la fila
+td > .btn-sm,
+td > form.d-inline > .btn-sm {
+  vertical-align: middle;
 }
