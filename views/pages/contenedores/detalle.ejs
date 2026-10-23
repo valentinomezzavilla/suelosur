@@ -53,7 +53,7 @@
             <hr>
             <p class="mb-1 fw-semibold"><%= proximo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(proximo.nro_op).padStart(4,'0') %></small><br>
-            <small class="text-muted">📍 <%= proximo.domicilio_entrega || 'A coordinar' %></small><br>
+            <small class="text-muted"><%- icon('mapPin', { size: 13, class: 'ic-dato' }) %><%= proximo.domicilio_entrega || 'A coordinar' %></small><br>
             <small class="text-muted">Zona: <%= proximo.zona_entrega || '—' %></small><br>
             <small class="text-muted">Inicio programado:
               <%= proximo.fecha_entrega_planificada ? formatFecha(proximo.fecha_entrega_planificada) : 'sin fecha' %></small>
@@ -62,7 +62,7 @@
             <hr>
             <p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>
-            <small class="text-muted">📍 <%= ultimo.domicilio_entrega %></small><br>
+            <small class="text-muted"><%- icon('mapPin', { size: 13, class: 'ic-dato' }) %><%= ultimo.domicilio_entrega %></small><br>
             <small class="text-muted">Zona: <%= ultimo.zona_entrega %></small>
           <% } %>
         <% } else { %>

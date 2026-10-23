@@ -28,7 +28,7 @@
           <% if (ultimo.cliente_nombre) { %>
             <hr><p class="mb-1 fw-semibold"><%= ultimo.cliente_nombre %></p>
             <small class="text-muted">OP-<%= String(ultimo.nro_op).padStart(4,'0') %></small><br>
-            <small class="text-muted">📍 <%= ultimo.domicilio_entrega %></small>
+            <small class="text-muted"><%- icon('mapPin', { size: 13, class: 'ic-dato' }) %><%= ultimo.domicilio_entrega %></small>
           <% } %>
         <% } else { %>
           <p class="text-muted">Sin movimientos.</p>
