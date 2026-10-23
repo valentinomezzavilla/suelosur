@@ -1,12 +1,17 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
+// ═══════════════════════════════════════════════════════════════
+// Login — fondo azul marino con curvas de nivel (suelo) y tarjeta clara.
+// ═══════════════════════════════════════════════════════════════
+
 .auth-body {
   min-height: 100vh;
+  min-height: 100dvh;
   background:
-    radial-gradient(900px 520px at 12% -8%, rgba(28, 91, 173, 0.42), transparent 62%),
-    radial-gradient(760px 460px at 105% 108%, rgba(232, 145, 42, 0.2), transparent 60%),
-    $sidebar-bg;
+    radial-gradient(1000px 600px at 12% -10%, rgba(28, 91, 173, 0.45), transparent 62%),
+    radial-gradient(800px 520px at 108% 112%, rgba(232, 145, 42, 0.16), transparent 60%),
+    linear-gradient(180deg, #0b1a33 0%, #0a1730 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -14,34 +19,30 @@
   position: relative;
   overflow: hidden;
 
-  // "Corte de suelo": capas horizontales al pie de la pantalla (firma estratos)
+  // Curvas de nivel: anillos finos que nacen fuera de pantalla (relieve del suelo)
   &::before {
     content: '';
     position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: 30vh;
+    inset: -10%;
     pointer-events: none;
-    background: linear-gradient(180deg,
-      transparent 0%,
-      rgba(217, 185, 138, 0.07) 18% 38%,
-      rgba(232, 145, 42, 0.13) 38% 58%,
-      rgba(217, 185, 138, 0.1) 58% 76%,
-      rgba(28, 91, 173, 0.22) 76% 100%);
+    background:
+      repeating-radial-gradient(circle at 18% 112%, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 34px),
+      repeating-radial-gradient(circle at 96% -14%, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 42px);
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 30%, #000 85%);
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 30%, #000 85%);
   }
-  // Líneas finas entre capas
+
+  // Franja "estratos" al pie de la pantalla
   &::after {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    height: 30vh;
+    height: 3px;
     pointer-events: none;
-    background: repeating-linear-gradient(180deg, transparent 0 11px, rgba(255, 255, 255, 0.035) 11px 12px);
-    -webkit-mask-image: linear-gradient(180deg, transparent, #000 40%);
-    mask-image: linear-gradient(180deg, transparent, #000 40%);
+    background: $strata;
+    opacity: 0.85;
   }
 
   > .login-card { z-index: 1; }
@@ -53,11 +54,15 @@
   background: #fff;
   border-radius: $radius-xl;
   width: 100%;
-  max-width: 420px;
-  padding: 2.6rem 2.25rem 2rem;
-  box-shadow: 0 30px 70px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  max-width: 412px;
+  padding: 2.5rem 2.25rem 2rem;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 30px 70px -16px rgba(0, 0, 0, 0.55);
   text-align: center;
   overflow: hidden;
+  animation: login-in 0.5s $ease-out both;
 
   // Franja superior con los colores del logo
   &::before {
@@ -66,14 +71,19 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
+    height: 3px;
     background: $strata;
   }
 
   @include sm-down {
-    padding: 2.2rem 1.4rem 1.6rem;
+    padding: 2.25rem 1.4rem 1.6rem;
     border-radius: $radius-lg;
   }
+}
+
+@keyframes login-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
 }
 
 // ── Logo ───────────────────────────────────────────────────────
@@ -81,38 +91,39 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 68px;
-  height: 68px;
-  border-radius: 18px;
-  background: $bg-card-alt;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: #fff;
   border: 1px solid $border;
-  margin-bottom: 1.2rem;
+  box-shadow: $shadow-sm, 0 0 0 6px $gray-50;
+  margin-bottom: 1.35rem;
 }
 
 .login-logo {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 }
 
 // ── Textos de cabecera ─────────────────────────────────────────
 .login-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.375rem;
+  font-weight: 600;
   color: $ink;
-  margin: 0 0 0.25rem;
+  margin: 0 0 0.3rem;
   letter-spacing: -0.025em;
 }
 
 .login-subtitle {
-  font-size: 0.88rem;
+  font-size: $fs-base;
   font-weight: 500;
-  color: $ink-soft;
+  color: $gray-600;
   margin: 0 0 0.15rem;
 }
 
 .login-desc {
-  font-size: 0.84rem;
+  font-size: $fs-sm;
   color: $muted;
   margin: 0 0 1.75rem;
 }
@@ -125,18 +136,20 @@
 // ── Formulario ─────────────────────────────────────────────────
 .login-form {
   text-align: left;
+
+  .alert { margin-bottom: 1rem; }
 }
 
 .login-field {
   margin-bottom: 1rem;
 
-  &:last-of-type { margin-bottom: 1.5rem; }
+  &:last-of-type { margin-bottom: 1.4rem; }
 }
 
 .login-label {
   display: block;
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: $fs-sm;
+  font-weight: 500;
   color: $ink-soft;
   margin-bottom: 0.4rem;
 }
@@ -144,17 +157,17 @@
 .login-input {
   display: block;
   width: 100%;
-  min-height: 46px;
-  padding: 0.65rem 0.9rem;
+  min-height: $control-h-lg;
+  padding: 0.6rem 0.85rem;
   background: #fff;
   border: 1px solid $border-input;
   border-radius: 10px;
-  font-size: 0.95rem;
+  font-size: 0.9375rem;
   color: $ink;
   box-shadow: $shadow-xs;
   transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
 
-  &::placeholder { color: #94a3b8; }
+  &::placeholder { color: $placeholder; }
 
   &:hover:not(:focus) { border-color: $border-input-hover; }
 
@@ -163,6 +176,8 @@
     border-color: $accent;
     box-shadow: $focus-ring;
   }
+
+  @include md-down { font-size: 16px; } // sin zoom de iOS
 }
 
 // ── Campo contraseña con ojo ────────────────────────────────────
@@ -176,11 +191,11 @@
 
 .login-eye {
   position: absolute;
-  right: 0.45rem;
+  right: 0.4rem;
   top: 50%;
   transform: translateY(-50%);
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   background: none;
   border: none;
   border-radius: $radius-md;
@@ -191,39 +206,42 @@
   align-items: center;
   justify-content: center;
   line-height: 1;
-  transition: color $dur-fast, background $dur-fast;
+  transition: color $dur-fast $ease, background-color $dur-fast $ease;
 
-  &:hover { color: $accent; background: $accent-soft; }
+  &:hover { color: $ink; background: $gray-100; }
 }
 
 // ── Botón principal ────────────────────────────────────────────
 .login-submit {
   display: block;
   width: 100%;
-  min-height: 48px;
-  padding: 0.8rem;
+  min-height: $control-h-lg;
+  padding: 0.7rem;
   background: $accent;
   color: #fff;
-  border: none;
+  border: 1px solid $accent-dark;
   border-radius: 10px;
-  font-size: 1rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  letter-spacing: 0.005em;
-  box-shadow: 0 6px 16px -4px rgba(28, 91, 173, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: background $dur-fast $ease, box-shadow $dur-fast $ease, transform 0.06s;
+  letter-spacing: -0.005em;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  transition: background-color $dur-fast $ease, box-shadow $dur-fast $ease, transform 0.08s $ease;
 
-  &:hover  { background: $accent-dark; box-shadow: 0 8px 20px -4px rgba(28, 91, 173, 0.6); }
-  &:active { transform: translateY(1px); }
+  &:hover  { background: $accent-dark; box-shadow: 0 4px 14px -4px rgba(28, 91, 173, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+  &:active { transform: translateY(0.5px) scale(0.99); background: $accent-darker; }
   &:focus-visible { outline: 2px solid $accent; outline-offset: 3px; }
 }
 
 // ── Pie de página ──────────────────────────────────────────────
 .login-footer {
-  margin-top: 1.5rem;
-  font-size: 0.8rem;
+  margin: 1.5rem 0 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid $border-soft;
+  font-size: $fs-sm;
   color: $muted;
   text-align: center;
+  text-wrap: balance;
 }
 
 .login-footer-link {
@@ -231,5 +249,5 @@
   font-weight: 500;
   text-decoration: none;
 
-  &:hover { text-decoration: underline; }
+  &:hover { text-decoration: underline; text-underline-offset: 2px; }
 }
