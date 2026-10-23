@@ -1,5 +1,19 @@
-<div class="empty-state <%= typeof compact !== 'undefined' && compact ? 'empty-state--compact' : '' %>">
-  <div class="empty-state__icon"><%= typeof icono !== 'undefined' ? icono : '📭' %></div>
+<%
+  // Estado vacío. Las vistas pasan un emoji en `icono`: se muestra el ícono de línea equivalente
+  // del set del sistema (mismo trazo que el resto de la interfaz). Si no hay equivalente, el emoji.
+  const _emoji = typeof icono !== 'undefined' ? icono : '📭'
+  const _EQUIV = {
+    '✅': 'checkCircle', '📭': 'inbox', '📦': 'box', '🧾': 'receipt', '👷': 'hardhat', '🗺️': 'map',
+    '🔍': 'search', '💳': 'creditCard', '👥': 'users', '📋': 'clipboard', '🚚': 'truck', '🚜': 'tool',
+    '🏭': 'store', '🏗️': 'layers', '🔑': 'key', '📊': 'chart',
+  }
+  const _sinVS = (s) => String(s).replace(/️/g, '') // 🗺️ / 🏗️ llegan con o sin selector de variación
+  const _ic = Object.entries(_EQUIV).find(([k]) => _sinVS(k) === _sinVS(_emoji))?.[1]
+  const _ok = _emoji === '✅'
+  const _compact = typeof compact !== 'undefined' && compact
+%>
+<div class="empty-state<%= _compact ? ' empty-state--compact' : '' %><%= _ok ? ' empty-state--ok' : '' %>">
+  <div class="empty-state__icon" aria-hidden="true"><%- _ic ? icon(_ic, { size: _compact ? 18 : 22 }) : _emoji %></div>
   <p class="empty-state__msg"><%= typeof mensaje !== 'undefined' ? mensaje : 'Aún no hay datos para mostrar.' %></p>
   <% if (typeof accionHref !== 'undefined' && typeof accionLabel !== 'undefined') { %>
     <a href="<%= accionHref %>" class="btn btn-naranja btn-sm"><%= accionLabel %></a>
