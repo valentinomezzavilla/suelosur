@@ -21,7 +21,7 @@
     </h4>
   </div>
   <div class="d-flex gap-2">
-    <a href="/choferes/<%= chofer.id %>/editar" class="btn btn-sm btn-secondary-yellow">Editar</a>
+    <a href="/choferes/<%= chofer.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
     <% if (chofer.activo) { %>
       <button type="button" class="btn btn-sm btn-outline-danger" onclick="document.getElementById('formBaja').style.display='block'">Dar de baja</button>
     <% } else { %>

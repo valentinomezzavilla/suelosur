@@ -14,7 +14,7 @@
   </div>
   <div class="d-flex gap-2">
     <% if (!estaAnulado) { %>
-      <a href="/alquileres/maquinaria/<%= alquiler.id %>/editar" class="btn btn-sm btn-secondary-yellow"><%- icon('edit', { size: 14 }) %> Editar</a>
+      <a href="/alquileres/maquinaria/<%= alquiler.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
       <a href="/remitos/<%= alquiler.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 14 }) %> Remito PDF</a>
     <% } %>
     <a href="/alquileres/maquinaria" class="btn btn-sm btn-outline-secondary">← Volver</a>
