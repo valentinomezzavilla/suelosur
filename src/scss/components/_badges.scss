@@ -9,49 +9,44 @@
   font-weight: 500;
 }
 
-// El punto solo en tablas (estado de cada fila); los contadores numéricos quedan limpios
+// El punto solo en tablas (estado de cada fila); los contadores numéricos quedan limpios.
+// Se dibuja como fondo (no con ::before) para que ::first-letter siga funcionando.
 :is(.table, .table-modern, .data-table) :is(.badge-en-transito, .badge-alerta, .badge-activo, .badge-pendiente,
   .badge--con-stock, .badge--disponible, .badge--sin-stock, .badge--alquilado, .badge--pendiente,
   .badge--en-transito, .badge--despachado, .badge--anulado) {
-  &::before {
-    content: '';
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    margin-right: 0.4em;
-    vertical-align: 0.1em;
-    border-radius: 50%;
-    background: currentColor;
-    opacity: 0.9;
-  }
+  padding-left: calc(0.6em + 6px + 0.4em) !important;
+  background-image: radial-gradient(circle at center, currentColor 0 2.6px, transparent 3.1px);
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+  background-position: left 0.6em center;
 }
 
 .badge-pendiente {
-  background: $warning-soft;
+  background-color: $warning-soft;
   color: $warning-text;
   border: 1px solid $warning-border;
 }
 
 .badge-activo {
-  background: $success-soft;
+  background-color: $success-soft;
   color: $success-text;
   border: 1px solid $success-border;
 }
 
 .badge-alerta {
-  background: $danger-soft;
+  background-color: $danger-soft;
   color: $danger-text;
   border: 1px solid $danger-border;
 }
 
 .badge-en-transito {
-  background: $info-soft;
+  background-color: $info-soft;
   color: $info-text;
   border: 1px solid $info-border;
 }
 
 .badge-rol {
-  background: $accent-soft;
+  background-color: $accent-soft;
   color: $accent-dark;
   border: 1px solid $accent-border;
   font-size: $fs-xxs;
@@ -59,7 +54,7 @@
   letter-spacing: 0.05em;
 }
 
-.badge-rol-lg { background: $accent; color: #fff; border-color: $accent; }
+.badge-rol-lg { background-color: $accent; color: #fff; border-color: $accent; }
 
 .dias-ok     { color: $success-text; font-weight: 600; }
 .dias-alerta { color: $warning-text; font-weight: 600; }
