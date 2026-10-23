@@ -1,38 +1,69 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
-// ── Tabla base (cabecera clara, moderna) ───────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Tablas — cabecera discreta, filas aireadas, cifras tabulares.
+// Tres variantes conviven con el mismo aspecto: .table (Bootstrap), .table-modern y .data-table.
+// ═══════════════════════════════════════════════════════════════
+
+%th-base {
+  background: $gray-50;
+  color: $muted;
+  font-weight: 500;
+  font-size: $fs-xs;
+  text-transform: none;
+  letter-spacing: 0;
+  border: none;
+  border-bottom: 1px solid $border;
+  padding: 0.625rem 0.75rem;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+%td-base {
+  border-color: $border-line;
+  padding: 0.75rem;
+  font-size: $fs-base;
+  color: $dark;
+  vertical-align: middle;
+  line-height: 1.4;
+}
+
 .table {
   --bs-table-border-color: #{$border-line};
   --bs-table-hover-bg:     #{$bg-hover};
-  --bs-table-striped-bg:   #{$bg-card-alt};
+  --bs-table-striped-bg:   #{$gray-50};
+  --bs-table-active-bg:    #{$gray-100};
   margin-bottom: 0;
 
-  thead th {
-    background: $bg-card-alt;
-    color: $muted;
+  thead th { @extend %th-base; }
+
+  tbody td,
+  tbody th { @extend %td-base; }
+
+  tfoot td,
+  tfoot th {
+    padding: 0.75rem;
+    border-top: 1px solid $border;
+    border-bottom: 0;
+    background: $gray-50;
     font-weight: 600;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    border: none;
-    border-bottom: 1px solid $border;
-    padding: 0.7rem 1rem;
-    white-space: nowrap;
+    color: $ink;
   }
-  tbody td {
-    border-color: $border-line;
-    padding: 0.72rem 1rem;
-    font-size: $fs-sm;
-    color: $dark;
-    vertical-align: middle;
-  }
+
+  // Aire a los costados: la primera y la última columna no quedan pegadas al borde
+  thead th:first-child, tbody td:first-child, tfoot td:first-child { padding-left: 1.25rem; }
+  thead th:last-child,  tbody td:last-child,  tfoot td:last-child  { padding-right: 1.25rem; }
+
   tbody tr {
-    transition: background $dur-fast $ease;
+    transition: background-color $dur-fast $ease;
     &:hover { background: $bg-hover; }
   }
   tbody tr:last-child td { border-bottom: none; }
-  tfoot tr.total-row { background: $accent-soft; font-weight: 700; }
+  tfoot tr.total-row { background: $accent-soft; font-weight: 600; }
+
+  // Texto secundario dentro de celdas (fechas, tipo, zona…)
+  td small, td .small { font-size: $fs-sm; }
 
   // Venta a cta. corriente ya entregada (con cargo generado) y todavía sin saldar
   // — ver ClientesModel.saldadaPorOperacion. El color nunca es la única señal: la fila
@@ -43,49 +74,74 @@
     box-shadow: inset 0 0 0 9999px #{$warning-soft};
   }
   tbody tr.venta-cc-pendiente:hover > td {
-    box-shadow: inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 65%, $bg-hover)};
+    box-shadow: inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 70%, $warning-border)};
   }
   tbody tr.venta-cc-pendiente > td:first-child {
-    box-shadow: inset 3px 0 0 $warning, inset 0 0 0 9999px #{$warning-soft};
+    box-shadow: inset 3px 0 0 $orange, inset 0 0 0 9999px #{$warning-soft};
   }
   tbody tr.venta-cc-pendiente:hover > td:first-child {
-    box-shadow: inset 3px 0 0 $warning, inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 65%, $bg-hover)};
+    box-shadow: inset 3px 0 0 $orange, inset 0 0 0 9999px #{color-mix(in srgb, $warning-soft 70%, $warning-border)};
   }
 }
 
-// Bootstrap .table-light en cabeceras: mismo tono que el resto
+// Cabeceras con .table-light o .table-dark de Bootstrap: mismo tono que el resto
 .table-light {
-  --bs-table-bg: #{$bg-card-alt};
+  --bs-table-bg: #{$gray-50};
   --bs-table-color: #{$muted};
   --bs-table-border-color: #{$border};
 }
 
-// ── Tabla "modern" (la que viene reemplazándola) ───────────────
+.table-sm {
+  thead th { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  tbody td { padding-top: 0.45rem; padding-bottom: 0.45rem; }
+}
+
+// Celda de acciones (dos o más botones / forms en fila): no se parte en renglones
+td:has(> .btn-sm ~ .btn-sm),
+td:has(> .btn-sm ~ form),
+td:has(> form ~ .btn-sm),
+td:has(> form ~ form) {
+  white-space: nowrap;
+}
+
+// Tabla pegada a los bordes de una tarjeta: las esquinas de la cabecera y de la última
+// fila siguen el radio de la tarjeta (la tarjeta no recorta: adentro hay desplegables)
+.card > .card-body.p-0 > .table,
+.card > .card-body.p-0 > .table-responsive > .table,
+.card > .table-responsive > .table,
+.card > .table {
+  $r: $radius-lg - 1px;
+  &:first-child > thead > tr:first-child > th:first-child { border-top-left-radius: $r; }
+  &:first-child > thead > tr:first-child > th:last-child  { border-top-right-radius: $r; }
+  &:last-child > tbody:last-child > tr:last-child > td:first-child { border-bottom-left-radius: $r; }
+  &:last-child > tbody:last-child > tr:last-child > td:last-child  { border-bottom-right-radius: $r; }
+}
+.card > .card-body.p-0 > .table-responsive:first-child > .table > thead > tr:first-child {
+  > th:first-child { border-top-left-radius: $radius-lg - 1px; }
+  > th:last-child  { border-top-right-radius: $radius-lg - 1px; }
+}
+
+// Filas atenuadas (registros inactivos): el <tr class="text-muted"> de las vistas
+.table tbody tr.text-muted > td { color: $muted; }
+
+// ── Tabla "modern" ─────────────────────────────────────────────
 .table-modern {
   width: 100%;
   margin: 0;
   border-collapse: collapse;
-  font-size: $fs-sm;
+  font-size: $fs-base;
 
-  thead th {
-    background: $bg-card-alt;
-    color: $muted;
-    font-weight: 600;
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    padding: 0.7rem 1rem;
-    border-bottom: 1px solid $border;
-    text-align: left;
-  }
+  thead th { @extend %th-base; text-align: left; }
 
   tbody td {
-    padding: 0.6rem 1rem;
+    @extend %td-base;
     border-bottom: 1px solid $border-line;
-    font-size: $fs-sm;
-    vertical-align: middle;
   }
 
+  thead th:first-child, tbody td:first-child { padding-left: 1.25rem; }
+  thead th:last-child,  tbody td:last-child  { padding-right: 1.25rem; }
+
+  tbody tr { transition: background-color $dur-fast $ease; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover         { background: $bg-hover; }
 
@@ -93,16 +149,17 @@
   .form-select { font-size: $fs-sm; }
 }
 
-// ── Encabezados ordenables ─────────────────────────────────────
+// ── Encabezados ordenables (helper inline de las vistas) ───────
 .th-sort {
   color: inherit;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: color $dur-fast;
+  border-radius: $radius-xs;
+  transition: color $dur-fast $ease;
 
-  &:hover    { color: $accent; }
-  &.is-active { color: $accent; font-weight: 700; }
+  &:hover    { color: $ink; }
+  &.is-active { color: $accent-dark; font-weight: 600; }
 }
 
 // ── Wrapper responsive para cualquier tabla ────────────────────
@@ -116,4 +173,9 @@
     border-radius: 0;
     padding: 0 $content-pad-mob;
   }
+}
+
+.table-responsive {
+  scrollbar-width: thin;
+  scrollbar-color: $gray-300 transparent;
 }

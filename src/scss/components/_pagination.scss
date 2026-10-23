@@ -1,8 +1,49 @@
 @use '../abstracts/variables' as *;
 
+// Paginación (partials/paginacion): botones compactos, la página actual resaltada
+.pagination {
+  --bs-pagination-padding-x: 0.6rem;
+  --bs-pagination-padding-y: 0.3rem;
+  --bs-pagination-font-size: #{$fs-sm};
+  --bs-pagination-color: #{$gray-700};
+  --bs-pagination-bg: transparent;
+  --bs-pagination-border-width: 0;
+  --bs-pagination-border-radius: #{$radius-sm};
+  --bs-pagination-hover-color: #{$ink};
+  --bs-pagination-hover-bg: #{$gray-100};
+  --bs-pagination-focus-color: #{$ink};
+  --bs-pagination-focus-bg: #{$gray-100};
+  --bs-pagination-focus-box-shadow: #{$focus-ring};
+  --bs-pagination-active-color: #{$ink};
+  --bs-pagination-active-bg: #fff;
+  --bs-pagination-disabled-color: #{$muted-light};
+  --bs-pagination-disabled-bg: transparent;
+  gap: 2px;
+  flex-wrap: wrap;
+
+  .page-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 30px;
+    border-radius: $radius-sm !important;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    transition: background-color $dur-fast $ease, color $dur-fast $ease, box-shadow $dur-fast $ease;
+  }
+
+  .page-item.active .page-link {
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1), 0 0 0 1px $border;
+    font-weight: 600;
+  }
+}
+
 .pagination-orange {
-  --bs-pagination-active-bg: #{$accent};
-  --bs-pagination-active-border-color: #{$accent};
-  --bs-pagination-color: #{$accent};
-  --bs-pagination-hover-color: #{$accent-dark};
+  --bs-pagination-active-color: #{$accent-dark};
+  --bs-pagination-active-bg: #{$accent-soft};
+
+  .page-item.active .page-link {
+    box-shadow: inset 0 0 0 1px $accent-border;
+  }
 }

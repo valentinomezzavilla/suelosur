@@ -16,7 +16,7 @@
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-lg;
-  padding: 1rem 1.15rem;
+  padding: 0.875rem 1rem;
   margin-bottom: 1rem;
   box-shadow: $shadow-xs;
 }
@@ -31,9 +31,9 @@
 
   label {
     font-size: $fs-xs;
-    font-weight: 600;
+    font-weight: 500;
     color: $ink-soft;
-    letter-spacing: 0.2px;
+    letter-spacing: 0;
   }
 
   input,
@@ -44,43 +44,65 @@
     border: 1px solid $border-input;
     border-radius: $radius-md;
     padding: 0 0.7rem;
-    font-size: $fs-sm;
-    background: #fff;
-    color: $dark;
+    font-size: $fs-base;
+    background-color: #fff;
+    color: $ink;
     font-family: inherit;
-    transition: border-color 0.12s, box-shadow 0.12s;
+    box-shadow: $shadow-xs;
+    transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
 
+    &:hover:not(:focus) { border-color: $border-input-hover; }
     &:focus { outline: none; border-color: $accent; box-shadow: $focus-ring; }
+    &::placeholder { color: $placeholder; }
+  }
+
+  select:not([multiple]) {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 2rem;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23667085' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='m4 6 4 4 4-4'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.55rem center;
+    background-size: 16px 16px;
   }
 }
 
-// ── Chips de período (Hoy / Semana / Mes) ─────────────────────
+// ── Chips de período (Hoy / Semana / Mes): control segmentado ──
 .periodo-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
   margin-bottom: 1rem;
+  background: $gray-100;
+  border: 1px solid $border-soft;
+  border-radius: 10px;
 }
 
 .periodo-chip {
-  padding: 0.4rem 0.9rem;
-  border-radius: $radius-md;
-  border: 1px solid $border-input;
-  background: $bg-card;
-  color: $ink-soft;
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 0.8rem;
+  border-radius: 7px;
+  border: 0;
+  background: transparent;
+  color: $gray-600;
   font-size: $fs-sm;
-  font-weight: 600;
+  font-weight: 500;
   text-decoration: none;
-  box-shadow: $shadow-xs;
-  transition: background $dur-fast $ease, border-color $dur-fast $ease, color $dur-fast $ease;
+  white-space: nowrap;
+  transition: background-color $dur-fast $ease, color $dur-fast $ease, box-shadow $dur-fast $ease;
 
-  &:hover { border-color: $accent; color: $accent-dark; background: $accent-soft; }
+  &:hover { color: $ink; background: rgba(255, 255, 255, 0.6); }
+  &:active { transform: scale(0.98); }
 
   &.is-active {
-    background: $accent;
-    border-color: $accent;
-    color: #fff;
-    box-shadow: 0 2px 6px -1px rgba(28, 91, 173, 0.4);
+    background: #fff;
+    color: $ink;
+    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.1), 0 0 0 1px rgba(16, 24, 40, 0.05);
   }
 }
 
@@ -92,57 +114,68 @@
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-lg;
-  box-shadow: $shadow-sm;
+  box-shadow: $shadow-xs;
+  scrollbar-width: thin;
+  scrollbar-color: $gray-300 transparent;
 }
 
 .data-table {
   width: 100%;
   margin: 0;
   border-collapse: collapse;
-  font-size: $fs-sm;
+  font-size: $fs-base;
+  font-variant-numeric: tabular-nums;
 
   thead th {
-    background: $bg-card-alt;
+    background: $gray-50;
     color: $muted;
-    font-weight: 600;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-weight: 500;
+    font-size: $fs-xs;
+    text-transform: none;
+    letter-spacing: 0;
     text-align: left;
-    padding: 0.7rem 1rem;
+    padding: 0.625rem 0.75rem;
     border-bottom: 1px solid $border;
     white-space: nowrap;
   }
 
   tbody td {
-    padding: 0.7rem 1rem;
+    padding: 0.75rem;
     border-bottom: 1px solid $border-line;
     vertical-align: middle;
+    color: $dark;
+    line-height: 1.4;
   }
 
+  thead th:first-child, tbody td:first-child { padding-left: 1.25rem; }
+  thead th:last-child,  tbody td:last-child  { padding-right: 1.25rem; }
+
+  tbody tr { transition: background-color $dur-fast $ease; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: $bg-hover; }
 
   // Venta a cta. corriente ya entregada y todavía sin saldar (ver /ventas)
   tbody tr.venta-cc-pendiente {
     background: $warning-soft;
-    box-shadow: inset 3px 0 0 $warning;
-    &:hover { background: color-mix(in srgb, $warning-soft 65%, $bg-hover); }
+    box-shadow: inset 3px 0 0 $orange;
+    &:hover { background: color-mix(in srgb, $warning-soft 70%, $warning-border); }
   }
 }
 
+// Fila de "sin resultados" dentro de una tabla
 .td-vacia {
   text-align: center;
   color: $muted;
-  font-style: italic;
-  padding: 2.25rem 1rem !important;
+  font-style: normal;
+  font-size: $fs-sm;
+  padding: 2.5rem 1rem !important;
 }
 
 .td-acciones { white-space: nowrap; text-align: right; }
 
 .transaccion-monto {
-  font-weight: 700;
-  color: $dark;
+  font-weight: 600;
+  color: $ink;
   white-space: nowrap;
   text-align: right;
 }
@@ -152,18 +185,19 @@
   justify-content: flex-end;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 1.1rem;
   margin: 0 0 1rem;
   background: $accent-soft;
-  border: 1px solid $border;
+  border: 1px solid $accent-border;
   border-radius: $radius-md;
-  font-weight: 700;
+  font-weight: 600;
   color: $accent-dark;
+  font-variant-numeric: tabular-nums;
 }
 
 // Badges de tipo de transacción (dinámicos: badge--tipo-xxx)
 .badge[class*="--tipo-"] {
   background: $accent-soft;
   color: $accent-dark;
-  border-color: rgba(28, 91, 173, 0.35);
+  border-color: $accent-border;
 }
