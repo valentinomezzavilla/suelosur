@@ -1,0 +1,5 @@
+<%# Leyenda "Desarrollado por" con el logo de Vezza. Uso: include('desarrollado_por') — o con { clase: 'x' } para variar el contexto %>
+<div class="desarrollado-por<%= typeof clase !== 'undefined' && clase ? ' ' + clase : '' %>">
+  <span class="desarrollado-por-texto">Desarrollado por</span>
+  <img src="/img/vezza.png" alt="Vezza" class="desarrollado-por-logo" width="205" height="198">
+</div>

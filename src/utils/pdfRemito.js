@@ -143,6 +143,7 @@ function construirRemito(doc, r) {
   doc.fillColor(GRIS).fontSize(8).font('Helvetica')
      .text(labelCliente, left, yFirma + 6, { width: wFirma, align: 'center' })
      .text('Firma Suelosur', right - wFirma, yFirma + 6, { width: wFirma, align: 'center' })
+  B.drawDesarrolladoPor(doc)
 }
 
 function nombreRemito(r) {

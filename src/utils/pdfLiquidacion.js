@@ -306,6 +306,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
        .text(LEYENDA, left, yPie, { width: width - 90, lineBreak: false, ellipsis: true })
        .text(`Página ${i + 1} de ${rango.count}`, right - 90, yPie, { width: 90, align: 'right', lineBreak: false })
        .text(`${B.EMPRESA.razon} · Emitida el ${fmtFecha(hoy)}`, left, yPie + 11, { width, lineBreak: false })
+    B.drawDesarrolladoPor(doc)
   }
   doc.end()
 }

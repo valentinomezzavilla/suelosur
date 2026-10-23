@@ -205,6 +205,7 @@ function generarFacturacionPDF(res, { cliente, operaciones, totales, comprobante
        .text(comprobante ? 'Detalle de los importes facturados. No reemplaza al comprobante fiscal.' : 'Detalle de los importes a facturar. No válido como factura.', left, yPie, { width: width - 90, lineBreak: false })
        .text(`Página ${i + 1} de ${rango.count}`, right - 90, yPie, { width: 90, align: 'right', lineBreak: false })
        .text(`${B.EMPRESA.razon} · Emitido el ${fmtFecha(hoy)}`, left, yPie + 11, { width, lineBreak: false })
+    B.drawDesarrolladoPor(doc)
   }
   doc.end()
 }
