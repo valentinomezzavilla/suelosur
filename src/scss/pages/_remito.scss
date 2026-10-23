@@ -1,48 +1,113 @@
 @use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Remito imprimible (views/pages/ventas/remito, sin layout).
+// En pantalla: una hoja centrada sobre fondo gris. Al imprimir: la hoja sola.
+// ═══════════════════════════════════════════════════════════════
+html:has(> .remito-body) { background: $bg-app; }
 
 .remito-body {
   font-family: $font-base;
-  font-size: 0.9rem;
+  font-size: $fs-base;
   color: $dark;
-  padding: 1.5rem;
+  max-width: 880px;
+  margin: 1.5rem auto 3rem;
+  padding: 2.25rem 2.5rem 2.5rem;
+  background: #fff;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-md;
+  position: relative;
+
+  // Franja "estratos" arriba de la hoja
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    border-radius: $radius-lg $radius-lg 0 0;
+    background: $strata;
+  }
+
+  // Barra de controles (no se imprime): separada del documento
+  > .no-print:first-child {
+    margin: -0.75rem -1rem 1.75rem !important;
+    padding: 0 0 1rem;
+    border-bottom: 1px dashed $border;
+  }
+
+  .table-bordered {
+    --bs-table-border-color: #{$border};
+
+    thead th { background: $gray-50; }
+    > :not(caption) > * > * { border-width: 1px; }
+  }
+
+  @include sm-down {
+    margin: 0;
+    border-radius: 0;
+    border: 0;
+    padding: 1.25rem 1rem 2rem;
+  }
 }
 
 .remito-brand {
-  color: $accent;
-  font-weight: 800;
-  font-size: 1.6rem;
-  letter-spacing: 1px;
+  color: $ink;
+  font-weight: 700;
+  font-size: 1.45rem;
+  letter-spacing: 0.06em;
 }
 
-.remito-title { color: $accent; }
+.remito-title {
+  color: $accent;
+  letter-spacing: 0.08em;
+}
 
 .remito-total td {
-  color: $accent;
-  font-size: 1.1rem;
+  color: $ink;
+  font-size: 1.05rem;
 }
 
 .remito-total-row td {
-  background: $accent-soft;
-  font-weight: bold;
+  background: $accent-soft !important;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .remito-print-btn {
-  background: $accent;
-  color: #fff;
-  font-weight: 600;
-
-  &:hover { background: $accent-dark; color: #fff; }
+  --bs-btn-color: #fff;
+  --bs-btn-bg: #{$accent};
+  --bs-btn-border-color: #{$accent-dark};
+  --bs-btn-hover-color: #fff;
+  --bs-btn-hover-bg: #{$accent-dark};
+  --bs-btn-hover-border-color: #{$accent-darker};
+  --btn-shadow: 0 1px 2px rgba(16, 24, 40, 0.14), inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
 .firma-box {
-  border-top: 1px solid #ccc;
-  width: 200px;
+  border-top: 1px solid $gray-400;
+  width: 220px;
   text-align: center;
   padding-top: 6px;
-  font-size: 0.8rem;
-  color: $muted-soft;
+  font-size: $fs-xs;
+  color: $muted;
 }
 
 @media print {
-  .remito-body { font-size: 0.85rem; }
+  html:has(> .remito-body) { background: #fff; }
+
+  .remito-body {
+    font-size: 0.85rem;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+
+    &::before { display: none; }
+  }
 }
