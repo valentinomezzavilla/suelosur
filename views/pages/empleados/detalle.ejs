@@ -144,7 +144,7 @@
       <h3 class="form-section__title">Acceso al sistema</h3>
       <% if (e.usuario_sistema) { %>
         <p class="resumen-valor"><%= e.usuario_nombre %></p>
-        <span class="badge rounded-pill px-3 badge-en-transito"><%= e.usuario_sistema %></span>
+        <span class="badge rounded-pill px-3 badge-en-transito badge--usuario"><%= e.usuario_sistema %></span>
       <% } else { %>
         <p class="form-hint">Este empleado no tiene cuenta de acceso al sistema.</p>
       <% } %>

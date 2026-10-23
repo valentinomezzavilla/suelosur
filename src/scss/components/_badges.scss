@@ -53,7 +53,18 @@
   letter-spacing: 0.05em;
 }
 
-.dias-ok     { color: $success-text; font-weight: 600; }
+// Usuario de acceso (login): es un identificador, va tal cual (sin la mayúscula inicial
+// ni el punto de estado de las tablas) y con la tipografía de los códigos
+.badge.badge--usuario {
+  font-family: $font-mono;
+  letter-spacing: -0.01em;
+  padding-left: 0.62em !important;
+  background-image: none;
+
+  &::first-letter { text-transform: none; }
+}
+
+.dias-ok    { color: $success-text; font-weight: 600; }
 .dias-alerta { color: $warning-text; font-weight: 600; }
 .dias-rojo   { color: $danger-text;  font-weight: 600; }
 span:is(.dias-ok, .dias-alerta, .dias-rojo) { white-space: nowrap; } // "5 / 4" no se corta en dos renglones
