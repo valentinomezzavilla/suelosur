@@ -23,10 +23,10 @@
   background: $accent-soft;
   border: 1px solid rgba(28, 91, 173, 0.2);
   color: $accent-dark;
-  font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+  font-family: $font-mono;
   font-size: $fs-xs;
-  font-weight: 700;
-  letter-spacing: 0.4px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .tx-modal__body {
@@ -44,27 +44,28 @@
   gap: 1rem;
   padding: 1.1rem 1.25rem;
   border-radius: $radius-lg;
-  background: linear-gradient(135deg, $bg-card-alt 0%, $accent-soft 100%);
+  background: linear-gradient(135deg, $gray-50 0%, $accent-soft 120%);
   border: 1px solid $border;
 }
 
 .tx-hero__label {
   display: block;
   color: $muted;
-  font-size: $fs-xs;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+  font-size: $fs-sm;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
   margin-bottom: 0.2rem;
 }
 
 .tx-hero__value {
   display: block;
-  color: $success;
-  font-size: 1.75rem;
-  font-weight: 800;
+  color: $success-text;
+  font-size: 1.85rem;
+  font-weight: 600;
   line-height: 1.1;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
 }
 
 // ── Datos en filas etiqueta / valor ────────────────────────────
@@ -162,11 +163,11 @@
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  color: $muted;
-  font-size: $fs-xs;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+  color: $ink-soft;
+  font-size: $fs-sm;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
   margin-bottom: 0.6rem;
 }
 
