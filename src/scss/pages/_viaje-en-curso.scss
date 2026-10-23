@@ -1,0 +1,429 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Viaje en curso (chofer, celular): mapa a pantalla completa + panel inferior.
+// Venía en un <style> en línea; se acota a .nav-wrapper para no tocar otras pantallas.
+// El mapa conserva el azul de navegación (#1a73e8): la ruta la dibuja el JS en ese color.
+// El panel usa los colores del sistema. Clases que toca el JS de la vista: .collapsed,
+// .hidden, .arrived, .nav-status(.active/.error), .nav-status__retry, .remito-preview__*.
+// ═══════════════════════════════════════════════════════════════
+
+$nav-blue: #1a73e8;
+$nav-shadow: 0 1px 3px rgba(0, 0, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.12);
+
+.nav-wrapper {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #e8eaed;
+  z-index: 1000;
+  overflow: hidden;
+
+  .nav-map-container { position: relative; flex: 1 1 auto; min-height: 0; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; background: #e8eaed; }
+
+  // ── Encabezado flotante ──
+  .nav-top {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    display: flex;
+    gap: 0.6rem;
+    align-items: stretch;
+    z-index: 600;
+    pointer-events: none;
+
+    > * { pointer-events: auto; }
+  }
+
+  .nav-icon-btn {
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.97);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: $nav-shadow;
+    font-size: 20px;
+    color: $gray-700;
+
+    &:active { background: $gray-100; transform: scale(0.96); }
+  }
+
+  .nav-dest-chip {
+    flex: 1;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.97);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 14px;
+    padding: 0.55rem 0.95rem;
+    box-shadow: $nav-shadow;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+
+    .d {
+      font-weight: 600;
+      color: $ink;
+      font-size: 0.92rem;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+
+      .ic { color: $accent; margin-right: 0.3rem; vertical-align: -0.15em; }
+    }
+
+    .c {
+      color: $muted;
+      font-size: 0.78rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  }
+
+  // ── Velocímetro flotante ──
+  .nav-speed {
+    position: absolute;
+    left: 14px;
+    bottom: 16px;
+    z-index: 600;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid $nav-blue;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: bottom 0.28s ease;
+
+    b { font-size: 1.3rem; line-height: 1.05; color: $ink; font-weight: 700; font-variant-numeric: tabular-nums; }
+    span { font-size: 0.58rem; color: $muted; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  }
+
+  // ── Botones flotantes (FAB) ──
+  .nav-fabs {
+    position: absolute;
+    right: 14px;
+    z-index: 600;
+    bottom: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: bottom 0.28s ease;
+  }
+
+  .nav-fab {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #fff;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    color: $nav-blue;
+
+    &:active { background: $gray-100; }
+    &[hidden] { display: none; }
+  }
+
+  .nav-fab--info {
+    color: $gray-700;
+    font-size: 14px;
+    font-weight: 600;
+    width: auto;
+    padding: 0 16px;
+    border-radius: 24px;
+    gap: 6px;
+  }
+
+  // ── Marcador del chofer (punto con flecha de dirección) ──
+  .nav-puck { position: relative; width: 34px; height: 34px; }
+
+  .nav-puck__halo {
+    position: absolute;
+    inset: -16px;
+    border-radius: 50%;
+    background: rgba(26, 115, 232, 0.28);
+    animation: puckPulse 2.4s ease-out infinite;
+    pointer-events: none;
+  }
+
+  .nav-puck__dot {
+    position: absolute;
+    inset: 6px;
+    border-radius: 50%;
+    background: $nav-blue;
+    border: 3px solid #fff;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(26, 115, 232, 0.3);
+  }
+
+  .nav-puck__arrow {
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-left: 7px solid transparent;
+    border-right: 7px solid transparent;
+    border-bottom: 11px solid $nav-blue;
+    transform-origin: 50% 21px;
+    transform: translateX(-50%) rotate(0deg);
+    transition: transform 0.3s linear;
+    filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.3));
+  }
+
+  .leaflet-marker-icon.nav-puck-icon { transition: transform 0.8s linear; }
+
+  // ── Panel inferior ──
+  // Se superpone al mapa (abajo): el JS ubica el velocímetro y los botones flotantes a
+  // "alto del panel + 16px" contando desde el pie del mapa, lo que solo da bien si el mapa
+  // ocupa toda la pantalla. Antes el panel iba debajo del mapa y el velocímetro quedaba
+  // arriba, tapando el botón de volver.
+  .nav-panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 700;
+    background: #fff;
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -2px 16px rgba(0, 0, 0, 0.12);
+    display: flex;
+    flex-direction: column;
+    transition: max-height 0.28s ease, transform 0.28s ease;
+    max-height: 60vh;
+    overflow: hidden;
+
+    &.collapsed { max-height: 116px; }
+    &.hidden { transform: translateY(100%); max-height: 0; }
+  }
+
+  .nav-grip {
+    padding: 8px 0 4px;
+    display: flex;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+
+    span { width: 40px; height: 5px; border-radius: 3px; background: $gray-300; }
+  }
+
+  .nav-progress {
+    height: 4px;
+    background: $gray-150;
+    border-radius: 2px;
+    margin: 0 1rem 0.55rem;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .nav-progress__bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, $nav-blue, $success);
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  .nav-stats {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0 1rem 0.6rem;
+    flex-shrink: 0;
+  }
+
+  .nav-stat {
+    flex: 1;
+    text-align: center;
+
+    b { display: block; font-size: 1.3rem; font-weight: 700; color: $ink; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    span { font-size: 0.7rem; color: $muted; font-weight: 500; }
+  }
+
+  .nav-stat--primary b { color: $success-text; font-size: 1.45rem; }
+
+  // ── Navegación externa + llamada ──
+  .nav-ext {
+    display: flex;
+    gap: 0.55rem;
+    margin-bottom: 0.85rem;
+
+    a {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+      min-height: 44px;
+      padding: 0.6rem 0.4rem;
+      border-radius: 10px;
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: $gray-700;
+      background: #fff;
+      border: 1px solid $border-input;
+      box-shadow: $shadow-xs;
+
+      &:active { background: $gray-100; }
+      &.disabled { opacity: 0.4; pointer-events: none; }
+      &.ext-call { color: $success-text; border-color: $success-border; background: $success-soft; }
+    }
+  }
+
+  // ── Estado "llegaste" ──
+  .nav-panel.arrived .nav-dest-card { background: $success-soft; }
+  .nav-panel.arrived .nav-dest-card__icon { background: $success; }
+  .nav-panel.arrived .btn-finalizar { background: $success !important; border-color: $success !important; animation: btnPulse 1.8s infinite; }
+
+  .nav-panel-hide {
+    border: none;
+    background: $gray-100;
+    color: $gray-600;
+    cursor: pointer;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 16px;
+    flex-shrink: 0;
+
+    &:active { background: $gray-200; }
+  }
+
+  .nav-body { overflow-y: auto; padding: 0.25rem 1rem 1rem; }
+
+  .nav-dest-card {
+    background: $gray-50;
+    border: 1px solid $border-soft;
+    padding: 0.85rem;
+    border-radius: 12px;
+    margin-bottom: 0.85rem;
+    display: flex;
+    gap: 0.85rem;
+    align-items: flex-start;
+  }
+
+  .nav-dest-card__icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: $accent;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .nav-dest-card__info h4 { margin: 0 0 2px; font-size: 0.95rem; font-weight: 600; color: $ink; }
+  .nav-dest-card__info p { margin: 0; font-size: 0.85rem; color: $muted; }
+
+  .nav-status {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.6rem 0.85rem;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    background: $info-soft;
+    color: $info-text;
+    margin-bottom: 0.85rem;
+
+    &.active { background: $success-soft; color: $success-text; }
+    &.error  { background: $danger-soft; color: $danger-text; }
+
+    .spinner {
+      width: 0.7rem;
+      height: 0.7rem;
+      border: 2px solid rgba(0, 0, 0, 0.15);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: navspin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+
+    &.active .spinner,
+    &.error .spinner { display: none; }
+  }
+
+  .nav-status__retry {
+    margin-left: auto;
+    border: 1px solid currentColor;
+    background: transparent;
+    color: inherit;
+    border-radius: $radius-sm;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    cursor: pointer;
+  }
+
+  .nav-actions {
+    display: flex;
+    gap: 0.6rem;
+
+    .btn {
+      flex: 1;
+      min-height: 48px;
+      padding: 0.8rem;
+      border-radius: 10px;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .btn-volver { background: $gray-100; color: $gray-700; }
+    .btn-finalizar { background: $accent; color: #fff; flex: 1.4; }
+    .btn-finalizar:active { background: $accent-dark; }
+  }
+}
+
+@keyframes puckPulse {
+  0%   { transform: scale(0.4); opacity: 0.9; }
+  70%  { transform: scale(1);  opacity: 0; }
+  100% { transform: scale(1);  opacity: 0; }
+}
+
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(7, 148, 85, 0.45); }
+  50%      { box-shadow: 0 0 0 12px rgba(7, 148, 85, 0); }
+}
+
+@keyframes navspin { to { transform: rotate(360deg); } }
+
+// ── Pad de firma (modal de finalizar) ──
+.firma-wrap { position: relative; }
+
+.firma-canvas {
+  width: 100%;
+  height: 180px;
+  border: 2px dashed $border-input;
+  border-radius: 10px;
+  background: #fff;
+  display: block;
+  touch-action: none;
+}
+
+.firma-clear { position: absolute; top: 8px; right: 8px; }
