@@ -12,11 +12,11 @@
   <div class="d-flex gap-2 align-items-center">
     <span class="badge rounded-pill px-3 py-2 <%= badge %>"><%= op.estado %></span>
     <% if (op.estado !== 'anulado') { %>
-      <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary">🖨️ Remito</a>
-      <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary">📄 PDF</a>
+      <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('printer', { size: 15 }) %> Remito</a>
+      <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 15 }) %> PDF</a>
     <% } %>
     <% if (op.modalidad === 'flete' && op.estado !== 'entregado' && op.estado !== 'anulado') { %>
-      <a href="/ventas/<%= op.id %>/editar" class="btn btn-sm btn-naranja">✏️ Editar</a>
+      <a href="/ventas/<%= op.id %>/editar" class="btn btn-sm btn-naranja"><%- icon('edit', { size: 15 }) %> Editar</a>
     <% } %>
     <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
@@ -46,16 +46,16 @@
             <p class="text-muted mb-1"><span class="fw-semibold text-dark">DNI/CUIT:</span> <%= op.cliente_dni %></p>
           <% } %>
           <% if (op.domicilio_ppal) { %>
-            <p class="text-muted mb-1">📍 <%= op.domicilio_ppal %><% if (op.cliente_zona) { %> <span class="text-muted">(<%= op.cliente_zona %>)</span><% } %></p>
+            <p class="text-muted mb-1"><%- icon('mapPin', { size: 14, class: 'ic-dato' }) %><%= op.domicilio_ppal %><% if (op.cliente_zona) { %> <span class="text-muted">(<%= op.cliente_zona %>)</span><% } %></p>
           <% } %>
           <% if (op.tel_whatsapp) { %>
-            <p class="text-muted mb-1">📱 <%= op.tel_whatsapp %> <span class="text-muted">(WhatsApp)</span></p>
+            <p class="text-muted mb-1"><%- icon('smartphone', { size: 14, class: 'ic-dato' }) %><%= op.tel_whatsapp %> <span class="text-muted">(WhatsApp)</span></p>
           <% } %>
           <% if (op.cliente_telefono) { %>
-            <p class="text-muted mb-1">📞 <%= op.cliente_telefono %></p>
+            <p class="text-muted mb-1"><%- icon('phone', { size: 14, class: 'ic-dato' }) %><%= op.cliente_telefono %></p>
           <% } %>
           <% if (op.cliente_email) { %>
-            <p class="text-muted mb-1">✉️ <%= op.cliente_email %></p>
+            <p class="text-muted mb-1"><%- icon('mail', { size: 14, class: 'ic-dato' }) %><%= op.cliente_email %></p>
           <% } %>
           <% if (op.cliente_cc) {
                const saldo = Number(op.cliente_saldo || 0)
@@ -75,8 +75,8 @@
 
   <!-- Totales -->
   <div class="col-md-3">
-    <div class="card shadow-sm h-100 card-accent-orange">
-      <div class="card-body d-flex flex-column justify-content-center text-center">
+    <div class="card shadow-sm h-100 card-accent-orange kpi-card">
+      <div class="card-body d-flex flex-column justify-content-center">
         <p class="text-muted small mb-1">Total</p>
         <h3 class="fw-bold text-orange">
           $<%= op.total.toLocaleString('es-AR', { minimumFractionDigits: 2 }) %>
@@ -92,21 +92,21 @@
       <div class="card-body d-flex flex-column gap-2">
         <% if (op.estado === 'pendiente') { %>
           <form action="/ventas/<%= op.id %>/despachar" method="POST">
-            <button class="btn btn-naranja w-100">🚛 Marcar como Despachada</button>
+            <button class="btn btn-naranja w-100"><%- icon('truck', { size: 16 }) %> Marcar como Despachada</button>
           </form>
           <form action="/ventas/<%= op.id %>/entregar" method="POST">
-            <button class="btn btn-success w-100">✅ Confirmar Entrega</button>
+            <button class="btn btn-success w-100"><%- icon('checkCircle', { size: 16 }) %> Confirmar Entrega</button>
           </form>
         <% } %>
         <% if (op.estado === 'despachado') { %>
           <form action="/ventas/<%= op.id %>/entregar" method="POST">
-            <button class="btn btn-success w-100">✅ Confirmar Entrega</button>
+            <button class="btn btn-success w-100"><%- icon('checkCircle', { size: 16 }) %> Confirmar Entrega</button>
           </form>
         <% } %>
         <% if (['pendiente','despachado'].includes(op.estado)) { %>
           <form action="/ventas/<%= op.id %>/anular" method="POST"
                 onsubmit="return confirm('¿Anular esta orden? No se puede deshacer.')">
-            <button class="btn btn-outline-danger w-100">✕ Anular OP</button>
+            <button class="btn btn-outline-danger w-100"><%- icon('x', { size: 16 }) %> Anular OP</button>
           </form>
         <% } %>
         <% if (op.estado === 'entregado' || op.estado === 'anulado') { %>
@@ -149,7 +149,7 @@
             </div>
             <div class="col-12">
               <small class="text-muted d-block">Domicilio</small>
-              <p class="mb-0">📍 <%= op.contenedor.domicilio_entrega %></p>
+              <p class="mb-0"><%- icon('mapPin', { size: 14, class: 'ic-dato' }) %><%= op.contenedor.domicilio_entrega %></p>
             </div>
           </div>
         </div>

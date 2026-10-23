@@ -31,20 +31,20 @@
           </a>
           <span class="form-text d-block mt-1">Abre WhatsApp con el mensaje listo hacia <%= r.chofer_nombre ? r.chofer_nombre.trim() : 'el chofer' %>. Presioná Enviar.</span>
         <% } else { %>
-          <span class="form-text text-muted d-block">📱 El chofer no tiene teléfono cargado — agregalo en su ficha para enviarle el viaje por WhatsApp.</span>
+          <span class="form-text text-muted d-block"><%- icon('smartphone', { size: 14, class: 'ic-dato' }) %>El chofer no tiene teléfono cargado — agregalo en su ficha para enviarle el viaje por WhatsApp.</span>
         <% } %>
       </div>
     <% } %>
 
     <% if (typeof solapamiento !== 'undefined' && solapamiento && solapamiento.opId === String(opId)) { %>
       <hr class="my-3">
-      <div class="alert alert-warning p-3 rounded-3" style="border-left:4px solid #f59e0b">
-        <p class="fw-semibold mb-2">⚠️ Solapamiento de horario detectado</p>
+      <div class="alert alert-warning p-3 rounded-3 d-block">
+        <p class="fw-semibold mb-2"><%- icon('alert', { size: 16, class: 'me-1' }) %>Solapamiento de horario detectado</p>
         <% solapamiento.advertencias.forEach(a => { %><p class="small mb-1"><%= a %></p><% }) %>
         <div class="d-flex flex-wrap gap-2 mt-3">
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="this.closest('.alert').remove()">Entiendo, continuar así</button>
           <form action="/operaciones/<%= opId %>/retrasar30" method="POST" class="d-inline">
-            <button class="btn btn-sm btn-warning">⏱ Atrasar 30 minutos</button>
+            <button class="btn btn-sm btn-warning"><%- icon('clock', { size: 15 }) %> Atrasar 30 minutos</button>
           </form>
           <button type="button" class="btn btn-sm btn-outline-secondary" onclick="this.closest('.alert').remove(); document.getElementById('selChofer-<%= opId %>')?.focus()">Elegir otro chofer / camión</button>
         </div>

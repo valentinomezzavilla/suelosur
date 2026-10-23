@@ -11,17 +11,17 @@
   border-radius: $radius-lg;
   padding: 1.25rem 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: $shadow-sm;
+  box-shadow: $shadow-xs;
 }
 
 .detalle-section-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: $dark;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  color: $ink;
   margin: 0 0 1rem;
-  padding-bottom: 0.6rem;
+  padding-bottom: 0.7rem;
   border-bottom: 1px solid $border-soft;
 }
 
@@ -38,7 +38,7 @@
 .info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 0.85rem 1.75rem;
+  gap: 0.25rem 1.75rem;
 }
 
 .info-row {
@@ -46,7 +46,7 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 1rem;
-  padding: 0.4rem 0;
+  padding: 0.55rem 0;
   border-bottom: 1px solid $border-line;
 
   &:last-child { border-bottom: none; }
@@ -59,23 +59,24 @@
 }
 
 .info-value {
-  color: $dark;
-  font-weight: 600;
-  font-size: $fs-sm;
+  color: $ink;
+  font-weight: 500;
+  font-size: $fs-base;
   text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.detalle-precio { color: $accent; font-weight: 700; font-size: 1.1rem; }
+.detalle-precio { color: $ink; font-weight: 600; font-size: 1.15rem; letter-spacing: -0.015em; }
 
-.saldo-negativo { color: $danger; }
-.saldo-positivo { color: $success; }
+.saldo-negativo { color: $danger-text; }
+.saldo-positivo { color: $success-text; }
 
 // ── Filtros de historial + secciones de historial ────────────
 .historial-filtros-card {
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-lg;
-  padding: 1rem 1.15rem;
+  padding: 0.875rem 1rem;
   margin-bottom: 1rem;
   box-shadow: $shadow-xs;
 }
@@ -85,20 +86,20 @@
 
   &__title {
     font-size: 1rem;
-    font-weight: 700;
-    color: $dark;
+    font-weight: 600;
+    color: $ink;
+    letter-spacing: -0.012em;
     margin: 0 0 0.75rem;
   }
 
   &__empty {
     color: $muted;
-    font-style: italic;
     font-size: $fs-sm;
     text-align: center;
-    padding: 1.25rem;
+    padding: 1.5rem;
     background: $bg-card;
-    border: 1px dashed $border;
-    border-radius: $radius-md;
+    border: 1px dashed $border-input;
+    border-radius: $radius-lg;
   }
 }
 
@@ -115,9 +116,10 @@
 }
 
 .section-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: $dark;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: $ink;
+  letter-spacing: -0.015em;
   margin: 0 0 0.75rem;
 }
 
@@ -149,43 +151,75 @@
 
 // ── Pantalla de confirmación de venta ─────────────────────────
 .confirmacion-card {
-  max-width: 480px;
+  max-width: 460px;
   margin: 3rem auto;
   background: $bg-card;
   border: 1px solid $border;
   border-radius: $radius-xl;
-  padding: 2.5rem 2rem;
+  padding: 2.5rem 2rem 2rem;
   text-align: center;
-  box-shadow: $shadow-md;
+  box-shadow: $shadow-lg;
+  animation: confirmacion-in 0.4s $ease-out both;
 }
 
+@keyframes confirmacion-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+// Tilde que "salta" al aparecer, con un anillo que se expande una vez
 .confirmacion-icon {
-  width: 72px;
-  height: 72px;
-  margin: 0 auto 1.1rem;
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 1.25rem;
   border-radius: 50%;
-  background: $success-soft;
-  color: $success;
+  background: $success;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2.2rem;
+  font-size: 1.9rem;
   font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 6px $success-soft, 0 8px 18px -6px rgba(7, 148, 85, 0.55);
+  animation: confirmacion-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) 0.1s both;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid $success;
+    opacity: 0;
+    animation: confirmacion-ring 0.9s $ease-out 0.35s;
+  }
+}
+
+@keyframes confirmacion-pop {
+  from { opacity: 0; transform: scale(0.6); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes confirmacion-ring {
+  from { opacity: 0.5; transform: scale(1); }
+  to   { opacity: 0; transform: scale(1.45); }
 }
 
 .confirmacion-titulo {
-  font-size: 1.4rem;
-  font-weight: 700;
-  color: $dark;
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: $ink;
+  letter-spacing: -0.022em;
   margin: 0 0 1.5rem;
 }
 
 .confirmacion-detalles {
   text-align: left;
-  background: $bg-card-alt;
+  background: $gray-50;
   border: 1px solid $border-soft;
   border-radius: $radius-md;
-  padding: 0.5rem 1.1rem;
+  padding: 0.35rem 1.1rem;
   margin-bottom: 1.5rem;
 }
 
