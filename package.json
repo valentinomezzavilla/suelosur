@@ -9,6 +9,7 @@
     "start": "node server.js",
     "geocodificar:alquileres": "node scripts/geocodificar-alquileres.js",
     "agrupar:alquileres": "node scripts/agrupar-alquileres.js",
+    "corregir:fecha-cargos": "node scripts/corregir-fecha-cargos.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
   },
   "dependencies": {

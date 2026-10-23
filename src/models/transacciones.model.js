@@ -139,12 +139,9 @@ const TransaccionesModel = {
       // Entra a cta. corriente: generar el cargo correspondiente.
       if (nuevoMetodo === 'cuenta_corriente' && tx.id_op_encabezado) {
         const monto = Number(tx.monto) || 0
-        await q(
-          `INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado)
-           VALUES (?, 'deuda', ?, ?, ?)`,
-          [tx.cliente_id, `${tx.tipo}: ${tx.descripcion || ''}`.trim(), -monto, tx.id_op_encabezado]
-        )
-        await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [monto, tx.cliente_id])
+        await ClientesModel.agregarMovimiento(tx.cliente_id, {
+          tipo: 'deuda', descripcion: `${tx.tipo}: ${tx.descripcion || ''}`.trim(), monto: -monto, id_op_encabezado: tx.id_op_encabezado,
+        }, q)
       }
     })
   },
