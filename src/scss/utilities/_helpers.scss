@@ -221,3 +221,10 @@ h1 .ic, h2 .ic, h4 .ic { margin-right: 0.15rem; }
   word-break: break-word;
   font-variant-numeric: tabular-nums;
 }
+
+// Ícono que acompaña un dato (dirección, teléfono, mail…): discreto y alineado al texto
+.ic-dato {
+  color: $gray-400;
+  margin-right: 0.4rem;
+  vertical-align: -0.18em;
+}
