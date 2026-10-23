@@ -96,7 +96,7 @@ describe('generarLiquidacionPDF — solo pendientes', () => {
     resumen, obra: null,
   }
 
-  it('no muestra lo pagado ni los pagos del período', async () => {
+  it('no muestra lo pagado', async () => {
     const textos = await textosDelPDF({ liquidacion, filtros: { ...filtros, estadoPago: 'pendientes' }, general: false })
     const todo = textos.join('\n').toUpperCase()
     assert.ok(!todo.includes('PAGADO'), 'no debe figurar "Pagado"')
@@ -106,10 +106,11 @@ describe('generarLiquidacionPDF — solo pendientes', () => {
     assert.ok(textos.includes('2 operaciones con saldo pendiente'))
   })
 
-  it('con "Todas" sigue mostrando pagado y pagos', async () => {
+  it('con "Todas" sigue mostrando pagado, pero tampoco lista los pagos recibidos del período', async () => {
     const todo = (await textosDelPDF({ liquidacion, filtros, general: false })).join('\n').toUpperCase()
     assert.ok(todo.includes('PAGADO'))
-    assert.ok(todo.includes('PAGOS RECIBIDOS'))
+    assert.ok(!todo.includes('PAGOS RECIBIDOS'))
+    assert.ok(!todo.includes('SIN PAGOS REGISTRADOS'))
   })
 
   it('general: el resumen por cliente queda solo con el saldo', async () => {

@@ -1,11 +1,11 @@
 'use strict'
 // ─────────────────────────────────────────────────────────────────
 // pdfLiquidacion.js — Liquidación para compartir con el cliente: ficha, resumen,
-// cada operación con su detalle y estado, resumen por obra y pagos.
+// cada operación con su detalle y estado, resumen por obra y saldo pendiente (sin el listado de pagos).
 // Sin cliente ("Liquidación general"): resumen por cliente y cada cliente en página nueva.
 // Diseño formal y sobrio: blanco, negro y grises, filetes finos, sin colores de acento.
 // No muestra el método de pago de cada operación: todo lo que figura se liquida junto.
-// Con el filtro "Solo pendientes" muestra solo lo que se debe: sin lo pagado ni los pagos del período.
+// Con el filtro "Solo pendientes" muestra solo lo que se debe: sin lo pagado.
 // ─────────────────────────────────────────────────────────────────
 const PDFDocument = require('pdfkit')
 const B = require('./pdfBrand')
@@ -240,19 +240,6 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     tablaResumen('Resumen por obra', 'Obra', porObra, tituloPagina)
   }
 
-  function pagos(lista, tituloPagina) {
-    if (!lista || soloPendiente) return
-    const total = lista.reduce((s, p) => s + p.monto, 0)
-    tablaSimple('Pagos recibidos del período', [
-      { key: 'fecha', header: 'Fecha', w: 0.14, align: 'left' }, { key: 'metodo', header: 'Forma de pago', w: 0.18, align: 'left' },
-      { key: 'descripcion', header: 'Concepto', w: 0.48, align: 'left' }, { key: 'monto', header: 'Importe', w: 0.2, align: 'right' },
-    ], [
-      ...lista.map(p => ({ fecha: fmtFecha(p.fecha), metodo: p.metodoTexto, descripcion: p.descripcion, monto: B.money(p.monto) })),
-      ...(lista.length ? [] : [{ descripcion: 'Sin pagos registrados en el período', _color: GRIS }]),
-      { descripcion: 'TOTAL', monto: B.money(total), _bold: true },
-    ], tituloPagina)
-  }
-
   // Operaciones del período que todavía deben algo (las "a convenir" no tienen precio)
   function pendiente(ops, tituloPagina) {
     if (!ops) return
@@ -306,7 +293,6 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     tarjetasResumen(c.resumen)
     operaciones(c, titulo)
     resumenPorObra(c.porObra, titulo)
-    pagos(c.pagos, titulo)
     pendiente(c.operaciones, titulo)
   }
 
