@@ -162,6 +162,8 @@
   margin: 0.35rem 0 0;
   line-height: 1.45;
 }
+// Ayuda suelta dentro de una sección (no pegada a un campo): aire antes del campo siguiente
+.form-section > .form-hint:not(:last-child) { margin-bottom: 0.8rem; }
 
 // Mensaje de error de campo (public/js/formValidation.js agrega .field-error / .field-error-msg)
 .field-error,
