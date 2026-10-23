@@ -23,6 +23,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+// Valor suelto, fuera de la grilla (ej. "Acceso al sistema" en la ficha del empleado):
+// alineado con lo que tiene debajo, no contra el borde derecho
+p.resumen-valor { text-align: left; margin-bottom: 0.4rem; }
+
 .resumen-total {
   display: flex;
   align-items: baseline;
