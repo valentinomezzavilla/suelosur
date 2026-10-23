@@ -1,0 +1,83 @@
+@use '../abstracts/variables' as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Tokens semánticos como variables CSS (capa nueva del rediseño).
+// Los componentes migrados usan estas variables; salen de los mismos valores SCSS
+// que usa el código viejo, así lo nuevo y lo viejo nunca se ven distintos.
+// ═══════════════════════════════════════════════════════════════
+:root {
+  // Superficies
+  --bg-app:       #{$bg-app};
+  --bg-surface:   #{$bg-card};
+  --bg-subtle:    #{$bg-card-alt};
+  --bg-hover:     #{$bg-hover};
+  --bg-active:    #{$bg-active};
+
+  // Texto
+  --text-1:       #{$ink};
+  --text-2:       #{$ink-soft};
+  --text-3:       #{$muted};
+  --text-4:       #{$placeholder};
+  --text-on-accent: #fff;
+
+  // Bordes
+  --border-1:     #{$border-line};
+  --border-2:     #{$border};
+  --border-3:     #{$border-input};
+  --border-4:     #{$border-input-hover};
+
+  // Marca
+  --accent:        #{$accent};
+  --accent-dark:   #{$accent-dark};
+  --accent-darker: #{$accent-darker};
+  --accent-soft:   #{$accent-soft};
+  --accent-border: #{$accent-border};
+  --orange:        #{$orange};
+  --orange-text:   #{$orange-text};
+  --sand:          #{$sand};
+  --navy:          #{$sidebar-bg};
+  --strata:        #{$strata};
+
+  // Estados
+  --success: #{$success}; --success-soft: #{$success-soft}; --success-border: #{$success-border}; --success-text: #{$success-text};
+  --warning: #{$warning}; --warning-soft: #{$warning-soft}; --warning-border: #{$warning-border}; --warning-text: #{$warning-text};
+  --danger:  #{$danger};  --danger-soft:  #{$danger-soft};  --danger-border:  #{$danger-border};  --danger-text:  #{$danger-text};
+  --info:    #{$info};    --info-soft:    #{$info-soft};    --info-border:    #{$info-border};    --info-text:    #{$info-text};
+  --neutral-soft: #{$neutral-soft}; --neutral-border: #{$neutral-border}; --neutral-text: #{$neutral-text};
+
+  // Forma
+  --radius-xs: #{$radius-xs};
+  --radius-sm: #{$radius-sm};
+  --radius-md: #{$radius-md};
+  --radius-lg: #{$radius-lg};
+  --radius-xl: #{$radius-xl};
+  --control-h:    #{$control-h};
+  --control-h-sm: #{$control-h-sm};
+
+  // Elevación
+  --shadow-xs: #{$shadow-xs};
+  --shadow-sm: #{$shadow-sm};
+  --shadow-md: #{$shadow-md};
+  --shadow-lg: #{$shadow-lg};
+  --shadow-xl: #{$shadow-xl};
+  --focus-ring: #{$focus-ring};
+
+  // Movimiento
+  --ease:     #{$ease};
+  --ease-out: #{$ease-out};
+  --dur-1:    #{$dur-fast};
+  --dur-2:    #{$dur};
+  --dur-3:    #{$dur-slow};
+
+  // Tipografía
+  --font-sans: #{$font-base};
+  --font-mono: #{$font-mono};
+
+  // Layout
+  --sidebar-w: #{$sidebar-w};
+  --navbar-h:  #{$navbar-h};
+
+  // Compat (nombres usados por vistas y estilos anteriores)
+  --dark: #{$dark};
+  --mid:  #{$dark-2};
+}

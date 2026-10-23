@@ -1,20 +1,16 @@
 @use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
 
 :root {
-  --accent:      #{$accent};
-  --accent-dark: #{$accent-dark};
-  --accent-soft: #{$accent-soft};
-  --dark:        #{$dark};
-  --mid:         #{$dark-2};
-  --sidebar-w:   #{$sidebar-w};
-
   // Bootstrap: alinear sus componentes a los tokens de Suelosur.
   // (No se toca --bs-body-bg: las celdas de tabla lo usan como fondo.)
   --bs-body-font-family: #{$font-base};
+  --bs-body-font-size:   #{$fs-base};
   --bs-body-color:       #{$dark};
   --bs-emphasis-color:   #{$ink};
   --bs-heading-color:    #{$ink};
   --bs-secondary-color:  #{$muted};
+  --bs-tertiary-color:   #{$muted-soft};
   --bs-border-color:     #{$border};
   --bs-border-radius:    #{$radius-md};
   --bs-border-radius-sm: #{$radius-sm};
@@ -23,30 +19,41 @@
   --bs-link-color:       #{$accent};
   --bs-link-color-rgb:   28, 91, 173;
   --bs-link-hover-color: #{$accent-dark};
-  --bs-link-hover-color-rgb: 22, 74, 143;
+  --bs-link-hover-color-rgb: 23, 76, 147;
   --bs-primary:          #{$accent};
   --bs-primary-rgb:      28, 91, 173;
-  --bs-box-shadow-sm:    #{$shadow-sm};
+  --bs-success-rgb:      7, 148, 85;
+  --bs-danger-rgb:       217, 45, 32;
+  --bs-warning-rgb:      232, 145, 42;
+  --bs-secondary-rgb:    71, 84, 103;
+  // .shadow-sm está en casi todas las tarjetas: elevación mínima y uniforme
+  --bs-box-shadow-sm:    #{$shadow-xs};
   --bs-box-shadow:       #{$shadow-md};
   --bs-box-shadow-lg:    #{$shadow-lg};
-  --bs-focus-ring-color: rgba(28, 91, 173, 0.22);
+  --bs-focus-ring-color: rgba(28, 91, 173, 0.2);
 }
 
 body {
   font-family: $font-base;
   font-size:   $fs-base;
-  line-height: 1.55;
+  line-height: 1.5;
   color:       $dark;
   background:  $bg-app;
+  font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  // Toques en mobile: sin la demora de 300 ms del doble toque
+  touch-action: manipulation;
 }
 
 h1, h2, h3, h4, h5, h6 {
   color: $ink;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
+  font-weight: 600;
 }
+
+strong, b { font-weight: 600; }
 
 // Títulos de página: el h4 al inicio de cada vista, y los .page-title de las
 // pantallas de venta. Mismo tamaño y peso en todo el sistema.
@@ -54,19 +61,41 @@ h1, h2, h3, h4, h5, h6 {
 .main-content h4.fw-semibold,
 .page-title,
 .ventas-productos__title {
-  font-size: 1.4rem;
-  font-weight: 700 !important;
-  letter-spacing: -0.02em;
+  font-size: 1.375rem;
+  font-weight: 600 !important;
+  line-height: 1.25;
+  letter-spacing: -0.022em;
   color: $ink;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.65rem;
+  text-wrap: balance;
 
-  .ic {
+  // El ícono del título va en una baldosa suave del color de marca
+  > .ic {
+    box-sizing: content-box;
+    width: 18px;
+    height: 18px;
+    padding: 7px;
+    margin: 0;
     color: $accent;
-    width: 20px;
-    height: 20px;
+    background: $accent-soft;
+    border-radius: $radius-md;
+    box-shadow: inset 0 0 0 1px rgba(28, 91, 173, 0.1);
   }
+
+  @include sm-down {
+    font-size: 1.2rem;
+
+    > .ic { width: 16px; height: 16px; padding: 6px; }
+  }
+}
+
+// Bajada bajo el título de página
+.main-content h4.fw-bold + p.text-muted,
+.main-content .mb-3 > h4.fw-bold + p.text-muted {
+  margin-top: 0.3rem;
+  font-size: $fs-base;
 }
 
 // Números alineados en columnas de dinero / métricas
@@ -77,29 +106,24 @@ h1, h2, h3, h4, h5, h6 {
 .total-display,
 .transaccion-monto,
 .rs-total-value,
-.input-total {
+.input-total,
+.text-end,
+.fact-num {
   font-variant-numeric: tabular-nums;
 }
 
-// ── Mono: códigos y cifras protagonistas ───────────────────────
+// ── Mono: códigos ──────────────────────────────────────────────
 // Los códigos de las tablas (OP-0041, VIA-000014, N° de cliente…) se marcan en
 // todas las vistas como <td class="fw-semibold text-orange">.
 .mono,
-td.fw-semibold.text-orange,
-.stat-card__value,
-.total-display,
-.rs-total-value,
-.transaccion-monto,
-.cart-total-bar #cartTotalValor,
-.input-total,
-.ventas-card__precio {
+td.fw-semibold.text-orange {
   font-family: $font-mono;
   letter-spacing: -0.01em;
 }
 // Código en tabla: naranja óxido (el de marca no se lee sobre blanco)
 td.fw-semibold.text-orange {
-  font-weight: 600 !important;
-  font-size: 0.8rem;
+  font-weight: 500 !important;
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 
@@ -114,35 +138,30 @@ td.fw-semibold.text-orange {
 a:focus-visible,
 button:focus-visible,
 .btn:focus-visible,
-[role="button"]:focus-visible {
+summary:focus-visible,
+[role="button"]:focus-visible,
+[tabindex]:focus-visible {
   outline: 2px solid $accent;
   outline-offset: 2px;
   box-shadow: none;
 }
 
-::selection { background: rgba(232, 145, 42, 0.28); }
+::selection { background: rgba(28, 91, 173, 0.16); }
 
 // Controles Bootstrap a la misma altura que los del resto del sistema
-.form-control:not(textarea):not(.form-control-sm):not([type="file"]),
-.form-select:not(.form-select-sm):not([multiple]) {
+.form-control:not(textarea):not(.form-control-sm):not(.form-control-lg):not([type="file"]):not([type="color"]),
+.form-select:not(.form-select-sm):not(.form-select-lg):not([multiple]):not([size]) {
   min-height: $control-h;
 }
 
-// Botones Bootstrap usados en cabeceras: misma altura/peso que el resto
-.btn {
-  --bs-btn-font-weight: 600;
-  --bs-btn-border-radius: #{$radius-md};
-  --bs-btn-focus-box-shadow: #{$focus-ring};
-  font-weight: 600;
-  letter-spacing: 0.005em;
-  transition: color $dur-fast $ease, background-color $dur-fast $ease,
-              border-color $dur-fast $ease, box-shadow $dur-fast $ease, transform 0.06s;
-
-  &:active { transform: translateY(1px); }
+hr {
+  border-color: $border;
+  opacity: 1;
 }
-.btn-sm {
-  --bs-btn-border-radius: 7px;
-  font-weight: 600;
+
+// Links de texto: subrayado solo al pasar el mouse, con transición de color
+a {
+  transition: color $dur-fast $ease;
 }
 
 // Respeta "reducir movimiento" del sistema operativo
@@ -150,6 +169,8 @@ button:focus-visible,
   *,
   *::before,
   *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }

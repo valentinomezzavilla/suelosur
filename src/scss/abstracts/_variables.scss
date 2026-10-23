@@ -1,13 +1,17 @@
 // ═══════════════════════════════════════════════════════════════
-// Suelosur — Design tokens
+// Suelosur — Design tokens (fuente única de valores)
+// Los nombres viejos se conservan: los parciales que todavía no se migraron siguen
+// compilando y toman la paleta nueva. Lo nuevo usa las variables CSS de base/_tokens.
 // ═══════════════════════════════════════════════════════════════
 
-// ── Paleta de marca Suelosur ───────────────────────────────────
+// ── Marca ──────────────────────────────────────────────────────
 $accent:        #1c5bad;  // azul corporativo (logo)
-$accent-dark:   #164a8f;
-$accent-soft:   #eaf1fb;
+$accent-dark:   #174c93;  // hover
+$accent-darker: #123d78;  // presionado
+$accent-soft:   #edf3fc;
+$accent-border: #c5d7f1;
 
-// Naranja del logo (acento de marca: indicadores, detalles)
+// Naranja del logo (acento de marca: firma, indicador activo, atención)
 $orange:      #e8912a;
 $orange-dark: #c97520;
 $orange-soft: #fdf2e4;
@@ -22,98 +26,127 @@ $brand-yellow:      #f5b301;
 $brand-yellow-dark: #d99a00;
 $brand-yellow-soft: #fff6e0;
 
-// ── Neutros (escala slate) ─────────────────────────────────────
-$dark:          #1e293b;
+// ── Neutros (gris frío, con un toque del azul marino de la marca) ──
+$gray-25:  #fcfcfd;
+$gray-50:  #f9fafb;
+$gray-100: #f2f4f7;
+$gray-150: #eaecf0;
+$gray-200: #e4e7ec;
+$gray-300: #c8ced8;
+$gray-400: #98a2b3;
+$gray-500: #667085;
+$gray-600: #475467;
+$gray-700: #344054;
+$gray-800: #1d2939;
+$gray-900: #101828;
+
+// Texto
+$ink:           $gray-900;  // títulos, cifras
+$dark:          $gray-800;  // texto de cuerpo
 $dark-2:        #2e3a52;
-$ink:           #0f172a;
-$ink-soft:      #334155;
-$muted:         #5b6577;
-$muted-soft:    #748196;
-$muted-light:   #b4bfcd;
+$ink-soft:      $gray-700;  // etiquetas, texto de botones
+$muted:         $gray-500;  // texto secundario (4.9:1 sobre blanco)
+$muted-soft:    #7c8799;    // solo para datos no esenciales
+$muted-light:   #b4bcc8;    // deshabilitado / decorativo
+$placeholder:   #8b95a7;
 
-// Neutros cálidos tipo piedra para superficies y bordes (el texto sigue en slate)
-$border:        #e3ded5;
-$border-soft:   #ece8e1;
-$border-line:   #f0ede7;
+// Bordes
+$border:        $gray-200;  // tarjetas, separadores principales
+$border-soft:   $gray-150;
+$border-line:   #eff1f4;    // divisores de filas
 // Bordes de controles de formulario: más marcados para que se distingan del fondo
-$border-input:       #cfc8bc;
-$border-input-hover: #b0a797;
+$border-input:       $gray-300;
+$border-input-hover: #a9b2c0;
 
-$bg-app:        #f3f1ec;
+// Superficies
+$bg-app:        #f5f6f8;
 $bg-card:       #ffffff;
-$bg-card-alt:   #faf8f4;
-$bg-hover:      #f7f4ee;
+$bg-card-alt:   $gray-50;
+$bg-hover:      #f6f7f9;
+$bg-active:     $gray-100;
 
-$sidebar-bg:     #0b1a33;  // azul marino corporativo (logo login)
-$sidebar-bg-2:   #0f2242;
-$sidebar-border: rgba(255, 255, 255, 0.07);
-$sidebar-text:   rgba(255, 255, 255, 0.74);
-$sidebar-muted:  rgba(255, 255, 255, 0.52);
+// Sidebar (azul marino corporativo)
+$sidebar-bg:     #0b1a33;
+$sidebar-bg-2:   #0d1f3d;
+$sidebar-border: rgba(255, 255, 255, 0.08);
+$sidebar-text:   rgba(255, 255, 255, 0.72);
+$sidebar-muted:  rgba(255, 255, 255, 0.5);
 $sidebar-hover:  rgba(255, 255, 255, 0.06);
 $sidebar-active: rgba(255, 255, 255, 0.1);
 
-// ── Estados ────────────────────────────────────────────────────
-$success:       #1a8f4c;
-$success-soft:  #ecf8f1;
-$success-border:#b9e5cb;
-$success-text:  #14532d;
+// ── Estados (texto con contraste AA sobre su fondo suave) ──────
+$success:       #079455;
+$success-soft:  #ecfdf3;
+$success-border:#abefc6;
+$success-text:  #067647;
 
-$warning:       #e08a0b;
-$warning-soft:  #fff8eb;
-$warning-border:#f8dfa6;
-$warning-text:  #8a4b06;
+$warning:       #dc6803;
+$warning-soft:  #fffaeb;
+$warning-border:#fedf89;
+$warning-text:  #b54708;
 
-$danger:        #dc3a2f;
-$danger-soft:   #fdf1f0;
-$danger-border: #f6c6c1;
-$danger-text:   #962218;
+$danger:        #d92d20;
+$danger-dark:   #b42318;
+$danger-soft:   #fef3f2;
+$danger-border: #fecdca;
+$danger-text:   #b42318;
 
-$info:          #1f73b7;
-$info-soft:     #e9f3fb;
-$info-border:   #bcd8f0;
-$info-text:     #174e7d;
+$info:          #1570ef;
+$info-soft:     #eff8ff;
+$info-border:   #b2ddff;
+$info-text:     #175cd3;
 
-// ── Espaciado / radios ─────────────────────────────────────────
-// Radios contenidos: más "industrial" que redondeado
-$radius-sm: 5px;
-$radius-md: 7px;
-$radius-lg: 10px;
-$radius-xl: 14px;
+$neutral-soft:  $gray-100;
+$neutral-border:$gray-200;
+$neutral-text:  $gray-600;
+
+// ── Radios ─────────────────────────────────────────────────────
+$radius-xs: 4px;
+$radius-sm: 6px;
+$radius-md: 8px;
+$radius-lg: 12px;
+$radius-xl: 16px;
 
 // ── Altura uniforme de controles (inputs, selects, botones) ────
-$control-h:    40px;
-$control-h-sm: 32px;
+$control-h:    36px;
+$control-h-sm: 30px;
+$control-h-lg: 44px;   // táctil (mobile) y acciones protagonistas
 
 // ── Sombras (sistema de elevación) ─────────────────────────────
-// Sombras con tinte cálido (sobre fondo piedra, el negro-azulado se ve sucio)
-$shadow-xs: 0 1px 2px rgba(41, 33, 20, 0.05);
-$shadow-sm: 0 1px 3px rgba(41, 33, 20, 0.07), 0 1px 2px rgba(41, 33, 20, 0.04);
-$shadow-md: 0 8px 20px -6px rgba(41, 33, 20, 0.14), 0 2px 4px rgba(41, 33, 20, 0.04);
-$shadow-lg: 0 20px 44px -12px rgba(41, 33, 20, 0.24);
+$shadow-xs: 0 1px 2px rgba(16, 24, 40, 0.05);
+$shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px -1px rgba(16, 24, 40, 0.06);
+$shadow-md: 0 4px 10px -2px rgba(16, 24, 40, 0.08), 0 2px 4px -2px rgba(16, 24, 40, 0.05);
+$shadow-lg: 0 12px 24px -6px rgba(16, 24, 40, 0.12), 0 4px 8px -4px rgba(16, 24, 40, 0.05);
+$shadow-xl: 0 24px 48px -12px rgba(16, 24, 40, 0.22);
 
 // ── Focus ring ─────────────────────────────────────────────────
-$focus-ring: 0 0 0 3px rgba(28, 91, 173, 0.22);
+$focus-ring:        0 0 0 3px rgba(28, 91, 173, 0.2);
+$focus-ring-danger: 0 0 0 3px rgba(217, 45, 32, 0.18);
 
 // ── Movimiento ─────────────────────────────────────────────────
-$ease:     cubic-bezier(0.2, 0, 0, 1);
-$dur-fast: 0.15s;
-$dur:      0.2s;
+$ease:      cubic-bezier(0.2, 0, 0, 1);      // estándar
+$ease-out:  cubic-bezier(0.16, 1, 0.3, 1);   // entradas (desacelera)
+$ease-in:   cubic-bezier(0.4, 0, 1, 1);      // salidas
+$dur-fast:  0.12s;
+$dur:       0.18s;
+$dur-slow:  0.26s;
 
 // ── Layout ─────────────────────────────────────────────────────
 $sidebar-w:        248px;
 $sidebar-w-mobile: 284px;
-$navbar-h:         60px;
+$navbar-h:         56px;
 $content-pad:      1.75rem;
 $content-pad-mob:  1rem;
 
 // ── Tipografía ─────────────────────────────────────────────────
-$font-base:   "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
-// Códigos (OP, remitos, transacciones), montos y KPIs
+// Inter: alta legibilidad en tamaños chicos y cifras tabulares para datos.
+$font-base:   "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+// Códigos (OP, remitos, transacciones)
 $font-mono:   "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
-$fs-base:     0.9375rem;
-$fs-sm:       0.85rem;
-$fs-xs:       0.75rem;
-$fs-xxs:      0.68rem;
+$fs-base:     0.875rem;   // 14px
+$fs-sm:       0.8125rem;  // 13px
+$fs-xs:       0.75rem;    // 12px
+$fs-xxs:      0.6875rem;  // 11px
 
 // ── Breakpoints ────────────────────────────────────────────────
 $bp-sm:  576px;
@@ -121,6 +154,13 @@ $bp-md:  768px;
 $bp-lg:  992px;
 $bp-xl:  1200px;
 
+// ── Capas (z-index) ────────────────────────────────────────────
+$z-navbar:   90;
+$z-sidebar:  100;
+$z-dropdown: 1000;
+$z-modal:    1060;
+$z-loader:   2000;
+
 // ── Firma visual: franja "estratos" (capas del suelo) ──────────
-// Tres capas cortas — naranja, arena, azul — que aparecen en navbar, sidebar y login.
+// Tres capas cortas — naranja, arena, azul — que aparecen en sidebar, login y carga.
 $strata: linear-gradient(90deg, $orange 0 33.33%, $sand 33.33% 66.66%, $accent 66.66% 100%);
