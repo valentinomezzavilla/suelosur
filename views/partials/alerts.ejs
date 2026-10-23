@@ -1,21 +1,21 @@
 <% if (success && success.length > 0) { %>
-  <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+  <div class="alert alert-success alert-dismissible alert-flash fade show" role="alert">
     <span class="alert-dot"></span>
     <span><%= success[0] %></span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar aviso"></button>
   </div>
 <% } %>
 <% if (error && error.length > 0) { %>
-  <div class="alert alert-danger alert-dismissible fade show shadow-sm" role="alert">
+  <div class="alert alert-danger alert-dismissible alert-flash fade show" role="alert">
     <span class="alert-dot"></span>
     <span><%= error[0] %></span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar aviso"></button>
   </div>
 <% } %>
 <% if (warning && warning.length > 0) { %>
-  <div class="alert alert-warning alert-dismissible fade show shadow-sm" role="alert">
+  <div class="alert alert-warning alert-dismissible alert-flash fade show" role="alert">
     <span class="alert-dot"></span>
     <span><%= warning[0] %></span>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar aviso"></button>
   </div>
 <% } %>

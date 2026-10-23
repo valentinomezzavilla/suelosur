@@ -1,42 +1,53 @@
 @use '../abstracts/variables' as *;
 
+// Avisos (flash del servidor y cajas informativas en las vistas)
 .alert {
+  --bs-alert-padding-x: 1rem;
+  --bs-alert-padding-y: 0.75rem;
+  position: relative;
   border: 1px solid transparent;
-  border-radius: $radius-lg;
-  font-size: $fs-sm;
+  border-radius: 10px;
+  font-size: $fs-base;
   font-weight: 500;
+  line-height: 1.45;
   padding: 0.75rem 1rem;
   display: flex;
-  align-items: center;
-  gap: 0.65rem;
+  align-items: flex-start;
+  gap: 0.7rem;
   box-shadow: $shadow-xs;
 
+  // Indicador del tono, alineado con la primera línea del texto
   .alert-dot {
     width: 8px;
     height: 8px;
+    margin-top: 0.4em;
     border-radius: 50%;
     flex-shrink: 0;
   }
+
+  > span:not(.alert-dot) { flex: 1; min-width: 0; }
+
+  a { font-weight: 600; color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
   &.alert-success {
     background: $success-soft;
     border-color: $success-border;
     color: $success-text;
-    .alert-dot { background: $success; box-shadow: 0 0 0 3px rgba(26, 143, 76, 0.18); }
+    .alert-dot { background: $success; box-shadow: 0 0 0 3px rgba(7, 148, 85, 0.16); }
   }
 
   &.alert-danger {
     background: $danger-soft;
     border-color: $danger-border;
     color: $danger-text;
-    .alert-dot { background: $danger; box-shadow: 0 0 0 3px rgba(220, 58, 47, 0.18); }
+    .alert-dot { background: $danger; box-shadow: 0 0 0 3px rgba(217, 45, 32, 0.16); }
   }
 
   &.alert-warning {
     background: $warning-soft;
     border-color: $warning-border;
     color: $warning-text;
-    .alert-dot { background: $warning; box-shadow: 0 0 0 3px rgba(224, 138, 11, 0.2); }
+    .alert-dot { background: $orange; box-shadow: 0 0 0 3px rgba(232, 145, 42, 0.2); }
   }
 
   &.alert-info {
@@ -44,4 +55,65 @@
     border-color: $info-border;
     color: $info-text;
   }
+
+  &.alert-secondary,
+  &.alert-light {
+    background: $gray-50;
+    border-color: $border;
+    color: $gray-700;
+  }
+}
+
+// Botón cerrar: discreto, del color del aviso
+.alert-dismissible {
+  padding-right: 2.75rem;
+
+  .btn-close {
+    position: absolute;
+    top: 50%;
+    right: 0.6rem;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    margin-top: -14px;
+    border-radius: $radius-sm;
+    background-size: 10px;
+    opacity: 0.5;
+    transition: opacity $dur-fast $ease, background-color $dur-fast $ease;
+
+    &:hover { opacity: 0.9; background-color: rgba(16, 24, 40, 0.06); }
+    &:focus { box-shadow: $focus-ring; }
+  }
+}
+
+// ── Avisos flash (partials/alerts): entran con un leve desplazamiento y muestran
+// cuánto falta para cerrarse solos (public/js/main.js los cierra a los 4 s).
+.alert-flash {
+  overflow: hidden;
+  box-shadow: $shadow-sm;
+  // "backwards": al terminar no retiene opacidad, así el .fade de Bootstrap puede desvanecerlo al cerrar
+  animation: alert-flash-in 0.32s $ease-out backwards;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.28;
+    transform-origin: left center;
+    animation: alert-flash-timer 4s linear forwards;
+  }
+}
+
+@keyframes alert-flash-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes alert-flash-timer {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
 }

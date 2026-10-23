@@ -1,28 +1,43 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
-.modal-header-dark {
-  background: $dark;
-  color: #fff;
+// ═══════════════════════════════════════════════════════════════
+// Modales — Bootstrap (.modal) y el propio (.modal-overlay + .modal-box)
+// ═══════════════════════════════════════════════════════════════
 
-  .btn-close { filter: invert(1) grayscale(100%) brightness(200%); }
+.modal {
+  --bs-modal-border-radius: #{$radius-xl};
+  --bs-modal-inner-border-radius: #{$radius-xl - 1px};
+  --bs-modal-header-padding: 1rem 1.25rem;
+  --bs-modal-padding: 1.25rem;
+  --bs-modal-footer-gap: 0.5rem;
+  --bs-modal-title-line-height: 1.3;
 }
 
 .modal-content {
   border-radius: $radius-xl;
-  border: 1px solid $border;
-  box-shadow: $shadow-lg;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  box-shadow: $shadow-xl;
   overflow: hidden;
 }
 
-.modal-backdrop.show { opacity: 0.55; }
+.modal-backdrop { --bs-backdrop-bg: #0b1426; }
+.modal-backdrop.show { opacity: 0.45; }
+
+// Entrada: escala y desplazamiento mínimos (Bootstrap anima el .modal-dialog)
+.modal.fade .modal-dialog {
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.22s $ease-out;
+}
+.modal.show .modal-dialog { transform: none; }
 
 .modal-footer {
-  background: $bg-card-alt;
+  background: $gray-50;
   border-top-color: $border-soft;
+  padding: 0.75rem 1.25rem;
 }
 
-// En mobile dejamos el modal full-width
+// En mobile dejamos el modal casi a pantalla completa
 @include sm-down {
   .modal-dialog { margin: 0.5rem; }
 }
@@ -31,25 +46,31 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1060;
+  z-index: $z-modal;
   display: none; // el JS lo cambia a flex
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(17, 24, 39, 0.55);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: rgba(11, 20, 38, 0.45);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  animation: modal-overlay-in 0.18s $ease-out;
 }
+
+@keyframes modal-overlay-in { from { opacity: 0; } to { opacity: 1; } }
 
 .modal-box {
   background: $bg-card;
   border-radius: $radius-xl;
+  border: 1px solid rgba(16, 24, 40, 0.08);
   width: 100%;
   max-width: 480px;
   max-height: 92vh;
+  max-height: 92dvh;
   overflow-y: auto;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.32);
-  animation: modal-pop 0.16s ease-out;
+  overscroll-behavior: contain;
+  box-shadow: $shadow-xl;
+  animation: modal-pop 0.22s $ease-out;
 
   &--lg { max-width: 800px; }
 }
@@ -64,39 +85,76 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 1.15rem 1.5rem;
+  padding: 1rem 1.25rem;
   border-bottom: 1px solid $border-soft;
   position: sticky;
   top: 0;
-  background: linear-gradient(180deg, $bg-card 0%, $bg-card-alt 100%);
+  background: rgba(255, 255, 255, 0.92);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
   z-index: 1;
+
+  .btn-close {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    margin: -0.25rem -0.4rem -0.25rem auto;
+    border-radius: $radius-md;
+    background-size: 11px;
+    opacity: 0.55;
+    transition: opacity $dur-fast $ease, background-color $dur-fast $ease;
+
+    &:hover { opacity: 0.95; background-color: $gray-100; }
+    &:focus { box-shadow: $focus-ring; }
+  }
+}
+
+// Cabecera oscura (stock): va después de .modal-header para ganarle el fondo
+.modal-header.modal-header-dark {
+  background: $sidebar-bg;
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+
+  .modal-title { color: #fff; }
+  .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+    &:hover { background-color: rgba(0, 0, 0, 0.25); }
+  }
 }
 
 .modal-title {
   margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: $dark;
-  letter-spacing: -0.2px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: $ink;
+  letter-spacing: -0.015em;
 
   span { color: $accent; }
 }
 
 .modal-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   background: transparent;
   border: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   line-height: 1;
   color: $muted;
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: $radius-sm;
+  padding: 0;
+  border-radius: $radius-md;
+  transition: color $dur-fast $ease, background-color $dur-fast $ease;
 
-  &:hover { color: $dark; background: $bg-app; }
+  &:hover { color: $ink; background: $gray-100; }
 }
 
 .modal-body {
-  padding: 1.5rem;
+  padding: 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -104,27 +162,31 @@
   // Secciones del formulario dentro del modal: más prolijas y jerarquizadas
   .form-section {
     margin: 0;
-    background: $bg-card-alt;
+    background: $gray-50;
     border: 1px solid $border-soft;
     border-radius: $radius-lg;
-    padding: 1.1rem 1.25rem;
+    padding: 1rem 1.1rem;
+    box-shadow: none;
   }
 
   .form-section__title {
     display: flex;
     align-items: center;
     gap: 0.45rem;
-    color: $accent;
+    color: $ink;
+    font-size: $fs-sm;
     border-bottom: 1px solid $border-soft;
     padding-bottom: 0.6rem;
-    margin-bottom: 0.9rem;
+    margin-bottom: 0.85rem;
+
+    .ic { color: $accent; }
   }
 }
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 0.6rem;
+  gap: 0.5rem;
   flex-wrap: wrap;
   padding-top: 0.25rem;
 }
@@ -135,24 +197,25 @@
   background: $danger-soft;
   border: 1px solid $danger-border;
   border-radius: $radius-lg;
-  padding: 0.85rem 1.1rem;
-  margin-bottom: 1.15rem;
+  padding: 0.875rem 1.1rem;
+  margin-bottom: 1.1rem;
 
   &__label {
-    font-size: $fs-xxs;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: $fs-xs;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
     color: $danger-text;
-    margin: 0 0 0.15rem;
+    margin: 0 0 0.2rem;
   }
 
   &__monto {
-    font-size: 1.55rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
     color: $danger-text;
     line-height: 1.15;
+    font-variant-numeric: tabular-nums;
   }
 
   &__concepto {
@@ -167,7 +230,7 @@
   border: 0;
   padding: 0;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: $fs-xs;
   font-weight: 600;
   color: $accent;
   cursor: pointer;
@@ -175,6 +238,7 @@
   &:hover,
   &:focus-visible {
     text-decoration: underline;
+    text-underline-offset: 2px;
   }
 }
 
@@ -188,8 +252,8 @@
     top: 50%;
     transform: translateY(-50%);
     color: $muted;
-    font-weight: 600;
-    font-size: $fs-sm;
+    font-weight: 500;
+    font-size: $fs-base;
     pointer-events: none;
   }
 
