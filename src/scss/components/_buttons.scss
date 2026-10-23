@@ -86,6 +86,14 @@
 .btn-secondary,
 .btn-light { @extend %btn-tone-secondary; }
 
+// Grupo de botones-radio (.btn-check, ej. "Tipo de cheque"): la opción elegida en azul,
+// no en el gris del :active, para que se distinga de un vistazo
+.btn-check:checked + .btn-outline-secondary {
+  --bs-btn-active-color: #{$accent-dark};
+  --bs-btn-active-bg: #{$accent-soft};
+  --bs-btn-active-border-color: #{$accent};
+}
+
 // ── Contornos con significado ──────────────────────────────────
 .btn-outline-primary { @include btn-tone-outline($accent, $accent-border, $accent-soft, $accent); }
 .btn-outline-success { @include btn-tone-outline($success-text, $success-border, $success-soft, $success); }
