@@ -1,14 +1,82 @@
 @use '../abstracts/variables' as *;
 @use '../abstracts/mixins'    as *;
 
-// ── Grid de accesos rápidos (dashboard) ───────────────────────
+// ═══════════════════════════════════════════════════════════════
+// Dashboard (tablero del dueño)
+// ═══════════════════════════════════════════════════════════════
+
+// ── Alertas: medidor de proporción + filas con su color ────────
+.dash-alertas {
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-meter {
+  display: flex;
+  gap: 3px;
+  height: 8px;
+  margin: 0.15rem 0 1.15rem;
+  border-radius: 999px;
+  background: $gray-100;
+  overflow: hidden;
+
+  &__seg {
+    flex: 1 1 0;
+    min-width: 6px;
+    border-radius: 2px;
+    animation: dash-meter-in 0.6s $ease-out both;
+    transform-origin: left center;
+
+    &--vencido { background: $danger; }
+    &--critico { background: #f97066; }
+    &--alto    { background: $info; }
+  }
+}
+
+@keyframes dash-meter-in {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+
+.dash-alertas__row {
+  align-items: center;
+
+  > span:first-child {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+
+    &::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+  }
+
+  &--vencido > span:first-child::before { background: $danger; }
+  &--critico > span:first-child::before { background: #f97066; }
+  &--alto    > span:first-child::before { background: $info; }
+}
+
+.dash-alertas__total {
+  margin-top: 0.35rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid $border-soft;
+
+  > span:last-child { font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+}
+
+// ── Grid de accesos rápidos ───────────────────────────────────
 .module-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 0.875rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.75rem;
 
   @include sm-down {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.6rem;
   }
 }
 
@@ -17,90 +85,96 @@
   flex-direction: column;
   background: $bg-card;
   border: 1px solid $border;
-  border-radius: $radius-xl;
-  padding: 1.25rem 1.15rem;
+  border-radius: $radius-lg;
+  padding: 1.1rem 1.1rem 1rem;
   text-decoration: none;
   color: $dark;
   position: relative;
   overflow: hidden;
   box-shadow: $shadow-xs;
-  transition: transform $dur $ease, box-shadow $dur $ease, border-color $dur $ease;
-
-  // Franja de acento superior (aparece en hover)
-  &::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: var(--mc, #{$border});
-    opacity: 0;
-    transition: opacity 0.16s ease;
-  }
+  transition: transform $dur $ease-out, box-shadow $dur $ease, border-color $dur $ease;
 
   &:hover {
-    transform: translateY(-3px);
+    transform: translateY(-2px);
     box-shadow: $shadow-md;
-    border-color: var(--mc, #{$border});
+    border-color: $border-input;
     color: $dark;
 
-    &::after { opacity: 1; }
+    .mc-icon {
+      background: $accent;
+      color: #fff;
+      box-shadow: 0 4px 10px -3px rgba(28, 91, 173, 0.5);
+    }
 
     .mc-arrow {
-      opacity: 1;
-      transform: translateX(4px);
+      color: $accent-dark;
+      transform: translateX(3px);
     }
   }
+
+  &:active { transform: translateY(0); box-shadow: $shadow-xs; }
+
+  @include sm-down { padding: 0.9rem; }
 }
 
 .mc-icon {
-  width: 46px;
-  height: 46px;
-  border-radius: $radius-lg;
-  background: var(--mc-soft, #{$bg-app});
-  color: var(--mc, #{$muted});
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: $accent-soft;
+  color: $accent;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.85rem;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(28, 91, 173, 0.1);
+  transition: background-color $dur $ease, color $dur $ease, box-shadow $dur $ease;
+
+  svg { width: 19px; height: 19px; }
 }
 
 .mc-name {
-  font-weight: 700;
-  font-size: 0.875rem;
-  color: $dark;
+  font-weight: 600;
+  font-size: $fs-base;
+  color: $ink;
   line-height: 1.3;
-  margin-bottom: 0.25rem;
+  letter-spacing: -0.006em;
+  margin-bottom: 0.2rem;
 }
 
 .mc-desc {
-  font-size: 0.73rem;
+  font-size: $fs-sm;
   color: $muted;
   line-height: 1.45;
   flex: 1;
 }
 
 .mc-arrow {
-  margin-top: 0.85rem;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--mc, #{$muted});
-  letter-spacing: 0.1px;
+  margin-top: 0.8rem;
+  font-size: $fs-xs;
+  font-weight: 500;
+  color: $muted;
   // visible siempre (en táctiles no hay hover); se refuerza al pasar el mouse
-  opacity: 0.55;
-  transition: opacity $dur, transform $dur $ease;
+  transition: color $dur $ease, transform $dur $ease-out;
 }
 
 // ── Separador de sección en el dashboard ──────────────────────
 .dashboard-section-title {
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: $muted;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid $border-soft;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: $fs-sm;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: -0.006em;
+  color: $ink;
+  margin-bottom: 0.85rem;
+
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: $border;
+  }
 }

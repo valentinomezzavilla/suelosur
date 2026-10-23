@@ -237,17 +237,39 @@
   }
 }
 
-// KPIs del tablero: etiqueta chica + cifra grande
+// KPIs (tablero, facturación): etiqueta con el punto del color de la tarjeta + cifra grande.
+// El acento de color (.card-accent-*) pasa de barra lateral a punto, como en las stat cards.
 .kpi-card {
+  --kpi-color: #{$gray-400};
   border-radius: $radius-lg;
 
+  &.card-accent-orange { --kpi-color: #{$orange}; }
+  &.card-accent-green  { --kpi-color: #{$success}; }
+  &.card-accent-blue   { --kpi-color: #{$accent}; }
+  &.card-accent-red    { --kpi-color: #{$danger}; border-left: 1px solid $border; }
+  &::before { display: none; }
+
+  .card-body { padding: 1.1rem 1.25rem 1.15rem; }
+
   .card-body > p.small {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
     font-size: $fs-sm;
     font-weight: 500;
     text-transform: none;
     letter-spacing: 0;
     color: $muted !important;
-    margin-bottom: 0.5rem !important;
+    margin-bottom: 0.55rem !important;
+
+    &::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+      background: var(--kpi-color);
+      flex-shrink: 0;
+    }
   }
   h3 {
     font-family: $font-base;

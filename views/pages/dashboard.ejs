@@ -53,11 +53,20 @@
       <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
         <span>Alertas</span><a href="/alertas" class="small text-decoration-none">Ver todo →</a>
       </div>
-      <div class="card-body">
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Vencidas</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.vencido %></span></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Críticas (≤30d)</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.critico %></span></div>
-        <div class="d-flex justify-content-between mb-2"><span class="text-muted">Altas (≤60d)</span><span class="badge rounded-pill px-3 badge-en-transito"><%= alertas.alto %></span></div>
-        <div class="d-flex justify-content-between"><span class="text-muted">Total</span><span class="fw-bold"><%= alertas.total %></span></div>
+      <div class="card-body dash-alertas">
+        <%
+          // Medidor: proporción de vencidas / críticas / altas (mismos números que las filas)
+          const _sev = [['vencido', alertas.vencido], ['critico', alertas.critico], ['alto', alertas.alto]]
+            .map(([k, n]) => ({ k, n: Number(n) || 0 }))
+          const _sumSev = _sev.reduce((a, s) => a + s.n, 0)
+        %>
+        <div class="dash-meter" role="img" aria-label="Vencidas <%= alertas.vencido %>, críticas <%= alertas.critico %>, altas <%= alertas.alto %>">
+          <% if (_sumSev) { _sev.filter(s => s.n).forEach(s => { %><span class="dash-meter__seg dash-meter__seg--<%= s.k %>" style="flex-grow:<%= s.n %>"></span><% }) } %>
+        </div>
+        <div class="d-flex justify-content-between mb-2 dash-alertas__row dash-alertas__row--vencido"><span class="text-muted">Vencidas</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.vencido %></span></div>
+        <div class="d-flex justify-content-between mb-2 dash-alertas__row dash-alertas__row--critico"><span class="text-muted">Críticas (≤30d)</span><span class="badge rounded-pill px-3 badge-alerta"><%= alertas.critico %></span></div>
+        <div class="d-flex justify-content-between mb-2 dash-alertas__row dash-alertas__row--alto"><span class="text-muted">Altas (≤60d)</span><span class="badge rounded-pill px-3 badge-en-transito"><%= alertas.alto %></span></div>
+        <div class="d-flex justify-content-between dash-alertas__total"><span class="text-muted">Total</span><span class="fw-bold"><%= alertas.total %></span></div>
       </div>
     </div>
   </div>
@@ -66,7 +75,7 @@
       <div class="card-header bg-white fw-semibold">Próximos vencimientos y pendientes</div>
       <div class="card-body p-0">
         <% if (!topAlertas.length) { %>
-          <div class="p-4 text-center text-muted">Sin alertas activas. 🎉</div>
+          <%- include('../partials/empty_state', { icono: '✅', mensaje: 'Sin alertas activas. 🎉', compact: true }) %>
         <% } else { %>
         <table class="table table-hover align-middle mb-0">
           <thead><tr><th>Severidad</th><th>Módulo</th><th>Tipo</th><th>Entidad</th><th>Vence</th></tr></thead>
@@ -95,7 +104,7 @@
 
     <% if (['admin_ventas','dueno'].includes(user.rol)) { %>
 
-    <a href="/ventas" class="module-card" style="--mc:#e8912a;--mc-soft:#fff3e8">
+    <a href="/ventas" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M3 9l1-5h16l1 5"/><path d="M4 9v11h16V9"/><path d="M9 22V12h6v10"/>
@@ -106,7 +115,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/alquileres/contenedores" class="module-card" style="--mc:#1c5bad;--mc-soft:#e9f1fb">
+    <a href="/alquileres/contenedores" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -118,7 +127,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/alquileres/maquinaria" class="module-card" style="--mc:#16a34a;--mc-soft:#f0fdf4">
+    <a href="/alquileres/maquinaria" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
@@ -129,7 +138,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/clientes" class="module-card" style="--mc:#7c3aed;--mc-soft:#f5f3ff">
+    <a href="/clientes" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
@@ -141,7 +150,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/contenedores" class="module-card" style="--mc:#475569;--mc-soft:#f1f5f9">
+    <a href="/contenedores" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
@@ -153,7 +162,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/maquinaria" class="module-card" style="--mc:#d97706;--mc-soft:#fffbeb">
+    <a href="/maquinaria" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
@@ -164,7 +173,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/stock" class="module-card" style="--mc:#dc2626;--mc-soft:#fef2f2">
+    <a href="/stock" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
@@ -175,7 +184,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/transacciones" class="module-card" style="--mc:#4f46e5;--mc-soft:#eef2ff">
+    <a href="/transacciones" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -187,7 +196,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/compras" class="module-card" style="--mc:#ca8a04;--mc-soft:#fefce8">
+    <a href="/compras" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>
@@ -199,7 +208,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/clientes/cuentas" class="module-card" style="--mc:#0891b2;--mc-soft:#ecfeff">
+    <a href="/clientes/cuentas" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <line x1="12" y1="1" x2="12" y2="23"/>
@@ -215,7 +224,7 @@
 
     <% if (user.rol === 'dueno') { %>
 
-    <a href="/circuitos" class="module-card" style="--mc:#0d9488;--mc-soft:#f0fdfa">
+    <a href="/circuitos" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
@@ -227,7 +236,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/flota" class="module-card" style="--mc:#0d1b35;--mc-soft:#e8edf5">
+    <a href="/flota" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <rect x="1" y="6" width="14" height="11" rx="1"/>
@@ -240,7 +249,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/empleados" class="module-card" style="--mc:#16a34a;--mc-soft:#f0fdf4">
+    <a href="/empleados" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/>
@@ -253,7 +262,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/alertas" class="module-card" style="--mc:#e74c3c;--mc-soft:#fef2f2">
+    <a href="/alertas" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -265,7 +274,7 @@
       <div class="mc-arrow">Ir al módulo →</div>
     </a>
 
-    <a href="/usuarios" class="module-card" style="--mc:#9333ea;--mc-soft:#faf5ff">
+    <a href="/usuarios" class="module-card">
       <div class="mc-icon">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="8" cy="15" r="4"/>
