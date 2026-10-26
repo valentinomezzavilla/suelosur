@@ -57,6 +57,11 @@ async function abrir() {
   const hayPrecioAsignado = (await cliente.query(
     `SELECT 1 FROM information_schema.columns WHERE table_name = 'op_detalle_contenedor' AND column_name = 'precio_asignado_en'`)).rowCount
   if (!hayPrecioAsignado && typeof db.migrarAsignacionPrecio === 'function') await db.migrarAsignacionPrecio()
+  // Detalle de las compras de material (cantidad, subtotal, flete): sin desplegar, se aplica
+  // dentro de la prueba (y se deshace con el ROLLBACK).
+  const hayDetalleCompras = (await cliente.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = 'egresos' AND column_name = 'cantidad'`)).rowCount
+  if (!hayDetalleCompras && typeof db.migrarDetalleCompras === 'function') await db.migrarDetalleCompras()
   // IVA sumado al neto (para facturar): sin desplegar, la columna se agrega dentro de la prueba
   await cliente.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS iva_alicuota REAL`)
 }
