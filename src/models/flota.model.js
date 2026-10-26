@@ -26,6 +26,20 @@ function faltantes(datos) {
     .map(([, etiqueta]) => etiqueta)
 }
 
+// Dónde queda registrada la actividad de un camión. Si tiene alguna, eliminarlo borraría
+// historial (operaciones, gastos, combustible…): en ese caso solo se puede dar de baja.
+const USOS = [
+  ['op_encabezado', 'id_camion', 'operaciones'],
+  ['movimiento_contenedor', 'id_camion', 'movimientos de contenedores'],
+  ['movimiento_maquinaria', 'id_camion', 'movimientos de maquinaria'],
+  ['circuitos', 'id_camion', 'circuitos'],
+  ['mantenimiento_vehiculo', 'id_vehiculo', 'mantenimientos'],
+  ['combustible', 'id_vehiculo', 'cargas de combustible'],
+  ['gastos_vehiculo', 'id_vehiculo', 'gastos'],
+  ['egresos', 'id_vehiculo', 'compras / pagos'],
+  ['historial_kilometraje', 'id_vehiculo', 'registros de kilometraje'],
+]
+
 const ESTADOS = ['activo', 'disponible', 'en_viaje', 'en_mantenimiento', 'fuera_servicio', 'inactivo']
 const DEDICACIONES = ['ambos', 'ventas', 'contenedores']
 
@@ -168,6 +182,30 @@ const FlotaModel = {
     if (await this.numeroInternoEnUso(d.numero_interno, id)) throw new Error(`Ya existe otro camión con el número interno ${d.numero_interno}.`)
     await query(`UPDATE flota_vehiculos SET ${CAMPOS.map(c => `${c}=?`).join(',')} WHERE id = ?`,
       [...CAMPOS.map(c => d[c]), id])
+  },
+
+  // Elimina un camión que no tiene actividad registrada (ej. uno cargado por error). Con
+  // actividad no se borra: se informa qué tiene y se sugiere darlo de baja. Junto con el
+  // camión se borran sus datos propios (historial de estados, reglas de mantenimiento,
+  // asignación a un chofer y documentos). Devuelve los archivos de documentos a borrar del disco.
+  async eliminar(id) {
+    return transaction(async (q) => {
+      const v = (await q(`SELECT id FROM flota_vehiculos WHERE id = ?`, [id])).rows[0]
+      if (!v) throw new Error('Camión no encontrado.')
+      const usos = []
+      for (const [tabla, columna, etiqueta] of USOS) {
+        const n = Number((await q(`SELECT COUNT(*) AS n FROM ${tabla} WHERE ${columna} = ?`, [id])).rows[0].n)
+        if (n) usos.push(`${n} ${etiqueta}`)
+      }
+      if (usos.length) throw new Error(`No se puede eliminar el camión: tiene ${usos.join(', ')}. Para conservar el historial, dalo de baja.`)
+      const archivos = (await q(`SELECT archivo FROM documentos WHERE entidad_tipo = 'vehiculo' AND entidad_id = ? AND archivo IS NOT NULL`, [id])).rows.map(r => r.archivo)
+      await q(`DELETE FROM documentos WHERE entidad_tipo = 'vehiculo' AND entidad_id = ?`, [id])
+      await q(`DELETE FROM asignaciones_recurso WHERE recurso_tipo = 'camion' AND recurso_id = ?`, [id])
+      await q(`DELETE FROM config_mantenimiento WHERE id_vehiculo = ?`, [id])
+      await q(`DELETE FROM estado_vehiculo_hist WHERE id_vehiculo = ?`, [id])
+      await q(`DELETE FROM flota_vehiculos WHERE id = ?`, [id])
+      return { archivos }
+    })
   },
 
   async toggleActivo(id) {
