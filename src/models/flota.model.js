@@ -9,6 +9,23 @@ const CAMPOS = [
 ]
 const NUMERICOS = new Set(['anio', 'capacidad_carga', 'kilometraje', 'numero_interno'])
 
+// Datos que hay que completar para dar de alta un camión (el formulario los marca con *).
+// Patente y nombre son NOT NULL en la tabla; tipo de unidad y actividad son los que usan
+// las reglas de compatibilidad chofer ↔ camión ↔ operación (sin actividad no se validan).
+const OBLIGATORIOS = {
+  patente: 'Patente',
+  nombre: 'Nombre / Identificación',
+  tipo_unidad: 'Tipo de unidad',
+  actividad: 'Actividad del camión',
+}
+
+// Etiquetas de los obligatorios que están vacíos (solo espacios cuenta como vacío).
+function faltantes(datos) {
+  return Object.entries(OBLIGATORIOS)
+    .filter(([campo]) => !String(datos[campo] == null ? '' : datos[campo]).trim())
+    .map(([, etiqueta]) => etiqueta)
+}
+
 const ESTADOS = ['activo', 'disponible', 'en_viaje', 'en_mantenimiento', 'fuera_servicio', 'inactivo']
 const DEDICACIONES = ['ambos', 'ventas', 'contenedores']
 
@@ -26,6 +43,8 @@ function normalizar(datos) {
 }
 
 const FlotaModel = {
+  OBLIGATORIOS,
+  faltantes,
   ESTADOS,
   DEDICACIONES,
 
@@ -130,6 +149,8 @@ const FlotaModel = {
   },
 
   async crear(datos) {
+    const sinCompletar = faltantes(datos)
+    if (sinCompletar.length) throw new Error(`Completá los datos obligatorios: ${sinCompletar.join(', ')}.`)
     const d = normalizar(datos)
     if (await this.patenteEnUso(d.patente)) throw new Error(`Ya existe un camión con la patente ${d.patente}.`)
     if (await this.numeroInternoEnUso(d.numero_interno)) throw new Error(`Ya existe un camión con el número interno ${d.numero_interno}.`)

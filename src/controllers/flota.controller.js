@@ -63,12 +63,11 @@ const FlotaController = {
   },
 
   async nuevo(req, res) {
-    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES })
+    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES, obligatorios: FlotaModel.OBLIGATORIOS })
   },
 
   async crear(req, res) {
     try {
-      if (!req.body.nombre && !req.body.patente) { req.flash('error', 'Nombre o patente requeridos.'); return res.redirect('/flota/nuevo') }
       const id = await FlotaModel.crear(req.body)
       await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: id, accion: 'crear', usuario: uid(req), detalle: { patente: req.body.patente } })
       req.flash('success', 'Camión registrado.')
