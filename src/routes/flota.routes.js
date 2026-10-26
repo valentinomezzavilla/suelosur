@@ -20,6 +20,7 @@ router.get('/:id/editar',    auth, acceso, ctrl.editar)
 router.put('/:id',           auth, acceso, ctrl.actualizar)
 router.post('/:id/estado',   auth, acceso, ctrl.cambiarEstado)
 router.post('/:id/toggle',   auth, acceso, ctrl.toggleActivo)
+router.post('/:id/eliminar', auth, acceso, ctrl.eliminar)
 
 // Documentos
 router.post('/:id/documentos',                 auth, acceso, uploadDocumento.single('archivo'), ctrl.subirDocumento)

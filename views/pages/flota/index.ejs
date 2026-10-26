@@ -81,6 +81,10 @@
             <a href="/flota/<%= v.id %>" class="btn btn-sm btn-outline-secondary" title="Ver"><%- icon('eye',{size:15}) %></a>
             <a href="/flota/<%= v.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit',{size:15}) %></a>
             <button type="button" class="btn btn-sm btn-outline-secondary" title="Ver ubicación" onclick="verCamionEnMapa('<%= v.id %>', '<%= (v.nombre||'').replace(/'/g,"") %> <%= v.patente||'' %>')"><%- icon('map',{size:15}) %></button>
+            <form action="/flota/<%= v.id %>/eliminar" method="POST" class="d-inline"
+                  onsubmit="return confirm(<%= JSON.stringify('¿Eliminar el camión ' + [v.nombre, v.patente].filter(Boolean).join(' ') + ' de la flota?'+String.fromCharCode(10,10)+'Solo se puede si no tiene operaciones ni gastos cargados; se borran también sus documentos y su historial de estados.') %>)">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash',{size:15}) %></button>
+            </form>
           </td>
         </tr>
         <% }) %>

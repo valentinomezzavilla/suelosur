@@ -21,6 +21,13 @@
   <div class="d-flex gap-2">
     <a href="/remitos/x/pdf" style="display:none"></a>
     <a href="/flota/<%= vehiculo.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
+    <form action="/flota/<%= vehiculo.id %>/toggle" method="POST" class="d-inline">
+      <button class="btn btn-sm btn-outline-secondary" title="<%= vehiculo.activo ? 'Lo saca de la flota activa y conserva su historial' : 'Vuelve a la flota activa' %>"><%= vehiculo.activo ? 'Dar de baja' : 'Reactivar' %></button>
+    </form>
+    <form action="/flota/<%= vehiculo.id %>/eliminar" method="POST" class="d-inline"
+          onsubmit="return confirm(<%= JSON.stringify('¿Eliminar este camión de la flota?'+String.fromCharCode(10,10)+'Solo se puede si no tiene operaciones ni gastos cargados; se borran también sus documentos y su historial de estados.') %>)">
+      <button class="btn btn-sm btn-outline-danger"><%- icon('trash', { size: 14 }) %> Eliminar</button>
+    </form>
   </div>
 </div>
 

@@ -1,5 +1,9 @@
 <%
   const estadoLbl = { activo:'Activo', disponible:'Disponible', en_viaje:'En viaje', en_mantenimiento:'En mantenimiento', fuera_servicio:'Fuera de servicio', inactivo:'Inactivo' }
+  // Campos obligatorios al dar de alta un camión (se marcan con * y el navegador no deja enviar sin completarlos).
+  const ob = (typeof obligatorios !== 'undefined' && obligatorios) || {}
+  const star = (c) => ob[c] ? ' *' : ''
+  const req = (c) => ob[c] ? 'required' : ''
   const dedicLbl = { ambos:'Ventas y contenedores', ventas:'Ventas (material/viajes)', contenedores:'Alquiler de contenedores' }
 %>
 <div class="d-flex justify-content-between align-items-center mb-3">
@@ -10,13 +14,14 @@
 <form action="<%= vehiculo ? `/flota/${vehiculo.id}?_method=PUT` : '/flota' %>" method="POST">
   <div class="card shadow-sm mb-3"><div class="card-header bg-white fw-semibold">Datos del vehículo</div>
     <div class="card-body">
+      <% if (Object.keys(ob).length) { %><p class="text-muted small mb-3">Los campos marcados con * son obligatorios.</p><% } %>
       <div class="row g-3">
         <div class="col-md-2"><label class="form-label">N° interno</label><input type="number" name="numero_interno" class="form-control" value="<%= vehiculo?.numero_interno || '' %>"></div>
-        <div class="col-md-3"><label class="form-label">Patente</label><input name="patente" class="form-control" value="<%= vehiculo?.patente || '' %>"></div>
-        <div class="col-md-4"><label class="form-label">Nombre / Identificación</label><input name="nombre" class="form-control" value="<%= vehiculo?.nombre || '' %>" placeholder="Ej: Camión 6"></div>
+        <div class="col-md-3"><label class="form-label">Patente<%= star('patente') %></label><input name="patente" <%= req('patente') %> class="form-control" value="<%= vehiculo?.patente || '' %>"></div>
+        <div class="col-md-4"><label class="form-label">Nombre / Identificación<%= star('nombre') %></label><input name="nombre" <%= req('nombre') %> class="form-control" value="<%= vehiculo?.nombre || '' %>" placeholder="Ej: Camión 6"></div>
         <div class="col-md-4">
-          <label class="form-label">Tipo de unidad</label>
-          <select name="tipo_unidad" class="form-select">
+          <label class="form-label">Tipo de unidad<%= star('tipo_unidad') %></label>
+          <select name="tipo_unidad" <%= req('tipo_unidad') %> class="form-select">
             <option value="">—</option>
             <% ['Volcador','Batea','Chasis','Semirremolque','Utilitario','Otro'].forEach(t => { %><option <%= vehiculo?.tipo_unidad===t?'selected':'' %>><%= t %></option><% }) %>
           </select>
@@ -35,9 +40,9 @@
           </select>
         </div>
         <div class="col-md-4">
-          <label class="form-label">Actividad del camión</label>
-          <select name="actividad" class="form-select">
-            <option value="">— Sin definir —</option>
+          <label class="form-label">Actividad del camión<%= star('actividad') %></label>
+          <select name="actividad" <%= req('actividad') %> class="form-select">
+            <option value="">— <%= ob.actividad ? 'Seleccionar' : 'Sin definir' %> —</option>
             <% const _actsCam = { ventas:'Ventas (viajes)', contenedores:'Contenedores', maquinas:'Máquinas' };
                Object.entries(_actsCam).forEach(([v,l]) => { %>
               <option value="<%= v %>" <%= vehiculo?.actividad===v?'selected':'' %>><%= l %></option>

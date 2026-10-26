@@ -63,12 +63,11 @@ const FlotaController = {
   },
 
   async nuevo(req, res) {
-    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES })
+    res.render('pages/flota/form', { titulo: 'Nuevo Camión', vehiculo: null, estados: FlotaModel.ESTADOS, dedicaciones: FlotaModel.DEDICACIONES, obligatorios: FlotaModel.OBLIGATORIOS })
   },
 
   async crear(req, res) {
     try {
-      if (!req.body.nombre && !req.body.patente) { req.flash('error', 'Nombre o patente requeridos.'); return res.redirect('/flota/nuevo') }
       const id = await FlotaModel.crear(req.body)
       await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: id, accion: 'crear', usuario: uid(req), detalle: { patente: req.body.patente } })
       req.flash('success', 'Camión registrado.')
@@ -126,6 +125,20 @@ const FlotaController = {
       req.flash('success', 'Estado actualizado.')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error.') }
     res.redirect(`/flota/${req.params.id}`)
+  },
+
+  async eliminar(req, res) {
+    const volver = `/flota/${req.params.id}`
+    try {
+      const vehiculo = await FlotaModel.obtener(req.params.id)
+      if (!vehiculo) { req.flash('error', 'Camión no encontrado.'); return res.redirect('/flota') }
+      const { archivos } = await FlotaModel.eliminar(req.params.id)
+      archivos.forEach(a => { try { fs.unlinkSync(path.join(DIR_DOCUMENTOS, a)) } catch (_) {} })
+      await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'eliminar', usuario: uid(req),
+        detalle: { patente: vehiculo.patente, nombre: vehiculo.nombre } })
+      req.flash('success', `Camión ${[vehiculo.nombre, vehiculo.patente].filter(Boolean).join(' ')} eliminado de la flota.`)
+      res.redirect('/flota')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al eliminar.'); res.redirect(volver) }
   },
 
   async toggleActivo(req, res) {
