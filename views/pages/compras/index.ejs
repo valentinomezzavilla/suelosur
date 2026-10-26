@@ -1,5 +1,6 @@
 <%
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  const num = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
   const presetHref = (p) => '/compras?preset=' + p
   const catMap = {}
   categorias.forEach(c => { catMap[c.clave] = c })
@@ -71,6 +72,39 @@
       </span>
     </a>
   <% }) %>
+</div>
+<% } %>
+
+<!-- Material comprado según los filtros: por producto y proveedor -->
+<% if (resumen.material && resumen.material.length) { %>
+<div class="card shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold py-2"><%- icon('layers', { size: 15 }) %> Material comprado · <%= periodoLabel %></div>
+  <div class="card-body p-0">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Producto / Proveedor</th><th class="text-end">Compras</th><th class="text-end">Cantidad</th><th class="text-end">Monto</th></tr></thead>
+      <tbody>
+        <% resumen.material.forEach(g => { %>
+        <tr class="table-light fw-semibold">
+          <td><%= g.producto %></td>
+          <td class="text-end"><%= g.count %></td>
+          <td class="text-end"><%= num(g.cantidad) %> <%= g.unidad %></td>
+          <td class="text-end"><%= money(g.monto) %></td>
+        </tr>
+        <% g.proveedores.forEach(pv => { %>
+        <tr>
+          <td class="ps-4"><small><%= pv.nombre %></small></td>
+          <td class="text-end"><small><%= pv.count %></small></td>
+          <td class="text-end"><small><%= num(pv.cantidad) %> <%= g.unidad %></small></td>
+          <td class="text-end"><small><%= money(pv.monto) %></small></td>
+        </tr>
+        <% }) %>
+        <% }) %>
+      </tbody>
+    </table>
+    <% if (resumen.materialSinCantidad) { %>
+    <small class="text-muted d-block px-3 py-2"><%= resumen.materialSinCantidad %> compra(s) de material más no tienen la cantidad registrada y no están sumadas acá.</small>
+    <% } %>
+  </div>
 </div>
 <% } %>
 
@@ -171,7 +205,7 @@
     <table class="table table-hover align-middle mb-0">
       <thead><tr>
         <th>Fecha</th><th>Categoría</th><th>Descripción</th><th>Proveedor / Empleado / Vehículo</th>
-        <th>Fletero</th><th>Método</th><th class="text-end">Monto</th><th class="text-center">Acciones</th>
+        <th>Cantidad</th><th>Fletero</th><th>Método</th><th class="text-end">Monto</th><th class="text-center">Acciones</th>
       </tr></thead>
       <tbody>
         <% egresos.forEach(e => { %>
@@ -183,6 +217,12 @@
             <% const extras = datosExtraDe(e); if (extras.length) { %><small class="text-muted d-block"><%= extras.join(' · ') %></small><% } %>
           </td>
           <td><small><%= detalleDe(e) %></small></td>
+          <td class="text-nowrap">
+            <% if (e.categoria === 'material' && e.cantidad != null) { %>
+              <span class="fw-semibold"><%= num(e.cantidad) %> <%= e.producto_unidad || '' %></span>
+              <% if (e.subtotal_material != null) { %><small class="text-muted d-block">Material <%= money(e.subtotal_material) %> · Flete <%= money(e.costo_final_flete) %></small><% } %>
+            <% } else { %><small class="text-muted">—</small><% } %>
+          </td>
           <td><small class="text-muted"><%= e.fletero || '—' %></small></td>
           <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
           <td class="text-end fw-semibold text-danger"><%= money(e.monto) %></td>
@@ -200,7 +240,7 @@
       </tbody>
       <tfoot>
         <tr class="table-light">
-          <td colspan="6" class="fw-semibold text-end">Total del período</td>
+          <td colspan="7" class="fw-semibold text-end">Total del período</td>
           <td class="text-end fw-bold text-danger"><%= money(resumen.total) %></td>
           <td></td>
         </tr>

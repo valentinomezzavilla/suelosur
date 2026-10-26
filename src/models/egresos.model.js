@@ -29,15 +29,21 @@ function construirFiltro({ categoria, id_proveedor, id_producto, id_empleado, id
 
 const EgresosModel = {
 
-  async crear({ fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario }) {
+  // `cantidad`, `subtotal_material`, `costo_final_flete` e `id_stock_ingreso` son solo de las
+  // compras de material: guardan el detalle de lo que se compró (ver migrarDetalleCompras).
+  async crear({ fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
+                cantidad, subtotal_material, costo_final_flete, id_stock_ingreso }) {
     if (!categoria) throw new Error('Elegí una categoría válida.')
     const { rows } = await query(`
-      INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario)
-      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
+                           cantidad, subtotal_material, costo_final_flete, id_stock_ingreso)
+      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null, (fletero || '').trim() || null,
         (periodo || '').trim() || null, id_proveedor || null, id_producto || null, id_empleado || null, id_vehiculo || null,
-        JSON.stringify(datos_extra || {}), origen || 'manual', id_usuario || null])
+        JSON.stringify(datos_extra || {}), origen || 'manual', id_usuario || null,
+        cantidad == null ? null : cantidad, subtotal_material == null ? null : subtotal_material,
+        costo_final_flete == null ? null : costo_final_flete, id_stock_ingreso || null])
     return rows[0].id
   },
 
@@ -47,6 +53,7 @@ const EgresosModel = {
       SELECT e.*,
              p.nombre AS proveedor_nombre,
              pr.nombre AS producto_nombre,
+             pr.unidad_medida AS producto_unidad,
              NULLIF(TRIM(COALESCE(emp.nombre,'') || ' ' || COALESCE(emp.apellido,'')), '') AS empleado_nombre,
              NULLIF(TRIM(COALESCE(v.nombre,'') || CASE WHEN v.patente IS NOT NULL THEN ' (' || v.patente || ')' ELSE '' END), '') AS vehiculo_nombre,
              u.nombre AS usuario_nombre,
@@ -75,7 +82,42 @@ const EgresosModel = {
     const porCategoria = {}
     let total = 0, count = 0
     rows.forEach(r => { porCategoria[r.categoria] = { monto: Number(r.s), count: Number(r.c) }; total += Number(r.s); count += Number(r.c) })
-    return { total, count, porCategoria }
+    return { total, count, porCategoria, ...(await EgresosModel.resumenMaterial(filtros)) }
+  },
+
+  // Material comprado según los filtros: por producto y, dentro de cada uno, por proveedor.
+  // Las cantidades se suman solo dentro de un mismo producto (no se mezclan tn con m³).
+  // `sinCantidad` cuenta las compras de material que no tienen cantidad registrada (las
+  // viejas que no se pudieron vincular al ingreso de stock): no entran en las sumas.
+  async resumenMaterial(filtros = {}) {
+    if (filtros.categoria && filtros.categoria !== 'material') return { material: [], materialSinCantidad: 0 }
+    const f = construirFiltro({ ...filtros, categoria: 'material' })
+    const rows = (await query(`
+      SELECT e.id_producto, pr.nombre AS producto, pr.unidad_medida AS unidad,
+             e.id_proveedor, p.nombre AS proveedor,
+             COUNT(*) AS c, COALESCE(SUM(e.cantidad),0) AS cant, COALESCE(SUM(e.monto),0) AS s
+      FROM egresos e
+      LEFT JOIN pagos_empleado pe ON pe.id = e.id_pago_empleado
+      LEFT JOIN productos pr      ON pr.id = e.id_producto
+      LEFT JOIN proveedores p     ON p.id  = e.id_proveedor
+      ${f.where} AND e.cantidad IS NOT NULL
+      GROUP BY e.id_producto, pr.nombre, pr.unidad_medida, e.id_proveedor, p.nombre
+      ORDER BY pr.nombre, p.nombre
+    `, f.params)).rows
+    const sinCantidad = Number((await query(`
+      SELECT COUNT(*) AS n FROM egresos e
+      LEFT JOIN pagos_empleado pe ON pe.id = e.id_pago_empleado
+      ${f.where} AND e.cantidad IS NULL
+    `, f.params)).rows[0].n)
+    const porProducto = new Map()
+    rows.forEach(r => {
+      const k = String(r.id_producto)
+      if (!porProducto.has(k)) porProducto.set(k, { id_producto: r.id_producto, producto: r.producto || 'Sin producto', unidad: r.unidad || '', cantidad: 0, monto: 0, count: 0, proveedores: [] })
+      const g = porProducto.get(k)
+      g.cantidad += Number(r.cant); g.monto += Number(r.s); g.count += Number(r.c)
+      g.proveedores.push({ id: r.id_proveedor, nombre: r.proveedor || 'Sin proveedor', cantidad: Number(r.cant), monto: Number(r.s), count: Number(r.c) })
+    })
+    return { material: [...porProducto.values()], materialSinCantidad: sinCantidad }
   },
 
   async obtener(id) {

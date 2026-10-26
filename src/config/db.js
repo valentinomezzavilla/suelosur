@@ -1556,6 +1556,7 @@ async function initDB() {
 
   await migrarGruposAlquiler()
   await migrarAsignacionPrecio()
+  await migrarDetalleCompras()
   await migrarHorasALocal()
 
   // Transferencia destinada a tercero (ver services/tercero.service.js): los datos del
@@ -1604,6 +1605,74 @@ async function migrarGruposAlquiler() {
 // ─────────────────────────────────────────────────────────────────
 async function migrarAsignacionPrecio() {
   await pool.query(`ALTER TABLE op_detalle_contenedor ADD COLUMN IF NOT EXISTS precio_asignado_en TEXT`)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// MIGRACIÓN: detalle de las compras de material en el libro de compras / pagos. Antes
+// egresos guardaba solo el monto; la cantidad, el subtotal del material y el flete iban
+// únicamente a stock_ingresos, sin vínculo con la compra. Ahora cada compra de material
+// guarda su detalle y el id del ingreso de stock que generó.
+// Las compras viejas se vinculan por coincidencia (ver vincularComprasConStock).
+// Las columnas van sin .catch(), igual que arriba.
+// ─────────────────────────────────────────────────────────────────
+async function migrarDetalleCompras() {
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS cantidad REAL`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS subtotal_material REAL`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS costo_final_flete REAL`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_stock_ingreso BIGINT`)
+  // El backfill es un extra: si falla, no tiene que impedir que la app arranque.
+  try {
+    const n = await vincularComprasConStock()
+    if (n) console.log(`✅ Backfill: ${n} compra(s) de material vinculadas a su ingreso de stock (cantidad y flete).`)
+  } catch (e) { console.error('Backfill detalle de compras:', e.message) }
+}
+
+// Recupera el detalle de las compras de material cargadas antes de que el libro lo guardara.
+// Cada una se empareja con el ingreso de stock que generó, que se registraba en la misma
+// operación: mismo proveedor (y producto, si la compra lo tiene), cantidad × (costo
+// unitario + flete) igual al monto y creado a los pocos minutos. Si hay más de un candidato
+// se toma el más cercano en el tiempo; si no hay ninguno, la compra queda sin cantidad.
+// Idempotente: solo toca compras sin cantidad e ingresos todavía no vinculados.
+const VENTANA_VINCULO_MS = 10 * 60 * 1000
+async function vincularComprasConStock() {
+  const sueltas = (await query(`
+    SELECT id, id_producto, id_proveedor, monto, created_at
+    FROM egresos WHERE categoria = 'material' AND cantidad IS NULL AND id_stock_ingreso IS NULL
+    ORDER BY id
+  `)).rows
+  if (!sueltas.length) return 0
+  const usados = new Set((await query(`SELECT id_stock_ingreso FROM egresos WHERE id_stock_ingreso IS NOT NULL`)).rows.map(r => String(r.id_stock_ingreso)))
+  const ingresos = (await query(`
+    SELECT id, id_producto, id_proveedor, cantidad, costo_unitario, costo_flete, created_at FROM stock_ingresos ORDER BY id
+  `)).rows.filter(i => !usados.has(String(i.id)))
+  const instante = (t) => t ? Date.parse(String(t).replace(' ', 'T')) : NaN
+  const redondear = (n) => Math.round(n * 100) / 100
+  let vinculadas = 0
+  for (const e of sueltas) {
+    const te = instante(e.created_at)
+    if (Number.isNaN(te)) continue
+    const monto = Number(e.monto)
+    let mejor = null, mejorDist = Infinity
+    for (const i of ingresos) {
+      if (i.usado) continue
+      if (String(i.id_proveedor || '') !== String(e.id_proveedor || '')) continue
+      if (e.id_producto && String(i.id_producto) !== String(e.id_producto)) continue
+      const total = Number(i.cantidad) * (Number(i.costo_unitario) + Number(i.costo_flete))
+      if (Math.abs(total - monto) > Math.max(1, monto * 0.001)) continue
+      const dist = Math.abs(instante(i.created_at) - te)
+      if (dist <= VENTANA_VINCULO_MS && dist < mejorDist) { mejor = i; mejorDist = dist }
+    }
+    if (!mejor) continue
+    mejor.usado = true
+    await query(`
+      UPDATE egresos SET cantidad = ?, subtotal_material = ?, costo_final_flete = ?, id_stock_ingreso = ?,
+                         id_producto = COALESCE(id_producto, ?)
+      WHERE id = ?
+    `, [mejor.cantidad, redondear(Number(mejor.cantidad) * Number(mejor.costo_unitario)),
+        redondear(Number(mejor.cantidad) * Number(mejor.costo_flete)), mejor.id, mejor.id_producto, e.id])
+    vinculadas++
+  }
+  return vinculadas
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1696,4 +1765,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock }

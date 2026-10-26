@@ -103,7 +103,7 @@ const ComprasController = {
         let desc = (descripcion || '').trim()
         // El costo unitario y de flete que se guardan reflejan el subtotal y flete final
         // ya calculados, por si se editaron manualmente.
-        await StockModel.registrarIngreso(id_producto, cant, {
+        const idIngreso = await StockModel.registrarIngreso(id_producto, cant, {
           id_proveedor: id_proveedor || null,
           costo_unitario: subtotalMaterial / cant,
           costo_flete: fleteFinal / cant,
@@ -114,6 +114,7 @@ const ComprasController = {
         await EgresosModel.crear({
           fecha: fecha || null, categoria, descripcion: desc, monto: montoNum, metodo_pago: metodo_pago || null,
           fletero: fletero || null, id_proveedor: id_proveedor || null, id_producto: id_producto || null,
+          cantidad: cant, subtotal_material: subtotalMaterial, costo_final_flete: fleteFinal, id_stock_ingreso: idIngreso,
           origen: 'manual', id_usuario: req.session.user?.id,
         })
         req.flash('success', 'Registrado en el libro de compras / pagos.')
