@@ -24,9 +24,16 @@
         <label class="form-label">Email</label>
         <input type="email" name="email" class="form-control" value="<%= proveedor?.email || '' %>">
       </div>
-      <div class="mb-4">
+      <div class="mb-3">
         <label class="form-label">Domicilio</label>
         <input type="text" name="domicilio" class="form-control" value="<%= proveedor?.domicilio || '' %>">
+      </div>
+      <div class="mb-4">
+        <label class="toggle-row">
+          <input type="checkbox" name="es_estacion" value="1" <%= proveedor?.es_estacion ? 'checked' : '' %>>
+          <span>Estación de servicio</span>
+        </label>
+        <small class="text-muted d-block">Aparece para elegir en las cargas de combustible y en las transferencias derivadas, y tiene su cuenta de deuda en <a href="/proveedores/estaciones">Estaciones de servicio</a>.</small>
       </div>
       <div class="d-flex gap-2">
         <button type="submit" class="btn btn-naranja px-4"><%= proveedor ? 'Guardar cambios' : 'Crear proveedor' %></button>

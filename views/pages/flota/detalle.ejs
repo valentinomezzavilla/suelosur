@@ -173,9 +173,14 @@
         <div class="col-md-2"><label class="form-label">Chofer</label>
           <select name="id_chofer" class="form-select form-select-sm"><option value="">—</option>
             <% choferes.forEach(c => { %><option value="<%= c.id %>"><%= c.nombre %> <%= c.apellido %></option><% }) %></select></div>
-        <div class="col-md-2"><label class="form-label">Estación</label><input name="estacion" class="form-control form-control-sm"></div>
+        <div class="col-md-2"><label class="form-label">Estación</label>
+          <select name="id_proveedor" class="form-select form-select-sm" title="La carga suma a la deuda con la estación">
+            <option value="">— Sin cuenta —</option>
+            <% estaciones.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %>
+          </select></div>
       </div>
       <button class="btn btn-sm btn-naranja mt-2">Cargar</button>
+      <small class="text-muted ms-2">La carga suma a la deuda con la estación elegida (<a href="/proveedores/estaciones">Estaciones de servicio</a>).</small>
     </form></div>
   </div>
   <div class="card shadow-sm"><div class="card-body p-0">

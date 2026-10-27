@@ -6,10 +6,11 @@ const ProveedoresController = {
 
   async index(req, res) {
     try {
-      const { q, page, sort, dir, estado } = req.query
+      const { q, page, sort, dir, estado, tipo } = req.query
       let todos = await ProveedoresModel.listarTodos({ q })
       if (estado === 'activo')   todos = todos.filter(p => !!p.activo)
       if (estado === 'inactivo') todos = todos.filter(p => !p.activo)
+      if (tipo === 'estacion')   todos = todos.filter(p => !!p.es_estacion)
       const sortMap = {
         nombre: (p) => (p.nombre || '').toLowerCase(),
         cuit:   (p) => (p.cuit || ''),
@@ -27,7 +28,7 @@ const ProveedoresController = {
       const { items: proveedores, total, page: pag, limit, totalPaginas } = paginar(todos, page, 20)
       res.render('pages/proveedores/index', {
         titulo: 'Proveedores', proveedores, total, page: pag, limit, totalPaginas,
-        filtros: { q: q||'', estado: estado||'', sort: sortKey, dir: dirNorm },
+        filtros: { q: q||'', estado: estado||'', tipo: tipo||'', sort: sortKey, dir: dirNorm },
       })
     } catch (err) { console.error(err); req.flash('error', 'Error.'); res.redirect('/') }
   },

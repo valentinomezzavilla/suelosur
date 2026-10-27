@@ -20,15 +20,16 @@ const ProveedoresModel = {
     return (await query(`SELECT * FROM proveedores WHERE id = ?`, [id])).rows[0]
   },
 
-  async crear({ nombre, cuit, domicilio, telefono, email }) {
-    const { rows } = await query(`INSERT INTO proveedores (nombre, cuit, domicilio, telefono, email) VALUES (?, ?, ?, ?, ?) RETURNING id`,
-      [nombre, cuit || null, domicilio || null, telefono || null, email || null])
+  // es_estacion: estación de servicio (tiene cuenta de combustible, ver estaciones.model.js)
+  async crear({ nombre, cuit, domicilio, telefono, email, es_estacion }) {
+    const { rows } = await query(`INSERT INTO proveedores (nombre, cuit, domicilio, telefono, email, es_estacion) VALUES (?, ?, ?, ?, ?, ?) RETURNING id`,
+      [nombre, cuit || null, domicilio || null, telefono || null, email || null, es_estacion ? 1 : 0])
     return rows[0].id
   },
 
-  async actualizar(id, { nombre, cuit, domicilio, telefono, email }) {
-    await query(`UPDATE proveedores SET nombre = ?, cuit = ?, domicilio = ?, telefono = ?, email = ? WHERE id = ?`,
-      [nombre, cuit || null, domicilio || null, telefono || null, email || null, id])
+  async actualizar(id, { nombre, cuit, domicilio, telefono, email, es_estacion }) {
+    await query(`UPDATE proveedores SET nombre = ?, cuit = ?, domicilio = ?, telefono = ?, email = ?, es_estacion = ? WHERE id = ?`,
+      [nombre, cuit || null, domicilio || null, telefono || null, email || null, es_estacion ? 1 : 0, id])
   },
 
   async toggleActivo(id) {

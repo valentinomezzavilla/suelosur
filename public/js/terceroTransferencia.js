@@ -17,6 +17,7 @@
 (function () {
   const CAMPOS = [
     { campo: 'proveedor', col: 'id_proveedor', label: 'Proveedor',   lista: 'proveedores' },
+    { campo: 'estacion',  col: 'id_proveedor', label: 'Estación de servicio', lista: 'estaciones' },
     { campo: 'vehiculo',  col: 'id_vehiculo',  label: 'Vehículo',    lista: 'vehiculos' },
     { campo: 'empleado',  col: 'id_empleado',  label: 'Empleado',    lista: 'empleados' },
     { campo: 'producto',  col: 'id_producto',  label: 'Producto',    lista: 'productos' },
@@ -24,7 +25,7 @@
     { campo: 'periodo',   col: 'periodo',      label: 'Período',     tipo: 'month' },
   ]
   // Campo obligatorio según la categoría elegida
-  const OBLIGATORIO = { proveedor: () => true, empleado: (cat) => cat === 'sueldo' }
+  const OBLIGATORIO = { proveedor: () => true, estacion: () => true, empleado: (cat) => cat === 'sueldo' }
   const mesActual = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') }
   let cache = null
   const cajas = new WeakMap()   // select → su bloque

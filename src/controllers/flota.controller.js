@@ -3,6 +3,7 @@ const path = require('path')
 const fs   = require('fs')
 const FlotaModel = require('../models/flota.model')
 const CombustibleModel = require('../models/combustible.model')
+const EstacionesModel  = require('../models/estaciones.model')
 const MantenimientoModel = require('../models/mantenimiento.model')
 const GastosModel = require('../models/gastos_vehiculo.model')
 const DocumentosModel = require('../models/documentos.model')
@@ -93,6 +94,7 @@ const FlotaController = {
         resumenGastos: await GastosModel.resumen(vehiculo.id, { desde: periodo.desde, hasta: periodo.hasta }),
         choferes: await EmpleadosModel.listarChoferes({ soloActivos: true }),
         historialEstados: await FlotaModel.historialEstados(vehiculo.id),
+        estaciones: await EstacionesModel.listar(),
         historialKm: await FlotaModel.historialKm(vehiculo.id),
         asignacionesRecurso: await AsignacionesModel.historialRecurso('camion', vehiculo.id),
         auditoria: await historial(ENTIDAD, vehiculo.id),

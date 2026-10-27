@@ -83,6 +83,18 @@
         </select>
       </div>
 
+      <!-- Estación de servicio (Combustible o cualquier categoría que la tenga habilitada) -->
+      <% if (catsCon('estacion')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('estacion') %>" style="display:none">
+        <label class="form-label">Estación de servicio</label>
+        <select name="id_proveedor" class="form-select">
+          <option value="">— Sin estación —</option>
+          <% estaciones.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %>
+        </select>
+        <small class="text-muted">El pago baja la deuda con la estación (<a href="/proveedores/estaciones" target="_blank">Estaciones de servicio</a>).</small>
+      </div>
+      <% } %>
+
       <!-- Empleado (sueldo) -->
       <div class="cond mb-3" data-cats="sueldo" style="display:none">
         <div class="row g-3">

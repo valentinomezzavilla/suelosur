@@ -26,7 +26,7 @@
   const genericas = categorias.filter(c => c.clave !== 'material' && c.clave !== 'sueldo')
   const catsCon = (campo) => genericas.filter(c => c.campos.includes(campo)).map(c => c.clave).join(' ')
   const dedupe = (str) => [...new Set(str.split(' ').filter(Boolean))].join(' ')
-  const catsProveedor = dedupe(['material', catsCon('proveedor')].filter(Boolean).join(' '))
+  const catsProveedor = dedupe(['material', catsCon('proveedor'), catsCon('estacion')].filter(Boolean).join(' '))
   const catsProducto  = dedupe(['material', catsCon('producto')].filter(Boolean).join(' '))
   const catsFletero   = dedupe(['material', catsCon('fletero')].filter(Boolean).join(' '))
   const catsEmpleado  = dedupe(['sueldo', catsCon('empleado')].filter(Boolean).join(' '))
@@ -131,10 +131,14 @@
 
     <!-- Proveedor -->
     <div class="row g-2 align-items-end mb-2 cond" data-cats="<%= catsProveedor %>" style="display:none">
-      <div class="col-md-3"><label class="form-label">Proveedor</label>
+      <div class="col-md-3"><label class="form-label">Proveedor / Estación</label>
         <select name="proveedor" class="form-select form-select-sm">
           <option value="">Todos</option>
-          <% proveedores.forEach(p => { %><option value="<%= p.id %>" <%= String(filtros.proveedor)===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %>
+          <% [['Estaciones de servicio', proveedores.filter(p => p.es_estacion)], ['Proveedores', proveedores.filter(p => !p.es_estacion)]].forEach(([grupo, lista]) => { if (!lista.length) return %>
+          <optgroup label="<%= grupo %>">
+            <% lista.forEach(p => { %><option value="<%= p.id %>" <%= String(filtros.proveedor)===String(p.id)?'selected':'' %>><%= p.nombre %></option><% }) %>
+          </optgroup>
+          <% }) %>
         </select></div>
     </div>
 

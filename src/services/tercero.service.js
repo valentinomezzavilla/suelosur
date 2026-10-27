@@ -27,7 +27,8 @@ const EXCLUIDAS = ['material']
 const CAMPOS_SISTEMA = { sueldo: ['empleado', 'periodo'] }
 const camposDe = (cat) => CAMPOS_SISTEMA[cat.clave] || cat.campos
 // Campo de la categoría → columna del egreso (mismos campos que el formulario de Compras)
-const COLUMNA = { proveedor: 'id_proveedor', vehiculo: 'id_vehiculo', empleado: 'id_empleado', producto: 'id_producto', fletero: 'fletero', periodo: 'periodo' }
+// (Estación de servicio es un proveedor marcado como tal: también va en id_proveedor)
+const COLUMNA = { proveedor: 'id_proveedor', estacion: 'id_proveedor', vehiculo: 'id_vehiculo', empleado: 'id_empleado', producto: 'id_producto', fletero: 'fletero', periodo: 'periodo' }
 const ORIGEN = 'tercero'
 
 const marcado = (v) => v === '1' || v === 'on' || v === true
@@ -54,6 +55,11 @@ async function leer(body = {}, metodo) {
     if (v) t[col] = v
   }
   if (camposDe(cat).includes('proveedor') && !t.id_proveedor) throw new Error('Elegí el proveedor al que se le transfirió.')
+  if (camposDe(cat).includes('estacion')) {
+    if (!t.id_proveedor) throw new Error('Elegí la estación de servicio a la que se le transfirió.')
+    const est = (await query(`SELECT 1 FROM proveedores WHERE id = ? AND es_estacion = 1`, [t.id_proveedor])).rows[0]
+    if (!est) throw new Error('La estación de servicio elegida no es válida.')
+  }
   if (clave === 'sueldo' && !t.id_empleado) throw new Error('Elegí el empleado al que se le pagó el sueldo.')
   if (t.periodo && !/^\d{4}-\d{2}$/.test(t.periodo)) delete t.periodo
   const concepto = String(body.tercero_concepto || '').trim().slice(0, 200)
@@ -74,7 +80,18 @@ async function guardarEnOp(id, tercero, { grupo = false } = {}, q = query) {
   }
 }
 
+// Un cobro (transacción) o pago de cuenta corriente genera UN solo egreso a tercero: si ya
+// tiene uno, se devuelve ese en lugar de crear otro (no se duplica lo pagado al tercero ni
+// se descuenta dos veces de la deuda con una estación).
+async function egresoExistente({ id_transaccion, id_movimiento_cuenta }, q) {
+  const [col, valor] = id_transaccion ? ['id_transaccion', id_transaccion] : (id_movimiento_cuenta ? ['id_movimiento_cuenta', id_movimiento_cuenta] : [])
+  if (!col) return null
+  return (await q(`SELECT id FROM egresos WHERE ${col} = ? AND origen = ? ORDER BY id LIMIT 1`, [valor, ORIGEN])).rows[0]?.id || null
+}
+
 async function crearEgreso(t, { monto, fecha, descripcion, id_op_encabezado, id_transaccion, id_movimiento_cuenta, id_usuario }, q = query) {
+  const existente = await egresoExistente({ id_transaccion, id_movimiento_cuenta }, q)
+  if (existente) return existente
   if (t.categoria === 'sueldo') return crearSueldo(t, { monto, fecha, descripcion, id_op_encabezado, id_transaccion, id_movimiento_cuenta, id_usuario }, q)
   const desc = [t.concepto, descripcion].filter(Boolean).join(' — ')
   const fletero = await FleterosModel.asegurar(t.fletero, q)
@@ -153,6 +170,7 @@ async function opciones() {
   return {
     categorias,
     proveedores: (await ProveedoresModel.listar()).map(p => ({ id: p.id, nombre: p.nombre + (p.cuit ? ` (${p.cuit})` : '') })),
+    estaciones: (await ProveedoresModel.listar()).filter(p => p.es_estacion).map(p => ({ id: p.id, nombre: p.nombre })),
     empleados: (await EmpleadosModel.listar()).map(e => ({ id: e.id, nombre: `${e.nombre} ${e.apellido || ''}`.trim() })),
     vehiculos: (await FlotaModel.listar({})).map(v => ({ id: v.id, nombre: [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') })),
     productos: (await StockModel.listar()).map(p => ({ id: p.id, nombre: p.nombre })),
