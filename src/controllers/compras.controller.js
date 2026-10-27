@@ -3,6 +3,7 @@ const { query }        = require('../config/db')
 const EgresosModel     = require('../models/egresos.model')
 const StockModel       = require('../models/stock.model')
 const ProveedoresModel = require('../models/proveedores.model')
+const FleterosModel    = require('../models/fleteros.model')
 const EmpleadosModel   = require('../models/empleados.model')
 const PagosEmpleadoModel = require('../models/pagos_empleado.model')
 const FlotaModel       = require('../models/flota.model')
@@ -57,6 +58,7 @@ const ComprasController = {
     res.render('pages/compras/form', {
       titulo: 'Registrar compra / pago',
       categorias: await CategoriasEgresoModel.listar({ soloActivas: true }),
+      fleteros: await FleterosModel.listar(),   // sugerencias del campo Fletero
       ...(await datosForm()),
     })
   },

@@ -1,0 +1,39 @@
+<% const v = valores || fletero || {} %>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> <%= titulo %></h4>
+  <a href="/fleteros" class="btn btn-sm btn-outline-secondary">← Volver</a>
+</div>
+
+<div class="card shadow-sm maxw-600">
+  <div class="card-body">
+    <form action="<%= fletero ? `/fleteros/${fletero.id}?_method=PUT` : '/fleteros' %>" method="POST">
+      <div class="mb-3">
+        <label class="form-label">Nombre / Empresa de transporte *</label>
+        <input type="text" name="nombre" class="form-control" value="<%= v.nombre || '' %>" required autofocus>
+        <% if (fletero) { %><small class="text-muted">Si lo cambiás, sus compras / pagos pasan a figurar con el nombre nuevo.</small><% } %>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">CUIT</label>
+          <input type="text" name="cuit" class="form-control" value="<%= v.cuit || '' %>" placeholder="20-12345678-9">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Teléfono</label>
+          <input type="text" name="telefono" class="form-control" value="<%= v.telefono || '' %>">
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input type="email" name="email" class="form-control" value="<%= v.email || '' %>">
+      </div>
+      <div class="mb-4">
+        <label class="form-label">Domicilio</label>
+        <input type="text" name="domicilio" class="form-control" value="<%= v.domicilio || '' %>">
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-naranja px-4"><%= fletero ? 'Guardar cambios' : 'Crear fletero' %></button>
+        <a href="/fleteros" class="btn btn-outline-secondary">Cancelar</a>
+      </div>
+    </form>
+  </div>
+</div>

@@ -20,7 +20,7 @@
     { campo: 'vehiculo',  col: 'id_vehiculo',  label: 'Vehículo',    lista: 'vehiculos' },
     { campo: 'empleado',  col: 'id_empleado',  label: 'Empleado',    lista: 'empleados' },
     { campo: 'producto',  col: 'id_producto',  label: 'Producto',    lista: 'productos' },
-    { campo: 'fletero',   col: 'fletero',      label: 'Fletero',     tipo: 'text' },
+    { campo: 'fletero',   col: 'fletero',      label: 'Fletero',     tipo: 'text', sugerencias: 'fleteros' },
     { campo: 'periodo',   col: 'periodo',      label: 'Período',     tipo: 'month' },
   ]
   // Campo obligatorio según la categoría elegida
@@ -66,7 +66,14 @@
         ? el('select', { name: 'tercero_' + c.col, class: 'form-select form-select-sm' },
             [opcion('', 'Seleccionar…'), ...(op[c.lista] || []).map(x => opcion(x.id, x.nombre))])
         : el('input', { type: c.tipo, name: 'tercero_' + c.col, class: 'form-control form-control-sm' })
-      return { ...c, control, wrap: grupo(c.label, control) }
+      const wrap = grupo(c.label, control)
+      // Texto libre con sugerencias (ej. fleteros dados de alta; uno nuevo se da de alta solo)
+      if (c.sugerencias) {
+        control.setAttribute('list', id + c.col)
+        control.setAttribute('autocomplete', 'off')
+        wrap.append(el('datalist', { id: id + c.col }, (op[c.sugerencias] || []).map(n => el('option', { value: n }))))
+      }
+      return { ...c, control, wrap }
     })
     const concepto = el('input', { type: 'text', name: 'tercero_concepto', class: 'form-control form-control-sm', placeholder: 'Ej.: remito 1234, factura A 0001-0005…', maxlength: '200' })
     const wrapConcepto = grupo('Concepto / remito', concepto)

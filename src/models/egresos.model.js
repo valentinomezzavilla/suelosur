@@ -5,6 +5,7 @@
 // vinculado opcionalmente a un proveedor / empleado / vehículo.
 // ═══════════════════════════════════════════════════════════════════
 const { query, transaction } = require('../config/db')
+const FleterosModel = require('./fleteros.model')
 
 // Filtros que se pueden combinar libremente desde el libro de compras / pagos.
 // Las categorías son dinámicas (tabla categorias_egreso), acá no se validan.
@@ -34,12 +35,14 @@ const EgresosModel = {
   async crear({ fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
                 cantidad, subtotal_material, costo_final_flete, id_stock_ingreso }) {
     if (!categoria) throw new Error('Elegí una categoría válida.')
+    // El fletero escrito queda dado de alta en Fleteros (o toma el nombre como está guardado)
+    fletero = await FleterosModel.asegurar(fletero)
     const { rows } = await query(`
       INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
                            cantidad, subtotal_material, costo_final_flete, id_stock_ingreso)
       VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
-    `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null, (fletero || '').trim() || null,
+    `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null, fletero,
         (periodo || '').trim() || null, id_proveedor || null, id_producto || null, id_empleado || null, id_vehiculo || null,
         JSON.stringify(datos_extra || {}), origen || 'manual', id_usuario || null,
         cantidad == null ? null : cantidad, subtotal_material == null ? null : subtotal_material,
