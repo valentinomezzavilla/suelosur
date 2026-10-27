@@ -11,6 +11,7 @@
     "agrupar:alquileres": "node scripts/agrupar-alquileres.js",
     "corregir:fecha-cargos": "node scripts/corregir-fecha-cargos.js",
     "revisar:tercero": "node scripts/revisar-transferencias-tercero.js",
+    "vincular:estacion": "node scripts/vincular-estacion.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
   },
   "dependencies": {
