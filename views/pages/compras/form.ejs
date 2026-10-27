@@ -19,6 +19,9 @@
 <div class="card shadow-sm" style="max-width:720px">
   <div class="card-body">
     <form action="/compras" method="POST" id="formEgreso">
+      <datalist id="listaFleteros">
+        <% fleteros.forEach(f => { %><option value="<%= f.nombre %>"></option><% }) %>
+      </datalist>
 
       <!-- Categoría -->
       <div class="mb-3">
@@ -65,7 +68,8 @@
         </div>
         <div class="mb-3">
           <label class="form-label">Fletero</label>
-          <input type="text" name="fletero" id="fletero" class="form-control" placeholder="Nombre del fletero o empresa de transporte">
+          <input type="text" name="fletero" id="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte">
+          <small class="text-muted">Elegí uno de <a href="/fleteros" target="_blank">Fleteros</a> o escribí uno nuevo (se da de alta solo).</small>
         </div>
       </div>
 
@@ -133,7 +137,7 @@
       <% if (catsCon('fletero')) { %>
       <div class="cond mb-3" data-cats="<%= catsCon('fletero') %>" style="display:none">
         <label class="form-label">Fletero</label>
-        <input type="text" name="fletero" class="form-control" placeholder="Nombre del fletero o empresa de transporte">
+        <input type="text" name="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte">
       </div>
       <% } %>
 

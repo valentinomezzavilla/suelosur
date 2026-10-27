@@ -19,6 +19,7 @@
 // ═══════════════════════════════════════════════════════════════════
 const { query } = require('../config/db')
 const CategoriasEgresoModel = require('../models/categoriasEgreso.model')
+const FleterosModel = require('../models/fleteros.model')
 
 // Material mueve stock (cantidad, costo, flete): tiene su propio circuito en Compras
 const EXCLUIDAS = ['material']
@@ -76,12 +77,13 @@ async function guardarEnOp(id, tercero, { grupo = false } = {}, q = query) {
 async function crearEgreso(t, { monto, fecha, descripcion, id_op_encabezado, id_transaccion, id_movimiento_cuenta, id_usuario }, q = query) {
   if (t.categoria === 'sueldo') return crearSueldo(t, { monto, fecha, descripcion, id_op_encabezado, id_transaccion, id_movimiento_cuenta, id_usuario }, q)
   const desc = [t.concepto, descripcion].filter(Boolean).join(' — ')
+  const fletero = await FleterosModel.asegurar(t.fletero, q)
   const { rows } = await q(`
     INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado,
                          id_vehiculo, datos_extra, origen, id_usuario, id_op_encabezado, id_transaccion, id_movimiento_cuenta)
     VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, 'transferencia', ?, ?, ?, ?, ?, ?, '{}', ?, ?, ?, ?, ?)
     RETURNING id
-  `, [fecha ? String(fecha).slice(0, 10) : null, t.categoria, desc, Number(monto) || 0, t.fletero || null, t.periodo || null,
+  `, [fecha ? String(fecha).slice(0, 10) : null, t.categoria, desc, Number(monto) || 0, fletero, t.periodo || null,
       t.id_proveedor || null, t.id_producto || null, t.id_empleado || null, t.id_vehiculo || null,
       ORIGEN, id_usuario || null, id_op_encabezado || null, id_transaccion || null, id_movimiento_cuenta || null])
   return rows[0].id
@@ -154,6 +156,7 @@ async function opciones() {
     empleados: (await EmpleadosModel.listar()).map(e => ({ id: e.id, nombre: `${e.nombre} ${e.apellido || ''}`.trim() })),
     vehiculos: (await FlotaModel.listar({})).map(v => ({ id: v.id, nombre: [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') })),
     productos: (await StockModel.listar()).map(p => ({ id: p.id, nombre: p.nombre })),
+    fleteros: (await FleterosModel.listar()).map(f => f.nombre),
   }
 }
 

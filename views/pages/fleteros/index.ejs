@@ -1,0 +1,76 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
+  // Libro de compras / pagos filtrado por el fletero, desde siempre (sin el mes actual por defecto)
+  const comprasHref = (f) => '/compras?preset=rango&fechaDesde=2000-01-01&fletero=' + encodeURIComponent(f.nombre)
+%>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> Fleteros</h4>
+  <a href="/fleteros/nuevo" class="btn btn-naranja">+ Nuevo Fletero</a>
+</div>
+
+<form method="GET" action="/fleteros" class="card shadow-sm mb-3">
+  <div class="card-body py-2">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Buscar</label>
+        <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
+               placeholder="Nombre, CUIT, teléfono o email..." autofocus>
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
+        <% if (filtros.q) { %><a href="/fleteros" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!fleteros.length) { %>
+      <%- include('../../partials/empty_state', { icono: '🚚', mensaje: 'No hay fleteros registrados.', accionHref: '/fleteros/nuevo', accionLabel: 'Crear primer fletero' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Nombre / Empresa</th>
+          <th>CUIT</th>
+          <th>Teléfono</th>
+          <th>Email</th>
+          <th class="text-center">Compras / pagos</th>
+          <th class="text-end">Flete pagado</th>
+          <th class="text-center">Estado</th>
+          <th class="text-center">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% fleteros.forEach(f => { %>
+        <tr class="<%= !f.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold"><%= f.nombre %></td>
+          <td><small class="text-muted"><%= f.cuit || '—' %></small></td>
+          <td><small class="text-muted"><%= f.telefono || '—' %></small></td>
+          <td><small class="text-muted"><%= f.email || '—' %></small></td>
+          <td class="text-center">
+            <% if (Number(f.compras) > 0) { %><a href="<%= comprasHref(f) %>" title="Ver en Compras / Pagos"><%= f.compras %></a>
+            <% } else { %><small class="text-muted">0</small><% } %>
+          </td>
+          <td class="text-end"><%= money(f.total_flete) %></td>
+          <td class="text-center">
+            <% if (f.activo) { %><span class="badge rounded-pill px-3 badge-activo">Activo</span>
+            <% } else { %><span class="badge rounded-pill px-3 badge-alerta">Inactivo</span><% } %>
+          </td>
+          <td class="text-center">
+            <a href="/fleteros/<%= f.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar"><%- icon('edit', { size: 15 }) %></a>
+            <form action="/fleteros/<%= f.id %>/toggle" method="POST" class="d-inline">
+              <button class="btn btn-sm <%= f.activo ? 'btn-outline-danger' : 'btn-outline-success' %>" title="<%= f.activo ? 'Desactivar' : 'Activar' %>">
+                <%- f.activo ? icon('ban', { size: 15 }) : icon('check', { size: 15 }) %>
+              </button>
+            </form>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <%- include('../../partials/paginacion', { page, totalPaginas, total, limit, filtros }) %>
+    <% } %>
+  </div>
+</div>

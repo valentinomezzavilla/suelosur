@@ -1462,6 +1462,34 @@ async function initDB() {
   // Fletero (persona/empresa que hizo el transporte) de una compra de material
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS fletero TEXT`).catch(() => {})
 
+  // Fleteros: ABM como el de proveedores. Las compras siguen guardando el nombre en
+  // egresos.fletero (renombrar un fletero actualiza sus compras, ver FleterosModel).
+  // Los nombres ya cargados en compras que no estén en la tabla se dan de alta solos.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS fleteros (
+      id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      nombre     TEXT NOT NULL,
+      cuit       TEXT,
+      domicilio  TEXT,
+      telefono   TEXT,
+      email      TEXT,
+      activo     INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT ahora_local()
+    )
+  `)
+  await pool.query(`
+    INSERT INTO fleteros (nombre)
+    SELECT DISTINCT ON (LOWER(TRIM(e.fletero))) TRIM(e.fletero) FROM egresos e
+    WHERE e.fletero IS NOT NULL AND TRIM(e.fletero) <> ''
+      AND NOT EXISTS (SELECT 1 FROM fleteros f WHERE LOWER(f.nombre) = LOWER(TRIM(e.fletero)))
+    ORDER BY LOWER(TRIM(e.fletero)), TRIM(e.fletero)
+  `)
+  // Mismo fletero escrito con otras mayúsculas / espacios: las compras toman el nombre guardado
+  await pool.query(`
+    UPDATE egresos e SET fletero = f.nombre FROM fleteros f
+    WHERE LOWER(TRIM(e.fletero)) = LOWER(f.nombre) AND e.fletero <> f.nombre
+  `)
+
   // Producto comprado (categoría material), para poder filtrar el libro de compras / pagos por producto
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_producto BIGINT REFERENCES productos(id)`).catch(() => {})
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_producto ON egresos(id_producto)`).catch(() => {})
