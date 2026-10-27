@@ -62,6 +62,9 @@ app.use((req, res, next) => {
   next()
 })
 
+// ── Envío único: el mismo formulario no se registra dos veces ────
+app.use(require('./middlewares/envioUnico'))
+
 // ── Rutas ────────────────────────────────────────────────────────
 const auth = require('./middlewares/auth')
 const roles = require('./middlewares/roles')

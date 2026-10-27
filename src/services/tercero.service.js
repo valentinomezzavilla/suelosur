@@ -133,6 +133,22 @@ async function crearSueldo(t, { monto, fecha, descripcion, id_op_encabezado, id_
   return e.id
 }
 
+// A quién se le transfirió, para mostrarlo en el pago del cliente: la estación / proveedor,
+// el empleado, o si no el concepto o la categoría.
+async function destino(t, q = query) {
+  if (t.id_proveedor) {
+    const p = (await q(`SELECT nombre FROM proveedores WHERE id = ?`, [t.id_proveedor])).rows[0]
+    if (p) return p.nombre
+  }
+  if (t.id_empleado) {
+    const e = (await q(`SELECT nombre, apellido FROM empleados WHERE id = ?`, [t.id_empleado])).rows[0]
+    if (e) return `${e.nombre} ${e.apellido || ''}`.trim()
+  }
+  if (t.concepto) return t.concepto
+  const cat = await CategoriasEgresoModel.obtenerPorClave(t.categoria)
+  return cat ? cat.etiqueta : 'tercero'
+}
+
 // Egreso del cobro de una operación que tiene tercero. Lo llama TransaccionesModel.crear
 // cuando la transacción es por transferencia; no hace nada si la operación no tiene tercero.
 async function egresoDeCobro({ id_transaccion, id_op_encabezado, monto, fecha, cliente, tipo }, q = query) {
@@ -178,4 +194,4 @@ async function opciones() {
   }
 }
 
-module.exports = { leer, guardarEnOp, crearEgreso, egresoDeCobro, borrarDeTransaccion, borrarDeOp, borrarDeMovimiento, opciones, parsear }
+module.exports = { leer, guardarEnOp, crearEgreso, destino, egresoDeCobro, borrarDeTransaccion, borrarDeOp, borrarDeMovimiento, opciones, parsear }
