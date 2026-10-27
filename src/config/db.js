@@ -1517,6 +1517,11 @@ async function initDB() {
     WHERE LOWER(TRIM(e.fletero)) = LOWER(f.nombre) AND e.fletero <> f.nombre
   `)
 
+  // Envío único de formularios (middlewares/envioUnico.js): el código de cada envío ya
+  // registrado, para descartar el mismo formulario si llega dos veces. Se guardan unos días.
+  await pool.query(`CREATE TABLE IF NOT EXISTS envios_formulario (token TEXT PRIMARY KEY, creado_en TIMESTAMPTZ NOT NULL DEFAULT now())`)
+  await pool.query(`DELETE FROM envios_formulario WHERE creado_en < now() - interval '7 days'`)
+
   // Producto comprado (categoría material), para poder filtrar el libro de compras / pagos por producto
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_producto BIGINT REFERENCES productos(id)`).catch(() => {})
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_producto ON egresos(id_producto)`).catch(() => {})

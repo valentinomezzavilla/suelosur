@@ -9,7 +9,54 @@
  *
  * Para excluir un link/form puntual: agregar el atributo  data-no-loader
  * Para personalizar el texto:                              data-loading-text="..."
+ *
+ * Además, cada formulario POST se envía UNA sola vez (ver "Envío único" abajo).
  */
+
+// ── Envío único de formularios ─────────────────────────────────
+// Un segundo click (o Enter) mientras el primer envío está en camino se ignora, y el
+// formulario lleva un código (_envio) con el que el servidor descarta el mismo envío si
+// vuelve a llegar (src/middlewares/envioUnico.js). Para excluir un form: data-repetible.
+(function () {
+  'use strict';
+
+  function codigo() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
+    return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+
+  document.addEventListener('submit', function (e) {
+    var form = e.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    if ((form.getAttribute('method') || 'get').toLowerCase() !== 'post') return;
+    if (form.dataset.repetible !== undefined) return;
+    if (form.target && form.target !== '_self') return;       // abre en nueva pestaña
+    if (e.defaultPrevented) return;                           // lo canceló otro script (confirm, fetch…)
+    if (form.__enviando) { e.preventDefault(); return; }       // segundo click: ya se está enviando
+
+    if (!form.querySelector('input[name="_envio"]')) {
+      var campo = document.createElement('input');
+      campo.type = 'hidden';
+      campo.name = '_envio';
+      campo.value = codigo();
+      form.appendChild(campo);
+    }
+    form.__enviando = true;
+    // Si otro script cancela el envío después de este, el form queda libre
+    setTimeout(function () { if (e.defaultPrevented) form.__enviando = false; }, 0);
+    // Red de seguridad si la página no cambia (descarga, error de red)
+    clearTimeout(form.__liberar);
+    form.__liberar = setTimeout(function () { form.__enviando = false; }, 15000);
+  });
+
+  // Al volver con "atrás" se puede enviar de nuevo; el código se conserva, así que el
+  // servidor no registra dos veces lo que ya había guardado.
+  window.addEventListener('pageshow', function () {
+    var forms = document.querySelectorAll('form');
+    for (var i = 0; i < forms.length; i++) forms[i].__enviando = false;
+  });
+})();
+
 (function () {
   'use strict';
 

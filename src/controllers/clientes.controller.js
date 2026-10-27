@@ -1,5 +1,6 @@
 'use strict'
 const ClientesModel = require('../models/clientes.model')
+const { transaction } = require('../config/db')
 const TransaccionesModel = require('../models/transacciones.model')
 const Tercero = require('../services/tercero.service')
 const paginar       = require('../utils/paginar')
@@ -13,12 +14,21 @@ const { normalizarFiltrosCuentas, filtrarCuentas, coincideCliente, TIPOS_CLIENTE
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
   && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v ? v : null
 
-// Pago de cuenta corriente por transferencia a un tercero: el egreso por el mismo monto
-async function egresoPagoCC(req, tercero, { monto, movId }) {
-  const cli = await ClientesModel.obtener(req.params.id)
-  await Tercero.crearEgreso(tercero, {
-    monto, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
-    descripcion: `Transferencia de ${ClientesModel.nombreCompleto(cli)} a tercero (pago de cuenta corriente)`,
+// Movimiento de cuenta corriente. Si es un pago por transferencia a un tercero (ej. una
+// estación de servicio), el pago del cliente y el egreso al tercero son UN solo movimiento:
+// se guardan juntos en la misma transacción (o ninguno), y el pago dice a quién se le transfirió.
+async function registrarMovimientoCC(req, { tipo = 'pago', descripcion, monto, signed = monto, metodo_pago }, tercero) {
+  const cli = tercero ? await ClientesModel.obtener(req.params.id) : null
+  return transaction(async (q) => {
+    const desc = tercero ? `${descripcion} — transferido a ${await Tercero.destino(tercero, q)}` : descripcion
+    const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago }, q)
+    if (tercero) {
+      await Tercero.crearEgreso(tercero, {
+        monto, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
+        descripcion: `Transferencia de ${ClientesModel.nombreCompleto(cli)} a tercero (pago de cuenta corriente)`,
+      }, q)
+    }
+    return movId
   })
 }
 
@@ -151,8 +161,7 @@ const ClientesController = {
       else if (clase === 'cargo') { tipo = 'deuda';  signed = -m; desc = descripcion || 'Cargo manual' }
       else                        { tipo = 'ajuste'; signed = (signo === 'neg' ? -m : m); desc = descripcion || 'Ajuste de saldo' }
       const tercero = clase === 'pago' ? await Tercero.leer(req.body, req.body.metodo_pago) : null
-      const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null })
-      if (tercero) await egresoPagoCC(req, tercero, { monto: m, movId })
+      await registrarMovimientoCC(req, { tipo, descripcion: desc, monto: m, signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null }, tercero)
       req.flash('success', 'Movimiento registrado.')
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error al registrar el movimiento.')
@@ -307,8 +316,7 @@ const ClientesController = {
       const concepto = (req.body.descripcion || '').trim()
       const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
       const tercero = await Tercero.leer(req.body, req.body.metodo_pago)
-      const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo: 'pago', descripcion, monto, metodo_pago: req.body.metodo_pago || null })
-      if (tercero) await egresoPagoCC(req, tercero, { monto, movId })
+      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null }, tercero)
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
