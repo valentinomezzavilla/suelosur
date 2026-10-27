@@ -1,0 +1,117 @@
+<%
+  const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
+  const saldoTxt = (s) => s < -0.005 ? money(-s) + ' a favor' : money(s)
+  const ORIGEN = {
+    carga:         ['Carga',              'badge-en-transito'],
+    cargo:         ['Cargo manual',       'badge-alerta'],
+    ajuste:        ['Ajuste',             'badge-pendiente'],
+    pago:          ['Pago',               'badge-activo'],
+    transferencia: ['Transf. de cliente', 'badge-activo'],
+  }
+  const METODO = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq' }
+  const conPeriodo = !!(filtros.desde || filtros.hasta)
+  const dia = (f) => String(f || '').slice(0, 10)
+%>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> <%= estacion.nombre %></h4>
+  <div class="d-flex gap-2">
+    <a href="/proveedores/<%= estacion.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Datos</a>
+    <a href="/proveedores/estaciones" class="btn btn-sm btn-outline-secondary">← Estaciones</a>
+  </div>
+</div>
+
+<div class="stat-cards mb-3" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+  <div class="stat-card <%= total.saldo > 0.005 ? 'stat-card--warning' : 'stat-card--success' %>"><div class="stat-card__body"><span class="stat-card__value"><%= saldoTxt(total.saldo) %></span><span class="stat-card__label">Deuda actual</span></div></div>
+  <div class="stat-card stat-card--neutral"><div class="stat-card__body"><span class="stat-card__value"><%= money(cuenta.debe) %></span><span class="stat-card__label">Cargas y cargos<%= conPeriodo ? ' del período' : '' %></span></div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= money(cuenta.haber) %></span><span class="stat-card__label">Pagado / derivado<%= conPeriodo ? ' en el período' : '' %></span></div></div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold">Registrar pago a la estación</div>
+      <div class="card-body">
+        <form action="/proveedores/estaciones/<%= estacion.id %>/pago" method="POST" class="row g-2 align-items-end" onsubmit="this.querySelector('button').disabled = true">
+          <div class="col-md-4"><label class="form-label">Monto *</label><input type="number" step="0.01" min="0.01" name="monto" class="form-control form-control-sm" required></div>
+          <div class="col-md-4"><label class="form-label">Método</label>
+            <select name="metodo_pago" class="form-select form-select-sm">
+              <% Object.keys(METODO).forEach(m => { %><option value="<%= m %>"><%= METODO[m] %></option><% }) %>
+            </select></div>
+          <div class="col-md-4"><label class="form-label">Fecha</label><input type="date" name="fecha" value="<%= hoyISO() %>" class="form-control form-control-sm"></div>
+          <div class="col-md-9"><label class="form-label">Detalle</label><input type="text" name="descripcion" maxlength="200" class="form-control form-control-sm" placeholder="Ej.: factura 0003-0001234"></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-naranja w-100">Registrar pago</button></div>
+        </form>
+        <small class="text-muted">Queda también en Compras / Pagos (categoría Combustible). Las transferencias de clientes derivadas a la estación se descuentan solas.</small>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="card shadow-sm h-100"><div class="card-header bg-white fw-semibold">Cargo manual / ajuste</div>
+      <div class="card-body">
+        <form action="/proveedores/estaciones/<%= estacion.id %>/movimiento" method="POST" class="row g-2 align-items-end" onsubmit="this.querySelector('button').disabled = true">
+          <div class="col-md-4"><label class="form-label">Tipo</label>
+            <select name="tipo" class="form-select form-select-sm">
+              <option value="cargo">Cargo (suma deuda)</option>
+              <option value="ajuste">Ajuste a favor (baja deuda)</option>
+            </select></div>
+          <div class="col-md-4"><label class="form-label">Monto *</label><input type="number" step="0.01" min="0.01" name="monto" class="form-control form-control-sm" required></div>
+          <div class="col-md-4"><label class="form-label">Fecha</label><input type="date" name="fecha" value="<%= hoyISO() %>" class="form-control form-control-sm"></div>
+          <div class="col-md-9"><label class="form-label">Detalle</label><input type="text" name="descripcion" maxlength="300" class="form-control form-control-sm" placeholder="Ej.: saldo inicial, resumen de octubre…"></div>
+          <div class="col-md-3"><button class="btn btn-sm btn-outline-secondary w-100">Registrar</button></div>
+        </form>
+        <small class="text-muted">Para la deuda que ya había antes de usar el sistema, o un resumen de la estación que no se cargó por camión.</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="GET" class="card shadow-sm mb-3"><div class="card-body py-2">
+  <div class="row g-2 align-items-end">
+    <div class="col-md-3"><label class="form-label">Desde</label><input type="date" name="desde" value="<%= filtros.desde %>" class="form-control form-control-sm"></div>
+    <div class="col-md-3"><label class="form-label">Hasta</label><input type="date" name="hasta" value="<%= filtros.hasta %>" class="form-control form-control-sm"></div>
+    <div class="col-auto">
+      <button class="btn btn-sm btn-naranja">Filtrar</button>
+      <% if (conPeriodo) { %><a href="/proveedores/estaciones/<%= estacion.id %>" class="btn btn-sm btn-outline-secondary ms-1">Ver todo</a><% } %>
+    </div>
+  </div>
+</div></form>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr><th>Fecha</th><th>Tipo</th><th>Detalle</th><th class="text-end">Debe</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% if (filtros.desde) { %>
+        <tr class="table-light"><td colspan="5"><small class="text-muted">Saldo anterior al <%= formatFecha(filtros.desde) %></small></td>
+          <td class="text-end fw-semibold"><%= saldoTxt(cuenta.saldoAnterior) %></td><td></td></tr>
+        <% } %>
+        <% if (!cuenta.movimientos.length) { %>
+        <tr><td colspan="7" class="text-center text-muted p-4">Sin movimientos<%= conPeriodo ? ' en el período' : '' %>.</td></tr>
+        <% } %>
+        <% cuenta.movimientos.forEach(m => { const o = ORIGEN[m.origen] || [m.origen, 'badge-pendiente'] %>
+        <tr>
+          <td><small><%= formatFecha(m.fecha) %></small></td>
+          <td><span class="badge rounded-pill <%= o[1] %>"><%= o[0] %></span></td>
+          <td><small><%= m.descripcion %><%= m.metodo_pago && METODO[m.metodo_pago] ? ' · ' + METODO[m.metodo_pago] : '' %></small></td>
+          <td class="text-end"><%= m.debe ? money(m.debe) : '' %></td>
+          <td class="text-end text-success"><%= m.haber ? money(m.haber) : '' %></td>
+          <td class="text-end fw-semibold"><%= saldoTxt(m.saldo) %></td>
+          <td class="text-end">
+            <% if (m.origen === 'cargo' || m.origen === 'ajuste') { %>
+            <form action="/proveedores/estaciones/<%= estacion.id %>/movimiento/<%= m.id %>/eliminar" method="POST" class="d-inline"
+                  onsubmit="return confirm('¿Eliminar este movimiento de <%= money(m.debe || m.haber) %>?')">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 14 }) %></button>
+            </form>
+            <% } else if (m.origen === 'carga' && m.id_vehiculo) { %>
+            <a href="/flota/<%= m.id_vehiculo %>?tab=combustible" class="btn btn-sm btn-outline-secondary" title="Ver en el camión"><%- icon('truck', { size: 14 }) %></a>
+            <% } else if (m.origen === 'pago' || m.origen === 'transferencia') { %>
+            <a href="/compras?preset=rango&fechaDesde=<%= dia(m.fecha) %>&fechaHasta=<%= dia(m.fecha) %>&proveedor=<%= estacion.id %>" class="btn btn-sm btn-outline-secondary" title="Ver en Compras / Pagos"><%- icon('receipt', { size: 14 }) %></a>
+            <% } %>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

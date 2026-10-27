@@ -4,6 +4,7 @@ const EgresosModel     = require('../models/egresos.model')
 const StockModel       = require('../models/stock.model')
 const ProveedoresModel = require('../models/proveedores.model')
 const FleterosModel    = require('../models/fleteros.model')
+const EstacionesModel  = require('../models/estaciones.model')
 const EmpleadosModel   = require('../models/empleados.model')
 const PagosEmpleadoModel = require('../models/pagos_empleado.model')
 const FlotaModel       = require('../models/flota.model')
@@ -14,6 +15,7 @@ const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 async function datosForm() {
   return {
     proveedores: await ProveedoresModel.listar(),
+    estaciones:  await EstacionesModel.listar(),
     empleados:   await EmpleadosModel.listar(),
     vehiculos:   await FlotaModel.listar({}),
     productos:   await StockModel.listar(),
@@ -140,7 +142,8 @@ const ComprasController = {
         fecha: fecha || null, categoria, descripcion: (descripcion || '').trim(), monto: montoNum, metodo_pago: metodo_pago || null,
         fletero:      cat.campos.includes('fletero')   ? (fletero || null) : null,
         periodo:      cat.campos.includes('periodo')   ? (periodo || null) : null,
-        id_proveedor: cat.campos.includes('proveedor') ? (id_proveedor || null) : null,
+        // Estación de servicio también va en id_proveedor (y baja la deuda con la estación)
+        id_proveedor: (cat.campos.includes('proveedor') || cat.campos.includes('estacion')) ? (id_proveedor || null) : null,
         id_producto:  cat.campos.includes('producto')  ? (id_producto || null) : null,
         id_empleado:  cat.campos.includes('empleado')  ? (id_empleado || null) : null,
         id_vehiculo:  cat.campos.includes('vehiculo')  ? (id_vehiculo || null) : null,

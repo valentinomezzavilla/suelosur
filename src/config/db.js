@@ -1484,6 +1484,33 @@ async function initDB() {
       AND NOT EXISTS (SELECT 1 FROM fleteros f WHERE LOWER(f.nombre) = LOWER(TRIM(e.fletero)))
     ORDER BY LOWER(TRIM(e.fletero)), TRIM(e.fletero)
   `)
+  // Estaciones de servicio: proveedores marcados como tal. Su cuenta (EstacionesModel.cuenta)
+  // suma las cargas de combustible hechas ahí (combustible.id_proveedor) y los cargos
+  // manuales (cc_proveedores), y resta todo lo que se les pagó o se les derivó por
+  // transferencia de un cliente (egresos.id_proveedor).
+  await pool.query(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS es_estacion INTEGER NOT NULL DEFAULT 0`)
+  await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS id_proveedor BIGINT REFERENCES proveedores(id)`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_combustible_proveedor ON combustible(id_proveedor)`)
+  await pool.query(`ALTER TABLE cc_proveedores ADD COLUMN IF NOT EXISTS id_usuario BIGINT`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_proveedor ON egresos(id_proveedor)`)
+  // Una sola vez: la categoría Combustible pasa a pedir la estación de servicio (en lugar
+  // de un proveedor cualquiera) y los proveedores que ya recibieron pagos de combustible
+  // quedan marcados como estación.
+  {
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_aplicadas (nombre TEXT PRIMARY KEY, aplicada_en TEXT DEFAULT ahora_local())`)
+    const r = await pool.query(`INSERT INTO migraciones_aplicadas (nombre) VALUES ('combustible_estacion_v1') ON CONFLICT DO NOTHING RETURNING nombre`)
+    if (r.rowCount) {
+      const cat = (await pool.query(`SELECT campos FROM categorias_egreso WHERE clave = 'combustible'`)).rows[0]
+      if (cat) {
+        let campos = []
+        try { campos = JSON.parse(cat.campos || '[]') } catch (_) { campos = [] }
+        campos = [...campos.filter(c => c !== 'proveedor' && c !== 'estacion'), 'estacion']
+        await pool.query(`UPDATE categorias_egreso SET campos = $1 WHERE clave = 'combustible'`, [JSON.stringify(campos)])
+      }
+      await pool.query(`UPDATE proveedores SET es_estacion = 1
+        WHERE id IN (SELECT id_proveedor FROM egresos WHERE categoria = 'combustible' AND id_proveedor IS NOT NULL)`)
+    }
+  }
   // Mismo fletero escrito con otras mayúsculas / espacios: las compras toman el nombre guardado
   await pool.query(`
     UPDATE egresos e SET fletero = f.nombre FROM fleteros f

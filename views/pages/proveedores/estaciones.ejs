@@ -1,0 +1,58 @@
+<% const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }) %>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> Estaciones de servicio</h4>
+  <div class="d-flex gap-2">
+    <a href="/proveedores?tipo=estacion" class="btn btn-sm btn-outline-secondary">Administrar estaciones</a>
+    <a href="/proveedores/nuevo" class="btn btn-sm btn-naranja">+ Nueva estación</a>
+  </div>
+</div>
+
+<div class="card shadow-sm mb-3"><div class="card-body py-2 small text-muted">
+  La deuda con cada estación suma las <strong>cargas de combustible</strong> hechas ahí (Flota → camión → Combustible) y los
+  <strong>cargos manuales</strong>, y resta los <strong>pagos</strong> y las <strong>transferencias de clientes derivadas</strong> a la estación
+  ("Destinado a tercero" → Combustible). Una estación es un proveedor con la marca "Estación de servicio".
+</div></div>
+
+<div class="stat-cards mb-3" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+  <div class="stat-card stat-card--warning"><div class="stat-card__body"><span class="stat-card__value"><%= money(totalDeuda) %></span><span class="stat-card__label">Deuda total con estaciones</span></div></div>
+  <div class="stat-card stat-card--info"><div class="stat-card__body"><span class="stat-card__value"><%= estaciones.length %></span><span class="stat-card__label">Estaciones</span></div></div>
+</div>
+
+<div class="card shadow-sm">
+  <div class="card-body p-0">
+    <% if (!estaciones.length) { %>
+      <%- include('../../partials/empty_state', { icono: '⛽', mensaje: 'No hay estaciones de servicio. Marcá un proveedor como "Estación de servicio" para verlo acá.', accionHref: '/proveedores', accionLabel: 'Ir a Proveedores' }) %>
+    <% } else { %>
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Estación</th>
+          <th class="text-end">Cargas / cargos</th>
+          <th class="text-end">Pagado / derivado</th>
+          <th class="text-end">Deuda</th>
+          <th>Último movimiento</th>
+          <th class="text-center">Cuenta</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% estaciones.forEach(e => { %>
+        <tr class="<%= !e.activo ? 'text-muted' : '' %>">
+          <td class="fw-semibold"><%= e.nombre %><% if (!e.activo) { %> <span class="badge rounded-pill badge-alerta ms-1">Inactiva</span><% } %>
+            <% if (e.cuit) { %><br><small class="text-muted"><%= e.cuit %></small><% } %></td>
+          <td class="text-end"><%= money(e.debe) %></td>
+          <td class="text-end"><%= money(e.haber) %></td>
+          <td class="text-end fw-bold <%= e.saldo > 0.005 ? 'text-danger' : (e.saldo < -0.005 ? 'text-success' : 'text-muted') %>">
+            <%= e.saldo < -0.005 ? money(-e.saldo) + ' a favor' : money(e.saldo) %></td>
+          <td><small class="text-muted"><%= e.ultimo_movimiento ? formatFecha(e.ultimo_movimiento) : '—' %></small></td>
+          <td class="text-center"><a href="/proveedores/estaciones/<%= e.id %>" class="btn btn-sm btn-outline-secondary">Ver cuenta</a></td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </div>
+</div>
+<div class="mt-2 small">
+  <% if (filtros.inactivas) { %><a href="/proveedores/estaciones">Ocultar estaciones inactivas</a>
+  <% } else { %><a href="/proveedores/estaciones?inactivas=1">Mostrar también las inactivas</a><% } %>
+</div>

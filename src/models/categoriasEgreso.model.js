@@ -5,7 +5,7 @@
 // recibo de sueldo, ver compras.controller.js) y no se pueden editar ni
 // borrar. El resto se administra libremente: cada categoría declara qué
 // campos fijos usa (proveedor, producto, vehiculo, empleado, fletero,
-// periodo — los mismos que ya existen en el formulario) y además puede
+// periodo, estacion — los mismos que ya existen en el formulario) y además puede
 // definir campos propios (texto / número / fecha / lista), con su nombre
 // y tipo. Los valores de los campos propios se guardan en egresos.datos_extra.
 // ═══════════════════════════════════════════════════════════════════
@@ -18,7 +18,15 @@ const CAMPOS_DISPONIBLES = [
   { clave: 'empleado',  etiqueta: 'Empleado' },
   { clave: 'fletero',   etiqueta: 'Fletero' },
   { clave: 'periodo',   etiqueta: 'Período' },
+  { clave: 'estacion',  etiqueta: 'Estación de servicio' },
 ]
+
+// Proveedor y Estación de servicio guardan los dos en egresos.id_proveedor: una categoría
+// usa uno u otro (si se marcan los dos, queda Estación).
+function validarCampos(campos) {
+  const lista = (Array.isArray(campos) ? campos : (campos ? [campos] : [])).filter(c => CAMPOS_DISPONIBLES.some(d => d.clave === c))
+  return lista.includes('estacion') ? lista.filter(c => c !== 'proveedor') : lista
+}
 
 const BADGES_DISPONIBLES = ['badge-activo', 'badge-en-transito', 'badge-alerta', 'badge-pendiente']
 
@@ -88,7 +96,7 @@ const CategoriasEgresoModel = {
     const clave = normalizarClave(etiqueta)
     if (!clave) throw new Error('El nombre de la categoría es obligatorio.')
     if (await this.obtenerPorClave(clave)) throw new Error('Ya existe una categoría con ese nombre.')
-    const camposValidos = (Array.isArray(campos) ? campos : [campos]).filter(c => CAMPOS_DISPONIBLES.some(d => d.clave === c))
+    const camposValidos = validarCampos(campos)
     const camposCustomValidos = normalizarCamposCustom(camposCustom)
     const badgeValido = BADGES_DISPONIBLES.includes(badge) ? badge : 'badge-pendiente'
     const { rows } = (await query(`
@@ -107,7 +115,7 @@ const CategoriasEgresoModel = {
     if (!actual) throw new Error('Categoría no encontrada.')
     if (actual.sistema) throw new Error('Esta es una categoría del sistema y no se puede editar.')
     if (!etiqueta || !etiqueta.trim()) throw new Error('El nombre de la categoría es obligatorio.')
-    const camposValidos = (Array.isArray(campos) ? campos : (campos ? [campos] : [])).filter(c => CAMPOS_DISPONIBLES.some(d => d.clave === c))
+    const camposValidos = validarCampos(campos)
     const camposCustomValidos = normalizarCamposCustom(camposCustom)
     const badgeValido = BADGES_DISPONIBLES.includes(badge) ? badge : actual.badge
     await query(`

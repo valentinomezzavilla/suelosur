@@ -1,6 +1,9 @@
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('truck', { size: 18 }) %> Proveedores</h4>
-  <a href="/proveedores/nuevo" class="btn btn-naranja">+ Nuevo Proveedor</a>
+  <div class="d-flex gap-2">
+    <a href="/proveedores/estaciones" class="btn btn-outline-secondary"><%- icon('truck', { size: 15 }) %> Estaciones de servicio</a>
+    <a href="/proveedores/nuevo" class="btn btn-naranja">+ Nuevo Proveedor</a>
+  </div>
 </div>
 
 <form method="GET" action="/proveedores" class="card shadow-sm mb-3">
@@ -11,9 +14,16 @@
         <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
                placeholder="Razón social, CUIT o email..." autofocus>
       </div>
+      <div class="col-md-3">
+        <label class="form-label">Tipo</label>
+        <select name="tipo" class="form-select form-select-sm">
+          <option value="">Todos</option>
+          <option value="estacion" <%= filtros.tipo === 'estacion' ? 'selected' : '' %>>Estaciones de servicio</option>
+        </select>
+      </div>
       <div class="col-auto">
         <button type="submit" class="btn btn-sm btn-naranja">Buscar</button>
-        <% if (filtros.q) { %><a href="/proveedores" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
+        <% if (filtros.q || filtros.tipo) { %><a href="/proveedores" class="btn btn-sm btn-outline-secondary ms-1">Limpiar</a><% } %>
       </div>
     </div>
   </div>
@@ -38,7 +48,8 @@
       <tbody>
         <% proveedores.forEach(p => { %>
         <tr class="<%= !p.activo ? 'text-muted' : '' %>">
-          <td class="fw-semibold"><%= p.nombre %></td>
+          <td class="fw-semibold"><%= p.nombre %>
+            <% if (p.es_estacion) { %><a href="/proveedores/estaciones/<%= p.id %>" class="badge rounded-pill badge-en-transito ms-1 text-decoration-none" title="Ver cuenta de la estación">Estación</a><% } %></td>
           <td><small class="text-muted"><%= p.cuit || '—' %></small></td>
           <td><small class="text-muted"><%= p.telefono || '—' %></small></td>
           <td><small class="text-muted"><%= p.email || '—' %></small></td>
