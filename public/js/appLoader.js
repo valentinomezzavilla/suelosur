@@ -121,6 +121,7 @@
     var form = e.target;
     if (!(form instanceof HTMLFormElement)) return;
     if (form.dataset.noLoader !== undefined) return;
+    if (e.defaultPrevented) return;                           // cancelado (ej. "Cancelar" en un confirm)
     if (form.target && form.target !== '_self') return;       // abre en nueva pestaña
     var action = form.getAttribute('action') || '';
     if (DESCARGA_RE.test(action)) return;                     // genera descarga

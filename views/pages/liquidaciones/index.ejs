@@ -101,6 +101,19 @@
   <% }) %>
 <% } %>
 
+<% if (r.cantidad) { %>
+  <%# Marcar / quitar "para facturar" las operaciones tildadas (el cliente pide factura de un período) %>
+  <form method="POST" action="/facturacion/marcar-varias" id="formFacturarGrupo" class="liq-facturar">
+    <input type="hidden" name="volver" value="/liquidaciones?<%= qs() %>">
+    <label class="liq-facturar__todas"><input type="checkbox" id="liqSelTodas"> Seleccionar todas</label>
+    <span class="liq-facturar__info" id="liqSelInfo">Tildá las operaciones que el cliente quiere facturar.</span>
+    <div class="liq-facturar__botones">
+      <button type="submit" class="btn btn-sm btn-outline-secondary" id="btnLiqQuitar" formaction="/facturacion/quitar-varias" disabled>Quitar de facturación</button>
+      <button type="submit" class="btn btn-sm btn-naranja" id="btnLiqMarcar" disabled>Marcar para facturar</button>
+    </div>
+  </form>
+<% } %>
+
 <% if (conCliente && liquidacion.clientes[0].pagos) { %>
   <% const pagos = liquidacion.clientes[0].pagos %>
   <div class="card shadow-sm mt-3">

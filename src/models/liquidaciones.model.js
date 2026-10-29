@@ -30,7 +30,7 @@ async function operacionesBase({ clienteId, desde, hasta, tipos, opIds, conAnula
   return (await query(`
     SELECT op.id, op.nro_op, op.nro_remito, op.tipo_op, op.modalidad, op.id_cliente, op.id_grupo,
            ${FECHA} AS fecha, op.obra, op.domicilio_calle, op.domicilio_altura,
-           op.precio_flete, op.monto_total, op.iva_alicuota,
+           op.precio_flete, op.monto_total, op.iva_alicuota, op.para_facturar, op.facturado,
            COALESCE(op.metodo_pago, oc.metodo_pago, om.metodo_pago) AS metodo_pago,
            (ag.cobro_modo = 'alquiler') AS grupo_todo_junto,
            oc.id AS oc_id, oc.precio_alquiler, oc.domicilio_entrega AS cont_entrega,
@@ -90,6 +90,7 @@ function armar(r, materiales) {
     obra: nombreObra(r), id_cliente: r.id_cliente, id_grupo: r.id_grupo, grupoTodoJunto: !!r.grupo_todo_junto,
     metodo_pago: r.metodo_pago, metodoTexto: L.METODOS[r.metodo_pago] || 'Sin definir',
     aConvenir: false, renglones: [], total: 0,
+    paraFacturar: Number(r.para_facturar) === 1, facturado: Number(r.facturado) === 1,
   }
   if (r.tipo_op === 'M') {
     op.renglones = [...(materiales[r.id] || [])]
