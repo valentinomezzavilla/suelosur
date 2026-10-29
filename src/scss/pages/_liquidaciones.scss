@@ -116,3 +116,31 @@
   &--pendiente  { background: $danger-soft;  color: $danger-text;  border-color: $danger-border; }
   &--a_convenir { background: $neutral-soft; color: $neutral-text; border-color: $neutral-border; }
 }
+
+// Casilla de cada tarjeta para marcar / quitar "para facturar" en grupo
+.liq-op__sel { accent-color: $accent; width: 16px; height: 16px; align-self: center; cursor: pointer; }
+
+// Barra de selección: queda pegada abajo mientras se recorren las operaciones
+.liq-facturar {
+  position: sticky;
+  bottom: 0.75rem;
+  z-index: $z-navbar - 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin-top: 0.5rem;
+  padding: 0.65rem 1rem;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-lg;
+  font-size: $fs-sm;
+
+  &__todas {
+    display: inline-flex; align-items: center; gap: 0.4rem; cursor: pointer; font-weight: 500; color: $ink;
+    input { accent-color: $accent; width: 16px; height: 16px; }
+  }
+  &__info { color: $muted; }
+  &__botones { display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
+}

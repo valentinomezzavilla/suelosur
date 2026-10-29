@@ -184,6 +184,27 @@ async function ajustarDeudaIva(q, id, alicAnterior, alicNueva) {
   await q(`UPDATE transacciones SET monto = ? WHERE id = ?`, [redondear(Number(ultima.monto) + diff), ultima.id])
 }
 
+// Marca una OP para facturar y le suma el IVA a lo que debe. false si no cambió nada
+// (no existe, anulada o ya marcada).
+async function marcarEn(q, id) {
+  const op = (await q(`SELECT id, estado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
+  if (!op || op.estado === 'anulado' || Number(op.para_facturar) === 1) return false
+  await q(`UPDATE op_encabezado SET para_facturar = 1, iva_alicuota = ? WHERE id = ?`, [ALICUOTA_FACTURAR, id])
+  await ajustarDeudaIva(q, id, Number(op.iva_alicuota) || 0, ALICUOTA_FACTURAR)
+  return true
+}
+
+// La saca de la lista para facturar y le descuenta el IVA sumado. false si no cambió nada
+// (no existe, ya facturada o no estaba marcada).
+async function quitarEn(q, id) {
+  const op = (await q(`SELECT id, facturado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
+  if (!op || Number(op.facturado) === 1) return false
+  if (Number(op.para_facturar) !== 1 && !Number(op.iva_alicuota)) return false
+  await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL WHERE id = ?`, [id])
+  if (Number(op.iva_alicuota)) await ajustarDeudaIva(q, id, Number(op.iva_alicuota), 0)
+  return true
+}
+
 module.exports = {
   TIPOS, CONDICIONES_IVA, ALICUOTAS, ALICUOTA_FACTURAR,
   tipoSugerido, desglose, desgloseOp, cuitValido, documentoReceptor, conceptoAfip, redondear, mapear,
@@ -203,11 +224,25 @@ module.exports = {
 
   // Marcar una OP ya existente (desde su detalle): también se le suma el IVA a lo que debe.
   async marcar(id) {
+    return transaction((q) => marcarEn(q, id))
+  },
+
+  // Marcar / quitar varias OP de una vez (desde Liquidaciones), todas en la misma
+  // transacción: o se marcan todas o ninguna. Devuelve los id que cambiaron; las que ya
+  // estaban así (o no se pueden: anuladas, facturadas) se saltean.
+  async marcarVarias(ids) {
     return transaction(async (q) => {
-      const op = (await q(`SELECT id, estado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
-      if (!op || op.estado === 'anulado' || Number(op.para_facturar) === 1) return
-      await q(`UPDATE op_encabezado SET para_facturar = 1, iva_alicuota = ? WHERE id = ?`, [ALICUOTA_FACTURAR, id])
-      await ajustarDeudaIva(q, id, Number(op.iva_alicuota) || 0, ALICUOTA_FACTURAR)
+      const cambiadas = []
+      for (const id of ids) if (await marcarEn(q, id)) cambiadas.push(id)
+      return cambiadas
+    })
+  },
+
+  async quitarVarias(ids) {
+    return transaction(async (q) => {
+      const cambiadas = []
+      for (const id of ids) if (await quitarEn(q, id)) cambiadas.push(id)
+      return cambiadas
     })
   },
 
@@ -243,12 +278,7 @@ module.exports = {
   // Saca una OP pendiente de la lista (tildada por error) y le descuenta el IVA sumado.
   // Las ya facturadas no se tocan.
   async quitar(id) {
-    return transaction(async (q) => {
-      const op = (await q(`SELECT id, facturado, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
-      if (!op || Number(op.facturado) === 1) return
-      await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL WHERE id = ?`, [id])
-      if (Number(op.iva_alicuota)) await ajustarDeudaIva(q, id, Number(op.iva_alicuota), 0)
-    })
+    return transaction((q) => quitarEn(q, id))
   },
 
   // Todas las OP para facturar; las anuladas solo si ya estaban facturadas (necesitan nota de crédito).

@@ -21,6 +21,34 @@ const destinoSeguro = (v, porDefecto) => {
   return s.startsWith('/') && !s.startsWith('//') ? s : porDefecto
 }
 
+// ids del formulario (uno o varios), sin repetidos ni basura
+const leerIds = (v) => [...new Set([].concat(v || []).map(x => String(x).trim()).filter(x => /^\d+$/.test(x)))]
+
+async function enGrupo(req, res, accion) {
+  const marcar = accion === 'marcar'
+  const ids = leerIds(req.body.ids)
+  try {
+    if (!ids.length) throw errorUsuario('No seleccionaste ninguna operación.')
+    const cambiadas = await FacturacionModel[marcar ? 'marcarVarias' : 'quitarVarias'](ids)
+    for (const id of cambiadas) {
+      await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: id, accion: marcar ? 'marcar_facturar' : 'quitar_facturar', usuario: req.session.user.id })
+    }
+    const n = cambiadas.length
+    const salteadas = ids.length - n
+    const ops = (k) => `${k} operaci${k === 1 ? 'ón' : 'ones'}`
+    if (!n) {
+      req.flash('warning', marcar ? 'Las operaciones elegidas ya estaban marcadas para facturar.' : 'Ninguna de las operaciones elegidas estaba marcada para facturar.')
+    } else {
+      const verbo = marcar ? (n === 1 ? 'marcó' : 'marcaron') : (n === 1 ? 'quitó' : 'quitaron')
+      req.flash('success', `Se ${verbo} ${ops(n)} ${marcar ? 'para facturar' : 'de facturación'}.`
+        + (salteadas ? ` ${ops(salteadas)} no ${salteadas === 1 ? 'cambió' : 'cambiaron'} (ya ${marcar ? 'estaban marcadas' : 'no estaban marcadas o están facturadas'}).` : ''))
+    }
+  } catch (err) {
+    req.flash('error', mensajeError(err, marcar ? 'Error al marcar las operaciones.' : 'Error al quitar las operaciones.'))
+  }
+  res.redirect(destinoSeguro(req.body.volver, '/liquidaciones'))
+}
+
 const leerFiltros = (q) => {
   const clienteId = /^\d+$/.test(String(q.clienteId || '').trim()) ? String(q.clienteId).trim() : ''
   return {
@@ -239,6 +267,15 @@ module.exports = {
       req.flash('error', mensajeError(err, 'Error al quitar la operación.'))
     }
     res.redirect(destinoSeguro(req.body.volver, volver('pendiente')))
+  },
+
+  // Marcar / quitar varias de una vez (desde Liquidaciones: el cliente pide factura de un período)
+  async marcarVarias(req, res) {
+    await enGrupo(req, res, 'marcar')
+  },
+
+  async quitarVarias(req, res) {
+    await enGrupo(req, res, 'quitar')
   },
 
   async notaCredito(req, res) {

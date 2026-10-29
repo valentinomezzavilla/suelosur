@@ -1,14 +1,20 @@
 <%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS %>
 <% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+<% const nroTxt = o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0') %>
 <div class="liq-op liq-op--<%= o.estado %>">
   <div class="liq-op__head">
     <div class="liq-op__titulo">
-      <% if (o.nro_remito) { %><strong>Remito <%= o.nro_remito %></strong><% } else { %><strong>OP-<%= String(o.nro_op).padStart(4, '0') %></strong><% } %>
+      <%# Selección para marcar / quitar "para facturar" en grupo (public/js/liquidacionesFacturar.js) %>
+      <input type="checkbox" class="liq-op__sel js-liq-sel" value="<%= o.id %>"
+             aria-label="Seleccionar <%= nroTxt %>" data-neto="<%= o.neto || 0 %>" data-iva="<%= o.iva || 0 %>"
+             data-marcada="<%= o.paraFacturar ? 1 : 0 %>" <%= o.facturado ? 'disabled title="Ya facturada"' : '' %>>
+      <strong><%= nroTxt %></strong>
       <span><%= formatFecha(o.fecha) %></span>
       <span><%= o.tipoTexto %></span>
       <% if (o.obra) { %><span>Obra: <%= o.obra %></span><% } %>
     </div>
     <div class="liq-op__acciones">
+      <% if (o.facturado) { %><span class="badge badge-activo">Facturada</span><% } else if (o.paraFacturar) { %><span class="badge badge-pendiente">Para facturar</span><% } %>
       <span class="liq-estado liq-estado--<%= o.estado %>"><%= ESTADOS[o.estado] %></span>
       <% const href = o.tipo === 'contenedor' ? '/alquileres/contenedores/' + o.id : o.tipo === 'maquinaria' ? '/alquileres/maquinaria/' + o.id : '/ventas/' + o.id %>
       <a href="<%= href %>" class="btn btn-sm btn-outline-secondary">Ver</a>
