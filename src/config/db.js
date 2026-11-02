@@ -1495,6 +1495,16 @@ async function initDB() {
   await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS nro_factura TEXT`)
   await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS nro_remito TEXT`)
   await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS hora TEXT`)
+  // Pago de combustible en Compras / Pagos con los datos de la carga (hora, factura, remito,
+  // litros y chofer). id_combustible: la carga que ese pago creó en Flota al marcar "Impacta
+  // en autonomía del camión" (pago y carga se eliminan juntos, desde Compras / Pagos).
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS hora TEXT`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS nro_factura TEXT`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS nro_remito TEXT`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS litros REAL`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_combustible ON egresos(id_combustible)`)
   await pool.query(`ALTER TABLE cc_proveedores ADD COLUMN IF NOT EXISTS id_usuario BIGINT`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_proveedor ON egresos(id_proveedor)`)
   // Una sola vez: la categoría Combustible pasa a pedir la estación de servicio (en lugar
@@ -1513,6 +1523,21 @@ async function initDB() {
       }
       await pool.query(`UPDATE proveedores SET es_estacion = 1
         WHERE id IN (SELECT id_proveedor FROM egresos WHERE categoria = 'combustible' AND id_proveedor IS NOT NULL)`)
+    }
+  }
+  // Una sola vez: la categoría Combustible suma los datos de la carga (campo 'carga': hora,
+  // factura, remito, litros, chofer e "Impacta en autonomía del camión"), que usa el vehículo
+  // y la estación de servicio.
+  {
+    const r = await pool.query(`INSERT INTO migraciones_aplicadas (nombre) VALUES ('combustible_carga_v1') ON CONFLICT DO NOTHING RETURNING nombre`)
+    if (r.rowCount) {
+      const cat = (await pool.query(`SELECT campos FROM categorias_egreso WHERE clave = 'combustible'`)).rows[0]
+      if (cat) {
+        let campos = []
+        try { campos = JSON.parse(cat.campos || '[]') } catch (_) { campos = [] }
+        campos = [...new Set([...campos.filter(c => c !== 'proveedor'), 'vehiculo', 'estacion', 'carga'])]
+        await pool.query(`UPDATE categorias_egreso SET campos = $1 WHERE clave = 'combustible'`, [JSON.stringify(campos)])
+      }
     }
   }
   // Mismo fletero escrito con otras mayúsculas / espacios: las compras toman el nombre guardado

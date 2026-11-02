@@ -101,6 +101,41 @@ const PagosEmpleadoModel = {
     })
   },
 
+  // Corrige un pago ya registrado (desde Compras / Pagos): mismas reglas que el alta, y el
+  // egreso vinculado se actualiza igual (monto neto, fecha, método, empleado y texto). El
+  // tipo no cambia. El recibo se arma siempre desde el pago, así que sale corregido.
+  async actualizar(id, { id_empleado, periodo, monto, descuentos, adiciones, fecha, descripcion, metodo_pago }) {
+    const actual = (await query(`SELECT * FROM pagos_empleado WHERE id = ?`, [id])).rows[0]
+    if (!actual) throw new Error('El pago no existe.')
+    const emp = (await query(`SELECT id, nombre, apellido FROM empleados WHERE id = ?`, [id_empleado])).rows[0]
+    if (!emp) throw new Error('El empleado no existe.')
+    const tipo = actual.tipo
+    const base = importe(monto)
+    if (base <= 0) throw new Error('Ingresá un monto mayor a cero.')
+    const conAjustes = ADMITEN_AJUSTES.has(tipo)
+    const desc = conAjustes ? importe(descuentos) : 0
+    const adic = conAjustes ? importe(adiciones) : 0
+    const neto = redondear(base - desc + adic)
+    if (neto <= 0) throw new Error('Los descuentos no pueden ser iguales o mayores al sueldo más las adiciones.')
+    const dia = fecha || actual.fecha || hoyISO()
+    const nombre = `${emp.nombre} ${emp.apellido || ''}`.trim()
+    const detalle = (descripcion || '').trim()
+
+    await transaction(async (q) => {
+      await q(`
+        UPDATE pagos_empleado SET id_empleado = ?, periodo = ?, monto = ?, sueldo_base = ?, descuentos = ?, adiciones = ?,
+                                  fecha = ?, descripcion = ?, metodo_pago = ?
+        WHERE id = ?
+      `, [emp.id, periodo || null, neto, base, desc, adic, dia, detalle, metodo_pago || null, id])
+      const texto = [`${TIPO_LABEL[tipo]} — ${nombre}`, periodo ? `(${periodo})` : '', detalle ? `— ${detalle}` : ''].filter(Boolean).join(' ')
+      await q(`
+        UPDATE egresos SET fecha = ?, descripcion = ?, monto = ?, metodo_pago = ?, id_empleado = ?
+        WHERE id_pago_empleado = ? ${actual.id_egreso ? 'OR id = ?' : ''}
+      `, [dia, texto, neto, metodo_pago || null, emp.id, id, ...(actual.id_egreso ? [actual.id_egreso] : [])])
+    })
+    return { neto, base, descuentos: desc, adiciones: adic }
+  },
+
   // Borra el pago y su egreso vinculado (si hay). `id_empleado` es opcional: cuando viene
   // (desde la ficha del chofer) solo borra si el pago realmente es de ese empleado.
   async eliminar(id, id_empleado) {

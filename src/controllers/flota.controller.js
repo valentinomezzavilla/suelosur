@@ -170,12 +170,15 @@ const FlotaController = {
   // ── Combustible ───────────────────────────────────────────────
   async cargarCombustible(req, res) {
     const back = `/flota/${req.params.id}?tab=combustible`
+    // Toda carga lleva el chofer que la hizo (aunque la registre otra persona, ej. administración)
+    if (!req.body.id_chofer) { req.flash('error', 'Elegí el chofer que hizo la carga.'); return res.redirect(back) }
     try { await CombustibleModel.crear({ id_vehiculo: req.params.id, ...req.body }); req.flash('success', 'Carga registrada.') }
-    catch (err) { console.error(err); req.flash('error', 'Error.') }
+    catch (err) { console.error(err); req.flash('error', err.message || 'Error al registrar la carga.') }
     res.redirect(back)
   },
   async eliminarCombustible(req, res) {
-    try { await CombustibleModel.eliminar(req.params.cargaId) } catch (err) { console.error(err) }
+    try { await CombustibleModel.eliminar(req.params.cargaId) }
+    catch (err) { console.error(err); req.flash('error', err.message || 'Error al eliminar la carga.') }
     res.redirect(`/flota/${req.params.id}?tab=combustible`)
   },
 

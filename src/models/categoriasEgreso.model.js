@@ -5,7 +5,7 @@
 // recibo de sueldo, ver compras.controller.js) y no se pueden editar ni
 // borrar. El resto se administra libremente: cada categoría declara qué
 // campos fijos usa (proveedor, producto, vehiculo, empleado, fletero,
-// periodo, estacion — los mismos que ya existen en el formulario) y además puede
+// periodo, estacion, carga — los mismos que ya existen en el formulario) y además puede
 // definir campos propios (texto / número / fecha / lista), con su nombre
 // y tipo. Los valores de los campos propios se guardan en egresos.datos_extra.
 // ═══════════════════════════════════════════════════════════════════
@@ -19,12 +19,16 @@ const CAMPOS_DISPONIBLES = [
   { clave: 'fletero',   etiqueta: 'Fletero' },
   { clave: 'periodo',   etiqueta: 'Período' },
   { clave: 'estacion',  etiqueta: 'Estación de servicio' },
+  // Hora, N° de factura, N° de remito, litros y chofer, y la opción de registrar también la
+  // carga en el camión (Flota). Necesita Vehículo y Estación de servicio: los suma sola.
+  { clave: 'carga',     etiqueta: 'Datos de carga de combustible (con vehículo y estación)' },
 ]
 
 // Proveedor y Estación de servicio guardan los dos en egresos.id_proveedor: una categoría
 // usa uno u otro (si se marcan los dos, queda Estación).
 function validarCampos(campos) {
-  const lista = (Array.isArray(campos) ? campos : (campos ? [campos] : [])).filter(c => CAMPOS_DISPONIBLES.some(d => d.clave === c))
+  let lista = (Array.isArray(campos) ? campos : (campos ? [campos] : [])).filter(c => CAMPOS_DISPONIBLES.some(d => d.clave === c))
+  if (lista.includes('carga')) lista = [...new Set([...lista, 'vehiculo', 'estacion'])]
   return lista.includes('estacion') ? lista.filter(c => c !== 'proveedor') : lista
 }
 
