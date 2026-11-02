@@ -6,30 +6,75 @@
   const genericas = categorias.filter(c => c.clave !== 'material' && c.clave !== 'sueldo')
   const catsCon = (campo) => genericas.filter(c => c.campos.includes(campo)).map(c => c.clave).join(' ')
   const catsProveedor = ['material', catsCon('proveedor')].filter(Boolean).join(' ')
+
+  // Edición: el mismo formulario con los datos de la compra / pago (`egreso`, ver
+  // EgresosModel.obtenerDetalle). La categoría no se cambia.
+  const ed = locals.egreso || null
+  const val = (campo) => (ed && ed[campo] != null) ? ed[campo] : ''
+  const sel = (actual, valor) => (actual != null && actual !== '' && String(actual) === String(valor)) ? 'selected' : ''
+  // El valor guardado puede ser de un registro que ya no está en la lista (dado de baja)
+  const falta = (cats, lista, id) => !!(ed && id && String(cats).split(' ').includes(ed.categoria) && !lista.some(x => String(x.id) === String(id)))
+  const r2 = (n) => Math.round(Number(n) * 100) / 100
+  const cant = ed ? Number(ed.cantidad) || 0 : 0
+  const costoU = cant ? r2((Number(ed.subtotal_material) || 0) / cant) : ''
+  const costoF = cant ? r2((Number(ed.costo_final_flete) || 0) / cant) : ''
+  const subtotalManual = !!(ed && cant && r2(cant * costoU) !== r2(ed.subtotal_material))
+  const fleteManual = !!(ed && cant && r2(cant * costoF) !== r2(ed.costo_final_flete))
+  const pagoSueldo = !!(ed && ed.categoria === 'sueldo' && ed.id_pago_empleado)
+  let extra = {}
+  try { extra = ed ? (JSON.parse(ed.datos_extra || '{}') || {}) : {} } catch { extra = {} }
+  const catEd = ed ? categorias.find(c => c.clave === ed.categoria) : null
 %>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold mb-0 text-dark-title"><%- icon('receipt', { size: 18 }) %> Registrar compra / pago</h4>
+  <h4 class="fw-bold mb-0 text-dark-title"><%- icon(ed ? 'edit' : 'receipt', { size: 18 }) %> <%= ed ? 'Editar compra / pago' : 'Registrar compra / pago' %></h4>
   <div class="d-flex gap-2">
-    <a href="/compras/categorias" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 14 }) %> Administrar categorías</a>
+    <% if (!ed) { %><a href="/compras/categorias" class="btn btn-sm btn-outline-secondary"><%- icon('layers', { size: 14 }) %> Administrar categorías</a><% } %>
     <a href="/compras" class="btn btn-sm btn-outline-secondary">← Volver</a>
   </div>
 </div>
 
 <div class="card shadow-sm" style="max-width:720px">
   <div class="card-body">
-    <form action="/compras" method="POST" id="formEgreso">
+    <% if (ed) { %>
+    <!-- Aviso fijo: no lleva .alert porque main.js cierra los .alert a los 4 segundos -->
+    <div class="border rounded bg-light small p-2 mb-3">
+      <% if (ed.categoria === 'material' && ed.ingreso) { %>
+        Al guardar se corrige también el stock: se descuenta lo que entró con esta compra
+        (<%= Number(ed.ingreso.cantidad).toLocaleString('es-AR') %> de <%= ed.producto_nombre || 'el producto' %>) y entra lo que cargues acá.
+        El ingreso de stock toma el producto, el proveedor, la cantidad y los costos nuevos.
+      <% } else if (ed.categoria === 'material') { %>
+        Esta compra es anterior al vínculo con el stock: los cambios corrigen la compra, pero no mueven el stock.
+        Si cambió el producto o la cantidad, ajustalo desde <a href="/stock">Stock</a>.
+      <% } else if (pagoSueldo) { %>
+        Se corrige también el pago en la ficha del empleado y su recibo.
+      <% } else if (ed.id_combustible) { %>
+        Este pago tiene una carga de combustible en el camión: se corrige junto con el pago
+        (si destildás "Impacta en autonomía del camión", la carga se borra).
+      <% } else { %>
+        Los cambios corrigen este registro del libro de compras / pagos.
+      <% } %>
+    </div>
+    <% } %>
+    <form action="<%= ed ? `/compras/${ed.id}?_method=PUT` : '/compras' %>" method="POST" id="formEgreso">
       <datalist id="listaFleteros">
         <% fleteros.forEach(f => { %><option value="<%= f.nombre %>"></option><% }) %>
       </datalist>
 
-      <!-- Categoría -->
+      <!-- Categoría (al editar no se cambia: va fija) -->
       <div class="mb-3">
         <label class="form-label">¿Qué es? *</label>
+        <% if (ed) { %>
+          <input type="hidden" name="categoria" value="<%= ed.categoria %>">
+          <select id="categoria" class="form-select" disabled>
+            <option value="<%= ed.categoria %>" selected><%= catEd ? catEd.etiqueta : ed.categoria %></option>
+          </select>
+        <% } else { %>
         <select name="categoria" id="categoria" class="form-select" required>
           <option value="">Seleccionar…</option>
           <% categorias.forEach(c => { %><option value="<%= c.clave %>"><%= c.etiqueta %></option><% }) %>
         </select>
+        <% } %>
       </div>
 
       <!-- Material (solo categoría material) -->
@@ -38,37 +83,38 @@
           <label class="form-label">Producto *</label>
           <select name="id_producto" id="id_producto" class="form-select">
             <option value="">Seleccionar…</option>
-            <% productos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
+            <% if (falta('material', productos, ed && ed.id_producto)) { %><option value="<%= ed.id_producto %>" selected><%= ed.producto_nombre || 'Producto #' + ed.id_producto %></option><% } %>
+            <% productos.forEach(p => { %><option value="<%= p.id %>" <%= ed && ed.categoria === 'material' ? sel(ed.id_producto, p.id) : '' %>><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
           </select>
         </div>
         <div class="row g-3 mb-3">
-          <div class="col-md-4"><label class="form-label">Cantidad *</label><input type="number" step="0.01" min="0.01" name="cantidad" id="cantidad" class="form-control"></div>
-          <div class="col-md-4"><label class="form-label">Costo unitario</label><input type="number" step="0.01" min="0" name="costo_unitario" id="costo_unitario" class="form-control" placeholder="0"></div>
-          <div class="col-md-4"><label class="form-label">Costo flete</label><input type="number" step="0.01" min="0" name="costo_flete" id="costo_flete" class="form-control" placeholder="0"></div>
+          <div class="col-md-4"><label class="form-label">Cantidad *</label><input type="number" step="0.01" min="0.01" name="cantidad" id="cantidad" class="form-control" value="<%= cant || '' %>"></div>
+          <div class="col-md-4"><label class="form-label">Costo unitario</label><input type="number" step="0.01" min="0" name="costo_unitario" id="costo_unitario" class="form-control" placeholder="0" value="<%= costoU %>"></div>
+          <div class="col-md-4"><label class="form-label">Costo flete</label><input type="number" step="0.01" min="0" name="costo_flete" id="costo_flete" class="form-control" placeholder="0" value="<%= costoF %>"></div>
         </div>
         <div class="row g-3 mb-3">
           <div class="col-md-6">
             <label class="form-label">Subtotal material</label>
-            <input type="number" step="0.01" min="0" name="subtotal_material" id="subtotal_material" class="form-control" placeholder="0">
+            <input type="number" step="0.01" min="0" name="subtotal_material" id="subtotal_material" class="form-control" placeholder="0" value="<%= ed && ed.subtotal_material != null ? r2(ed.subtotal_material) : '' %>">
             <small class="text-muted">Cantidad × Costo unitario.</small>
             <label class="toggle-row toggle-sm mt-1">
-              <input type="checkbox" id="checkEditarSubtotal">
+              <input type="checkbox" id="checkEditarSubtotal" <%= subtotalManual ? 'checked' : '' %>>
               <span>Editar manualmente</span>
             </label>
           </div>
           <div class="col-md-6">
             <label class="form-label">Costo final flete</label>
-            <input type="number" step="0.01" min="0" name="costo_final_flete" id="costo_final_flete" class="form-control" placeholder="0">
+            <input type="number" step="0.01" min="0" name="costo_final_flete" id="costo_final_flete" class="form-control" placeholder="0" value="<%= ed && ed.costo_final_flete != null ? r2(ed.costo_final_flete) : '' %>">
             <small class="text-muted">Cantidad × Costo flete.</small>
             <label class="toggle-row toggle-sm mt-1">
-              <input type="checkbox" id="checkEditarFlete">
+              <input type="checkbox" id="checkEditarFlete" <%= fleteManual ? 'checked' : '' %>>
               <span>Editar manualmente</span>
             </label>
           </div>
         </div>
         <div class="mb-3">
           <label class="form-label">Fletero</label>
-          <input type="text" name="fletero" id="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte">
+          <input type="text" name="fletero" id="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte" value="<%= val('fletero') %>">
           <small class="text-muted">Elegí uno de <a href="/fleteros" target="_blank">Fleteros</a> o escribí uno nuevo (se da de alta solo).</small>
         </div>
       </div>
@@ -79,7 +125,8 @@
         <input type="text" id="buscarProv" class="form-control form-control-sm mb-1" placeholder="Buscar por razón social o CUIT…">
         <select name="id_proveedor" id="selProv" class="form-select">
           <option value="">— Sin proveedor —</option>
-          <% proveedores.forEach(p => { %><option value="<%= p.id %>" data-search="<%= (p.nombre + ' ' + (p.cuit||'')).toLowerCase() %>"><%= p.nombre %><%= p.cuit ? ' (' + p.cuit + ')' : '' %></option><% }) %>
+          <% if (falta(catsProveedor, proveedores, ed && ed.id_proveedor)) { %><option value="<%= ed.id_proveedor %>" selected><%= ed.proveedor_nombre || 'Proveedor #' + ed.id_proveedor %></option><% } %>
+          <% proveedores.forEach(p => { %><option value="<%= p.id %>" data-search="<%= (p.nombre + ' ' + (p.cuit||'')).toLowerCase() %>" <%= sel(val('id_proveedor'), p.id) %>><%= p.nombre %><%= p.cuit ? ' (' + p.cuit + ')' : '' %></option><% }) %>
         </select>
       </div>
 
@@ -87,9 +134,10 @@
       <% if (catsCon('estacion')) { %>
       <div class="cond mb-3" data-cats="<%= catsCon('estacion') %>" style="display:none">
         <label class="form-label">Estación de servicio</label>
-        <select name="id_proveedor" class="form-select">
+        <select name="id_proveedor" id="selEstacion" class="form-select">
           <option value="">— Sin estación —</option>
-          <% estaciones.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %></option><% }) %>
+          <% if (falta(catsCon('estacion'), estaciones, ed && ed.id_proveedor)) { %><option value="<%= ed.id_proveedor %>" selected><%= ed.proveedor_nombre || 'Estación #' + ed.id_proveedor %></option><% } %>
+          <% estaciones.forEach(e => { %><option value="<%= e.id %>" <%= sel(val('id_proveedor'), e.id) %>><%= e.nombre %></option><% }) %>
         </select>
         <small class="text-muted">El pago baja la deuda con la estación (<a href="/proveedores/estaciones" target="_blank">Estaciones de servicio</a>).</small>
       </div>
@@ -102,12 +150,13 @@
             <label class="form-label">Empleado *</label>
             <select name="id_empleado" id="id_empleado" class="form-select">
               <option value="">Seleccionar…</option>
-              <% empleados.forEach(e => { %><option value="<%= e.id %>" data-sueldo="<%= Number(e.sueldo_basico || e.salario || 0) %>"><%= e.nombre %> <%= e.apellido || '' %><%= e.legajo ? ' — Legajo ' + e.legajo : '' %></option><% }) %>
+              <% if (falta('sueldo', empleados, ed && ed.id_empleado)) { %><option value="<%= ed.id_empleado %>" selected><%= ed.empleado_nombre || 'Empleado #' + ed.id_empleado %></option><% } %>
+              <% empleados.forEach(e => { %><option value="<%= e.id %>" data-sueldo="<%= Number(e.sueldo_basico || e.salario || 0) %>" <%= sel(val('id_empleado'), e.id) %>><%= e.nombre %> <%= e.apellido || '' %><%= e.legajo ? ' — Legajo ' + e.legajo : '' %></option><% }) %>
             </select>
           </div>
           <div class="col-md-4">
             <label class="form-label">Período</label>
-            <input type="month" name="periodo" id="periodo" class="form-control" value="<%= hoyISO().slice(0, 7) %>">
+            <input type="month" name="periodo" id="periodo" class="form-control" value="<%= ed ? val('periodo') : hoyISO().slice(0, 7) %>">
           </div>
         </div>
       </div>
@@ -116,10 +165,42 @@
       <% if (catsCon('vehiculo')) { %>
       <div class="cond mb-3" data-cats="<%= catsCon('vehiculo') %>" style="display:none">
         <label class="form-label">Vehículo</label>
-        <select name="id_vehiculo" class="form-select">
+        <select name="id_vehiculo" id="selVehiculo" class="form-select">
           <option value="">— Sin vehículo —</option>
-          <% vehiculos.forEach(v => { %><option value="<%= v.id %>"><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
+          <% if (falta(catsCon('vehiculo'), vehiculos, ed && ed.id_vehiculo)) { %><option value="<%= ed.id_vehiculo %>" selected><%= ed.vehiculo_nombre || 'Vehículo #' + ed.id_vehiculo %></option><% } %>
+          <% vehiculos.forEach(v => { %><option value="<%= v.id %>" <%= sel(val('id_vehiculo'), v.id) %>><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
         </select>
+      </div>
+      <% } %>
+
+      <!-- Datos de la carga de combustible (Combustible o cualquier categoría con el campo 'carga').
+           Con "Impacta en autonomía del camión" el pago crea además la carga en Flota. -->
+      <% if (catsCon('carga')) { %>
+      <div class="cond mb-3" data-cats="<%= catsCon('carga') %>" style="display:none">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><label class="form-label">Hora</label><input type="time" name="hora" class="form-control" value="<%= val('hora') %>"></div>
+          <div class="col-md-4"><label class="form-label">N° Factura</label><input type="text" name="nro_factura" maxlength="40" class="form-control" placeholder="Ej.: 0003-00012345" value="<%= val('nro_factura') %>"></div>
+          <div class="col-md-4"><label class="form-label">N° Remito</label><input type="text" name="nro_remito" maxlength="40" class="form-control" value="<%= val('nro_remito') %>"></div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4"><label class="form-label" id="lblLitros">Litros</label><input type="number" step="0.01" min="0" name="litros" id="litros" class="form-control" value="<%= ed && ed.litros != null ? r2(ed.litros) : '' %>"></div>
+          <div class="col-md-8"><label class="form-label">Chofer *</label>
+            <select name="id_chofer" id="selChofer" class="form-select" required>
+              <option value="">Seleccionar…</option>
+              <% if (falta(catsCon('carga'), choferes, ed && ed.id_chofer)) { %><option value="<%= ed.id_chofer %>" selected><%= ed.chofer_nombre || 'Chofer #' + ed.id_chofer %></option><% } %>
+              <% choferes.forEach(c => { %><option value="<%= c.id %>" <%= sel(val('id_chofer'), c.id) %>><%= c.nombre %> <%= c.apellido || '' %></option><% }) %>
+            </select>
+          </div>
+        </div>
+        <label class="toggle-row">
+          <input type="checkbox" name="impacta_flota" value="1" id="impactaFlota" <%= ed && ed.id_combustible ? 'checked' : '' %>>
+          <span>Impacta en autonomía del camión</span>
+        </label>
+        <small class="text-muted d-block">Registra también la carga en Flota → camión → Combustible (litros, km y consumo). La carga suma a la deuda con la estación y este pago la cancela.</small>
+        <div id="bloqueImpacta" class="row g-3 mt-1" style="display:none">
+          <div class="col-md-4"><label class="form-label">Km al cargar</label><input type="number" min="0" name="km_al_cargar" class="form-control" value="<%= ed && ed.carga && ed.carga.km_al_cargar ? ed.carga.km_al_cargar : '' %>"></div>
+          <div class="col-md-8 d-flex align-items-end"><small class="text-muted">Pide camión, estación de servicio y litros.</small></div>
+        </div>
       </div>
       <% } %>
 
@@ -129,7 +210,8 @@
         <label class="form-label">Producto</label>
         <select name="id_producto" class="form-select">
           <option value="">— Sin producto —</option>
-          <% productos.forEach(p => { %><option value="<%= p.id %>"><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
+          <% if (falta(catsCon('producto'), productos, ed && ed.id_producto)) { %><option value="<%= ed.id_producto %>" selected><%= ed.producto_nombre || 'Producto #' + ed.id_producto %></option><% } %>
+          <% productos.forEach(p => { %><option value="<%= p.id %>" <%= sel(val('id_producto'), p.id) %>><%= p.nombre %> (<%= p.unidad_medida %>)</option><% }) %>
         </select>
       </div>
       <% } %>
@@ -140,7 +222,8 @@
         <label class="form-label">Empleado</label>
         <select name="id_empleado" class="form-select">
           <option value="">— Sin empleado —</option>
-          <% empleados.forEach(e => { %><option value="<%= e.id %>"><%= e.nombre %> <%= e.apellido || '' %></option><% }) %>
+          <% if (falta(catsCon('empleado'), empleados, ed && ed.id_empleado)) { %><option value="<%= ed.id_empleado %>" selected><%= ed.empleado_nombre || 'Empleado #' + ed.id_empleado %></option><% } %>
+          <% empleados.forEach(e => { %><option value="<%= e.id %>" <%= sel(val('id_empleado'), e.id) %>><%= e.nombre %> <%= e.apellido || '' %></option><% }) %>
         </select>
       </div>
       <% } %>
@@ -149,7 +232,7 @@
       <% if (catsCon('fletero')) { %>
       <div class="cond mb-3" data-cats="<%= catsCon('fletero') %>" style="display:none">
         <label class="form-label">Fletero</label>
-        <input type="text" name="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte">
+        <input type="text" name="fletero" class="form-control" list="listaFleteros" autocomplete="off" placeholder="Nombre del fletero o empresa de transporte" value="<%= val('fletero') %>">
       </div>
       <% } %>
 
@@ -157,7 +240,7 @@
       <% if (catsCon('periodo')) { %>
       <div class="cond mb-3" data-cats="<%= catsCon('periodo') %>" style="display:none">
         <label class="form-label">Período</label>
-        <input type="month" name="periodo" class="form-control">
+        <input type="month" name="periodo" class="form-control" value="<%= val('periodo') %>">
       </div>
       <% } %>
 
@@ -170,11 +253,14 @@
           <% if (cf.tipo === 'lista') { %>
             <select name="<%= cf.clave %>" class="form-select">
               <option value="">Seleccionar…</option>
-              <% (cf.opciones || []).forEach(op => { %><option value="<%= op %>"><%= op %></option><% }) %>
+              <% const vCf = (ed && ed.categoria === c.clave) ? (extra[cf.clave] || '') : '' %>
+              <% if (vCf && !(cf.opciones || []).includes(vCf)) { %><option value="<%= vCf %>" selected><%= vCf %></option><% } %>
+              <% (cf.opciones || []).forEach(op => { %><option value="<%= op %>" <%= sel(vCf, op) %>><%= op %></option><% }) %>
             </select>
           <% } else { %>
             <input type="<%= cf.tipo === 'numero' ? 'number' : (cf.tipo === 'fecha' ? 'date' : 'text') %>"
-                   <%= cf.tipo === 'numero' ? 'step="0.01"' : '' %> name="<%= cf.clave %>" class="form-control">
+                   <%= cf.tipo === 'numero' ? 'step="0.01"' : '' %> name="<%= cf.clave %>" class="form-control"
+                   value="<%= (ed && ed.categoria === c.clave) ? (extra[cf.clave] || '') : '' %>">
           <% } %>
         </div>
         <% }) %>
@@ -185,11 +271,12 @@
       <div class="row g-3 mb-3">
         <div class="col-md-4">
           <label class="form-label">Fecha</label>
-          <input type="date" name="fecha" class="form-control" value="<%= hoyISO() %>">
+          <input type="date" name="fecha" class="form-control" value="<%= ed ? String(ed.fecha || '').slice(0, 10) : hoyISO() %>">
         </div>
         <div class="col-md-4">
           <label class="form-label" id="lblMonto">Monto *</label>
-          <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" placeholder="0" required>
+          <input type="number" step="0.01" min="0" name="monto" id="monto" class="form-control" placeholder="0" required
+                 value="<%= ed ? r2(pagoSueldo && ed.pago_base != null ? ed.pago_base : ed.monto) : '' %>">
           <small class="text-muted cond" data-cats="material" style="display:none">Se calcula como Subtotal material + Costo final flete.</small>
           <small class="text-muted cond" data-cats="sueldo" id="ayudaSueldo" style="display:none">Se completa con el sueldo establecido del empleado (podés cambiarlo).</small>
         </div>
@@ -197,10 +284,8 @@
           <label class="form-label">Método de pago</label>
           <select name="metodo_pago" class="form-select">
             <option value="">—</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
-            <option value="otros">Otros</option>
+            <% [['efectivo', 'Efectivo'], ['transferencia', 'Transferencia'], ['cheque', 'Cheque'], ['echeq', 'Echeq'], ['otros', 'Otros']].forEach(([v, t]) => { %>
+            <option value="<%= v %>"<%= sel(val('metodo_pago'), v) ? ' selected' : '' %>><%= t %></option><% }) %>
           </select>
         </div>
       </div>
@@ -209,12 +294,12 @@
       <div class="cond row g-3 mb-3" data-cats="sueldo" style="display:none">
         <div class="col-md-4">
           <label class="form-label">Descuentos</label>
-          <input type="number" step="0.01" min="0" name="descuentos" id="descuentos" class="form-control" placeholder="0">
+          <input type="number" step="0.01" min="0" name="descuentos" id="descuentos" class="form-control" placeholder="0" value="<%= pagoSueldo && Number(ed.pago_descuentos) ? r2(ed.pago_descuentos) : '' %>">
           <small class="text-muted">Lo que se le descuenta al sueldo.</small>
         </div>
         <div class="col-md-4">
           <label class="form-label">Adiciones</label>
-          <input type="number" step="0.01" min="0" name="adiciones" id="adiciones" class="form-control" placeholder="0">
+          <input type="number" step="0.01" min="0" name="adiciones" id="adiciones" class="form-control" placeholder="0" value="<%= pagoSueldo && Number(ed.pago_adiciones) ? r2(ed.pago_adiciones) : '' %>">
           <small class="text-muted">Bonificaciones que se le suman.</small>
         </div>
         <div class="col-md-4">
@@ -226,11 +311,12 @@
 
       <div class="mb-4">
         <label class="form-label">Descripción</label>
-        <input type="text" name="descripcion" id="descripcion" class="form-control" placeholder="Detalle, N° de comprobante, período…">
+        <input type="text" name="descripcion" id="descripcion" class="form-control" placeholder="Detalle, N° de comprobante, período…"
+               value="<%= pagoSueldo ? (ed.pago_descripcion || '') : val('descripcion') %>">
       </div>
 
       <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-naranja px-4">Registrar</button>
+        <button type="submit" class="btn btn-naranja px-4"><%= ed ? 'Guardar cambios' : 'Registrar' %></button>
         <a href="/compras" class="btn btn-outline-secondary">Cancelar</a>
       </div>
     </form>
@@ -246,6 +332,22 @@
     const costo = document.getElementById('costo_unitario')
     const flete = document.getElementById('costo_flete')
 
+    // "Impacta en autonomía del camión": muestra el km y vuelve obligatorios el camión, la
+    // estación y los litros (solo mientras el check está visible y tildado). El chofer es
+    // obligatorio siempre (y, oculto con otra categoría, queda deshabilitado y no se valida).
+    const impacta = document.getElementById('impactaFlota')
+    const bloqueImpacta = document.getElementById('bloqueImpacta')
+    const obligatoriosImpacta = ['selVehiculo', 'selEstacion', 'litros']
+      .map(id => document.getElementById(id)).filter(Boolean)
+    function aplicarImpacta() {
+      if (!impacta) return
+      const activo = impacta.checked && !impacta.disabled
+      bloqueImpacta.style.display = activo ? '' : 'none'
+      obligatoriosImpacta.forEach(f => { f.required = activo })
+      document.getElementById('lblLitros').textContent = activo ? 'Litros *' : 'Litros'
+    }
+    if (impacta) impacta.addEventListener('change', aplicarImpacta)
+
     // Al ocultar un bloque condicional, se deshabilitan sus campos para que no se
     // manden en el POST (si no, un <select> oculto pisaría el valor del visible
     // cuando dos categorías comparten el mismo name, como Proveedor o Vehículo).
@@ -258,10 +360,14 @@
         el.querySelectorAll('input, select, textarea').forEach(f => { f.disabled = !visible })
       })
       aplicarBloqueoMonto()
+      aplicarImpacta()
       const lblMonto = document.getElementById('lblMonto')
       if (lblMonto) lblMonto.textContent = v === 'sueldo' ? 'Sueldo *' : 'Monto *'
-      if (v === 'sueldo') { traerSueldo(); calcNeto() }
+      // Al abrir una edición el sueldo ya viene cargado: no se pisa con el de la ficha
+      if (v === 'sueldo') { if (!(modoEdicion && cargando)) traerSueldo(); calcNeto() }
     }
+    const modoEdicion = <%= ed ? 'true' : 'false' %>
+    let cargando = true
     cat.addEventListener('change', toggle)
 
     // Sueldo: al elegir el empleado, el monto se completa con el sueldo establecido en su
@@ -306,6 +412,7 @@
       monto.readOnly = esMaterial
     }
     toggle()
+    cargando = false
 
     // Material: Subtotal material = cantidad × costo unitario, y Costo final flete =
     // cantidad × costo flete. Cada uno se calcula solo salvo que se tilde su

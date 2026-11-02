@@ -171,8 +171,8 @@
         <div class="col-md-2"><label class="form-label">N° Factura</label><input type="text" name="nro_factura" maxlength="40" class="form-control form-control-sm" placeholder="Ej.: 0003-00012345"></div>
         <div class="col-md-2"><label class="form-label">N° Remito</label><input type="text" name="nro_remito" maxlength="40" class="form-control form-control-sm"></div>
         <div class="col-md-2"><label class="form-label">Litros</label><input type="number" step="0.01" name="litros" class="form-control form-control-sm" required></div>
-        <div class="col-md-2"><label class="form-label">Chofer</label>
-          <select name="id_chofer" class="form-select form-select-sm"><option value="">—</option>
+        <div class="col-md-2"><label class="form-label">Chofer *</label>
+          <select name="id_chofer" class="form-select form-select-sm" required><option value="">Seleccionar…</option>
             <% choferes.forEach(c => { %><option value="<%= c.id %>"><%= c.nombre %> <%= c.apellido %></option><% }) %></select></div>
         <div class="col-md-2"><label class="form-label">Importe</label><input type="number" step="0.01" name="costo_total" class="form-control form-control-sm"></div>
         <div class="col-md-2"><label class="form-label">Km al cargar</label><input type="number" name="km_al_cargar" class="form-control form-control-sm"></div>
@@ -198,7 +198,9 @@
           <td><small class="text-muted"><%= c.estacion || '—' %></small></td>
           <td><small><%= c.chofer_nombre || '—' %></small></td><td class="text-end"><%= c.litros %></td>
           <td class="text-end"><%= money(c.costo_total) %></td><td class="text-end"><%= (c.km_al_cargar||0).toLocaleString('es-AR') %></td>
-          <td class="text-end"><form action="/flota/<%= vehiculo.id %>/combustible/<%= c.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form></td>
+          <td class="text-end"><% if (c.id_egreso) { %>
+            <a href="/compras?categoria=combustible&vehiculo=<%= vehiculo.id %>" class="btn btn-sm btn-outline-secondary" title="Registrada desde Compras / Pagos: se elimina desde ahí, junto con el pago"><%- icon('receipt',{size:14}) %></a>
+          <% } else { %><form action="/flota/<%= vehiculo.id %>/combustible/<%= c.id %>/eliminar" method="POST"><button class="btn btn-sm btn-outline-danger"><%- icon('trash',{size:14}) %></button></form><% } %></td>
         </tr><% }) %></tbody>
     </table>
     </div>

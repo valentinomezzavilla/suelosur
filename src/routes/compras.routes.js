@@ -23,6 +23,8 @@ router.get('/nueva',       auth, acceso, ctrl.nueva)
 router.post('/',           auth, acceso, ctrl.crear)
 router.post('/pagar-gasto/:gastoId', auth, acceso, ctrl.pagarGasto)
 router.get('/recibo/:pagoId', auth, acceso, pagosCtrl.recibo)
+router.get('/:id/editar',   auth, acceso, ctrl.editar)
+router.put('/:id',          auth, acceso, ctrl.actualizar)
 router.post('/:id/eliminar', auth, acceso, ctrl.eliminar)
 
 module.exports = router

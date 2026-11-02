@@ -1,6 +1,8 @@
 'use strict'
-const { query }        = require('../config/db')
+const { query, transaction } = require('../config/db')
+const { hoyISO }       = require('../utils/fecha')
 const EgresosModel     = require('../models/egresos.model')
+const CombustibleModel = require('../models/combustible.model')
 const StockModel       = require('../models/stock.model')
 const ProveedoresModel = require('../models/proveedores.model')
 const FleterosModel    = require('../models/fleteros.model')
@@ -10,6 +12,7 @@ const PagosEmpleadoModel = require('../models/pagos_empleado.model')
 const FlotaModel       = require('../models/flota.model')
 const CategoriasEgresoModel = require('../models/categoriasEgreso.model')
 const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
+const { registrarAuditoria } = require('../utils/auditoria')
 
 // Datos que necesita el formulario (listas para los campos condicionales)
 async function datosForm() {
@@ -17,9 +20,41 @@ async function datosForm() {
     proveedores: await ProveedoresModel.listar(),
     estaciones:  await EstacionesModel.listar(),
     empleados:   await EmpleadosModel.listar(),
+    choferes:    await EmpleadosModel.listarChoferes({ soloActivos: true }),
     vehiculos:   await FlotaModel.listar({}),
     productos:   await StockModel.listar(),
   }
+}
+
+// Lo que no se corrige desde Compras / Pagos (se corrige donde nació)
+function motivoNoEditable(e) {
+  if (e.origen === 'tercero') return 'Esta salida es la transferencia de un cliente destinada a un tercero: se corrige desde la transacción del cobro.'
+  if (e.categoria === 'sueldo' && e.pago_tipo === 'descuento') return 'Un descuento al empleado no es una salida de dinero: se corrige desde su ficha.'
+  return null
+}
+
+function datosExtraDe(e) {
+  try { return JSON.parse(e.datos_extra || '{}') || {} } catch { return {} }
+}
+
+// Lo que pide "Impacta en autonomía del camión" (además del chofer), como texto; null si está todo
+function faltantesCarga(d) {
+  const faltan = [
+    !d.id_vehiculo && 'el camión',
+    !d.id_proveedor && 'la estación de servicio',
+    !(parseFloat(d.litros) > 0) && 'los litros',
+  ].filter(Boolean)
+  return faltan.length ? faltan.join(', ').replace(/, ([^,]*)$/, ' y $1') : null
+}
+
+// Qué había antes de la corrección (queda en la auditoría; el detalle muestra la última edición)
+async function auditarEdicion(id, antes, usuario) {
+  const campos = ['fecha', 'categoria', 'descripcion', 'monto', 'metodo_pago', 'id_proveedor', 'id_producto', 'cantidad',
+    'subtotal_material', 'costo_final_flete', 'fletero', 'id_empleado', 'id_vehiculo', 'periodo', 'hora', 'nro_factura',
+    'nro_remito', 'litros', 'id_chofer', 'id_combustible']
+  const resumen = {}
+  campos.forEach(c => { if (antes[c] != null && antes[c] !== '') resumen[c] = antes[c] })
+  await registrarAuditoria({ entidad_tipo: 'egreso', entidad_id: id, accion: 'editar', usuario, detalle: { antes: resumen } })
 }
 
 const ComprasController = {
@@ -104,22 +139,24 @@ const ComprasController = {
         if (montoNum <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect('/compras/nueva') }
         if (!id_producto || cant <= 0) { req.flash('error', 'Para material, elegí el producto y una cantidad válida.'); return res.redirect('/compras/nueva') }
 
-        let desc = (descripcion || '').trim()
+        const obs = (descripcion || '').trim()
+        const dia = fecha || hoyISO()   // compra e ingreso de stock con el mismo día
+        // Ingreso de stock y compra en una sola transacción: o quedan los dos o ninguno.
         // El costo unitario y de flete que se guardan reflejan el subtotal y flete final
         // ya calculados, por si se editaron manualmente.
-        const idIngreso = await StockModel.registrarIngreso(id_producto, cant, {
-          id_proveedor: id_proveedor || null,
-          costo_unitario: subtotalMaterial / cant,
-          costo_flete: fleteFinal / cant,
-          usuario: req.session.user?.id, observaciones: desc,
-        })
-        if (!desc) desc = 'Compra de material'
-
-        await EgresosModel.crear({
-          fecha: fecha || null, categoria, descripcion: desc, monto: montoNum, metodo_pago: metodo_pago || null,
-          fletero: fletero || null, id_proveedor: id_proveedor || null, id_producto: id_producto || null,
-          cantidad: cant, subtotal_material: subtotalMaterial, costo_final_flete: fleteFinal, id_stock_ingreso: idIngreso,
-          origen: 'manual', id_usuario: req.session.user?.id,
+        await transaction(async (q) => {
+          const idIngreso = await StockModel.registrarIngreso(id_producto, cant, {
+            id_proveedor: id_proveedor || null,
+            costo_unitario: subtotalMaterial / cant,
+            costo_flete: fleteFinal / cant,
+            usuario: req.session.user?.id, observaciones: obs, fecha: dia,
+          }, q)
+          await EgresosModel.crear({
+            fecha: dia, categoria, descripcion: obs || 'Compra de material', monto: montoNum, metodo_pago: metodo_pago || null,
+            fletero: fletero || null, id_proveedor: id_proveedor || null, id_producto: id_producto || null,
+            cantidad: cant, subtotal_material: subtotalMaterial, costo_final_flete: fleteFinal, id_stock_ingreso: idIngreso,
+            origen: 'manual', id_usuario: req.session.user?.id,
+          }, q)
         })
         req.flash('success', 'Registrado en el libro de compras / pagos.')
         return res.redirect('/compras')
@@ -138,7 +175,7 @@ const ComprasController = {
         if (v) datosExtra[cf.clave] = v
       })
 
-      await EgresosModel.crear({
+      const egreso = {
         fecha: fecha || null, categoria, descripcion: (descripcion || '').trim(), monto: montoNum, metodo_pago: metodo_pago || null,
         fletero:      cat.campos.includes('fletero')   ? (fletero || null) : null,
         periodo:      cat.campos.includes('periodo')   ? (periodo || null) : null,
@@ -149,18 +186,160 @@ const ComprasController = {
         id_vehiculo:  cat.campos.includes('vehiculo')  ? (id_vehiculo || null) : null,
         datos_extra: datosExtra,
         origen: 'manual', id_usuario: req.session.user?.id,
-      })
+      }
+
+      // Datos de la carga de combustible (campo 'carga'): quedan en el pago. Con "Impacta en
+      // autonomía del camión" el pago crea además la carga en Flota → camión → Combustible:
+      // la carga suma a la deuda con la estación y este mismo pago la cancela.
+      // El chofer es obligatorio siempre: aunque el pago lo cargue administración, queda
+      // registrado quién hizo la carga.
+      const conCarga = cat.campos.includes('carga')
+      if (conCarga) {
+        const { hora, nro_factura, nro_remito, litros, id_chofer } = req.body
+        if (!id_chofer) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect('/compras/nueva') }
+        Object.assign(egreso, { hora, nro_factura, nro_remito, litros, id_chofer })
+      }
+      if (conCarga && req.body.impacta_flota === '1') {
+        const faltan = faltantesCarga(egreso)
+        if (faltan) {
+          req.flash('error', `Para que impacte en el camión, completá ${faltan}.`)
+          return res.redirect('/compras/nueva')
+        }
+        egreso.fecha = fecha || hoyISO()   // pago y carga con el mismo día
+        await transaction(async (q) => {
+          egreso.id_combustible = await CombustibleModel.crear({
+            id_vehiculo: egreso.id_vehiculo, id_chofer: egreso.id_chofer, id_proveedor: egreso.id_proveedor,
+            litros: egreso.litros, costo_total: montoNum, km_al_cargar: req.body.km_al_cargar,
+            fecha: egreso.fecha, hora: egreso.hora, nro_factura: egreso.nro_factura, nro_remito: egreso.nro_remito,
+          }, q)
+          await EgresosModel.crear(egreso, q)
+        })
+        req.flash('success', 'Registrado en Compras / Pagos y como carga de combustible del camión.')
+        return res.redirect('/compras')
+      }
+
+      await EgresosModel.crear(egreso)
 
       req.flash('success', 'Registrado en el libro de compras / pagos.')
       res.redirect('/compras')
     } catch (err) { console.error(err); req.flash('error', err.message || 'Error al registrar.'); res.redirect('/compras/nueva') }
   },
 
+  // ── Editar compra / pago ─────────────────────────────────────
+  // El mismo formulario del alta, con los datos cargados. La categoría no se cambia.
+  async editar(req, res) {
+    try {
+      const egreso = await EgresosModel.obtenerDetalle(req.params.id)
+      if (!egreso) { req.flash('error', 'No se encontró la compra / pago.'); return res.redirect('/compras') }
+      const bloqueo = motivoNoEditable(egreso)
+      if (bloqueo) { req.flash('error', bloqueo); return res.redirect('/compras') }
+      res.render('pages/compras/form', {
+        titulo: 'Editar compra / pago',
+        egreso,
+        categorias: await CategoriasEgresoModel.listar(),   // también la inactiva, si es la de este registro
+        fleteros: await FleterosModel.listar(),
+        ...(await datosForm()),
+      })
+    } catch (err) { console.error(err); req.flash('error', 'Error al abrir la compra / pago.'); res.redirect('/compras') }
+  },
+
+  async actualizar(req, res) {
+    const id = req.params.id
+    const volver = `/compras/${id}/editar`
+    try {
+      const e = await EgresosModel.obtenerDetalle(id)
+      if (!e) { req.flash('error', 'No se encontró la compra / pago.'); return res.redirect('/compras') }
+      const bloqueo = motivoNoEditable(e)
+      if (bloqueo) { req.flash('error', bloqueo); return res.redirect('/compras') }
+      const b = req.body
+      const usuario = req.session.user?.id
+      const comunes = { fecha: b.fecha || e.fecha, descripcion: (b.descripcion || '').trim(), metodo_pago: b.metodo_pago || null }
+
+      // Sueldo (o cualquier pago a empleado): se corrige el pago de la ficha y su recibo
+      if (e.categoria === 'sueldo' && e.id_pago_empleado) {
+        if (!b.id_empleado) { req.flash('error', 'Elegí el empleado.'); return res.redirect(volver) }
+        await PagosEmpleadoModel.actualizar(e.id_pago_empleado, {
+          ...comunes, id_empleado: b.id_empleado, periodo: (b.periodo || '').trim() || null,
+          monto: b.monto, descuentos: b.descuentos, adiciones: b.adiciones,
+        })
+        await auditarEdicion(id, e, usuario)
+        req.flash('success', 'Pago corregido en Compras / Pagos, en la ficha del empleado y en su recibo.')
+        return res.redirect('/compras')
+      }
+
+      // Material: el monto es subtotal + flete, y la corrección mueve el stock
+      if (e.categoria === 'material') {
+        const cant = parseFloat(b.cantidad) || 0
+        const subtotal = parseFloat(b.subtotal_material) || cant * (parseFloat(b.costo_unitario) || 0)
+        const flete = parseFloat(b.costo_final_flete) || cant * (parseFloat(b.costo_flete) || 0)
+        const monto = subtotal + flete
+        if (monto <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect(volver) }
+        if (!b.id_producto || cant <= 0) { req.flash('error', 'Elegí el producto y una cantidad válida.'); return res.redirect(volver) }
+        const r = await EgresosModel.editar(id, {
+          ...comunes, descripcion: comunes.descripcion || 'Compra de material', observaciones: comunes.descripcion, monto,
+          fletero: b.fletero || null, id_proveedor: b.id_proveedor || null, id_producto: b.id_producto,
+          cantidad: cant, subtotal_material: subtotal, costo_final_flete: flete, datos_extra: datosExtraDe(e),
+        })
+        await auditarEdicion(id, e, usuario)
+        req.flash('success', r.stockMovido
+          ? 'Compra corregida: el stock y el ingreso de stock quedaron actualizados.'
+          : 'Compra corregida. Es anterior al vínculo con stock: si cambió el producto o la cantidad, ajustá el stock desde Stock.')
+        return res.redirect('/compras')
+      }
+
+      // Resto de las categorías: los campos que la categoría usa
+      // (un sueldo viejo sin pago en la ficha del empleado se corrige como un registro común)
+      const cat = e.categoria === 'sueldo'
+        ? { campos: ['empleado', 'periodo'], camposCustom: [] }
+        : ((await CategoriasEgresoModel.obtenerPorClave(e.categoria)) || { campos: [], camposCustom: [] })
+      const usa = (c) => cat.campos.includes(c)
+      const monto = parseFloat(b.monto) || 0
+      if (monto <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect(volver) }
+      const extra = datosExtraDe(e)
+      cat.camposCustom.forEach(cf => {
+        const v = (b[cf.clave] || '').toString().trim()
+        if (v) extra[cf.clave] = v; else delete extra[cf.clave]
+      })
+      const datos = {
+        ...comunes, monto, datos_extra: extra,
+        fletero:      usa('fletero')  ? (b.fletero || null) : e.fletero,
+        periodo:      usa('periodo')  ? (b.periodo || null) : e.periodo,
+        id_proveedor: (usa('proveedor') || usa('estacion')) ? (b.id_proveedor || null) : e.id_proveedor,
+        id_producto:  usa('producto') ? (b.id_producto || null) : e.id_producto,
+        id_empleado:  usa('empleado') ? (b.id_empleado || null) : e.id_empleado,
+        id_vehiculo:  usa('vehiculo') ? (b.id_vehiculo || null) : e.id_vehiculo,
+        // Datos de la carga: si la categoría ya no los usa, quedan como estaban
+        hora: e.hora, nro_factura: e.nro_factura, nro_remito: e.nro_remito, litros: e.litros, id_chofer: e.id_chofer,
+      }
+      let carga = null
+      if (usa('carga')) {
+        if (!b.id_chofer) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect(volver) }
+        Object.assign(datos, { hora: b.hora, nro_factura: b.nro_factura, nro_remito: b.nro_remito, litros: b.litros, id_chofer: b.id_chofer })
+        const impacta = b.impacta_flota === '1'
+        if (impacta) {
+          const faltan = faltantesCarga(datos)
+          if (faltan) { req.flash('error', `Para que impacte en el camión, completá ${faltan}.`); return res.redirect(volver) }
+        }
+        carga = { impacta, km_al_cargar: b.km_al_cargar }
+      }
+      await EgresosModel.editar(id, datos, { carga })
+      await auditarEdicion(id, e, usuario)
+      req.flash('success', carga && (carga.impacta || e.id_combustible)
+        ? (carga.impacta ? 'Pago corregido, junto con la carga de combustible del camión.' : 'Pago corregido; se quitó la carga del camión.')
+        : 'Compra / pago corregido.')
+      res.redirect('/compras')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al guardar los cambios.'); res.redirect(volver) }
+  },
+
+  // Baja: se deshace todo lo que la operación movió (ver EgresosModel.eliminar)
   async eliminar(req, res) {
     try {
-      await EgresosModel.eliminar(req.params.id)
-      req.flash('success', 'Registro eliminado.')
-    } catch (err) { console.error(err); req.flash('error', 'Error al eliminar.') }
+      const r = await EgresosModel.eliminar(req.params.id)
+      if (!r) req.flash('error', 'No se encontró el registro.')
+      else if (r.material && !r.stockRevertido) {
+        req.flash('success', 'Compra eliminada. Era anterior al vínculo con el stock: si hace falta, ajustá el stock desde Stock.')
+      } else req.flash('success', r.stockRevertido ? 'Compra eliminada: se descontó del stock lo que había entrado.' : 'Registro eliminado.')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'Error al eliminar.') }
     res.redirect('/compras')
   },
 

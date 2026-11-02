@@ -66,6 +66,11 @@ async function abrir() {
   await cliente.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS iva_alicuota REAL`)
   // Factura, remito y hora de la carga de combustible: lo mismo
   for (const col of ['nro_factura', 'nro_remito', 'hora']) await cliente.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS ${col} TEXT`)
+  // Los mismos datos en el pago de combustible de Compras / Pagos y la carga que crea: lo mismo
+  for (const col of ['nro_factura', 'nro_remito', 'hora']) await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS ${col} TEXT`)
+  await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS litros REAL`)
+  await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
+  await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
 }
 
 async function cerrar() {

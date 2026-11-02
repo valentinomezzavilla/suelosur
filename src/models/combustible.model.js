@@ -11,47 +11,80 @@ function horaHHMM(v) {
 }
 const texto = (v) => String(v || '').trim() || null
 
+// id_proveedor: estación de servicio (proveedor marcado como tal); la carga suma a la
+// deuda con esa estación (ver estaciones.model.js). `estacion` guarda su nombre a la vista.
+// nro_factura / nro_remito: los comprobantes de la estación; hora: cuándo se cargó (HH:MM).
+async function insertarCarga(q, { id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha, hora, nro_factura, nro_remito }) {
+  if (id_proveedor) {
+    const est = (await q(`SELECT nombre FROM proveedores WHERE id = ? AND es_estacion = 1`, [id_proveedor])).rows[0]
+    if (!est) throw new Error('La estación de servicio elegida no existe.')
+    estacion = est.nombre
+  }
+  const { rows } = await q(`
+    INSERT INTO combustible (id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha,
+                             hora, nro_factura, nro_remito)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    RETURNING id
+  `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
+      parseInt(km_al_cargar) || 0, texto(estacion), id_proveedor || null, fecha || hoyISO(),
+      horaHHMM(hora), texto(nro_factura), texto(nro_remito)])
+  // Actualizar km del vehículo si la carga reporta un km mayor
+  const km = parseInt(km_al_cargar) || 0
+  if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])
+  return rows[0].id
+}
+
 const CombustibleModel = {
+
+  horaHHMM,
+  texto,
 
   async listar(id_vehiculo, { desde, hasta } = {}) {
     const wheres = ['c.id_vehiculo = ?']
     const params = [id_vehiculo]
     if (desde) { wheres.push('c.fecha >= ?'); params.push(desde) }
     if (hasta) { wheres.push('c.fecha <= ?'); params.push(hasta) }
+    // id_egreso: el pago de Compras / Pagos que creó la carga (se elimina desde ahí)
     return (await query(`
-      SELECT c.*, e.nombre AS chofer_nombre
+      SELECT c.*, e.nombre AS chofer_nombre,
+             (SELECT eg.id FROM egresos eg WHERE eg.id_combustible = c.id LIMIT 1) AS id_egreso
       FROM combustible c LEFT JOIN empleados e ON e.id = c.id_chofer
       WHERE ${wheres.join(' AND ')}
       ORDER BY c.fecha DESC, c.hora DESC NULLS LAST, c.created_at DESC
     `, params)).rows
   },
 
-  // id_proveedor: estación de servicio (proveedor marcado como tal); la carga suma a la
-  // deuda con esa estación (ver estaciones.model.js). `estacion` guarda su nombre a la vista.
-  // nro_factura / nro_remito: los comprobantes de la estación; hora: cuándo se cargó (HH:MM).
-  async crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha, hora, nro_factura, nro_remito }) {
-    return await transaction(async (q) => {
-      if (id_proveedor) {
-        const est = (await q(`SELECT nombre FROM proveedores WHERE id = ? AND es_estacion = 1`, [id_proveedor])).rows[0]
-        if (!est) throw new Error('La estación de servicio elegida no existe.')
-        estacion = est.nombre
-      }
-      const { rows } = await q(`
-        INSERT INTO combustible (id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha,
-                                 hora, nro_factura, nro_remito)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        RETURNING id
-      `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
-          parseInt(km_al_cargar) || 0, texto(estacion), id_proveedor || null, fecha || hoyISO(),
-          horaHHMM(hora), texto(nro_factura), texto(nro_remito)])
-      // Actualizar km del vehículo si la carga reporta un km mayor
-      const km = parseInt(km_al_cargar) || 0
-      if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])
-      return rows[0].id
-    })
+  // `q`: la transacción de quien llama (el pago de Compras / Pagos que crea la carga junto
+  // con el egreso); sin ella, la carga va en su propia transacción.
+  async crear(datos, q = null) {
+    if (q) return insertarCarga(q, datos)
+    return await transaction((tq) => insertarCarga(tq, datos))
   },
 
+  // Corrige una carga (la que creó un pago de Compras / Pagos, al editar ese pago). Mismos
+  // campos que el alta; el km del camión solo sube (igual que al cargar).
+  async actualizar(id, { id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, id_proveedor, fecha, hora, nro_factura, nro_remito }, q) {
+    let estacion = null
+    if (id_proveedor) {
+      const est = (await q(`SELECT nombre FROM proveedores WHERE id = ? AND es_estacion = 1`, [id_proveedor])).rows[0]
+      if (!est) throw new Error('La estación de servicio elegida no existe.')
+      estacion = est.nombre
+    }
+    await q(`
+      UPDATE combustible SET id_vehiculo = ?, id_chofer = ?, litros = ?, costo_total = ?, km_al_cargar = ?, estacion = ?,
+                             id_proveedor = ?, fecha = ?, hora = ?, nro_factura = ?, nro_remito = ?
+      WHERE id = ?
+    `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0, parseInt(km_al_cargar) || 0,
+        estacion, id_proveedor || null, fecha || hoyISO(), horaHHMM(hora), texto(nro_factura), texto(nro_remito), id])
+    const km = parseInt(km_al_cargar) || 0
+    if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])
+  },
+
+  // Una carga creada por un pago de Compras / Pagos se elimina desde ahí, junto con el pago:
+  // borrarla sola dejaría el pago bajando la deuda de la estación sin la carga que la sumó.
   async eliminar(id) {
+    const pago = (await query(`SELECT id FROM egresos WHERE id_combustible = ? LIMIT 1`, [id])).rows[0]
+    if (pago) throw new Error('Esta carga se registró desde Compras / Pagos: eliminá ese pago y se borran los dos.')
     await query(`DELETE FROM combustible WHERE id = ?`, [id])
   },
 

@@ -32,17 +32,20 @@ const StockModel = {
   },
 
   // Devuelve el id del ingreso, para que la compra del libro (egresos) quede vinculada a él.
-  async registrarIngreso(id_producto, cantidad, { id_proveedor, costo_unitario, costo_flete, usuario, observaciones } = {}) {
-    return transaction(async (q) => {
+  // `fecha`: la de la compra (sin ella, hoy). `q`: la transacción de quien llama (la compra
+  // de Compras / Pagos registra el ingreso y el egreso juntos: o entran los dos o ninguno).
+  async registrarIngreso(id_producto, cantidad, { id_proveedor, costo_unitario, costo_flete, usuario, observaciones, fecha } = {}, q = null) {
+    const registrar = async (q) => {
       await q(`UPDATE stock SET cantidad_actual = cantidad_actual + ? WHERE id_producto = ?`, [cantidad, id_producto])
       const { rows } = await q(`
-        INSERT INTO stock_ingresos (id_producto, id_proveedor, cantidad, costo_unitario, costo_flete, id_usuario, observaciones)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO stock_ingresos (id_producto, id_proveedor, cantidad, costo_unitario, costo_flete, id_usuario, observaciones, fecha)
+        VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')))
         RETURNING id
       `, [id_producto, id_proveedor || null, cantidad,
-          parseFloat(costo_unitario) || 0, parseFloat(costo_flete) || 0, usuario || null, observaciones || ''])
+          parseFloat(costo_unitario) || 0, parseFloat(costo_flete) || 0, usuario || null, observaciones || '', fecha || null])
       return rows[0].id
-    })
+    }
+    return q ? registrar(q) : transaction(registrar)
   },
 
   async ingresos(id_producto) {

@@ -24,10 +24,11 @@ function llamar(ctrl, accion, { body = {}, params = {}, query = {}, user }) {
   })
 }
 
-let user
+let user, chofer
 before(async () => {
   await prueba.abrir()
   user = { id: await datos.idAdministrativo(), rol: 'dueno' }
+  chofer = (await datos.crearChofer()).id_empleado
 })
 after(() => prueba.cerrar())
 
@@ -43,7 +44,7 @@ describe('carga de combustible: factura, remito y hora', () => {
   it('la carga guarda N° de factura, N° de remito y hora (recortados)', async () => {
     const r = await llamar(FlotaController, 'cargarCombustible', { user, params: { id: camion }, body: {
       fecha: '2026-10-20', hora: '08:30', nro_factura: '  0003-00012345 ', nro_remito: ' R-5566 ', litros: '120.5',
-      costo_total: '150000', km_al_cargar: '', id_chofer: '', id_proveedor: String(estacion) } })
+      costo_total: '150000', km_al_cargar: '', id_chofer: String(chofer), id_proveedor: String(estacion) } })
     assert.equal(r.url, `/flota/${camion}?tab=combustible`)
     assert.ok(r.flashes.some(f => f.tipo === 'success'), JSON.stringify(r.flashes))
     const c = (await prueba.q(`SELECT * FROM combustible WHERE id_vehiculo = ?`, [camion])).rows[0]
@@ -100,7 +101,7 @@ describe('forma de pago "Otros" en los pagos a proveedores', () => {
   })
 
   it('Compras / Pagos guarda "otros" y lo muestra como "Otros"', async () => {
-    await llamar(ComprasController, 'crear', { user, body: { categoria: 'combustible', fecha: '2026-10-21', monto: '5000', metodo_pago: 'otros', id_proveedor: String(estacion) } })
+    await llamar(ComprasController, 'crear', { user, body: { categoria: 'combustible', fecha: '2026-10-21', monto: '5000', metodo_pago: 'otros', id_proveedor: String(estacion), id_chofer: String(chofer) } })
     const e = (await prueba.q(`SELECT metodo_pago FROM egresos WHERE id_proveedor = ? ORDER BY id DESC LIMIT 1`, [estacion])).rows[0]
     assert.equal(e.metodo_pago, 'otros')
 

@@ -20,6 +20,74 @@
     return def.camposCustom.map(cf => extra[cf.clave] ? `${cf.etiqueta}: ${extra[cf.clave]}` : null).filter(Boolean)
   }
 
+  // "Ver compra": todo el detalle del registro como pares [etiqueta, valor] (los vacíos no van)
+  const TIPO_PAGO = { sueldo: 'Sueldo', anticipo: 'Anticipo', viatico: 'Viático', horas_extra: 'Horas extra',
+                      bonificacion: 'Bonificación', descuento: 'Descuento', liquidacion: 'Liquidación' }
+  const editable = (e) => e.origen !== 'tercero' && e.pago_tipo !== 'descuento'
+  const detalleCompra = (e) => {
+    const cant = Number(e.cantidad) || 0
+    const u = e.producto_unidad ? ' ' + e.producto_unidad : ''
+    const filas = [
+      ['Fecha', formatFecha(e.fecha)],
+      ['Categoría', catLabel(e.categoria)],
+      ['Monto', money(e.monto)],
+      ['Método de pago', METODO[e.metodo_pago] || e.metodo_pago],
+      ['Descripción', e.descripcion],
+    ]
+    if (e.categoria === 'material') {
+      filas.push(
+        ['Producto', e.producto_nombre],
+        ['Proveedor', e.proveedor_nombre],
+        ['Cantidad', e.cantidad != null ? num(e.cantidad) + u : null],
+        ['Costo unitario', cant && e.subtotal_material != null ? money(Math.round(e.subtotal_material / cant * 100) / 100) : null],
+        ['Subtotal material', e.subtotal_material != null ? money(e.subtotal_material) : null],
+        ['Costo flete (unitario)', cant && e.costo_final_flete != null ? money(Math.round(e.costo_final_flete / cant * 100) / 100) : null],
+        ['Costo final flete', e.costo_final_flete != null ? money(e.costo_final_flete) : null],
+        ['Fletero', e.fletero],
+        ['Stock', e.id_stock_ingreso ? `Ingresó al stock (${num(e.cantidad)}${u})` : 'Compra anterior al vínculo con el stock'],
+      )
+    } else {
+      filas.push(
+        ['Proveedor / Estación', e.proveedor_nombre],
+        ['Producto', e.producto_nombre],
+        ['Empleado', e.empleado_nombre],
+        ['Período', e.periodo],
+        ['Vehículo', e.vehiculo_nombre],
+        ['Fletero', e.fletero],
+      )
+    }
+    if (e.id_pago_empleado) {
+      const conAjustes = Number(e.pago_descuentos) || Number(e.pago_adiciones)
+      filas.push(
+        ['Tipo de pago', TIPO_PAGO[e.pago_tipo] || e.pago_tipo],
+        ['Sueldo / importe', conAjustes ? money(e.pago_base) : null],
+        ['Descuentos', Number(e.pago_descuentos) ? money(e.pago_descuentos) : null],
+        ['Adiciones', Number(e.pago_adiciones) ? money(e.pago_adiciones) : null],
+        ['Neto pagado', conAjustes ? money(e.monto) : null],
+      )
+    }
+    filas.push(
+      ['Hora', e.hora],
+      ['N° Factura', e.nro_factura],
+      ['N° Remito', e.nro_remito],
+      ['Litros', e.litros ? num(e.litros) + ' l' : null],
+      ['Chofer', e.chofer_nombre],
+      ['Carga en el camión', e.id_combustible ? ('Sí' + (e.carga_km ? ` · ${num(e.carga_km)} km` : '')) : null],
+    )
+    datosExtraDe(e).forEach(t => { const i = t.indexOf(': '); filas.push([t.slice(0, i), t.slice(i + 2)]) })
+    filas.push(
+      ['Origen', e.origen === 'alerta' ? 'Automático (alerta de vencimiento)' : (e.origen === 'tercero' ? 'Transferencia de cliente a tercero' : null)],
+      ['Registrado por', [e.usuario_nombre, e.created_at ? formatFechaHora(e.created_at) : null].filter(Boolean).join(' · ')],
+      ['Última edición', e.editado_en ? [e.editado_por, formatFechaHora(e.editado_en)].filter(Boolean).join(' · ') : null],
+    )
+    return {
+      titulo: `${catLabel(e.categoria)} — ${money(e.monto)}`,
+      filas: filas.filter(([, v]) => v != null && String(v).trim() !== ''),
+      editar: editable(e) ? `/compras/${e.id}/editar` : null,
+      recibo: e.id_pago_empleado && e.pago_tipo !== 'descuento' ? `/compras/recibo/${e.id_pago_empleado}` : null,
+    }
+  }
+
   // 'material' y 'sueldo' son categorías del sistema (no están en categorias_egreso.campos,
   // así que se agregan a mano a los bloques que corresponden). El resto de las categorías
   // declaran sus campos de forma dinámica.
@@ -219,6 +287,10 @@
             <% if (e.origen === 'alerta') { %><small class="text-muted d-block">auto · alerta</small><% } %></td>
           <td><%= e.descripcion || '—' %>
             <% const extras = datosExtraDe(e); if (extras.length) { %><small class="text-muted d-block"><%= extras.join(' · ') %></small><% } %>
+            <% const carga = [e.hora, e.nro_factura && 'Fact. ' + e.nro_factura, e.nro_remito && 'Rem. ' + e.nro_remito,
+                              e.litros && num(e.litros) + ' l', e.chofer_nombre && 'Chofer: ' + e.chofer_nombre].filter(Boolean)
+               if (carga.length || e.id_combustible) { %><small class="text-muted d-block"><%= carga.join(' · ') %>
+              <% if (e.id_combustible) { %><span class="badge rounded-pill badge-en-transito ms-1" title="También quedó como carga de combustible del camión (Flota)">Carga en camión</span><% } %></small><% } %>
           </td>
           <td><small><%= detalleDe(e) %></small></td>
           <td class="text-nowrap">
@@ -231,13 +303,25 @@
           <td><small class="text-muted"><%= METODO[e.metodo_pago] || '—' %></small></td>
           <td class="text-end fw-semibold text-danger"><%= money(e.monto) %></td>
           <td class="text-center text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-ver-compra" title="Ver compra"
+                    data-detalle="<%= JSON.stringify(detalleCompra(e)) %>"><%- icon('eye', { size: 15 }) %></button>
+            <% if (editable(e)) { %>
+              <a href="/compras/<%= e.id %>/editar" class="btn btn-sm btn-outline-secondary" title="Editar compra"><%- icon('edit', { size: 15 }) %></a>
+            <% } %>
             <% if (e.id_pago_empleado) { %>
               <a href="/compras/recibo/<%= e.id_pago_empleado %>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Recibo de sueldo"><%- icon('fileText', { size: 15 }) %></a>
             <% } %>
+            <% if (e.origen !== 'tercero') { %>
+            <% const aviso = [`¿Eliminar este registro de ${catLabel(e.categoria)} por ${money(e.monto)}?`,
+                              e.id_pago_empleado ? 'También se elimina de la ficha del empleado y su recibo.' : '',
+                              e.id_combustible ? 'También se elimina la carga de combustible del camión.' : '',
+                              e.categoria === 'material' && e.id_stock_ingreso
+                                ? `Se descuenta del stock lo que entró (${num(e.cantidad)}${e.producto_unidad ? ' ' + e.producto_unidad : ''} de ${e.producto_nombre || 'el producto'}).` : ''].filter(Boolean).join(' ') %>
             <form action="/compras/<%= e.id %>/eliminar" method="POST" class="d-inline"
-                  onsubmit="return confirm('¿Eliminar este registro de <%= catLabel(e.categoria) %> por <%= money(e.monto) %>?<%= e.id_pago_empleado ? ' También se elimina de la ficha del empleado y su recibo.' : '' %>')">
+                  onsubmit="return confirm(<%= JSON.stringify(aviso) %>)">
               <button class="btn btn-sm btn-outline-danger" title="Eliminar"><%- icon('trash', { size: 15 }) %></button>
             </form>
+            <% } %>
           </td>
         </tr>
         <% }) %>
@@ -253,3 +337,56 @@
     <% } %>
   </div>
 </div>
+
+<!-- Ver compra: el detalle completo del registro (lo arma detalleCompra() en cada botón) -->
+<div class="modal fade" id="modalVerCompra" tabindex="-1" aria-labelledby="modalVerCompraTitulo">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header modal-header-dark">
+        <h6 class="modal-title text-white fw-bold" id="modalVerCompraTitulo">Compra / pago</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body p-0">
+        <table class="table table-sm mb-0"><tbody id="modalVerCompraFilas"></tbody></table>
+      </div>
+      <div class="modal-footer">
+        <a href="#" class="btn btn-sm btn-outline-secondary" id="modalVerCompraRecibo" target="_blank" rel="noopener"><%- icon('fileText', { size: 14 }) %> Recibo</a>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+        <a href="#" class="btn btn-sm btn-naranja" id="modalVerCompraEditar"><%- icon('edit', { size: 14 }) %> Editar compra</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const modal = document.getElementById('modalVerCompra')
+    if (!modal) return
+    const titulo = document.getElementById('modalVerCompraTitulo')
+    const filas = document.getElementById('modalVerCompraFilas')
+    const editar = document.getElementById('modalVerCompraEditar')
+    const recibo = document.getElementById('modalVerCompraRecibo')
+    document.querySelectorAll('.btn-ver-compra').forEach(btn => btn.addEventListener('click', () => {
+      let d
+      try { d = JSON.parse(btn.dataset.detalle) } catch { return }
+      titulo.textContent = d.titulo
+      filas.replaceChildren(...d.filas.map(([etiqueta, valor]) => {
+        const tr = document.createElement('tr')
+        const th = document.createElement('th')
+        th.className = 'text-muted fw-normal ps-3 text-nowrap'
+        th.style.width = '40%'
+        th.textContent = etiqueta
+        const td = document.createElement('td')
+        td.className = 'pe-3'
+        td.textContent = valor
+        tr.append(th, td)
+        return tr
+      }))
+      editar.style.display = d.editar ? '' : 'none'
+      if (d.editar) editar.href = d.editar
+      recibo.style.display = d.recibo ? '' : 'none'
+      if (d.recibo) recibo.href = d.recibo
+      bootstrap.Modal.getOrCreateInstance(modal).show()
+    }))
+  })()
+</script>
