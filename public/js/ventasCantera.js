@@ -244,8 +244,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Transferencia destinada a tercero: se valida y viaja con la venta
         if (window.TerceroTransferencia && !window.TerceroTransferencia.copiarA(document.getElementById('metodoPago'), document.getElementById('formCantera'))) return;
 
-        document.getElementById('formCantera').submit();
+        // requestSubmit (no submit()) dispara el evento 'submit': así appLoader.js le pone el código
+        // de envío único y bloquea el segundo click. Con submit() la venta (y la transferencia a
+        // tercero, que baja la deuda de la estación) podía registrarse dos veces.
+        const formCantera = document.getElementById('formCantera');
+        btnConfirmar.disabled = true;
+        if (typeof formCantera.requestSubmit === 'function') formCantera.requestSubmit();
+        else formCantera.submit();
     });
+
+    // Al volver con "atrás" el botón queda como lo deja el carrito
+    window.addEventListener('pageshow', actualizarBotonConfirmar);
 
     // La fecha arranca en hoy pero se puede mover hacia atrás para cargar ventas viejas
     const fechaCantera = document.getElementById('fechaCantera');
