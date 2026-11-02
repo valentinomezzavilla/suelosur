@@ -3,7 +3,7 @@ const EstacionesModel = require('../models/estaciones.model')
 const EgresosModel    = require('../models/egresos.model')
 
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) ? String(v) : ''
-const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq']
+const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq', 'otros']
 
 const EstacionesController = {
 

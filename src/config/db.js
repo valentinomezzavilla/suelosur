@@ -1491,6 +1491,10 @@ async function initDB() {
   await pool.query(`ALTER TABLE proveedores ADD COLUMN IF NOT EXISTS es_estacion INTEGER NOT NULL DEFAULT 0`)
   await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS id_proveedor BIGINT REFERENCES proveedores(id)`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_combustible_proveedor ON combustible(id_proveedor)`)
+  // Carga de combustible: N° de factura y N° de remito de la estación y hora de la carga (HH:MM)
+  await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS nro_factura TEXT`)
+  await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS nro_remito TEXT`)
+  await pool.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS hora TEXT`)
   await pool.query(`ALTER TABLE cc_proveedores ADD COLUMN IF NOT EXISTS id_usuario BIGINT`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_proveedor ON egresos(id_proveedor)`)
   // Una sola vez: la categoría Combustible pasa a pedir la estación de servicio (en lugar

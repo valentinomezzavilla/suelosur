@@ -19,7 +19,8 @@ const SQL_MOVIMIENTOS = `
   SELECT 'carga' AS origen, c.id, c.id_proveedor, c.fecha, c.created_at,
          'Carga de combustible' || COALESCE(' — ' || NULLIF(CONCAT_WS(' · ',
             NULLIF(CONCAT_WS(' ', CASE WHEN v.numero_interno IS NOT NULL THEN '#' || v.numero_interno END, v.patente), ''),
-            CASE WHEN c.litros > 0 THEN ROUND(c.litros::numeric, 2) || ' l' END), ''), '') AS descripcion,
+            CASE WHEN c.litros > 0 THEN ROUND(c.litros::numeric, 2) || ' l' END,
+            'Fact. ' || NULLIF(c.nro_factura, ''), 'Rem. ' || NULLIF(c.nro_remito, '')), ''), '') AS descripcion,
          COALESCE(c.costo_total, 0) AS debe, 0 AS haber, c.id_vehiculo, NULL::bigint AS id_transaccion, NULL::text AS metodo_pago
   FROM combustible c LEFT JOIN flota_vehiculos v ON v.id = c.id_vehiculo
   WHERE c.id_proveedor IS NOT NULL
