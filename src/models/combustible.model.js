@@ -3,6 +3,14 @@
 const { query, transaction } = require('../config/db')
 const { hoyISO } = require('../utils/fecha')
 
+// Hora de la carga como 'HH:MM' (el <input type="time"> manda 'HH:MM' o 'HH:MM:SS'); otra cosa → null
+function horaHHMM(v) {
+  const m = String(v || '').trim().match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/)
+  if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) return null
+  return `${m[1].padStart(2, '0')}:${m[2]}`
+}
+const texto = (v) => String(v || '').trim() || null
+
 const CombustibleModel = {
 
   async listar(id_vehiculo, { desde, hasta } = {}) {
@@ -14,13 +22,14 @@ const CombustibleModel = {
       SELECT c.*, e.nombre AS chofer_nombre
       FROM combustible c LEFT JOIN empleados e ON e.id = c.id_chofer
       WHERE ${wheres.join(' AND ')}
-      ORDER BY c.fecha DESC, c.created_at DESC
+      ORDER BY c.fecha DESC, c.hora DESC NULLS LAST, c.created_at DESC
     `, params)).rows
   },
 
   // id_proveedor: estación de servicio (proveedor marcado como tal); la carga suma a la
   // deuda con esa estación (ver estaciones.model.js). `estacion` guarda su nombre a la vista.
-  async crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha }) {
+  // nro_factura / nro_remito: los comprobantes de la estación; hora: cuándo se cargó (HH:MM).
+  async crear({ id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha, hora, nro_factura, nro_remito }) {
     return await transaction(async (q) => {
       if (id_proveedor) {
         const est = (await q(`SELECT nombre FROM proveedores WHERE id = ? AND es_estacion = 1`, [id_proveedor])).rows[0]
@@ -28,11 +37,13 @@ const CombustibleModel = {
         estacion = est.nombre
       }
       const { rows } = await q(`
-        INSERT INTO combustible (id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO combustible (id_vehiculo, id_chofer, litros, costo_total, km_al_cargar, estacion, id_proveedor, fecha,
+                                 hora, nro_factura, nro_remito)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         RETURNING id
       `, [id_vehiculo, id_chofer || null, parseFloat(litros) || 0, parseFloat(costo_total) || 0,
-          parseInt(km_al_cargar) || 0, (estacion || '').trim() || null, id_proveedor || null, fecha || hoyISO()])
+          parseInt(km_al_cargar) || 0, texto(estacion), id_proveedor || null, fecha || hoyISO(),
+          horaHHMM(hora), texto(nro_factura), texto(nro_remito)])
       // Actualizar km del vehículo si la carga reporta un km mayor
       const km = parseInt(km_al_cargar) || 0
       if (km) await q(`UPDATE flota_vehiculos SET kilometraje = GREATEST(kilometraje, ?) WHERE id = ?`, [km, id_vehiculo])

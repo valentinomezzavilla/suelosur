@@ -64,6 +64,8 @@ async function abrir() {
   if (!hayDetalleCompras && typeof db.migrarDetalleCompras === 'function') await db.migrarDetalleCompras()
   // IVA sumado al neto (para facturar): sin desplegar, la columna se agrega dentro de la prueba
   await cliente.query(`ALTER TABLE op_encabezado ADD COLUMN IF NOT EXISTS iva_alicuota REAL`)
+  // Factura, remito y hora de la carga de combustible: lo mismo
+  for (const col of ['nro_factura', 'nro_remito', 'hora']) await cliente.query(`ALTER TABLE combustible ADD COLUMN IF NOT EXISTS ${col} TEXT`)
 }
 
 async function cerrar() {
