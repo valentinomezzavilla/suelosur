@@ -73,7 +73,7 @@ const AlquileresMaquinariaController = {
         fecha_entrega_planificada: fechaEntrega || null,
         hora_planificada: horaEntrega || null,
       })
-      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, parseFloat(precio_total) || 0)
+      await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, parseFloat(precio_total) || 0, req.body.nroFactura)
       await Tercero.guardarEnOp(id_op, tercero)
       req.flash('success', `Alquiler maquinaria OP-${String(nro_op).padStart(4,'0')} creado.`)
       res.redirect('/alquileres/maquinaria')

@@ -119,13 +119,13 @@ const AlquileresModel = {
   },
 
   async listarPorEstado({ q } = {}) {
-    // Búsqueda libre por N° de OP, remito o cliente — mismo criterio que ventas/transacciones.
+    // Búsqueda libre por N° de OP, remito, cliente o N° de factura — mismo criterio que ventas.
     let filtroWhere = ''
     const filtroParams = []
     if (q && String(q).trim()) {
       const term = `%${String(q).trim()}%`
-      filtroWhere = ` AND (CAST(op.nro_op AS TEXT) ILIKE ? OR CAST(op.nro_remito AS TEXT) ILIKE ? OR cli.nombre ILIKE ? OR cli.apellido ILIKE ?)`
-      filtroParams.push(term, term, term, term)
+      filtroWhere = ` AND (CAST(op.nro_op AS TEXT) ILIKE ? OR CAST(op.nro_remito AS TEXT) ILIKE ? OR cli.nombre ILIKE ? OR cli.apellido ILIKE ? OR op.nro_factura ILIKE ?)`
+      filtroParams.push(term, term, term, term, term)
     }
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `

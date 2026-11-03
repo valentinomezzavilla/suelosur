@@ -139,7 +139,9 @@ function mapear(r, hoy) {
     sin_precio,
     neto,
     iva,
-    comprobante: r.nro_factura ? `${r.tipo_comprobante ? r.tipo_comprobante + ' ' : ''}${r.nro_factura}` : null,
+    // Comprobante: solo el de la factura registrada. En una pendiente, nro_factura es el número
+    // cargado con la operación (todavía no facturada).
+    comprobante: facturado && r.nro_factura ? `${r.tipo_comprobante ? r.tipo_comprobante + ' ' : ''}${r.nro_factura}` : null,
     requiereNC: anulada && facturado && !r.nc_numero,
     condicion_iva_label: CONDICIONES_IVA[r.condicion_iva] || null,
     dias: emision ? Math.floor((Date.parse(hoy) - Date.parse(emision)) / 86400000) : 0,
@@ -147,6 +149,10 @@ function mapear(r, hoy) {
 }
 
 const errorUsuario = (msg) => Object.assign(new Error(msg), { usuario: true })
+
+// N° de factura cargado con la operación (al crearla o al marcarla para facturar): texto
+// recortado, hasta 40 caracteres; vacío → null.
+const nroFacturaDe = (v) => String(v ?? '').trim().slice(0, 40) || null
 
 // Se sumó o se quitó el IVA de una OP ya creada (marcar / quitar "para facturar"): lo que
 // debe el cliente acompaña.
@@ -186,10 +192,12 @@ async function ajustarDeudaIva(q, id, alicAnterior, alicNueva) {
 
 // Marca una OP para facturar y le suma el IVA a lo que debe. false si no cambió nada
 // (no existe, anulada o ya marcada).
-async function marcarEn(q, id) {
+// `nroFactura` (opcional): el N° de factura que ya se conoce; queda pendiente con ese número.
+async function marcarEn(q, id, nroFactura = null) {
   const op = (await q(`SELECT id, estado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
   if (!op || op.estado === 'anulado' || Number(op.para_facturar) === 1) return false
-  await q(`UPDATE op_encabezado SET para_facturar = 1, iva_alicuota = ? WHERE id = ?`, [ALICUOTA_FACTURAR, id])
+  await q(`UPDATE op_encabezado SET para_facturar = 1, iva_alicuota = ?, nro_factura = COALESCE(?, nro_factura) WHERE id = ?`,
+    [ALICUOTA_FACTURAR, nroFacturaDe(nroFactura), id])
   await ajustarDeudaIva(q, id, Number(op.iva_alicuota) || 0, ALICUOTA_FACTURAR)
   return true
 }
@@ -200,7 +208,8 @@ async function quitarEn(q, id) {
   const op = (await q(`SELECT id, facturado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
   if (!op || Number(op.facturado) === 1) return false
   if (Number(op.para_facturar) !== 1 && !Number(op.iva_alicuota)) return false
-  await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL WHERE id = ?`, [id])
+  // Sin facturar y fuera de la lista: el N° de factura cargado tampoco queda
+  await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL, nro_factura = NULL WHERE id = ?`, [id])
   if (Number(op.iva_alicuota)) await ajustarDeudaIva(q, id, Number(op.iva_alicuota), 0)
   return true
 }
@@ -214,17 +223,29 @@ module.exports = {
   // quien crea el cobro en el alta lo hace por conIva(neto, alícuota).
   // `monto` null = todavía sin importe (un alquiler sin precio): se guarda NULL, no 0, para
   // que el monto salga del precio que se le asigne después en vez de quedar tapado por un 0.
-  async marcarAlCrear(id_op, flag, monto) {
+  // `nroFactura` (opcional): el N° de factura cargado en el alta. La OP sigue pendiente de
+  // facturar con ese número (se busca por él y viene cargado al facturarla).
+  async marcarAlCrear(id_op, flag, monto, nroFactura = null) {
     if (!id_op || !esVerdadero(flag)) return 0
     const sinMonto = monto === null || monto === undefined || String(monto).trim() === ''
-    await query(`UPDATE op_encabezado SET para_facturar = 1, monto_facturar = ?, iva_alicuota = ? WHERE id = ?`,
-      [sinMonto ? null : (Number(monto) || 0), ALICUOTA_FACTURAR, id_op])
+    await query(`UPDATE op_encabezado SET para_facturar = 1, monto_facturar = ?, iva_alicuota = ?, nro_factura = ? WHERE id = ?`,
+      [sinMonto ? null : (Number(monto) || 0), ALICUOTA_FACTURAR, nroFacturaDe(nroFactura), id_op])
     return ALICUOTA_FACTURAR
   },
 
   // Marcar una OP ya existente (desde su detalle): también se le suma el IVA a lo que debe.
-  async marcar(id) {
-    return transaction((q) => marcarEn(q, id))
+  async marcar(id, nroFactura = null) {
+    return transaction((q) => marcarEn(q, id, nroFactura))
+  },
+
+  // Carga o corrige el N° de factura de una OP pendiente de facturar (vacío lo borra). Las
+  // ya facturadas no se tocan: su número es el de la factura registrada.
+  async guardarNroFactura(id, nroFactura) {
+    const { rowCount } = await query(`
+      UPDATE op_encabezado SET nro_factura = ?
+      WHERE id = ? AND para_facturar = 1 AND COALESCE(facturado, 0) = 0
+    `, [nroFacturaDe(nroFactura), id])
+    if (!rowCount) throw errorUsuario('La operación no está pendiente de facturar.')
   },
 
   // Marcar / quitar varias OP de una vez (desde Liquidaciones), todas en la misma

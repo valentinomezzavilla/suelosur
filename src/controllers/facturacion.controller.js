@@ -249,11 +249,25 @@ module.exports = {
 
   async marcar(req, res) {
     try {
-      await FacturacionModel.marcar(req.params.id)
-      await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'marcar_facturar', usuario: req.session.user.id })
+      await FacturacionModel.marcar(req.params.id, req.body.nroFactura)
+      await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'marcar_facturar', usuario: req.session.user.id,
+        detalle: String(req.body.nroFactura || '').trim() ? { nro_factura: String(req.body.nroFactura).trim() } : null })
       req.flash('success', 'La operación quedó marcada para facturar.')
     } catch (err) {
       req.flash('error', mensajeError(err, 'Error al marcar la operación.'))
+    }
+    res.redirect(destinoSeguro(req.body.volver, volver('pendiente')))
+  },
+
+  // Carga o corrige el N° de factura de una operación pendiente (desde su detalle)
+  async nroFactura(req, res) {
+    try {
+      await FacturacionModel.guardarNroFactura(req.params.id, req.body.nroFactura)
+      await registrarAuditoria({ entidad_tipo: ENTIDAD, entidad_id: req.params.id, accion: 'nro_factura', usuario: req.session.user.id,
+        detalle: { nro_factura: String(req.body.nroFactura || '').trim() || null } })
+      req.flash('success', String(req.body.nroFactura || '').trim() ? 'N° de factura guardado.' : 'Se quitó el N° de factura.')
+    } catch (err) {
+      req.flash('error', mensajeError(err, 'Error al guardar el N° de factura.'))
     }
     res.redirect(destinoSeguro(req.body.volver, volver('pendiente')))
   },

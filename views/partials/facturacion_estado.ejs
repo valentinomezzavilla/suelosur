@@ -36,19 +36,39 @@
           </div>
         <% } %>
         <div class="small text-muted mt-1">Aparece en Facturación → Pendiente Facturar.</div>
+        <% if (_f.nro_factura) { %>
+          <div class="small mt-1">N° de Factura: <span class="fw-semibold"><%= _f.nro_factura %></span></div>
+        <% } %>
       <% } else { %>
         <span class="badge badge--anulado">No marcada para facturar</span>
       <% } %>
     </div>
     <% if (_puede && !_f.facturado && !_f.anulada) { %>
       <form method="POST" action="/facturacion/<%= opId %>/<%= _f.para_facturar ? 'quitar' : 'marcar' %>"
+            class="d-flex flex-wrap align-items-center gap-2"
             onsubmit="return confirm('<%= _f.para_facturar ? (_f.con_iva ? '¿Quitarla de facturación? Se le descuenta el IVA a lo que debe el cliente.' : '¿Quitarla de facturación?') : '¿Marcarla para facturar? Se le suma el IVA 21% a lo que debe el cliente.' %>')">
         <input type="hidden" name="volver" value="<%= volver %>">
+        <% if (!_f.para_facturar) { %>
+          <input type="text" name="nroFactura" maxlength="40" class="form-control form-control-sm" style="max-width:190px"
+                 placeholder="N° de Factura (opcional)" aria-label="N° de Factura (opcional)" autocomplete="off">
+        <% } %>
         <button type="submit" class="btn btn-sm <%= _f.para_facturar ? 'btn-outline-secondary' : 'btn-naranja' %>">
           <%= _f.para_facturar ? 'Quitar de facturación' : 'Marcar para facturar' %>
         </button>
       </form>
     <% } %>
   </div>
+  <% if (_puede && _f.para_facturar && !_f.facturado && !_f.anulada) { %>
+  <!-- N° de Factura de una pendiente: se carga o se corrige acá (vacío lo borra) -->
+  <div class="card-body border-top pt-2">
+    <form method="POST" action="/facturacion/<%= opId %>/nro-factura" class="d-flex flex-wrap align-items-center gap-2">
+      <input type="hidden" name="volver" value="<%= volver %>">
+      <label class="small text-muted mb-0" for="nroFactura-<%= opId %>">N° de Factura</label>
+      <input type="text" name="nroFactura" id="nroFactura-<%= opId %>" maxlength="40" class="form-control form-control-sm" style="max-width:190px"
+             value="<%= _f.nro_factura || '' %>" placeholder="Ej: 0001-00001234" autocomplete="off">
+      <button type="submit" class="btn btn-sm btn-outline-secondary"><%= _f.nro_factura ? 'Guardar' : 'Cargar' %></button>
+    </form>
+  </div>
+  <% } %>
 </div>
 <% } %>
