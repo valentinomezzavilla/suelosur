@@ -232,6 +232,10 @@ document.addEventListener('DOMContentLoaded', () => {
         formMetodoPago.value  = document.getElementById('metodoPago')?.value || 'efectivo';
         const formParaFacturar = document.getElementById('formParaFacturar');
         if (formParaFacturar) formParaFacturar.value = document.getElementById('paraFacturar')?.checked ? '1' : '';
+        // N° de Factura: solo si es para facturar
+        const formNroFactura = document.getElementById('formNroFactura');
+        if (formNroFactura) formNroFactura.value = document.getElementById('paraFacturar')?.checked
+            ? (document.getElementById('nroFactura')?.value || '').trim() : '';
         formPrecioTotal.value = checkPrecio.checked ? inputPrecio.value : calcularTotal();
         const formObs = document.getElementById('formObservaciones');
         if (formObs) formObs.value = document.getElementById('obsCantera')?.value?.trim() || '';

@@ -37,6 +37,24 @@
         <input type="checkbox" name="paraFacturar" id="paraFacturar" value="1">
         Operación para Facturar
     </label>
+    <!-- N° de Factura: se habilita con "Para facturar". Opcional: queda con la operación
+         (pendiente en Facturación), sirve para buscarla y viene cargado al facturarla. -->
+    <div class="form-group mt-2" id="grupoNroFactura" hidden>
+        <label for="nroFactura">N° de Factura</label>
+        <input type="text" name="nroFactura" id="nroFactura" maxlength="40" placeholder="Ej: 0001-00001234" autocomplete="off" disabled>
+        <p class="form-hint">Opcional. Queda guardado con la operación y sirve para buscarla; al facturarla en Facturación, el número viene cargado.</p>
+    </div>
+    <script>
+    (() => {
+      const check = document.getElementById('paraFacturar')
+      const grupo = document.getElementById('grupoNroFactura')
+      const input = document.getElementById('nroFactura')
+      if (!check || !grupo || !input) return
+      const aplicar = () => { grupo.hidden = !check.checked; input.disabled = !check.checked }
+      check.addEventListener('change', aplicar)
+      aplicar()
+    })()
+    </script>
     <p class="form-hint" id="avisoIvaFacturar" hidden
        data-fuente="<%= typeof ivaFuente !== 'undefined' ? ivaFuente : '' %>">
         El precio cargado es el neto: se le suma el IVA 21% y el cliente paga el total con IVA.

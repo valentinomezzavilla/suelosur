@@ -157,7 +157,7 @@ const VentasController = {
         nro_remito:          remito.nro,
       })
       // Para facturar: se cobra el neto + IVA
-      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total, req.body.nroFactura)
       await Tercero.guardarEnOp(id_op, tercero)
 
       await VentasModel.entregar(id_op)
@@ -337,7 +337,7 @@ const VentasController = {
         detalles: [detalle],
       })
       // Para facturar: se cobra el neto + IVA
-      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total)
+      const alicuota = await require('../models/facturacion.model').marcarAlCrear(id_op, req.body.paraFacturar, total, req.body.nroFactura)
       await Tercero.guardarEnOp(id_op, tercero)
       // A cuenta corriente: el cargo aparece en la cuenta del cliente desde que se registra
       // la venta, aunque el viaje quede programado.

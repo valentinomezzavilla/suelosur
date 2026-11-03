@@ -166,7 +166,7 @@
         claseInput: '', claseSelect: '', claseLabel: '' }) %>
   <div class="filtro-group fact-filtro-q">
     <label for="fq">Buscar</label>
-    <input id="fq" type="text" name="q" value="<%= filtros.q %>" placeholder="N° de OP, CUIT<%= esFact ? ', N° de factura o CAE' : '' %>">
+    <input id="fq" type="text" name="q" value="<%= filtros.q %>" placeholder="N° de OP, CUIT, N° de factura<%= esFact ? ' o CAE' : '' %>">
   </div>
   <div class="fact-filtro-salto" aria-hidden="true"></div>
   <div class="filtro-group">
@@ -238,11 +238,12 @@
                          data-con-iva="<%= o.con_iva ? 1 : 0 %>" data-sin-precio="<%= o.sin_precio ? 1 : 0 %>"
                          data-cuit="<%= o.cuit || '' %>" data-dni="<%= o.dni || '' %>"
                          data-razon="<%= o.razon_social || '' %>" data-cond="<%= o.condicion_iva || '' %>"
-                         data-op="<%= nroOp(o.nro_op) %>">
+                         data-op="<%= nroOp(o.nro_op) %>" data-nro-factura="<%= o.nro_factura || '' %>">
                 </td>
                 <td class="text-nowrap">
                   <a href="<%= linkOp(o) %>" class="fw-semibold text-decoration-none"><%= nroOp(o.nro_op) %></a>
                   <div class="small text-muted"><%= o.tipo_label %></div>
+                  <% if (o.nro_factura) { %><div class="small" title="N° de Factura cargado con la operación">Fact. <span class="fw-semibold"><%= o.nro_factura %></span></div><% } %>
                 </td>
                 <td class="text-nowrap">
                   <%= formatFecha(o.fecha_emision) %>

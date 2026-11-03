@@ -194,7 +194,7 @@ const AlquileresController = {
           id_chofer: id_chofer || null, id_camion: id_camion || null,
         })
         const FacturacionModel = require('../models/facturacion.model')
-        for (const op of grupo.ops) await FacturacionModel.marcarAlCrear(op.id, req.body.paraFacturar, op.precio_alquiler)
+        for (const op of grupo.ops) await FacturacionModel.marcarAlCrear(op.id, req.body.paraFacturar, op.precio_alquiler, req.body.nroFactura)
         // Se geocodifica una sola vez; ubicar copia las coordenadas al resto del grupo.
         ubicarEnSegundoPlano(grupo.ops[0].id)
         const nros = grupo.ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')
@@ -219,7 +219,7 @@ const AlquileresController = {
         const neto = parseFloat(precio_alquiler) || 0
         const destinoTxt = textoDestino({ domicilio: domicilio_entrega, obra })
         // Para facturar: se cobra el neto + IVA
-        const monto = conIva(neto, await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, neto))
+        const monto = conIva(neto, await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, neto, req.body.nroFactura))
         await Tercero.guardarEnOp(result.id, tercero)
         await TransaccionesModel.crear({
           tipo: 'Alquiler', id_op_encabezado: result.id, nro_remito: result.nro_remito,
@@ -258,7 +258,7 @@ const AlquileresController = {
           observaciones, obra, fecha_inicio: fechaInicio,
           nro_remito: remitoLeido.nro,
         })
-        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler)
+        await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler, req.body.nroFactura)
         ubicarEnSegundoPlano(result.id)
         // El alquiler sigue abierto: el ingreso se genera al retirar el contenedor, una vez asignado el precio.
         req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4, '0')} cargado como en curso desde el ${fechaInicio}. ${AVISO_ASIGNAR_PRECIO}`)
@@ -290,7 +290,7 @@ const AlquileresController = {
           nro_remito: remitoLeido.nro,
         })
       }
-      await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler)
+      await require('../models/facturacion.model').marcarAlCrear(result.id, req.body.paraFacturar, precio_alquiler, req.body.nroFactura)
       ubicarEnSegundoPlano(result.id)
 
       req.flash('success', `Alquiler OP-${String(result.nro_op).padStart(4,'0')} ${esProgramado ? 'programado' : 'creado'}. ${AVISO_ASIGNAR_PRECIO}`)

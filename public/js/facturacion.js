@@ -82,7 +82,9 @@
     const sug = tipoSugerido($('fCond').value)
     if ([...$('fTipo').options].some(o => o.value === sug)) $('fTipo').value = sug
     $('fAlicuota').value = '21'
-    $('fNumero').value = ''
+    // El N° de Factura cargado con las operaciones viene puesto (si todas tienen el mismo)
+    const nros = [...new Set(checks.map(c => (c.dataset.nroFactura || '').trim()).filter(Boolean))]
+    $('fNumero').value = nros.length === 1 ? nros[0] : ''
     $('formFacturar').querySelector('input[name="modo"][value="manual"]').checked = true
     actualizarModo($('formFacturar'), 'camposManual', 'fNumero')
     actualizarPreview()

@@ -32,6 +32,7 @@ router.post('/marcar-varias',          auth, operativo, ctrl.marcarVarias)
 router.post('/quitar-varias',          auth, operativo, ctrl.quitarVarias)
 router.post('/:id/marcar',             auth, operativo, ctrl.marcar)
 router.post('/:id/quitar',             auth, operativo, ctrl.quitar)
+router.post('/:id/nro-factura',        auth, operativo, ctrl.nroFactura)
 router.post('/:id/revertir',           auth, contable,  ctrl.revertir)
 router.post('/:id/nota-credito',       auth, contable,  ctrl.notaCredito)
 
