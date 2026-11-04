@@ -2,16 +2,17 @@
 
             <%
                 const tipoCorto = { 'Venta Cantera':'Cantera', 'Venta Viaje':'Viaje', 'Alquiler':'Contenedor', 'Maquinaria':'Máquina', 'Ajuste':'Ajuste' }
-                const m = metricas || { total:0, count:0, ventas:0, alquileres:0 }
+                const metodoTexto = { efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque', echeq: 'Echeq', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor' }
+                const m = metricas || { entradas: 0, salidas: 0, neto: 0, aCuenta: 0, cantidad: 0, conteo: {} }
                 const money = (n) => '$' + Number(n||0).toLocaleString('es-AR')
-                const presetHref = (p) => {
-                    const o = { preset: p }
-                    if (filtros.tipo && filtros.tipo !== 'todos') o.tipo = filtros.tipo
-                    if (filtros.cliente) o.cliente = filtros.cliente
-                    if (filtros.remito) o.remito = filtros.remito
-                    if (filtros.nroOp) o.nroOp = filtros.nroOp
-                    return '/transacciones?' + new URLSearchParams(o).toString()
+                const puedeCorregir = ['dueno','admin_contable'].includes(user?.rol)
+                // Enlace que conserva los filtros y cambia los que se pasan
+                const conFiltros = (cambios) => {
+                    const o = Object.assign({}, filtros, cambios)
+                    const limpio = Object.entries(o).filter(([k, v]) => v !== '' && v != null && k !== 'sortBy' && k !== 'sortDir' && !(k === 'categoria' && v === 'todas'))
+                    return '/transacciones?' + new URLSearchParams(limpio).toString()
                 }
+                const presetHref = (p) => conFiltros({ preset: p, fechaDesde: '', fechaHasta: '', mes: '' })
                 // El reporte usa los mismos filtros que la tabla (sin la página ni el orden)
                 const qsReporte = new URLSearchParams(Object.entries(filtros).filter(([k, v]) => v !== '' && v != null && k !== 'sortBy' && k !== 'sortDir')).toString()
             %>
@@ -25,24 +26,35 @@
                        title="Reporte Excel con los filtros aplicados"><%- icon('download', { size: 14 }) %> Excel</a>
                 </div>
             </div>
+            <p class="mov-ayuda">Todo el movimiento de plata: lo que <strong>entra</strong> (ventas, alquileres, pagos de clientes) y lo que <strong>sale</strong> (sueldos, compras y gastos). La fecha de cada renglón es la <strong>fecha de pago</strong>.</p>
 
-            <!-- Métricas del período -->
+            <!-- Qué mostrar: un botón por tipo -->
+            <nav class="mov-chips" aria-label="Qué transacciones ver">
+                <% categorias.forEach(c => { const activa = (filtros.categoria || 'todas') === c.clave %>
+                    <a href="<%= conFiltros({ categoria: c.clave, page: '' }) %>" class="mov-chip <%= activa ? 'is-active' : '' %>" <%= activa ? 'aria-current=true' : '' %>>
+                        <span><%= c.etiqueta %></span>
+                        <span class="mov-chip__n"><%= (m.conteo || {})[c.clave] || 0 %></span>
+                    </a>
+                <% }) %>
+            </nav>
+
+            <!-- Métricas de lo que se está viendo -->
             <div class="stat-cards">
+                <div class="stat-card stat-card--success">
+                    <div class="stat-card__icon"><%- icon('arrowDown', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.entradas) %></span><span class="stat-card__label">Entró · <%= periodoLabel %></span></div>
+                </div>
+                <div class="stat-card stat-card--danger">
+                    <div class="stat-card__icon"><%- icon('arrowUp', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.salidas) %></span><span class="stat-card__label">Salió · <%= periodoLabel %></span></div>
+                </div>
                 <div class="stat-card stat-card--neutral">
                     <div class="stat-card__icon"><%- icon('chart', { size: 20 }) %></div>
-                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.total) %></span><span class="stat-card__label">Total · <%= periodoLabel %></span></div>
-                </div>
-                <div class="stat-card stat-card--info">
-                    <div class="stat-card__icon"><%- icon('clipboard', { size: 20 }) %></div>
-                    <div class="stat-card__body"><span class="stat-card__value"><%= m.count %></span><span class="stat-card__label">Operaciones</span></div>
-                </div>
-                <div class="stat-card stat-card--success">
-                    <div class="stat-card__icon"><%- icon('box', { size: 20 }) %></div>
-                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.ventas) %></span><span class="stat-card__label">Ventas</span></div>
+                    <div class="stat-card__body"><span class="stat-card__value <%= m.neto < 0 ? 'text-danger' : '' %>"><%= m.neto < 0 ? '−' + money(Math.abs(m.neto)) : money(m.neto) %></span><span class="stat-card__label">Neto (entró − salió)</span></div>
                 </div>
                 <div class="stat-card stat-card--warning">
-                    <div class="stat-card__icon"><%- icon('truck', { size: 20 }) %></div>
-                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.alquileres) %></span><span class="stat-card__label">Alquileres</span></div>
+                    <div class="stat-card__icon"><%- icon('clipboard', { size: 20 }) %></div>
+                    <div class="stat-card__body"><span class="stat-card__value"><%= money(m.aCuenta) %></span><span class="stat-card__label" title="Ventas y alquileres a cuenta corriente: no es plata cobrada. Cuando el cliente paga, aparece en Pagos de clientes.">Vendido a cuenta corriente</span></div>
                 </div>
             </div>
 
@@ -56,21 +68,12 @@
             <!-- Filtros -->
             <form method="GET" action="/transacciones" class="filtros-bar filtros-bar--extended">
                 <input type="hidden" name="preset" value="rango">
+                <% if (filtros.categoria && filtros.categoria !== 'todas') { %><input type="hidden" name="categoria" value="<%= filtros.categoria %>"><% } %>
+                <% if (filtros.tipo && filtros.tipo !== 'todos') { %><input type="hidden" name="tipo" value="<%= filtros.tipo %>"><% } %>
                 <div class="filtro-group">
-                    <label>Tipo</label>
-                    <select name="tipo">
-                        <option value="todos" <%=filtros.tipo==='todos' || !filtros.tipo ? 'selected' : '' %>>Todos
-                        </option>
-                        <% tipos.forEach(t=> { %>
-                            <option value="<%= t %>" <%=filtros.tipo===t ? 'selected' : '' %>><%= t %>
-                            </option>
-                            <% }) %>
-                    </select>
-                </div>
-                <div class="filtro-group">
-                    <label>Cliente</label>
+                    <label>Cliente / persona</label>
                     <input type="text" name="cliente" value="<%= filtros.cliente %>" list="listaClientesTx"
-                        placeholder="Buscar por nombre / apellido / DNI..." autocomplete="off">
+                        placeholder="Nombre del cliente, empleado o proveedor..." autocomplete="off">
                     <datalist id="listaClientesTx">
                         <% (clientesLista || []).forEach(c => { %>
                             <option value="<%= [c.nombre, c.apellido].filter(Boolean).join(' ') %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
@@ -88,11 +91,11 @@
                         placeholder="Ej: 308 u OP-0308" autocomplete="off">
                 </div>
                 <div class="filtro-group">
-                    <label>Desde</label>
+                    <label>Pagado desde</label>
                     <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde %>">
                 </div>
                 <div class="filtro-group">
-                    <label>Hasta</label>
+                    <label>Pagado hasta</label>
                     <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta %>">
                 </div>
                 <div class="filtro-group">
@@ -113,72 +116,89 @@
                     <thead>
                         <tr>
                             <th>Código</th>
+                            <th>Fecha de pago</th>
                             <th>Tipo</th>
-                            <th>Cliente</th>
+                            <th>Cliente / persona</th>
                             <th>Descripción</th>
-                            <th>Fecha</th>
-                            <th>Monto</th>
+                            <th>Método</th>
+                            <th class="text-end">Monto</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
-                        <% if (transacciones.length===0) { %>
+                        <% if (movimientos.length === 0) { %>
                             <tr>
-                                <td colspan="7" class="td-vacia">No hay transacciones que coincidan con los filtros</td>
+                                <td colspan="8" class="td-vacia">No hay transacciones que coincidan con los filtros</td>
                             </tr>
-                            <% } %>
-                                <% transacciones.forEach(t=> {
-                                    const sinSaldar = t.metodo_pago === 'cuenta_corriente' && t.saldada === false
-                                %>
-                                    <tr class="<%= sinSaldar ? 'venta-cc-pendiente' : '' %>" <%= sinSaldar ? 'title="Venta a cuenta corriente — todavía no se saldó"' : '' %>>
-                                        <td class="fw-semibold text-orange"><%= codigoTx(t) %>
-                                        </td>
-                                        <td>
-                                            <span
-                                                class="badge badge--tipo-<%= t.tipo.toLowerCase().replace(/ /g,'-') %>">
-                                                <%= tipoCorto[t.tipo] || t.tipo %>
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <%= t.cliente %>
-                                        </td>
-                                        <td>
-                                            <%= t.descripcion %>
-                                        </td>
-                                        <td>
-                                            <%= formatFecha(t.fecha) %>
-                                        </td>
-                                        <td class="transaccion-monto">$<%= t.monto?.toLocaleString('es-AR') %>
-                                            <% if (sinSaldar) { %>
-                                                <div><span class="badge rounded-pill px-2 py-1 badge-pendiente" style="font-size:0.62rem;white-space:nowrap">Sin saldar</span></div>
-                                            <% } %>
-                                        </td>
-                                        <td class="td-acciones">
-                                            <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
-                                                data-real-id="<%= t.id %>"
-                                                data-id="<%= codigoTx(t) %>" data-tipo="<%= t.tipo %>"
-                                                data-cliente="<%= t.cliente %>" data-cliente-id="<%= t.cliente_id || '' %>"
-                                                data-descripcion="<%= t.descripcion %>"
-                                                data-fecha="<%= formatFecha(t.fecha) %>" data-monto="<%= t.monto %>"
-                                                data-metodo-pago="<%= t.metodo_pago || '' %>"
-                                                data-op-id="<%= t.id_op_encabezado || '' %>"
-                                                data-nro-remito="<%= t.nro_remito || '' %>"
-                                                data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
-                                                Ver
+                        <% } %>
+                        <% movimientos.forEach(t => {
+                            const esTx = t.origen === 'transaccion'
+                            const sinSaldar = esTx && t.metodo_pago === 'cuenta_corriente' && t.saldada === false
+                            const cargadoOtroDia = t.cargado_en && String(t.cargado_en).slice(0, 10) !== String(t.fecha || '').slice(0, 10)
+                            const tipoTxt = esTx ? (tipoCorto[t.tipo] || t.tipo) : (t.origen === 'pago_cliente' ? 'Pago de cliente' : t.tipo)
+                            const tipoCls = esTx ? 'badge--tipo-' + t.tipo.toLowerCase().replace(/ /g, '-')
+                                          : (t.origen === 'pago_cliente' ? 'mov-badge mov-badge--pago' : (t.categoria === 'sueldos' ? 'mov-badge mov-badge--sueldo' : 'mov-badge mov-badge--egreso'))
+                        %>
+                            <tr class="<%= sinSaldar ? 'venta-cc-pendiente' : '' %>" <%= sinSaldar ? 'title="Venta a cuenta corriente — todavía no se saldó"' : '' %>>
+                                <td class="fw-semibold text-orange"><%= codigoMov(t) %></td>
+                                <td>
+                                    <%= formatFecha(t.fecha) %>
+                                    <% if (cargadoOtroDia) { %><div class="mov-cargado" title="Día en que se cargó en el sistema">Cargado el <%= formatFecha(t.cargado_en) %></div><% } %>
+                                </td>
+                                <td><span class="badge <%= tipoCls %>"><%= tipoTxt %></span></td>
+                                <td><%= t.persona %></td>
+                                <td>
+                                    <%= t.descripcion %>
+                                    <% if (t.es_tercero) { %><div class="mov-cargado">Pagado por un cliente con transferencia a tercero</div><% } %>
+                                </td>
+                                <td><small class="text-muted"><%= metodoTexto[t.metodo_pago] || t.metodo_pago || '—' %></small></td>
+                                <td class="transaccion-monto mov-monto mov-monto--<%= t.sentido %>">
+                                    <%= t.sentido === 'salida' ? '−' : (t.sentido === 'entrada' ? '+' : '') %><%= money(t.monto) %>
+                                    <div class="mov-sentido">
+                                        <% if (t.sentido === 'entrada') { %>Entró<% } else if (t.sentido === 'salida') { %>Salió<% } else { %>A cuenta corriente<% } %>
+                                    </div>
+                                    <% if (sinSaldar) { %>
+                                        <div><span class="badge rounded-pill px-2 py-1 badge-pendiente" style="font-size:0.62rem;white-space:nowrap">Sin saldar</span></div>
+                                    <% } %>
+                                </td>
+                                <td class="td-acciones">
+                                    <% if (esTx) { %>
+                                        <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
+                                            data-real-id="<%= t.id %>"
+                                            data-id="<%= codigoMov(t) %>" data-tipo="<%= t.tipo %>"
+                                            data-cliente="<%= t.persona %>" data-cliente-id="<%= t.cliente_id || '' %>"
+                                            data-descripcion="<%= t.descripcion %>"
+                                            data-fecha="<%= formatFecha(t.fecha) %>" data-fecha-iso="<%= String(t.fecha || '').slice(0, 10) %>"
+                                            data-cargado="<%= formatFechaHora(t.cargado_en) %>"
+                                            data-monto="<%= t.monto %>"
+                                            data-metodo-pago="<%= t.metodo_pago || '' %>"
+                                            data-op-id="<%= t.id_op_encabezado || '' %>"
+                                            data-nro-remito="<%= t.nro_remito || '' %>"
+                                            data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
+                                            Ver
+                                        </button>
+                                        <% if (puedeCorregir) { %>
+                                            <button type="button" class="btn-secondary btn-sm btn-borrar-transaccion"
+                                                data-id="<%= t.id %>" data-codigo="<%= codigoMov(t) %>"
+                                                data-cliente="<%= t.persona %>"
+                                                data-monto="<%= money(t.monto) %>"
+                                                data-tiene-op="<%= t.id_op_encabezado ? '1' : '' %>"
+                                                title="Eliminar">
+                                                <%- icon('trash', { size: 14 }) %>
                                             </button>
-                                            <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
-                                                <button type="button" class="btn-secondary btn-sm btn-borrar-transaccion"
-                                                    data-id="<%= t.id %>" data-codigo="<%= codigoTx(t) %>"
-                                                    data-cliente="<%= t.cliente %>"
-                                                    data-monto="$<%= t.monto?.toLocaleString('es-AR') %>"
-                                                    data-tiene-op="<%= t.id_op_encabezado ? '1' : '' %>"
-                                                    title="Eliminar">
-                                                    <%- icon('trash', { size: 14 }) %>
-                                                </button>
-                                            <% } %>
-                                        </td>
-                                    </tr>
-                                    <% }) %>
+                                        <% } %>
+                                    <% } else if (t.origen === 'pago_cliente') { %>
+                                        <a href="/clientes/cuentas/<%= t.cliente_id %>" class="btn-secondary btn-sm" title="Ver la cuenta corriente del cliente">Ver cuenta</a>
+                                    <% } else { %>
+                                        <% if (t.id_pago_empleado) { %>
+                                            <a href="/compras/recibo/<%= t.id_pago_empleado %>" class="btn-secondary btn-sm" target="_blank" rel="noopener">Recibo</a>
+                                        <% } %>
+                                        <a href="/compras?<%= new URLSearchParams(Object.assign({ preset: 'rango', fechaDesde: String(t.fecha).slice(0, 10), fechaHasta: String(t.fecha).slice(0, 10), categoria: t.categoria_egreso || '' }, t.id_empleado ? { empleado: t.id_empleado } : {})).toString() %>"
+                                           class="btn-secondary btn-sm" title="Ver en Compras / Pagos">Ver</a>
+                                    <% } %>
+                                </td>
+                            </tr>
+                        <% }) %>
                     </tbody>
                 </table>
             </div>
@@ -230,20 +250,36 @@
                             <span class="tx-row__label">Cliente</span>
                             <span class="tx-row__value" id="modal-t-cliente"></span>
                         </div>
+                        <div class="tx-row" id="filaFechaPago">
+                            <span class="tx-row__label" id="modal-t-fecha-label">Fecha de pago</span>
+                            <span class="tx-row__value">
+                                <span id="modal-t-fecha"></span>
+                                <% if (puedeCorregir) { %>
+                                    <button type="button" class="tx-link-btn" id="btnEditarFechaPago">Corregir</button>
+                                <% } %>
+                            </span>
+                        </div>
+                        <% if (puedeCorregir) { %>
+                        <form id="formFechaPago" method="POST" class="tx-metodo-edit" style="display:none">
+                            <input type="date" name="fecha" id="inputFechaPagoEdit" max="<%= hoyISO() %>" required aria-label="Fecha de pago">
+                            <button type="submit" class="btn-secondary btn-sm">Guardar</button>
+                            <button type="button" class="btn-secondary btn-sm" id="btnCancelarFechaPago">Cancelar</button>
+                        </form>
+                        <% } %>
                         <div class="tx-row">
-                            <span class="tx-row__label">Fecha</span>
-                            <span class="tx-row__value" id="modal-t-fecha"></span>
+                            <span class="tx-row__label">Cargado el</span>
+                            <span class="tx-row__value" id="modal-t-cargado"></span>
                         </div>
                         <div class="tx-row" id="filaMetodoPago">
                             <span class="tx-row__label">Método de pago</span>
                             <span class="tx-row__value">
                                 <span class="tx-pago" id="modal-t-metodo-pago"></span>
-                                <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
+                                <% if (puedeCorregir) { %>
                                     <button type="button" class="tx-link-btn" id="btnEditarMetodoPago">Corregir</button>
                                 <% } %>
                             </span>
                         </div>
-                        <% if (['dueno','admin_contable'].includes(user?.rol)) { %>
+                        <% if (puedeCorregir) { %>
                         <form id="formMetodoPago" method="POST" class="tx-metodo-edit" style="display:none">
                             <select name="metodo_pago" id="selectMetodoPagoEdit" data-tercero>
                                 <option value="efectivo">Efectivo</option>

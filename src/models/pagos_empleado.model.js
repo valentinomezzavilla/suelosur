@@ -31,16 +31,45 @@ const PagosEmpleadoModel = {
   TIPO_LABEL,
   sueldoEstablecido,
 
+  // Pagos del empleado, con su origen: cargado a mano (ficha o Compras) o pagado por un
+  // cliente con una transferencia a tercero (pagado_por = cliente, ref = OP / remito).
   async listar(id_empleado, { desde, hasta, tipo } = {}) {
-    const wheres = ['id_empleado = ?']
+    const wheres = ['p.id_empleado = ?']
     const params = [id_empleado]
-    if (desde) { wheres.push('fecha >= ?'); params.push(desde) }
-    if (hasta) { wheres.push('fecha <= ?'); params.push(hasta) }
-    if (tipo)  { wheres.push('tipo = ?');  params.push(tipo) }
+    if (desde) { wheres.push('p.fecha >= ?'); params.push(desde) }
+    if (hasta) { wheres.push('p.fecha <= ?'); params.push(hasta) }
+    if (tipo)  { wheres.push('p.tipo = ?');  params.push(tipo) }
     return (await query(`
-      SELECT * FROM pagos_empleado WHERE ${wheres.join(' AND ')}
-      ORDER BY fecha DESC, created_at DESC
+      SELECT p.*, e.origen AS egreso_origen, (e.origen = 'tercero') AS de_tercero,
+             COALESCE(NULLIF(t.cliente, ''), NULLIF(TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')), '')) AS pagado_por,
+             COALESCE(t.cliente_id, mc.cliente_id) AS pagado_por_id,
+             op.nro_op AS pagado_nro_op, op.nro_remito AS pagado_nro_remito
+      FROM pagos_empleado p
+      LEFT JOIN LATERAL (
+        SELECT * FROM egresos eg WHERE eg.id_pago_empleado = p.id OR eg.id = p.id_egreso ORDER BY eg.id LIMIT 1
+      ) e ON TRUE
+      LEFT JOIN transacciones t ON t.id = e.id_transaccion
+      LEFT JOIN movimientos_cuenta mc ON mc.id = e.id_movimiento_cuenta
+      LEFT JOIN clientes c ON c.id = mc.cliente_id
+      LEFT JOIN op_encabezado op ON op.id = COALESCE(e.id_op_encabezado, t.id_op_encabezado)
+      WHERE ${wheres.join(' AND ')}
+      ORDER BY p.fecha DESC, p.created_at DESC
     `, params)).rows
+  },
+
+  // Sueldos de un mes ('AAAA-MM') de todos los empleados: { [id_empleado]: { sueldo, otros } }
+  // (ver utils/sueldos: qué cuenta como sueldo y a qué mes pertenece cada pago)
+  async delMes(mes) {
+    const { totalesDelMes } = require('../utils/sueldos')
+    const rows = (await query(`
+      SELECT id_empleado, tipo, COALESCE(SUM(monto), 0)::float8 AS total
+      FROM pagos_empleado
+      WHERE COALESCE(NULLIF(periodo, ''), LEFT(fecha, 7)) = ?
+      GROUP BY id_empleado, tipo
+    `, [mes])).rows
+    const porEmpleado = {}
+    rows.forEach(r => (porEmpleado[r.id_empleado] ||= []).push(r))
+    return Object.fromEntries(Object.entries(porEmpleado).map(([id, filas]) => [id, totalesDelMes(filas)]))
   },
 
   // Un pago con los datos del empleado que necesita el recibo
@@ -143,6 +172,13 @@ const PagosEmpleadoModel = {
       const p = (await q(`SELECT id, id_egreso, id_empleado FROM pagos_empleado WHERE id = ?`, [id])).rows[0]
       if (!p) return
       if (id_empleado != null && String(p.id_empleado) !== String(id_empleado)) return
+      // Lo pagó un cliente con una transferencia a tercero: es parte de ese cobro. Borrarlo
+      // solo acá dejaría el cobro del cliente sin su contraparte; se deshace desde el cobro.
+      const deTercero = (await q(`SELECT 1 FROM egresos WHERE (id_pago_empleado = ? OR id = ?) AND origen = 'tercero' LIMIT 1`,
+        [id, p.id_egreso || 0])).rows[0]
+      if (deTercero) {
+        throw new Error('Este pago lo hizo un cliente con una transferencia: no se borra desde acá. Para deshacerlo, corregí o anulá el cobro del cliente (en Transacciones o en su cuenta corriente).')
+      }
       await q(`DELETE FROM egresos WHERE id_pago_empleado = ?`, [id])
       if (p.id_egreso) await q(`DELETE FROM egresos WHERE id = ?`, [p.id_egreso])
       await q(`DELETE FROM pagos_empleado WHERE id = ?`, [id])

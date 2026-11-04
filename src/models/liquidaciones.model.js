@@ -14,8 +14,9 @@ const { fmtFecha } = require('../utils/fecha')
 const L = require('../utils/liquidaciones')
 const { ivaDe, conIva, etiqueta: etiquetaIva } = require('../utils/iva')
 
-// Fecha de la operación: la de entrega planificada; si falta, la de emisión (= Libro de ventas)
-const FECHA = `LEFT(COALESCE(op.fecha_entrega_planificada, op.fecha_emision), 10)`
+// Fecha de la operación: regla única del sistema (venta = fecha de compra; alquiler = inicio).
+// La misma que usan la cuenta corriente y el Libro de ventas: ver utils/fechaOperacion.
+const { SQL_FECHA_OPERACION: FECHA } = require('../utils/fechaOperacion')
 const TIPO_OP = { cantera: 'M', viaje: 'M', contenedor: 'C', maquinaria: 'MA' }
 
 async function operacionesBase({ clienteId, desde, hasta, tipos, opIds, conAnuladas = false }) {
@@ -196,7 +197,12 @@ const LiquidacionesModel = {
       return op
     })
     L.repartirGrupos(ops)
-    ops.forEach(o => { delete o._sinRegistroPago; delete o._pagadoGrupo; delete o._totalGrupo })
+    // ¿La operación ya está en la cuenta corriente (tiene su cargo, propio o el del grupo)?
+    const gruposConCargo = new Set(ops.filter(o => o.metodo_pago === 'cuenta_corriente' && cc[o.id] && o.id_grupo != null).map(o => String(o.id_grupo)))
+    ops.forEach(o => {
+      o.enCuenta = o.metodo_pago === 'cuenta_corriente' && (!!cc[o.id] || (o.grupoTodoJunto && gruposConCargo.has(String(o.id_grupo))))
+      delete o._sinRegistroPago; delete o._pagadoGrupo; delete o._totalGrupo
+    })
     ops = L.filtrarPorEstado(ops, estadoPago)
 
     const fichas = await datosClientes(clienteId ? [clienteId] : [...new Set(ops.map(o => o.id_cliente))])
@@ -216,8 +222,29 @@ const LiquidacionesModel = {
         porObra: !obraElegida && porObra.length > 1 ? porObra.map(o => ({ nombre: o.nombre, resumen: o.resumen })) : [],
       })
     }
-    return { clientes, resumen: L.resumir(ops), obra: obraElegida ? obraElegida.nombre : null }
+    // Con un cliente y sin obra: cómo se pasa del saldo de esta liquidación a la deuda de su cuenta
+    const conciliacion = clienteId && !obraElegida ? await conciliacionCuenta(clienteId, ops, { desde, hasta }) : null
+    return { clientes, resumen: L.resumir(ops), obra: obraElegida ? obraElegida.nombre : null, conciliacion }
   },
+}
+
+// Datos para L.conciliarConCuenta: la imputación de la cuenta del cliente (la misma que
+// usan Cuenta corriente y esta liquidación), con la fecha y el grupo de la OP de cada cargo.
+async function conciliacionCuenta(clienteId, ops, { desde, hasta }) {
+  const { imputar } = require('../utils/imputacion')
+  const { fechaDeOperacion } = require('../utils/fechaOperacion')
+  const cliente = (await query(`SELECT saldo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+  const { cargos, aFavor } = imputar(await ClientesModel.movimientosParaImputar([clienteId]))
+  const idsOp = [...new Set(Object.values(cargos).map(c => c.idOp).filter(Boolean).map(Number))]
+  const datosOp = idsOp.length ? Object.fromEntries((await query(
+    `SELECT id, tipo_op, fecha_emision, fecha_entrega_planificada, id_grupo FROM op_encabezado WHERE id = ANY(?::bigint[])`, [idsOp]
+  )).rows.map(r => [String(r.id), r])) : {}
+  for (const c of Object.values(cargos)) {
+    const op = c.idOp ? datosOp[String(c.idOp)] : null
+    c.fechaOp = op ? fechaDeOperacion(op) : null
+    c.grupo = op ? op.id_grupo : null
+  }
+  return L.conciliarConCuenta({ cargos, aFavor, ops, desde, hasta, saldoCuenta: cliente ? cliente.saldo : 0 })
 }
 
 module.exports = LiquidacionesModel

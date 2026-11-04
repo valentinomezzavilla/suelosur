@@ -67,6 +67,35 @@
   <div class="liq-resumen__caja"><span>Operaciones</span><strong><%= r.cantidad %></strong></div>
 </div>
 
+<%# Relación con la cuenta corriente: de dónde sale la diferencia entre los dos números %>
+<% if (conCliente && liquidacion.conciliacion) {
+     const cc = liquidacion.conciliacion
+     const textoCuenta = cc.deudaCuenta > 0.005 ? 'Debe ' + $(cc.deudaCuenta) : (cc.deudaCuenta < -0.005 ? 'A favor ' + $(Math.abs(cc.deudaCuenta)) : 'Al día')
+     const idCli = liquidacion.clientes[0] && liquidacion.clientes[0].cliente ? liquidacion.clientes[0].cliente.id : filtros.clienteId
+%>
+  <div class="card shadow-sm mb-3 liq-conciliacion">
+    <div class="card-body">
+      <% if (cc.coincide) { %>
+        <p class="mb-0"><strong>Coincide con la cuenta corriente:</strong> <%= textoCuenta %>.
+          <a href="/clientes/cuentas/<%= idCli %>" class="ms-1">Ver cuenta corriente →</a></p>
+      <% } else { %>
+        <h6 class="fw-bold mb-1">¿Por qué este saldo no es igual al de la cuenta corriente?</h6>
+        <p class="text-muted small mb-2">Esta liquidación muestra lo que el cliente consumió en el período, pagado de cualquier forma. La cuenta corriente muestra toda su deuda acumulada. Los dos incluyen todos los pagos registrados hasta hoy.</p>
+        <table class="table table-sm mb-0 liq-conciliacion__tabla">
+          <tbody>
+            <tr><td>Saldo pendiente de esta liquidación</td><td class="text-end fw-semibold"><%= $(cc.saldoLiquidacion) %></td></tr>
+            <% cc.renglones.forEach(x => { %>
+              <tr><td><%= x.signo < 0 ? 'Menos' : 'Más' %>: <%= x.texto %></td><td class="text-end <%= x.signo < 0 ? 'text-success' : 'text-danger' %>"><%= x.signo < 0 ? '−' : '+' %> <%= $(x.importe) %></td></tr>
+            <% }) %>
+            <tr class="fw-bold"><td>Cuenta corriente hoy</td><td class="text-end"><%= textoCuenta %></td></tr>
+          </tbody>
+        </table>
+        <a href="/clientes/cuentas/<%= idCli %>" class="small">Ver cuenta corriente →</a>
+      <% } %>
+    </div>
+  </div>
+<% } %>
+
 <% if (!r.cantidad) { %>
   <div class="card shadow-sm"><div class="card-body text-center text-muted py-5">Sin operaciones en el período.</div></div>
 <% } else if (conCliente) { %>

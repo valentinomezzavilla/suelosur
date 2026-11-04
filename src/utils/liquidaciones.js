@@ -115,6 +115,57 @@ function agruparPor(ops, claveFn, nombreFn) {
     .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'))
 }
 
+// ── Relación con la cuenta corriente ────────────────────────────────
+// La Liquidación muestra lo que el cliente consumió en el período (todas las formas de pago)
+// y la Cuenta corriente, la deuda acumulada de la cuenta. Esto explica, renglón por renglón,
+// cómo se pasa de un número al otro (los dos "a hoy": con todos los pagos registrados).
+//
+//  cargos:   imputar(...).cargos del cliente, cada uno con fechaOp y grupo (id_grupo) de su OP
+//  aFavor:   saldo a favor sin usar (imputar(...).aFavor)
+//  ops:      operaciones que muestra la liquidación (con enCuenta, metodo_pago, resta, estado)
+//  saldoCuenta: clientes.saldo (negativo = debe)
+function conciliarConCuenta({ cargos, aFavor = 0, ops, desde, hasta, saldoCuenta }) {
+  const mostradas = new Set(ops.map(o => String(o.id)))
+  const grupos = new Set(ops.filter(o => o.grupoTodoJunto && o.id_grupo != null).map(o => String(o.id_grupo)))
+  const suma = (lista) => redondear(lista.reduce((s, o) => s + (Number(o.resta) || 0), 0))
+  const cuentan = ops.filter(o => o.estado !== 'a_convenir')
+
+  const saldoLiquidacion = suma(cuentan)
+  const enCuentaMostrado = suma(cuentan.filter(o => o.enCuenta))
+  const contadoSinCobrar = suma(cuentan.filter(o => !o.enCuenta && o.metodo_pago !== 'cuenta_corriente'))
+  const enCursoSinCargo  = suma(cuentan.filter(o => !o.enCuenta && o.metodo_pago === 'cuenta_corriente'))
+
+  let incluidos = 0, anteriores = 0, posteriores = 0, filtradas = 0, manuales = 0
+  for (const c of Object.values(cargos || {})) {
+    const r = Number(c.restante) || 0
+    if (r <= CENTAVO / 2) continue
+    if (!c.idOp) manuales += r
+    else if (mostradas.has(String(c.idOp)) || (c.grupo != null && grupos.has(String(c.grupo)))) incluidos += r
+    else if (desde && c.fechaOp && c.fechaOp < desde) anteriores += r
+    else if (hasta && c.fechaOp && c.fechaOp > hasta) posteriores += r
+    else filtradas += r
+  }
+  const otras = redondear(incluidos - enCuentaMostrado)
+  const deudaMovimientos = redondear(enCuentaMostrado + otras + anteriores + posteriores + filtradas + manuales - aFavor)
+  const deudaCuenta = redondear(-(Number(saldoCuenta) || 0))
+  const sinExplicar = redondear(deudaCuenta - deudaMovimientos)
+
+  // Renglones: solo los que tienen importe (signo: + suma a la deuda, − resta)
+  const renglones = [
+    { clave: 'contado',     signo: -1, importe: contadoSinCobrar, texto: 'Operaciones de contado o a convenir todavía sin cobrar (no van a la cuenta corriente)' },
+    { clave: 'en_curso',    signo: -1, importe: enCursoSinCargo,  texto: 'Alquileres a cuenta corriente en curso (el cargo se genera al cerrarlos)' },
+    { clave: 'anteriores',  signo: 1,  importe: redondear(anteriores),  texto: `Deuda de operaciones anteriores al ${desde ? desde.split('-').reverse().join('/') : 'período'}` },
+    { clave: 'posteriores', signo: 1,  importe: redondear(posteriores), texto: `Deuda de operaciones posteriores al ${hasta ? hasta.split('-').reverse().join('/') : 'período'}` },
+    { clave: 'filtradas',   signo: 1,  importe: redondear(filtradas),   texto: 'Deuda de operaciones del período que no se muestran por los filtros elegidos' },
+    { clave: 'manuales',    signo: 1,  importe: redondear(manuales),    texto: 'Cargos cargados a mano en la cuenta corriente (sin operación)' },
+    { clave: 'otras',       signo: otras < 0 ? -1 : 1, importe: Math.abs(otras), texto: 'Diferencia por alquileres agrupados cobrados todo junto' },
+    { clave: 'a_favor',     signo: -1, importe: redondear(aFavor), texto: 'Pagos a favor todavía sin aplicar' },
+    { clave: 'sin_explicar', signo: sinExplicar < 0 ? -1 : 1, importe: Math.abs(sinExplicar), texto: 'Diferencia entre el saldo guardado de la cuenta y sus movimientos (avisar a sistemas)' },
+  ].filter(r => r.importe > CENTAVO)
+
+  return { saldoLiquidacion, deudaCuenta, renglones, coincide: Math.abs(deudaCuenta - saldoLiquidacion) <= CENTAVO }
+}
+
 function nroLiquidacion(hoy, clienteId) {
   const fecha = String(hoy).replace(/-/g, '')
   return `LIQ-${fecha}-${clienteId != null ? String(clienteId).padStart(4, '0') : 'GRAL'}`
@@ -128,5 +179,5 @@ function diasEntre(desde, hasta) {
 module.exports = {
   TIPOS, ESTADOS, METODOS,
   rangoMes, normalizarFiltros, tipoDeOperacion, estadoPago, repartirGrupos,
-  filtrarPorEstado, resumir, agruparPor, nroLiquidacion, diasEntre,
+  filtrarPorEstado, resumir, agruparPor, nroLiquidacion, diasEntre, conciliarConCuenta,
 }

@@ -33,6 +33,9 @@
         document.getElementById('formAbonar').action = `/clientes/${btn.dataset.id}/abonar`;
         // Transferencia a tercero: no arrastrar lo elegido en un abono anterior
         document.getElementById('inputMetodoAbonar')?.dispatchEvent(new Event('tercero:reset'));
+        // Fecha de pago: cada abono arranca en hoy (el máximo permitido)
+        const inputFecha = document.getElementById('inputFechaAbonar');
+        if (inputFecha && inputFecha.max) inputFecha.value = inputFecha.max;
         modalAbonar.style.display = 'flex';
         document.body.style.overflow = 'hidden';
         inputMonto.focus();

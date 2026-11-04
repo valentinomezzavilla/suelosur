@@ -21,8 +21,9 @@ describe('LiquidacionesModel.liquidacion', () => {
     admin = await datos.idAdministrativo()
     cliente = await datos.crearCliente({ cuentaCorriente: true })
     producto = (await prueba.q(`SELECT id FROM productos WHERE COALESCE(es_contenedor,0)=0 ORDER BY id LIMIT 1`)).rows[0].id
+    // La venta es del mes de su fecha de compra (regla única: utils/fechaOperacion)
     const base = { id_cliente: cliente, id_administrativo: admin, tipo_op: 'M', modalidad: 'flete',
-      fecha_entrega_planificada: '2026-10-05', domicilio: { calle: 'Colón', altura: '100' }, obra: null }
+      fecha_emision: '2026-10-05', fecha_entrega_planificada: '2026-10-05', domicilio: { calle: 'Colón', altura: '100' }, obra: null }
 
     // 1) Venta de contado cobrada: 1000 de producto + 200 de flete
     contado = (await VentasModel.crear({ ...base, metodo_pago: 'efectivo', precio_flete: 200, monto_total: 1200,

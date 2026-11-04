@@ -1662,6 +1662,12 @@ async function initDB() {
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado_por BIGINT`).catch(() => {})
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS anulado_motivo TEXT`).catch(() => {})
 
+  // Fecha de pago ≠ día de carga: created_at es la fecha del movimiento (un pago se puede
+  // cargar días después de hecho); registrado_en, el momento real en que se cargó. Se agrega
+  // sin default y después se pone el default: las filas viejas quedan en NULL (no se sabe).
+  await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS registrado_en TEXT`).catch(() => {})
+  await pool.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`).catch(() => {})
+
   console.log('✅ Base de datos PostgreSQL inicializada')
 }
 

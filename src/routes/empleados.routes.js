@@ -16,4 +16,9 @@ router.post('/:id/toggle',   auth, acceso, ctrl.toggleActivo)
 router.post('/:id/asignaciones',                   auth, acceso, ctrl.asignarRecurso)
 router.post('/:id/asignaciones/:asigId/finalizar', auth, acceso, ctrl.finalizarAsignacion)
 
+// Pagos y sueldos (los mismos de la ficha del chofer y de Compras / Pagos)
+router.post('/:id/pagos',                  auth, acceso, ctrl.registrarPago)
+router.get('/:id/pagos/:pagoId/recibo',    auth, acceso, require('../controllers/pagosEmpleado.controller').recibo)
+router.post('/:id/pagos/:pagoId/eliminar', auth, acceso, ctrl.eliminarPago)
+
 module.exports = router

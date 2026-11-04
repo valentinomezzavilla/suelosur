@@ -190,6 +190,7 @@
             <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
           </select>
         </div>
+        <%- include('../../partials/fecha_pago', { nombre: 'fecha', idCampo: 'inputFechaAbonar', metodoSel: '' }) %>
         <div class="modal-actions">
           <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
           <button type="submit" class="btn btn-success">Confirmar pago</button>

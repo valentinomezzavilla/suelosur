@@ -1,6 +1,7 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const { hoyISO } = require('../utils/fecha')
+const { leerFechaPago } = require('../utils/fechaPago')
 const { nombreClienteSQL } = require('../utils/nombreCliente')
 const { SQL_SIGUIENTE_NRO_OP } = require('../utils/numeracion')
 const FlotaModel = require('./flota.model')
@@ -226,6 +227,14 @@ const VentasModel = {
     const obra   = (datos.obra || '').trim() || null
     if (!calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
     const fecha  = datos.fecha || null
+    // Fecha de compra (define el mes de la venta). Si no vino, se conserva la actual.
+    let fechaCompra = null
+    if (datos.fechaCompra !== undefined && String(datos.fechaCompra).trim() !== '') {
+      const leida = leerFechaPago(datos.fechaCompra, { etiqueta: 'La fecha de compra' })
+      if (leida.error) throw new Error(leida.error)
+      fechaCompra = leida.fecha
+      if (fecha && String(fecha).slice(0, 10) < fechaCompra) throw new Error('La fecha de envío no puede ser anterior a la fecha de compra.')
+    }
     const hora   = datos.hora || null
     const zona   = datos.zona || null
     const metodoPago = datos.metodoPago || null
@@ -267,11 +276,12 @@ const VentasModel = {
         SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
             domicilio_calle = ?, domicilio_altura = ?, obra = ?,
             domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
-            observaciones = ?, precio_flete = ?, monto_total = ?
+            observaciones = ?, precio_flete = ?, monto_total = ?,
+            fecha_emision = COALESCE(?, fecha_emision)
         WHERE id = ?
-      `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, id])
-      // Cambió el total o el método: el cargo en cuenta corriente acompaña
-      await VentasModel.sincronizarCargoCC(id, q)
+      `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, fechaCompra, id])
+      // Cambió el total, el método o la fecha de compra: el cargo en cuenta corriente acompaña
+      await VentasModel.sincronizarCargoCC(id, q, { moverFecha: fechaCompra != null })
     })
   },
 
@@ -289,6 +299,7 @@ const VentasModel = {
       clienteNombre: op.cliente_nombre,
       telefono: op.tel_whatsapp || '',
       fecha: op.fecha_entrega_planificada || '',
+      fechaCompra: String(op.fecha_emision || '').slice(0, 10),
       hora: op.hora_planificada || '',
       zona: op.zona || '',
       calle: op.domicilio_calle || '',
@@ -410,7 +421,8 @@ const TIPOS_CARGO = Object.values(TIPO_CARGO_POR_METODO)
 // después de crear, editar, entregar, anular o cambiar el método de pago: deja el
 // cargo como corresponde (lo crea, ajusta el importe/cliente/tipo, o lo borra) y
 // mantiene clientes.saldo en línea. `q` permite correrlo dentro de una transacción abierta.
-VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
+// moverFecha: también lleva el cargo a la fecha de compra (al corregirla en la edición).
+VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha = false } = {}) {
   const op = (await q(`
     SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.metodo_pago, op.id_cliente, op.modalidad,
            op.obra, op.domicilio_calle, op.domicilio_altura, op.fecha_emision, op.observaciones,
@@ -424,7 +436,7 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
   // Cargos existentes de cualquiera de los dos tipos: si cambió el método de pago
   // (de cuenta corriente a saldo a favor o viceversa) el del tipo viejo queda obsoleto.
   const cargos = (await q(
-    `SELECT id, cliente_id, monto, tipo FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = ANY(?) ORDER BY id`,
+    `SELECT id, cliente_id, monto, tipo, created_at FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = ANY(?) ORDER BY id`,
     [idOp, TIPOS_CARGO]
   )).rows
   // Se conserva a lo sumo uno, del tipo que corresponde ahora; el resto son duplicados u obsoletos
@@ -447,7 +459,18 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
     ? `Venta Viaje ${nro}${destino ? ': ' + destino : ''}`
     : `Venta Cantera ${nro}${op.observaciones ? ': ' + String(op.observaciones).slice(0, 140) : ''}`) + sufijo
 
+  // El cargo va en la fecha de compra de la venta (regla única: utils/fechaOperacion)
+  const hoy = hoyISO()
+  const fecha = String(op.fecha_emision || '').slice(0, 10)
+  const createdAt = fecha && fecha < hoy ? `${fecha} 12:00:00` : null
+
   if (actual) {
+    // Se corrigió la fecha de compra (solo al editar la venta, no en la puesta en regla del
+    // arranque): el cargo se mueve a la fecha nueva, así cae en el mismo mes en todos lados.
+    if (moverFecha && fecha && fecha <= hoy && String(actual.created_at || '').slice(0, 10) !== fecha) {
+      await q(`UPDATE movimientos_cuenta SET created_at = COALESCE(?, ahora_local()) WHERE id = ?`, [createdAt, actual.id])
+      cambio = `cargo movido al ${fecha}`
+    }
     const cambioCliente = String(actual.cliente_id) !== String(op.id_cliente)
     if (cambioCliente || Math.abs(Number(actual.monto) - monto) > 0.005) {
       await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(actual.monto), actual.cliente_id])
@@ -458,10 +481,6 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query) {
     }
     return cambio
   }
-  // Venta cargada con fecha pasada: el cargo va en esa fecha (igual que su transacción)
-  const hoy = hoyISO()
-  const fecha = String(op.fecha_emision || '').slice(0, 10)
-  const createdAt = fecha && fecha < hoy ? `${fecha} 12:00:00` : null
   await q(`
     INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado, created_at)
     VALUES (?, ?, ?, ?, ?, COALESCE(?, ahora_local()))

@@ -291,6 +291,18 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     encabezado(titulo)
     ficha(c.cliente)
     tarjetasResumen(c.resumen)
+    // Si la deuda de la cuenta corriente no es la misma que el saldo del período, se aclara
+    // (incluye operaciones de otros períodos, cargos de la cuenta y pagos a favor)
+    const conc = liquidacion.conciliacion
+    if (conc && !conc.coincide) {
+      const d = conc.deudaCuenta
+      const texto = d > 0.005 ? `Deuda total de la cuenta corriente al ${fmtFecha(hoyISO())}: ${B.money(d)}`
+        : (d < -0.005 ? `Saldo a favor en la cuenta corriente al ${fmtFecha(hoyISO())}: ${B.money(-d)}` : `Cuenta corriente al día al ${fmtFecha(hoyISO())}`)
+      doc.fillColor(NEGRO).fontSize(9).font('Helvetica-Bold').text(texto, left, y, { width, lineBreak: false })
+      doc.fillColor(GRIS).fontSize(7.5).font('Helvetica')
+         .text('Incluye operaciones de otros períodos, cargos de la cuenta y pagos a favor; puede no coincidir con el saldo de esta liquidación.', left, y + 13, { width })
+      y += 34
+    }
     operaciones(c, titulo)
     resumenPorObra(c.porObra, titulo)
     pendiente(c.operaciones, titulo)
