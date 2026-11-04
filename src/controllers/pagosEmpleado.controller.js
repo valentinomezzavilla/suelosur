@@ -6,7 +6,9 @@ const { generarReciboPDF } = require('../utils/pdfRecibo')
 
 const PagosEmpleadoController = {
   async recibo(req, res) {
-    const back = req.params.id ? `/choferes/${req.params.id}?tab=pagos` : '/compras'
+    // Se llega desde la ficha del chofer, la de Flota de Personal o Compras / Pagos
+    const back = !req.params.id ? '/compras'
+      : (req.baseUrl === '/empleados' ? `/empleados/${req.params.id}#pagos` : `/choferes/${req.params.id}?tab=pagos`)
     try {
       const pago = await PagosEmpleadoModel.obtenerConEmpleado(req.params.pagoId)
       // Desde la ficha del chofer, el pago tiene que ser de ese chofer

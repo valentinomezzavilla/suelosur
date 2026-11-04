@@ -10,6 +10,8 @@ router.get('/', auth, roles('admin_ventas','admin_contable','dueno'), ctrl.index
 router.get('/export/:formato', auth, roles('admin_ventas','admin_contable','dueno'), ctrl.exportar)
 // Corregir método de pago mueve plata entre cuentas: solo para contable y dueño
 router.post('/:id/metodo-pago', auth, roles('admin_contable','dueno'), ctrl.cambiarMetodoPago)
+// Corregir la fecha de pago de un cobro: mismos permisos que corregir el método
+router.post('/:id/fecha-pago', auth, roles('admin_contable','dueno'), ctrl.cambiarFechaPago)
 // Borrar arrastra la operación entera: lo dejamos solo para contable y dueño
 router.post('/:id/eliminar', auth, roles('admin_contable','dueno'), ctrl.eliminar)
 

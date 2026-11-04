@@ -7,7 +7,11 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h4 class="fw-bold mb-0 text-dark-title"><%= nroFormato %></h4>
-    <small class="text-muted">Emitida el <%= formatFecha(op.fecha_emision) %> por <%= op.administrativo_nombre %></small>
+    <small class="text-muted">
+      Fecha de compra: <strong><%= formatFecha(op.fecha_emision) %></strong>
+      <% if (op.modalidad === 'flete' && op.fecha_entrega_planificada) { %> · Fecha de envío: <strong><%= formatFecha(op.fecha_entrega_planificada) %></strong><% } %>
+      · Cargada por <%= op.administrativo_nombre %>
+    </small>
   </div>
   <div class="d-flex gap-2 align-items-center">
     <span class="badge rounded-pill px-3 py-2 <%= badge %>"><%= op.estado %></span>
@@ -94,12 +98,15 @@
           <form action="/ventas/<%= op.id %>/despachar" method="POST">
             <button class="btn btn-naranja w-100"><%- icon('truck', { size: 16 }) %> Marcar como Despachada</button>
           </form>
-          <form action="/ventas/<%= op.id %>/entregar" method="POST">
-            <button class="btn btn-success w-100"><%- icon('checkCircle', { size: 16 }) %> Confirmar Entrega</button>
-          </form>
         <% } %>
-        <% if (op.estado === 'despachado') { %>
+        <% if (['pendiente','despachado'].includes(op.estado)) {
+             // Al confirmar la entrega se registra el cobro: si es de contado, con su fecha de pago
+             const cobraAhora = !['cuenta_corriente', 'saldo_a_favor', 'a_convenir'].includes(op.metodo_pago || 'efectivo')
+        %>
           <form action="/ventas/<%= op.id %>/entregar" method="POST">
+            <% if (cobraAhora) { %>
+              <%- include('../../partials/fecha_pago', { idCampo: 'fechaPagoEntrega', metodoSel: '' }) %>
+            <% } %>
             <button class="btn btn-success w-100"><%- icon('checkCircle', { size: 16 }) %> Confirmar Entrega</button>
           </form>
         <% } %>

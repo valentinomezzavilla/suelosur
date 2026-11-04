@@ -152,3 +152,11 @@
 
   </aside>
 </div>
+
+<!-- Pagos y sueldos: los de la ficha, los cargados en Compras / Pagos y los que pagó un
+     cliente con transferencia a tercero (todos quedan en el mismo registro) -->
+<section id="pagos" class="mt-4">
+  <h2 class="form-section__title" style="font-size:1rem">Pagos y sueldos</h2>
+  <p class="form-hint">Todo lo que se le pagó a <%= e.nombre %>: cargado acá, en Compras / Pagos, o pagado por un cliente con una transferencia. Cada pago aparece también en Transacciones → Sueldos.</p>
+  <%- include('../../partials/pagos_empleado', { base: `/empleados/${e.id}`, extra: '', empleado: e, pagos, resumenPagos, filtros, periodoLabel }) %>
+</section>

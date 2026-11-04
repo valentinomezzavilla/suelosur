@@ -241,6 +241,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (formObs) formObs.value = document.getElementById('obsCantera')?.value?.trim() || '';
         const formFecha = document.getElementById('formFecha');
         if (formFecha) formFecha.value = document.getElementById('fechaCantera')?.value || '';
+        // Fecha de pago: solo si el método se cobra en el momento (el campo está habilitado)
+        const fechaPago = document.getElementById('fechaPagoCantera');
+        const formFechaPago = document.getElementById('formFechaPago');
+        if (formFechaPago) {
+            const conPago = !!fechaPago && !fechaPago.disabled;
+            formFechaPago.disabled = !conPago;
+            formFechaPago.value = conPago ? (fechaPago.value || '') : '';
+        }
         const remitoInput = document.getElementById('remitoCantera');
         const formRemito = document.getElementById('formRemito');
         if (formRemito) formRemito.value = remitoInput?.value?.trim() || '';
@@ -263,6 +271,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // La fecha arranca en hoy pero se puede mover hacia atrás para cargar ventas viejas
     const fechaCantera = document.getElementById('fechaCantera');
     if (fechaCantera && !fechaCantera.value) { const d = new Date(), p = (n) => String(n).padStart(2, '0'); fechaCantera.value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; }
+    // Mientras no se toque a mano, la fecha de pago acompaña a la de la venta
+    // (cargar una venta de otro día sin acordarse del pago la dejaría en hoy)
+    const fechaPagoCantera = document.getElementById('fechaPagoCantera');
+    if (fechaCantera && fechaPagoCantera) {
+        let pagoTocado = false;
+        fechaPagoCantera.addEventListener('input', () => { pagoTocado = true; });
+        fechaCantera.addEventListener('change', () => { if (!pagoTocado && fechaCantera.value) fechaPagoCantera.value = fechaCantera.value; });
+    }
 
     renderCarrito();
 });

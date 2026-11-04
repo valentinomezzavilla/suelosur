@@ -28,7 +28,7 @@
     const cant = Number(e.cantidad) || 0
     const u = e.producto_unidad ? ' ' + e.producto_unidad : ''
     const filas = [
-      ['Fecha', formatFecha(e.fecha)],
+      ['Fecha de pago', formatFecha(e.fecha)],
       ['Categoría', catLabel(e.categoria)],
       ['Monto', money(e.monto)],
       ['Método de pago', METODO[e.metodo_pago] || e.metodo_pago],

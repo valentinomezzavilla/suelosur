@@ -223,7 +223,10 @@ const ChoferesController = {
   },
 
   async eliminarPago(req, res) {
-    try { await PagosModel.eliminar(req.params.pagoId, req.params.id) } catch (err) { console.error(err) }
+    try {
+      await PagosModel.eliminar(req.params.pagoId, req.params.id)
+      req.flash('success', 'Pago eliminado.')
+    } catch (err) { console.error(err); req.flash('error', err.message || 'No se pudo eliminar el pago.') }
     res.redirect(`/choferes/${req.params.id}?tab=pagos`)
   },
 

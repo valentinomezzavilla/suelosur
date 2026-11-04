@@ -38,14 +38,22 @@
 
                 <!-- Fecha y hora -->
                 <div class="form-section">
-                    <h3 class="form-section__title">Fecha y hora del viaje</h3>
+                    <h3 class="form-section__title">Fechas</h3>
                     <div class="form-row-2">
                         <div class="form-group">
-                            <label for="fechaViaje">Fecha *</label>
-                            <input type="date" name="fecha" id="fechaViaje" required>
+                            <label for="fechaCompraViaje">Fecha de compra *</label>
+                            <input type="date" name="fechaCompra" id="fechaCompraViaje" value="<%= hoyISO() %>" max="<%= hoyISO() %>" required>
+                            <p class="form-hint">El día en que el cliente hizo el pedido. Define a qué mes pertenece la venta.</p>
                         </div>
                         <div class="form-group">
-                            <label for="horaViaje">Hora</label>
+                            <label for="fechaViaje">Fecha de envío *</label>
+                            <input type="date" name="fecha" id="fechaViaje" required>
+                            <p class="form-hint">El día en que se lleva el material.</p>
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="horaViaje">Hora de envío</label>
                             <input type="time" name="hora" id="horaViaje">
                         </div>
                     </div>
@@ -225,6 +233,31 @@
                         </label>
                     </div>
                     <input type="hidden" name="finalizarAhora" id="inputFinalizarAhora" value="false">
+                    <!-- Fecha de pago: solo al finalizar ahora (el cobro se registra en este momento).
+                         Si se programa, se carga al confirmar la entrega. -->
+                    <div id="bloqueFechaPagoViaje" hidden>
+                        <%- include('../../partials/fecha_pago', { idCampo: 'fechaPagoViaje' }) %>
+                    </div>
+                    <script>
+                    (() => {
+                      const bloque = document.getElementById('bloqueFechaPagoViaje')
+                      const fin = document.getElementById('opFinalizar')
+                      const prog = document.getElementById('opProgramar')
+                      if (!bloque || !fin) return
+                      const aplicar = () => { bloque.hidden = !fin.checked }
+                      fin.addEventListener('change', aplicar)
+                      if (prog) prog.addEventListener('change', aplicar)
+                      aplicar()
+                      // Mientras no se toque a mano, la fecha de pago acompaña a la de compra
+                      const compra = document.getElementById('fechaCompraViaje')
+                      const pago = document.getElementById('fechaPagoViaje')
+                      if (compra && pago) {
+                        let tocado = false
+                        pago.addEventListener('input', () => { tocado = true })
+                        compra.addEventListener('change', () => { if (!tocado && compra.value) pago.value = compra.value })
+                      }
+                    })()
+                    </script>
                 </div>
 
                 <button type="submit" class="btn-finalizar" id="btnConfirmarViaje">Confirmar venta</button>

@@ -36,7 +36,8 @@ describe('marcar / quitar para facturar en grupo', () => {
   const venta = async (id_cliente, neto) => {
     const id = (await VentasModel.crear({
       id_cliente, id_administrativo: admin, tipo_op: 'M', modalidad: 'flete', metodo_pago: 'cuenta_corriente',
-      fecha_entrega_planificada: '2026-10-05', domicilio: { calle: 'Colón', altura: '100' }, obra: null,
+      // La venta es del mes de su fecha de compra (regla única: utils/fechaOperacion)
+      fecha_emision: '2026-10-05', fecha_entrega_planificada: '2026-10-05', domicilio: { calle: 'Colón', altura: '100' }, obra: null,
       precio_flete: 0, monto_total: neto, detalles: [{ id_producto: producto, cantidad_pedida: 1, precio_unitario: neto }],
     })).id
     await VentasModel.sincronizarCargoCC(id)

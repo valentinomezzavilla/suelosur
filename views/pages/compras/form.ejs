@@ -270,8 +270,9 @@
       <!-- Comunes -->
       <div class="row g-3 mb-3">
         <div class="col-md-4">
-          <label class="form-label">Fecha</label>
-          <input type="date" name="fecha" class="form-control" value="<%= ed ? String(ed.fecha || '').slice(0, 10) : hoyISO() %>">
+          <label class="form-label" for="fechaCompraPago">Fecha de pago</label>
+          <input type="date" name="fecha" id="fechaCompraPago" class="form-control" max="<%= hoyISO() %>" value="<%= ed ? String(ed.fecha || '').slice(0, 10) : hoyISO() %>">
+          <small class="text-muted">El día en que se pagó. Si se pagó antes de cargarlo, cambiala: el día de carga queda registrado aparte.</small>
         </div>
         <div class="col-md-4">
           <label class="form-label" id="lblMonto">Monto *</label>

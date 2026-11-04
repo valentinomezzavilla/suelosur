@@ -11,8 +11,9 @@ const { importesVenta } = require('./ventas.model')
 const { SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 const { ivaDe, etiqueta: etiquetaIva } = require('../utils/iva')
 
-// Fecha del renglón: la de entrega planificada; si falta, la de emisión.
-const FECHA = `COALESCE(op.fecha_entrega_planificada, op.fecha_emision)`
+// Fecha del renglón: regla única del sistema (venta = fecha de compra; alquiler = inicio),
+// la misma de la cuenta corriente y de Liquidaciones (utils/fechaOperacion).
+const { SQL_FECHA_OPERACION: FECHA } = require('../utils/fechaOperacion')
 
 const ReportesModel = {
 

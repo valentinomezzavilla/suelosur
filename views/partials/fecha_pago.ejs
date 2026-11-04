@@ -1,0 +1,44 @@
+<%#
+  Campo "Fecha de pago" (ver src/utils/fechaPago.js). Viene con la fecha de hoy; se cambia
+  solo si el cliente pagó otro día. No acepta fechas futuras.
+  Locals opcionales:
+    nombre    → name del input (por defecto "fechaPago")
+    idCampo   → id del input (por defecto "fechaPago")
+    valor     → fecha inicial AAAA-MM-DD (por defecto hoy)
+    metodoSel → selector del <select> de método de pago: el campo se oculta (y no se envía)
+                cuando el método no es un cobro en el momento (cuenta corriente, saldo a
+                favor, a convenir). Por defecto "#metodoPago". "" = siempre visible.
+    ayuda     → texto de ayuda
+%>
+<%
+  const _hoy = typeof hoyISO === 'function' ? hoyISO() : new Date().toISOString().slice(0, 10)
+  const _nombre = typeof nombre !== 'undefined' && nombre ? nombre : 'fechaPago'
+  const _id = typeof idCampo !== 'undefined' && idCampo ? idCampo : 'fechaPago'
+  const _valor = typeof valor !== 'undefined' && valor ? String(valor).slice(0, 10) : _hoy
+  const _metodoSel = typeof metodoSel !== 'undefined' ? metodoSel : '#metodoPago'
+  const _ayuda = typeof ayuda !== 'undefined' && ayuda ? ayuda : 'Si el cliente pagó otro día, cambiala. No puede ser una fecha futura.'
+%>
+<div class="form-group fecha-pago" id="<%= _id %>Grupo">
+    <label for="<%= _id %>">Fecha de pago</label>
+    <input type="date" name="<%= _nombre %>" id="<%= _id %>" class="form-control" value="<%= _valor %>" max="<%= _hoy %>" required>
+    <p class="form-hint"><%= _ayuda %></p>
+</div>
+<% if (_metodoSel) { %>
+<script>
+(() => {
+  // Sin cobro en el momento: no hay fecha de pago (el pago llega después, por la cuenta)
+  const SIN_COBRO = ['cuenta_corriente', 'saldo_a_favor', 'a_convenir']
+  const grupo = document.getElementById('<%= _id %>Grupo')
+  const input = document.getElementById('<%= _id %>')
+  const metodo = document.querySelector('<%= _metodoSel %>')
+  if (!grupo || !input || !metodo) return
+  const aplicar = () => {
+    const oculto = SIN_COBRO.includes(metodo.value)
+    grupo.hidden = oculto
+    input.disabled = oculto
+  }
+  metodo.addEventListener('change', aplicar)
+  aplicar()
+})()
+</script>
+<% } %>

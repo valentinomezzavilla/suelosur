@@ -8,6 +8,7 @@ const { etiquetaPeriodo } = require('../utils/periodos')
 const { generarTablaPDF } = require('../utils/pdfTabla')
 const { fmtFecha, hoyISO } = require('../utils/fecha')
 const { normalizarFiltros, TIPOS } = require('../utils/liquidaciones')
+const { leerFechaPago, fechaHoraDePago } = require('../utils/fechaPago')
 const { normalizarFiltrosCuentas, filtrarCuentas, coincideCliente, TIPOS_CLIENTE } = require('../utils/filtroCuentas')
 
 // Fecha YYYY-MM-DD válida, o null (lo mal formado se ignora)
@@ -17,14 +18,15 @@ const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.i
 // Movimiento de cuenta corriente. Si es un pago por transferencia a un tercero (ej. una
 // estación de servicio), el pago del cliente y el egreso al tercero son UN solo movimiento:
 // se guardan juntos en la misma transacción (o ninguno), y el pago dice a quién se le transfirió.
-async function registrarMovimientoCC(req, { tipo = 'pago', descripcion, monto, signed = monto, metodo_pago }, tercero) {
+// fechaDia: 'AAAA-MM-DD' (fecha de pago, ya validada); el egreso a tercero lleva la misma.
+async function registrarMovimientoCC(req, { tipo = 'pago', descripcion, monto, signed = monto, metodo_pago, fechaDia }, tercero) {
   const cli = tercero ? await ClientesModel.obtener(req.params.id) : null
   return transaction(async (q) => {
     const desc = tercero ? `${descripcion} — transferido a ${await Tercero.destino(tercero, q)}` : descripcion
-    const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago }, q)
+    const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago, fecha: fechaHoraDePago(fechaDia) }, q)
     if (tercero) {
       await Tercero.crearEgreso(tercero, {
-        monto, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
+        monto, fecha: fechaDia || null, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
         descripcion: `Transferencia de ${ClientesModel.nombreCompleto(cli)} a tercero (pago de cuenta corriente)`,
       }, q)
     }
@@ -160,8 +162,10 @@ const ClientesController = {
       if (clase === 'pago')       { tipo = 'pago';   signed =  m; desc = descripcion || 'Pago / abono de deuda' }
       else if (clase === 'cargo') { tipo = 'deuda';  signed = -m; desc = descripcion || 'Cargo manual' }
       else                        { tipo = 'ajuste'; signed = (signo === 'neg' ? -m : m); desc = descripcion || 'Ajuste de saldo' }
+      const fechaLeida = leerFechaPago(req.body.fecha, { etiqueta: clase === 'pago' ? 'La fecha de pago' : 'La fecha' })
+      if (fechaLeida.error) { req.flash('error', fechaLeida.error); return res.redirect(back) }
       const tercero = clase === 'pago' ? await Tercero.leer(req.body, req.body.metodo_pago) : null
-      await registrarMovimientoCC(req, { tipo, descripcion: desc, monto: m, signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null }, tercero)
+      await registrarMovimientoCC(req, { tipo, descripcion: desc, monto: m, signed, metodo_pago: clase === 'pago' ? (req.body.metodo_pago || null) : null, fechaDia: fechaLeida.fecha }, tercero)
       req.flash('success', 'Movimiento registrado.')
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error al registrar el movimiento.')
@@ -315,8 +319,10 @@ const ClientesController = {
       // referencia a esa operación; si no, queda el genérico de siempre.
       const concepto = (req.body.descripcion || '').trim()
       const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
+      const fechaLeida = leerFechaPago(req.body.fecha)
+      if (fechaLeida.error) { req.flash('error', fechaLeida.error); return res.redirect('back') }
       const tercero = await Tercero.leer(req.body, req.body.metodo_pago)
-      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null }, tercero)
+      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null, fechaDia: fechaLeida.fecha }, tercero)
       req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')

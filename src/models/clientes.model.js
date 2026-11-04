@@ -3,6 +3,8 @@ const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
 const { agruparObras, movimientoDeObra } = require('../utils/obras')
 const { hoyISO } = require('../utils/fecha')
+const { fechaDeOperacion } = require('../utils/fechaOperacion')
+const { imputar, porOperacion } = require('../utils/imputacion')
 
 // Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
 // En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
@@ -175,15 +177,17 @@ const ClientesModel = {
   async fechaCargoDeOperacion(idOp, q = query) {
     const op = (await q(`SELECT tipo_op, fecha_emision, fecha_entrega_planificada FROM op_encabezado WHERE id = ?`, [idOp])).rows[0]
     if (!op) return null
-    // Las ventas se fechan por su emisión (ver VentasModel.sincronizarCargoCC); el resto, como la Liquidación
-    const fecha = String((op.tipo_op === 'M' ? op.fecha_emision : (op.fecha_entrega_planificada || op.fecha_emision)) || '').slice(0, 10)
+    // Regla única (utils/fechaOperacion): venta = fecha de compra; alquiler = inicio
+    const fecha = fechaDeOperacion(op)
     return fecha && fecha < hoyISO() ? `${fecha} 12:00:00` : null
   },
 
   // `q` permite registrarlo dentro de una transacción (cobro de un alquiler agrupado).
-  // Un cargo o ajuste de una operación va en la fecha de la operación; un pago, en el momento.
-  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado }, q = query) {
-    const creadoEn = id_op_encabezado && tipo !== 'pago' ? await this.fechaCargoDeOperacion(id_op_encabezado, q) : null
+  // Un cargo o ajuste de una operación va en la fecha de la operación; un pago, en su fecha
+  // de pago (`fecha`, 'AAAA-MM-DD HH:MM:SS' de utils/fechaPago) o, sin ella, en el momento.
+  // El momento real de carga queda en registrado_en (default de la columna).
+  async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado, fecha }, q = query) {
+    const creadoEn = fecha || (id_op_encabezado && tipo !== 'pago' ? await this.fechaCargoDeOperacion(id_op_encabezado, q) : null)
     const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado, created_at) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local())) RETURNING id`,
       [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null, creadoEn])
     await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
@@ -216,58 +220,32 @@ const ClientesModel = {
   // deudas más antiguas del cliente, igual que ya refleja el saldo corrido de estadoCuenta().
   // Solo trae las operaciones que tienen cargo.
   async pagadoPorOperacion(opIds) {
-    const ids = [...new Set((opIds || []).filter(Boolean))]
+    const ids = [...new Set((opIds || []).filter(Boolean).map(String))]
     if (!ids.length) return {}
-    const ph = ids.map(() => '?').join(',')
-
     const clientesIds = (await query(
-      `SELECT DISTINCT cliente_id FROM movimientos_cuenta WHERE id_op_encabezado IN (${ph})`, ids
+      `SELECT DISTINCT cliente_id FROM movimientos_cuenta WHERE id_op_encabezado = ANY(?::bigint[])`, [ids.map(Number)]
     )).rows.map(r => r.cliente_id)
     if (!clientesIds.length) return {}
 
-    const movs = (await query(
-      `SELECT cliente_id, id_op_encabezado, monto, tipo FROM movimientos_cuenta
-       WHERE cliente_id IN (${clientesIds.map(() => '?').join(',')}) AND COALESCE(anulado, 0) = 0
-       ORDER BY cliente_id, created_at ASC, id ASC`,
-      clientesIds
-    )).rows
-
-    const deudas = {} // id_op_encabezado -> { total, pagado }
-    let clienteActual = null
-    let cola = [] // deudas abiertas del cliente actual, más vieja primero
-    for (const m of movs) {
-      if (m.cliente_id !== clienteActual) { clienteActual = m.cliente_id; cola = [] }
-      const monto = Number(m.monto)
-      // 'uso_saldo_favor' se paga en el momento con crédito ya acumulado: no es una
-      // deuda pendiente, así que no entra en la cola (si entrara, quedaría esperando
-      // para siempre un pago futuro que no va a llegar).
-      if (monto < 0 && m.tipo !== 'uso_saldo_favor') {
-        const entrada = { idOp: m.id_op_encabezado, restante: -monto }
-        cola.push(entrada)
-        // Una OP puede tener más de un cargo (p. ej. el IVA sumado al marcarla para facturar)
-        if (m.id_op_encabezado) {
-          const d = deudas[m.id_op_encabezado] ||= { total: 0, pagado: 0 }
-          d.total += entrada.restante
-        }
-      } else if (monto > 0) {
-        let disponible = monto
-        while (disponible > 1e-6 && cola.length) {
-          const cabeza = cola[0]
-          const consumido = Math.min(disponible, cabeza.restante)
-          cabeza.restante -= consumido
-          disponible -= consumido
-          if (cabeza.idOp && deudas[cabeza.idOp]) deudas[cabeza.idOp].pagado += consumido
-          if (cabeza.restante <= 1e-6) cola.shift()
-        }
-      }
-    }
+    const movs = await this.movimientosParaImputar(clientesIds)
+    const porCliente = new Map()
+    movs.forEach(m => { const k = String(m.cliente_id); if (!porCliente.has(k)) porCliente.set(k, []); porCliente.get(k).push(m) })
+    const deudas = {}
+    for (const lista of porCliente.values()) Object.assign(deudas, porOperacion(imputar(lista).cargos))
 
     const resultado = {}
-    for (const id of ids) {
-      const d = deudas[id]
-      if (d) resultado[id] = { total: Math.round(d.total * 100) / 100, pagado: Math.round(d.pagado * 100) / 100 }
-    }
+    for (const id of ids) if (deudas[id]) resultado[id] = deudas[id]
     return resultado
+  },
+
+  // Movimientos vigentes (sin anulados) en el orden de la cuenta, para imputar pagos
+  async movimientosParaImputar(clientesIds) {
+    return (await query(
+      `SELECT id, cliente_id, id_op_encabezado, monto, tipo, created_at FROM movimientos_cuenta
+       WHERE cliente_id = ANY(?::bigint[]) AND COALESCE(anulado, 0) = 0
+       ORDER BY cliente_id, created_at ASC, id ASC`,
+      [clientesIds.map(Number)]
+    )).rows
   },
 
   // ¿El cliente ya saldó cada operación? { [id_op_encabezado]: boolean } (sin cargo = saldada).
@@ -283,44 +261,10 @@ const ClientesModel = {
   },
 
   // Cuánto falta pagar de cada cargo del cliente: { [movimiento_id]: restante }.
-  // Los pagos y ajustes a favor se aplican FIFO contra los cargos más viejos (misma
-  // regla que saldadaPorOperacion y que el saldo corrido del estado de cuenta).
+  // Misma imputación que Liquidaciones y Transacciones (utils/imputacion).
   async pendientePorCargo(clienteId) {
-    const movs = (await query(
-      `SELECT id, monto, tipo FROM movimientos_cuenta WHERE cliente_id = ? AND COALESCE(anulado, 0) = 0 ORDER BY created_at ASC, id ASC`, [clienteId]
-    )).rows
-    const restante = {}
-    const cola = []
-    let aFavor = 0 // pagos adelantados: cubren los cargos que vengan después
-    for (const m of movs) {
-      const monto = Number(m.monto)
-      // 'uso_saldo_favor' se paga en el momento con crédito ya acumulado: no es un
-      // cargo pendiente, así que no entra en la cola de FIFO (y no le come pagos
-      // futuros a los cargos reales que sí están esperando uno).
-      if (monto < 0 && m.tipo === 'uso_saldo_favor') {
-        restante[m.id] = 0
-      } else if (monto < 0) {
-        const entrada = { id: m.id, resta: -monto }
-        const usado = Math.min(aFavor, entrada.resta)
-        entrada.resta -= usado
-        aFavor -= usado
-        restante[m.id] = entrada.resta
-        if (entrada.resta > 1e-6) cola.push(entrada)
-      } else if (monto > 0) {
-        let disponible = monto
-        while (disponible > 1e-6 && cola.length) {
-          const cabeza = cola[0]
-          const usado = Math.min(disponible, cabeza.resta)
-          cabeza.resta -= usado
-          disponible -= usado
-          restante[cabeza.id] = cabeza.resta
-          if (cabeza.resta <= 1e-6) cola.shift()
-        }
-        aFavor += disponible
-      }
-    }
-    Object.keys(restante).forEach(k => { restante[k] = Math.round(restante[k] * 100) / 100 })
-    return restante
+    const { cargos } = imputar(await this.movimientosParaImputar([clienteId]))
+    return Object.fromEntries(Object.entries(cargos).map(([id, c]) => [id, c.restante]))
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────

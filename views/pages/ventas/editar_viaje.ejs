@@ -25,14 +25,21 @@
                 </div>
 
                 <div class="form-section">
-                    <h3 class="form-section__title">Fecha y hora del viaje</h3>
+                    <h3 class="form-section__title">Fechas</h3>
                     <div class="form-row-2">
                         <div class="form-group">
-                            <label for="fecha">Fecha *</label>
-                            <input type="date" name="fecha" id="fecha" value="<%= viaje.fecha %>" required>
+                            <label for="fechaCompra">Fecha de compra *</label>
+                            <input type="date" name="fechaCompra" id="fechaCompra" value="<%= viaje.fechaCompra || hoyISO() %>" max="<%= hoyISO() %>" required>
+                            <p class="form-hint">El día en que el cliente hizo el pedido. Define a qué mes pertenece la venta (también en su cuenta corriente).</p>
                         </div>
                         <div class="form-group">
-                            <label for="hora">Hora</label>
+                            <label for="fecha">Fecha de envío *</label>
+                            <input type="date" name="fecha" id="fecha" value="<%= viaje.fecha %>" required>
+                        </div>
+                    </div>
+                    <div class="form-row-2">
+                        <div class="form-group">
+                            <label for="hora">Hora de envío</label>
                             <input type="time" name="hora" id="hora" value="<%= viaje.hora || '' %>">
                         </div>
                     </div>

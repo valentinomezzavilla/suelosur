@@ -1,6 +1,7 @@
 'use strict'
 const { query, transaction } = require('../config/db')
 const { hoyISO }       = require('../utils/fecha')
+const { leerFechaPago } = require('../utils/fechaPago')
 const EgresosModel     = require('../models/egresos.model')
 const CombustibleModel = require('../models/combustible.model')
 const StockModel       = require('../models/stock.model')
@@ -107,6 +108,10 @@ const ComprasController = {
               id_producto, cantidad, costo_unitario, costo_flete, fletero,
               subtotal_material, costo_final_flete,
               periodo, descuentos, adiciones } = req.body
+
+      // Fecha de pago: puede ser anterior al día de carga (que queda en created_at), no futura
+      const errFecha = fecha ? leerFechaPago(fecha).error : null
+      if (errFecha) { req.flash('error', errFecha); return res.redirect('/compras/nueva') }
 
       const cat = await CategoriasEgresoModel.obtenerPorClave(categoria)
       if (!cat || !cat.activo) { req.flash('error', 'Elegí una categoría válida.'); return res.redirect('/compras/nueva') }
@@ -252,8 +257,10 @@ const ComprasController = {
       const bloqueo = motivoNoEditable(e)
       if (bloqueo) { req.flash('error', bloqueo); return res.redirect('/compras') }
       const b = req.body
+      const errFecha = b.fecha ? leerFechaPago(b.fecha).error : null
+      if (errFecha) { req.flash('error', errFecha); return res.redirect(volver) }
       const usuario = req.session.user?.id
-      const comunes = { fecha: b.fecha || e.fecha, descripcion: (b.descripcion || '').trim(), metodo_pago: b.metodo_pago || null }
+      const comunes ={ fecha: b.fecha || e.fecha, descripcion: (b.descripcion || '').trim(), metodo_pago: b.metodo_pago || null }
 
       // Sueldo (o cualquier pago a empleado): se corrige el pago de la ficha y su recibo
       if (e.categoria === 'sueldo' && e.id_pago_empleado) {

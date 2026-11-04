@@ -69,6 +69,9 @@ async function abrir() {
   // Los mismos datos en el pago de combustible de Compras / Pagos y la carga que crea: lo mismo
   for (const col of ['nro_factura', 'nro_remito', 'hora']) await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS ${col} TEXT`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS litros REAL`)
+  // Día de carga de un movimiento de cuenta corriente (la fecha de pago puede ser anterior): lo mismo
+  await cliente.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS registrado_en TEXT`)
+  await cliente.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
 }

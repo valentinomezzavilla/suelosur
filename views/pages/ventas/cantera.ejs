@@ -93,8 +93,12 @@
 
                 <div class="carrito-seccion">
                     <label class="form-label" for="fechaCantera">Fecha de la venta</label>
-                    <input type="date" id="fechaCantera" class="form-control">
+                    <input type="date" id="fechaCantera" class="form-control" max="<%= hoyISO() %>">
                     <small class="text-muted">Se puede cargar una venta de un día anterior: impacta en esa fecha.</small>
+                </div>
+
+                <div class="carrito-seccion">
+                    <%- include('../../partials/fecha_pago', { idCampo: 'fechaPagoCantera' }) %>
                 </div>
 
                 <div class="carrito-seccion">
@@ -123,6 +127,7 @@
         <input type="hidden" name="precioTotal" id="formPrecioTotal">
         <input type="hidden" name="observaciones" id="formObservaciones">
         <input type="hidden" name="fecha" id="formFecha">
+        <input type="hidden" name="fechaPago" id="formFechaPago" disabled>
         <input type="hidden" name="remito" id="formRemito">
         <input type="hidden" name="paraFacturar" id="formParaFacturar">
         <input type="hidden" name="nroFactura" id="formNroFactura">

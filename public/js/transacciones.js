@@ -29,6 +29,24 @@
         if (formMetodoPago) formMetodoPago.style.display = 'flex';
     });
 
+    // ── Corregir fecha de pago ────────────────────────────────
+    const formFechaPago      = document.getElementById('formFechaPago');
+    const inputFechaPago     = document.getElementById('inputFechaPagoEdit');
+    const btnEditarFechaPago = document.getElementById('btnEditarFechaPago');
+
+    function cerrarEdicionFechaPago() {
+        if (formFechaPago) formFechaPago.style.display = 'none';
+        const fila = document.getElementById('filaFechaPago');
+        if (fila) fila.style.display = '';
+    }
+    document.getElementById('btnCancelarFechaPago')?.addEventListener('click', cerrarEdicionFechaPago);
+    btnEditarFechaPago?.addEventListener('click', () => {
+        const fila = document.getElementById('filaFechaPago');
+        if (fila) fila.style.display = 'none';
+        if (formFechaPago) formFechaPago.style.display = 'flex';
+        inputFechaPago?.focus();
+    });
+
     document.querySelectorAll('.btn-ver-transaccion').forEach(btn => {
         btn.addEventListener('click', () => {
             document.getElementById('modal-t-id').textContent = '#' + btn.dataset.id;
@@ -40,6 +58,18 @@
             document.getElementById('modal-t-cliente').textContent = btn.dataset.cliente;
             document.getElementById('modal-t-descripcion').textContent = btn.dataset.descripcion;
             document.getElementById('modal-t-fecha').textContent = btn.dataset.fecha;
+            const cargado = document.getElementById('modal-t-cargado');
+            if (cargado) cargado.textContent = btn.dataset.cargado || '—';
+            // Fecha de pago: una venta a cuenta corriente no tiene (el pago entra por la cuenta)
+            cerrarEdicionFechaPago();
+            if (formFechaPago) {
+                formFechaPago.action = '/transacciones/' + btn.dataset.realId + '/fecha-pago';
+                if (inputFechaPago) inputFechaPago.value = btn.dataset.fechaIso || '';
+            }
+            const esCC = btn.dataset.metodoPago === 'cuenta_corriente';
+            if (btnEditarFechaPago) btnEditarFechaPago.hidden = esCC;
+            const labelFecha = document.getElementById('modal-t-fecha-label');
+            if (labelFecha) labelFecha.textContent = esCC ? 'Fecha (a cuenta corriente)' : 'Fecha de pago';
             document.getElementById('modal-t-monto').textContent = '$' + Number(btn.dataset.monto).toLocaleString('es-AR');
             const mp = btn.dataset.metodoPago;
             document.getElementById('modal-t-metodo-pago').textContent = PAGO_LABEL[mp] || (mp ? mp : '—');
@@ -121,6 +151,7 @@
         document.getElementById('modal-transaccion').style.display = 'none';
         document.body.style.overflow = '';
         cerrarEdicionMetodoPago();
+        cerrarEdicionFechaPago();
     }
     document.getElementById('cerrarModalTransaccion')?.addEventListener('click', cerrarModal);
     document.getElementById('cerrarModalTransaccionBtn')?.addEventListener('click', cerrarModal);

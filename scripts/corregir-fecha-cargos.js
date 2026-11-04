@@ -17,9 +17,8 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') })
 const { query, transaction, pool } = require('../src/config/db')
 const { hoyISO } = require('../src/utils/fecha')
 
-// Fecha de la operación: la misma regla que ClientesModel.fechaCargoDeOperacion
-const SQL_FECHA_OP = `CASE WHEN op.tipo_op = 'M' THEN LEFT(op.fecha_emision, 10)
-  ELSE LEFT(COALESCE(NULLIF(op.fecha_entrega_planificada, ''), op.fecha_emision), 10) END`
+// Fecha de la operación: la regla única del sistema (utils/fechaOperacion)
+const { SQL_FECHA_OPERACION: SQL_FECHA_OP } = require('../src/utils/fechaOperacion')
 
 async function candidatos({ clienteId } = {}) {
   const params = [hoyISO()]

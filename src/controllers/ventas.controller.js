@@ -11,6 +11,7 @@ const { textoDestino } = require('../utils/destino')
 const { leerRemito, opConRemito } = require('../utils/remito')
 const { hoyISO }        = require('../utils/fecha')
 const { conIva }        = require('../utils/iva')
+const { leerFechaPago, fechaHoraDePago } = require('../utils/fechaPago')
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
@@ -20,6 +21,23 @@ function fechaRetroactiva(fecha) {
   const f = String(fecha).slice(0, 10)
   const hoy = hoyISO()
   return f < hoy ? f : null
+}
+
+// Fecha de compra de una venta con viaje (fecha_emision): el día del pedido, que define el
+// mes de la venta en todo el sistema. Si el formulario no la manda (un formulario viejo
+// abierto antes de la actualización), vale la regla anterior: la fecha del viaje si ya pasó.
+// → { emision: 'AAAA-MM-DD' | null (= hoy), fecha: 'AAAA-MM-DD', error }
+function leerFechaCompra(body) {
+  const hoy = hoyISO()
+  if (body.fechaCompra === undefined) {
+    const retro = fechaRetroactiva(body.fecha)
+    return { emision: retro, fecha: retro || hoy, error: null }
+  }
+  const { fecha, error } = leerFechaPago(body.fechaCompra, { hoy, etiqueta: 'La fecha de compra' })
+  if (error) return { error }
+  const envio = String(body.fecha || '').slice(0, 10)
+  if (envio && envio < fecha) return { error: 'La fecha de envío no puede ser anterior a la fecha de compra.' }
+  return { emision: fecha < hoy ? fecha : null, fecha, error: null }
 }
 
 // El precio de lista de una venta NUNCA sale de lo que mande el formulario: siempre se
@@ -111,6 +129,13 @@ const VentasController = {
       }
       const remito = await leerRemito(req.body.remito)
       if (remito.error) { req.flash('error', remito.error); return res.redirect('/ventas/cantera') }
+      // Fecha de pago (solo cobros en el momento; sin ella vale la fecha de la venta)
+      let fechaCobro = fechaRetro
+      if (req.body.fechaPago !== undefined) {
+        const pago = leerFechaPago(req.body.fechaPago)
+        if (pago.error) { req.flash('error', pago.error); return res.redirect('/ventas/cantera') }
+        fechaCobro = fechaHoraDePago(pago.fecha)
+      }
       let tercero
       try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/ventas/cantera') }
       let carrito = []
@@ -171,7 +196,7 @@ const VentasController = {
         monto:           conIva(total, alicuota),
         descripcion:     desc,
         metodo_pago:     metodoPago || 'efectivo',
-        fecha:           fechaRetro,
+        fecha:           fechaCobro,
       })
 
       // A cuenta corriente: el cargo en la cuenta del cliente
@@ -290,6 +315,15 @@ const VentasController = {
       try { tercero = await Tercero.leer(req.body, metodoPago) } catch (e) { req.flash('error', e.message); return res.redirect('/ventas/viaje') }
 
       const esFinalizarAhora = finalizarAhora === 'true'
+      // Fechas: compra (define el mes), envío (fecha) y pago (solo si se cobra ahora)
+      const compra = leerFechaCompra(req.body)
+      if (compra.error) { req.flash('error', compra.error); return res.redirect('/ventas/viaje') }
+      let fechaCobro = compra.emision
+      if (esFinalizarAhora && req.body.fechaPago !== undefined) {
+        const pago = leerFechaPago(req.body.fechaPago)
+        if (pago.error) { req.flash('error', pago.error); return res.redirect('/ventas/viaje') }
+        fechaCobro = fechaHoraDePago(pago.fecha)
+      }
       const destino   = textoDestino({ calle, numero, obra })
       const flete     = Math.max(0, Number(precioFlete) || 0)
 
@@ -326,7 +360,7 @@ const VentasController = {
         metodo_pago:         metodoPago || 'efectivo',
         observaciones:       descripcion || '',
         fecha_entrega_planificada: fecha || null,
-        fecha_emision:       fechaRetroactiva(fecha),
+        fecha_emision:       compra.emision,
         hora_planificada:    hora || null,
         zona:                zona || null,
         obra:                obra || null,
@@ -369,7 +403,7 @@ const VentasController = {
           monto:           conIva(total, alicuota),
           descripcion:     `Viaje a ${destino}`,
           metodo_pago:     metodoPago || 'efectivo',
-          fecha:           fechaRetroactiva(fecha),
+          fecha:           fechaCobro,
         })
       }
 
@@ -468,6 +502,9 @@ const VentasController = {
         req.flash('warning', 'La orden ya estaba entregada o anulada.')
         return res.redirect(`/ventas/${op.id}`)
       }
+      // Fecha de pago del cobro de contado (por defecto hoy; no puede ser futura)
+      const pago = leerFechaPago(req.body.fechaPago)
+      if (pago.error) { req.flash('error', pago.error); return res.redirect(`/ventas/${op.id}`) }
       await VentasModel.entregar(op.id)
       const esViaje = op.modalidad === 'flete'
       const destino = esViaje ? textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra }) : ''
@@ -485,6 +522,7 @@ const VentasController = {
             ? [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
             : (op.observaciones || ''),
           metodo_pago:     op.metodo_pago || 'efectivo',
+          fecha:           fechaHoraDePago(pago.fecha),
         })
       }
       // A cuenta corriente: el cargo ya existe desde el alta; esto lo confirma (no duplica)

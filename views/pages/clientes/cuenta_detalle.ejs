@@ -34,6 +34,10 @@
     <a href="/clientes/cuentas/<%= cliente.id %>/pdf?<%= qsPdf %>" target="_blank" class="btn btn-sm btn-outline-secondary">
       <%- icon('printer', { size: 15 }) %> Descargar PDF
     </a>
+    <a href="/liquidaciones?<%= new URLSearchParams(Object.assign({ clienteId: String(cliente.id) }, filtros.desde ? { desde: filtros.desde } : {}, filtros.hasta ? { hasta: filtros.hasta } : {})).toString() %>"
+       class="btn btn-sm btn-outline-secondary" title="Las operaciones del período con su detalle, y por qué el saldo puede ser distinto">
+      <%- icon('fileText', { size: 15 }) %> Ver liquidación del período
+    </a>
     <% if (cliente.saldo < 0) { %>
       <button type="button" class="btn btn-success btn-abonar"
               data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
@@ -205,7 +209,11 @@
             <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
           </select>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
+          <label class="form-label" for="fechaMovimiento">Fecha</label>
+          <input type="date" name="fecha" id="fechaMovimiento" class="form-control form-control-sm" value="<%= hoyISO() %>" max="<%= hoyISO() %>" required>
+        </div>
+        <div class="col-md-2">
           <label class="form-label">Descripción</label>
           <input type="text" name="descripcion" class="form-control form-control-sm" placeholder="(opcional)">
         </div>
@@ -213,6 +221,7 @@
           <button type="submit" class="btn btn-sm btn-naranja">Registrar</button>
         </div>
       </div>
+      <p class="form-hint mb-0 mt-2">Fecha: para un pago, el día en que pagó el cliente (puede ser anterior a hoy). El día en que se carga queda registrado aparte.</p>
     </form>
   </div>
 </div>
@@ -248,7 +257,12 @@
         <% estado.movimientos.forEach(m => { %>
         <% const anulado = !!Number(m.anulado) %>
         <tr class="<%= anulado ? 'mov-anulado' : '' %>">
-          <td><small class="text-muted"><%= formatFechaHora(m.created_at) %></small></td>
+          <td>
+            <small class="text-muted"><%= formatFechaHora(m.created_at) %></small>
+            <% if (m.registrado_en && String(m.registrado_en).slice(0, 10) !== String(m.created_at).slice(0, 10)) { %>
+              <div class="small text-muted" title="Día en que se cargó en el sistema">Cargado el <%= formatFecha(m.registrado_en) %></div>
+            <% } %>
+          </td>
           <td>
             <% if (anulado) { %><span class="badge rounded-pill px-3 badge-alerta" title="Anulado el <%= formatFechaHora(m.anulado_en) %>: <%= m.anulado_motivo %>">Pago anulado</span>
             <% } else if (m.tipo === 'deuda') { %><span class="badge rounded-pill px-3 badge-alerta">Cargo</span>
@@ -336,6 +350,7 @@
             <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
           </select>
         </div>
+        <%- include('../../partials/fecha_pago', { nombre: 'fecha', idCampo: 'inputFechaAbonar', metodoSel: '' }) %>
         <div class="modal-actions">
           <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
           <button type="submit" class="btn btn-success">Confirmar pago</button>

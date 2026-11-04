@@ -146,6 +146,26 @@ const TransaccionesModel = {
     })
   },
 
+  // Corrige la fecha de pago de un cobro ya cargado (se cobró otro día del que se cargó, o el
+  // cobro lo registró el chofer / el cierre del alquiler en el momento). `fecha` 'AAAA-MM-DD'
+  // ya validada (utils/fechaPago). El egreso a tercero que generó (y el pago de sueldo, si lo
+  // fue) pasa a la misma fecha. Una venta a cuenta corriente no tiene fecha de pago: el
+  // pago entra por la cuenta del cliente.
+  async cambiarFechaPago(id, fecha) {
+    const tx = (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
+    if (!tx) throw new Error('La transacción no existe.')
+    if (tx.metodo_pago === 'cuenta_corriente') {
+      throw new Error('Es una venta a cuenta corriente: no tiene fecha de pago. El pago se registra (con su fecha) en la cuenta corriente del cliente.')
+    }
+    const { fechaHoraDePago } = require('../utils/fechaPago')
+    await transaction(async (q) => {
+      await q(`UPDATE transacciones SET fecha = COALESCE(?, ahora_local()) WHERE id = ?`, [fechaHoraDePago(fecha), id])
+      await q(`UPDATE egresos SET fecha = ? WHERE id_transaccion = ? AND origen = 'tercero'`, [fecha, id])
+      await q(`UPDATE pagos_empleado SET fecha = ? WHERE id IN (
+                 SELECT id_pago_empleado FROM egresos WHERE id_transaccion = ? AND origen = 'tercero' AND id_pago_empleado IS NOT NULL)`, [fecha, id])
+    })
+  },
+
   // Elimina la transacción y, si tiene una operación detrás, la operación entera con
   // todo lo que cuelga de ella. Si solo se borrara la transacción, la operación
   // seguiría contando en el dashboard y en los listados.
