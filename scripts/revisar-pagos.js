@@ -14,7 +14,8 @@
 //
 // Uso:
 //   npm run revisar:pagos                    → todo
-//   npm run revisar:pagos -- --cliente=123   → un cliente, con el detalle de su cuenta: cada pago y
+//   npm run revisar:pagos -- --buscar=co.c   → busca clientes por nombre o N° y muestra su detalle (hasta 3)
+//   npm run revisar:pagos -- --cliente=123   → un cliente (id interno), con el detalle de su cuenta: cada pago y
 //                                              a qué operaciones se aplicó, y cada operación
 
 const path = require('path')
@@ -132,7 +133,28 @@ function imprimirDetalle(d) {
   if (d.aFavor > 0.005) console.log(`\nSaldo a favor sin aplicar: ${pesos(d.aFavor)}`)
 }
 
+// Clientes por nombre (o apellido) o por N° de cliente
+async function buscarClientes(texto) {
+  const t = String(texto || '').trim()
+  if (!t) return []
+  return (await query(`
+    SELECT id, numero, TRIM(COALESCE(nombre, '') || ' ' || COALESCE(apellido, '')) AS nombre, saldo
+    FROM clientes
+    WHERE TRIM(COALESCE(nombre, '') || ' ' || COALESCE(apellido, '')) ILIKE ? OR CAST(numero AS TEXT) = ?
+    ORDER BY id LIMIT 20`, ['%' + t + '%', t])).rows
+}
+
 async function main(args = process.argv.slice(2)) {
+  const buscar = args.find(a => a.startsWith('--buscar='))
+  if (buscar) {
+    const encontrados = await buscarClientes(buscar.slice('--buscar='.length))
+    console.log(`\n=== Clientes que coinciden (${encontrados.length}) ===`)
+    encontrados.forEach(c => console.log(`  id ${c.id} · N° ${c.numero} · ${c.nombre} · saldo ${pesos(c.saldo)}`))
+    if (!encontrados.length) console.log('  (ninguno)')
+    else if (encontrados.length > 3) console.log('\nSon muchos: repetí con --cliente=ID (el id de la lista) para ver el detalle de uno.')
+    else for (const c of encontrados) imprimirDetalle(await detalleCliente(c.id))
+    return { encontrados }
+  }
   const arg = args.find(a => a.startsWith('--cliente='))
   const clienteId = arg ? arg.split('=')[1] : null
   const sinCargo = await ventasSinCargo(clienteId)
@@ -160,13 +182,13 @@ async function main(args = process.argv.slice(2)) {
   if (clienteId) {
     const detalle = await detalleCliente(clienteId)
     if (detalle) imprimirDetalle(detalle)
-    else console.log('\nNo existe el cliente', clienteId)
+    else console.log(`\nNo existe el cliente con id ${clienteId}. --cliente toma el id interno (el de la URL /clientes/cuentas/ID), no el N° de cliente: para buscar por nombre o N° usá --buscar=texto`)
   }
   console.log('\nPara cambiar el estado de una: Liquidaciones o Cuenta corriente → "Marcar pendiente" / "Marcar como pagada".')
   return { sinCargo, dudosas, sinCobro }
 }
 
-module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, detalleCliente, main }
+module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, detalleCliente, buscarClientes, main }
 
 if (require.main === module) {
   main()
