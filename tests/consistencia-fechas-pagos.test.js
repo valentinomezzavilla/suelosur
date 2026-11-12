@@ -82,48 +82,61 @@ describe('imputación de pagos (FIFO único)', () => {
   })
 })
 
-describe('Liquidación ↔ Cuenta corriente', () => {
-  const op = (id, resta, extra = {}) => ({ id, resta, estado: resta > 0 ? 'pendiente' : 'pagada', metodo_pago: 'cuenta_corriente', enCuenta: true, ...extra })
+describe('saldo del cliente (el mismo en Cuenta corriente y en Liquidación)', () => {
+  const op = (id, resta, extra = {}) => ({ id, nro_op: id, fecha: '2026-10-10', resta, total: resta, estado: resta > 0 ? 'pendiente' : 'pagada',
+    metodo_pago: 'cuenta_corriente', enCuenta: true, estadoOp: 'entregado', tipo: 'viaje', tipoTexto: 'Venta con viaje', ...extra })
+  const periodo = { desde: '2026-10-01', hasta: '2026-10-31' }
 
-  it('coinciden cuando todo lo de la cuenta es del período', () => {
-    const r = L.conciliarConCuenta({
-      cargos: { 1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' } }, aFavor: 0,
-      ops: [op(10, 100)], desde: '2026-10-01', hasta: '2026-10-31', saldoCuenta: -100,
-    })
-    assert.equal(r.coincide, true)
-    assert.equal(r.renglones.length, 0)
+  it('todo es del período: la cuenta corriente es el total', () => {
+    const r = L.saldoDelCliente({ cargos: { 1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' } }, aFavor: 0,
+      ops: [op(10, 100)], saldoCuenta: -100, ...periodo })
+    assert.equal(r.cuenta.saldo, -100)
+    assert.deepEqual(r.cuenta.desglose, { periodo: 100, anteriores: 0, posteriores: 0, manuales: 0 })
+    assert.equal(r.cuenta.coincideConMovimientos, true)
+    assert.equal(r.total, 100)
   })
 
-  it('explica la diferencia renglón por renglón y llega exacto a la cuenta', () => {
-    const r = L.conciliarConCuenta({
+  it('separa la deuda por período y lo que no va a la cuenta corriente', () => {
+    const r = L.saldoDelCliente({
       cargos: {
-        1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' },   // de la liquidación
-        2: { idOp: 5,  restante: 649.8, fechaOp: '2026-09-20' }, // septiembre: deuda anterior
+        1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' },   // del período
+        2: { idOp: 5,  restante: 649.8, fechaOp: '2026-09-20' }, // septiembre
         3: { idOp: null, restante: 50 },                          // cargo a mano
-        4: { idOp: 12, restante: 30, fechaOp: '2026-10-07' },    // octubre, filtrada (otro tipo)
+        4: { idOp: 12, restante: 30, fechaOp: '2026-11-07' },    // posterior
+        5: { idOp: 13, restante: 0, fechaOp: '2026-10-07' },     // pagado: no cuenta
       },
       aFavor: 0,
-      ops: [op(10, 100), op(11, 70, { metodo_pago: 'efectivo', enCuenta: false }), op(13, 40, { enCuenta: false })],
-      desde: '2026-10-01', hasta: '2026-10-31', saldoCuenta: -829.8,
+      ops: [
+        op(10, 100),
+        op(11, 70, { metodo_pago: 'efectivo', enCuenta: false }),                                            // contado sin cobrar
+        op(14, 40, { metodo_pago: 'cuenta_corriente', enCuenta: false, enCurso: true, tipo: 'contenedor' }), // alquiler en curso
+        op(15, 25, { metodo_pago: 'efectivo', enCuenta: false, estadoOp: 'pendiente' }),                     // viaje sin entregar
+        op(16, 0, { estado: 'a_convenir', enCuenta: false }),                                                // sin precio: no cuenta
+      ],
+      saldoCuenta: -829.8, ...periodo,
     })
-    const imp = Object.fromEntries(r.renglones.map(x => [x.clave, x.signo * x.importe]))
-    assert.deepEqual(imp, { contado: -70, en_curso: -40, anteriores: 649.8, filtradas: 30, manuales: 50 })
-    assert.equal(r.saldoLiquidacion, 210)
-    const total = Math.round((r.saldoLiquidacion + Object.values(imp).reduce((s, v) => s + v, 0)) * 100) / 100
-    assert.equal(total, r.deudaCuenta)
-    assert.equal(r.coincide, false)
+    assert.deepEqual(r.cuenta.desglose, { periodo: 100, anteriores: 649.8, posteriores: 30, manuales: 50 })
+    assert.equal(r.cuenta.deuda, 829.8)
+    assert.equal(r.sinCobrar.total, 70)
+    assert.deepEqual(r.sinCobrar.ops.map(o => o.id), [11])
+    assert.deepEqual(r.enCurso.ops.map(o => o.id), [14])
+    assert.deepEqual(r.programadas.ops.map(o => o.id), [15])
+    assert.equal(r.total, 899.8) // cuenta corriente + sin cobrar
   })
 
   it('avisa si el saldo guardado no coincide con los movimientos', () => {
-    const r = L.conciliarConCuenta({ cargos: { 1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' } }, aFavor: 0,
-      ops: [op(10, 100)], desde: '2026-10-01', hasta: '2026-10-31', saldoCuenta: -150 })
-    assert.deepEqual(r.renglones.map(x => [x.clave, x.signo * x.importe]), [['sin_explicar', 50]])
+    const r = L.saldoDelCliente({ cargos: { 1: { idOp: 10, restante: 100, fechaOp: '2026-10-05' } }, aFavor: 0,
+      ops: [op(10, 100)], saldoCuenta: -150, saldoMovimientos: -100, ...periodo })
+    assert.equal(r.cuenta.coincideConMovimientos, false)
   })
 
-  it('los pagos a favor sin aplicar restan', () => {
-    const r = L.conciliarConCuenta({ cargos: {}, aFavor: 200, ops: [], desde: '2026-10-01', hasta: '2026-10-31', saldoCuenta: 200 })
-    assert.deepEqual(r.renglones.map(x => [x.clave, x.signo * x.importe]), [['a_favor', -200]])
-    assert.equal(r.deudaCuenta, -200)
+  it('saldo a favor: dice de qué pagos sale', () => {
+    const creditos = [{ id: 7, fecha: '2026-10-02 12:00:00', tipo: 'pago', descripcion: 'Pago / abono de deuda', monto: 500, sobrante: 200 }]
+    const r = L.saldoDelCliente({ cargos: {}, aFavor: 200, creditos, ops: [], saldoCuenta: 200, ...periodo })
+    assert.equal(r.cuenta.saldo, 200)
+    assert.equal(r.cuenta.aFavor, 200)
+    assert.deepEqual(r.cuenta.creditos.map(c => [c.fecha, c.sobrante, c.monto]), [['2026-10-02', 200, 500]])
+    assert.equal(r.total, -200)
   })
 })
 

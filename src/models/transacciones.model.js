@@ -3,6 +3,9 @@ const { query, transaction } = require('../config/db')
 const ClientesModel = require('./clientes.model')
 const { SQL_DESCRIPCION_DETALLE } = require('../utils/contenedor')
 
+// Métodos que se pagan contra la cuenta del cliente (su pago está en la cuenta corriente)
+const EN_CUENTA = ['cuenta_corriente', 'saldo_a_favor']
+
 // Prefijos para el código legible de cada tipo de transacción
 const PREFIJO = { 'Venta Cantera': 'CAN', 'Venta Viaje': 'VIA', 'Alquiler': 'CON', 'Maquinaria': 'MAQ', 'Ajuste': 'AJU' }
 
@@ -59,13 +62,14 @@ const TransaccionesModel = {
 
   // Cambia el método de pago de una transacción ya cargada (p.ej. se finalizó como
   // "efectivo" y en realidad era "cuenta corriente"). Mantiene todo consistente:
-  //  · Si sale de cuenta corriente: revierte el cargo pendiente en la cuenta del cliente.
-  //  · Si entra a cuenta corriente: genera el cargo correspondiente.
   //  · El método de la OP asociada (si tiene) se actualiza igual, para que el resto
-  //    de la app (remito, detalle de venta) muestre lo mismo.
+  //    de la app (remito, detalle, Liquidaciones) muestre lo mismo.
+  //  · La cuenta del cliente acompaña con la regla única de cada tipo de operación
+  //    (VentasModel / AlquileresModel.sincronizarCargoCC): si entra a cuenta corriente o a
+  //    saldo a favor queda el cargo por lo cobrado; si sale, se quita (con el IVA que tuviera).
   // `tercero`: datos de la transferencia a tercero (TerceroService.leer), o null.
   async cambiarMetodoPago(id, nuevoMetodo, tercero = null) {
-    const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq', 'cuenta_corriente']
+    const METODOS = ['efectivo', 'transferencia', 'cheque', 'echeq', 'cuenta_corriente', 'saldo_a_favor']
     if (!METODOS.includes(nuevoMetodo)) throw new Error('Método de pago inválido.')
 
     const tx = (await query(`SELECT * FROM transacciones WHERE id = ?`, [id])).rows[0]
@@ -108,40 +112,26 @@ const TransaccionesModel = {
       const errCC = await require('./clientes.model').errorCuentaCorriente(tx.cliente_id)
       if (errCC) throw new Error(errCC)
     }
-    // Las ventas (tipo M) llevan el cargo con la regla única de VentasModel
-    const esVenta = tx.id_op_encabezado
-      ? (await query(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [tx.id_op_encabezado])).rows[0]?.tipo_op === 'M'
-      : false
+    if (nuevoMetodo === 'saldo_a_favor') {
+      if (!tx.cliente_id || !tx.id_op_encabezado) throw new Error('No se puede pasar a saldo a favor: la transacción no tiene cliente y operación asociados.')
+      const errSaldo = await ClientesModel.errorSaldoFavor(tx.cliente_id, { monto: tx.monto, opId: tx.id_op_encabezado })
+      if (errSaldo) throw new Error(errSaldo)
+    }
+    const op = tx.id_op_encabezado
+      ? (await query(`SELECT tipo_op FROM op_encabezado WHERE id = ?`, [tx.id_op_encabezado])).rows[0]
+      : null
 
     await transaction(async (q) => {
       await q(`UPDATE transacciones SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, id])
       await rehacerTercero(q)
-      if (tx.id_op_encabezado) {
-        await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
-      }
-      if (esVenta) {
+      if (!op) return
+      await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [nuevoMetodo, tx.id_op_encabezado])
+      if (op.tipo_op === 'M') {
         await require('./ventas.model').sincronizarCargoCC(tx.id_op_encabezado, q)
-        return
-      }
-
-      // Salía de cta. corriente: revertir el cargo (si seguía en pie) en el saldo del cliente.
-      if (anterior === 'cuenta_corriente' && tx.id_op_encabezado) {
-        const deuda = (await q(
-          `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda' LIMIT 1`,
-          [tx.id_op_encabezado]
-        )).rows[0]
-        if (deuda) {
-          await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [deuda.id])
-          await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(deuda.monto), deuda.cliente_id])
-        }
-      }
-
-      // Entra a cta. corriente: generar el cargo correspondiente.
-      if (nuevoMetodo === 'cuenta_corriente' && tx.id_op_encabezado) {
-        const monto = Number(tx.monto) || 0
-        await ClientesModel.agregarMovimiento(tx.cliente_id, {
-          tipo: 'deuda', descripcion: `${tx.tipo}: ${tx.descripcion || ''}`.trim(), monto: -monto, id_op_encabezado: tx.id_op_encabezado,
-        }, q)
+      } else if (op.tipo_op === 'C' || op.tipo_op === 'MA') {
+        await q(`UPDATE ${op.tipo_op === 'MA' ? 'op_detalle_maquinaria' : 'op_detalle_contenedor'} SET metodo_pago = ? WHERE id_orden_pedido = ?`,
+          [nuevoMetodo, tx.id_op_encabezado])
+        await require('./alquileres.model').sincronizarCargoCC(tx.id_op_encabezado, q)
       }
     })
   },
@@ -234,18 +224,11 @@ const TransaccionesModel = {
       // Un alquiler puede estar encadenado como "próximo" de otro: hay que soltarlo
       await q(`UPDATE op_detalle_contenedor SET alquiler_siguiente_id = NULL WHERE alquiler_siguiente_id = ?`, [idOp])
 
-      // Si la venta/alquiler era a cuenta corriente, el cargo en la cuenta del cliente
-      // queda apuntando a una operación que está por desaparecer: hay que revertirlo
-      // (si no, además de quedar un cargo fantasma, la FK contra op_encabezado rompe
-      // el DELETE de más abajo).
-      const deudas = (await q(
-        `SELECT id, cliente_id, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = 'deuda'`,
-        [idOp]
-      )).rows
-      for (const deuda of deudas) {
-        await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [deuda.id])
-        await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(deuda.monto), deuda.cliente_id])
-      }
+      // Si la venta/alquiler era a cuenta corriente o con saldo a favor, lo que tenía en la
+      // cuenta del cliente (cargo, uso del saldo a favor, IVA) queda apuntando a una operación
+      // que está por desaparecer: se borra (si no, además de quedar un cargo fantasma, la FK
+      // contra op_encabezado rompe el DELETE de más abajo). El saldo lo recalcula la base.
+      await q(`DELETE FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo IN ('deuda', 'uso_saldo_favor', 'ajuste')`, [idOp])
 
       await q(`DELETE FROM op_detalle_contenedor WHERE id_orden_pedido = ?`, [idOp])
       await q(`DELETE FROM op_detalle_maquinaria WHERE id_orden_pedido = ?`, [idOp])
@@ -296,11 +279,11 @@ const TransaccionesModel = {
   // (ver ClientesModel.saldadaPorOperacion — FIFO contra las deudas del cliente)
   async _marcarSaldadas(rows) {
     const idsCC = rows
-      .filter(r => r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado)
+      .filter(r => EN_CUENTA.includes(r.metodo_pago) && r.id_op_encabezado)
       .map(r => r.id_op_encabezado)
     const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
     rows.forEach(r => {
-      if (r.metodo_pago === 'cuenta_corriente' && r.id_op_encabezado) r.saldada = !!saldadas[r.id_op_encabezado]
+      if (EN_CUENTA.includes(r.metodo_pago) && r.id_op_encabezado) r.saldada = !!saldadas[r.id_op_encabezado]
     })
     return rows
   },

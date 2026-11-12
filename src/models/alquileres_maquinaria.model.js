@@ -103,9 +103,13 @@ const AlquileresMaquinariaModel = {
     await query(`UPDATE op_detalle_maquinaria SET id_maquinaria = ? WHERE id_orden_pedido = ?`, [id_maquinaria, id_op])
   },
 
-  // Edición de los datos comerciales / de trabajo del alquiler de maquinaria
+  // Edición de los datos comerciales / de trabajo del alquiler de maquinaria. Si ya se cobró
+  // (al iniciar el trabajo) y cambia el precio o el método de pago, el cobro y la cuenta del
+  // cliente acompañan (AlquileresModel.corregirCobro).
   async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago, observaciones, fecha_entrega_planificada }) {
     const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
+    const AlquileresModel = require('./alquileres.model')
+    const correccion = await AlquileresModel._correccionDeCobro(id_op, { precio: parseFloat(precio_total) || 0, metodo: metodo_pago })
     await transaction(async (q) => {
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, id_op])
@@ -117,6 +121,7 @@ const AlquileresMaquinariaModel = {
       `, [domicilio_entrega, calle || null, numero || null, zona_entrega || '',
           parseInt(plazo_alquiler) || 1, parseFloat(precio_por_hora) || 0,
           parseFloat(horas_pactadas) || 0, parseFloat(precio_total) || 0, metodo_pago || null, id_op])
+      if (correccion) await AlquileresModel.corregirCobro(id_op, correccion, q)
     })
   },
 

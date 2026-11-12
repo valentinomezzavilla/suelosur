@@ -43,12 +43,19 @@
                 <div class="info-row">
                     <span class="info-label">Cuenta corriente</span>
                     <span class="info-value">
+                        <% const s = Number(cliente.saldo) || 0
+                           // Mismo texto que Cuentas corrientes y la Liquidación (negativo = debe)
+                           const saldoTxt = s < -0.005 ? 'Debe $' + (-s).toLocaleString('es-AR') : (s > 0.005 ? 'A favor $' + s.toLocaleString('es-AR') : 'Al día') %>
                         <% if (cliente.cuentaCorriente) { %>
                             <span class="badge badge--con-stock">Habilitada</span>
-                            — Saldo: <b>$<%= cliente.saldo.toLocaleString('es-AR') %></b>
-                            <a href="/clientes/cuentas/<%= cliente.id %>" class="btn-sm btn-secondary" style="margin-left:0.5rem">Estado de cuenta</a>
                         <% } else { %>
                             <span class="badge badge--sin-stock">No habilitada</span>
+                        <% } %>
+                        <% if (cliente.cuentaCorriente || Math.abs(s) > 0.005) { %>
+                            — Saldo: <b class="<%= s < -0.005 ? 'text-danger' : (s > 0.005 ? 'text-success' : '') %>"><%= saldoTxt %></b>
+                            <a href="/clientes/cuentas/<%= cliente.id %>" class="btn-sm btn-secondary" style="margin-left:0.5rem">Estado de cuenta</a>
+                        <% } %>
+                        <% if (!cliente.cuentaCorriente) { %>
                             <form action="/clientes/<%= cliente.id %>/habilitar-cuenta" method="POST" style="display:inline; margin-left:0.5rem">
                                 <button type="submit" class="btn-sm btn-primary-green">Habilitar</button>
                             </form>

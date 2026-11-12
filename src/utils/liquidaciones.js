@@ -15,6 +15,11 @@ const METODOS = {
 }
 const ESTADOS_FILTRO = ['todas', 'pendientes', 'pagadas']
 const CENTAVO = 0.01
+// Métodos que se resuelven contra la cuenta del cliente (cargo / uso del crédito), no cobrando
+// en el momento. Lo pagado de esas operaciones sale de la imputación de la cuenta.
+const METODOS_EN_CUENTA = ['cuenta_corriente', 'saldo_a_favor']
+// Transacciones que no son plata que entró: las de la cuenta, y "a convenir" (todavía sin cobrar)
+const METODOS_SIN_COBRO = [...METODOS_EN_CUENTA, 'a_convenir']
 
 const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 const fechaValida = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')) && !Number.isNaN(new Date(s + 'T00:00:00').getTime())
@@ -56,13 +61,15 @@ function estadoDe(total, pagado) {
 }
 
 // cobrado: lo cobrado por transacciones de contado de la operación.
-// cc: { total, pagado } del cargo en cuenta corriente (imputación FIFO), o undefined si no hay cargo.
+// cc: { total, pagado } del cargo en la cuenta del cliente (imputación FIFO), o undefined si
+// no hay cargo. A cuenta corriente y con saldo a favor, lo pagado es lo de la cuenta: una
+// pagada con saldo a favor está pagada en lo que alcanzó el crédito, y sin cargo todavía (un
+// alquiler en curso) no está pagada.
 function estadoPago({ total, aConvenir, metodoPago, cobrado = 0, cc }) {
   if (aConvenir) return { pagado: 0, resta: 0, estado: 'a_convenir' }
   const t = redondear(total)
   let pagado
-  if (metodoPago === 'saldo_a_favor') pagado = t
-  else if (metodoPago === 'cuenta_corriente') pagado = cc ? Number(cc.pagado) || 0 : 0
+  if (METODOS_EN_CUENTA.includes(metodoPago)) pagado = cc ? Number(cc.pagado) || 0 : 0
   else pagado = Number(cobrado) || 0
   pagado = redondear(Math.min(Math.max(pagado, 0), t))
   const estado = estadoDe(t, pagado)
@@ -115,55 +122,70 @@ function agruparPor(ops, claveFn, nombreFn) {
     .sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es'))
 }
 
-// ── Relación con la cuenta corriente ────────────────────────────────
-// La Liquidación muestra lo que el cliente consumió en el período (todas las formas de pago)
-// y la Cuenta corriente, la deuda acumulada de la cuenta. Esto explica, renglón por renglón,
-// cómo se pasa de un número al otro (los dos "a hoy": con todos los pagos registrados).
+// ── Saldo del cliente ───────────────────────────────────────────────
+// UN solo saldo por cliente, el mismo en Cuentas corrientes, en el estado de cuenta, en la
+// Liquidación y en su PDF:
+//  · Cuenta corriente: clientes.saldo (= suma de sus movimientos; negativo = debe, positivo =
+//    a favor). Es el número del listado de Cuentas corrientes. Se desglosa por la fecha de la
+//    operación de cada cargo que se debe (del período mirado, anteriores, posteriores, cargos
+//    a mano) menos los pagos que quedaron a favor sin aplicar, y se dice de qué pagos sale el
+//    saldo a favor.
+//  · Sin cobrar: operaciones ya hechas que no van a la cuenta corriente (contado o a convenir)
+//    y todavía no se cobraron del todo. También las debe el cliente.
+//  · Informativo, todavía no es deuda: alquileres de contenedor en curso (se cobran o cargan
+//    al retirarlos; importe estimado a hoy) y operaciones sin entregar / sin iniciar.
+//  total = lo que debe en total (cuenta corriente + sin cobrar); negativo = a favor.
 //
-//  cargos:   imputar(...).cargos del cliente, cada uno con fechaOp y grupo (id_grupo) de su OP
-//  aFavor:   saldo a favor sin usar (imputar(...).aFavor)
-//  ops:      operaciones que muestra la liquidación (con enCuenta, metodo_pago, resta, estado)
-//  saldoCuenta: clientes.saldo (negativo = debe)
-function conciliarConCuenta({ cargos, aFavor = 0, ops, desde, hasta, saldoCuenta }) {
-  const mostradas = new Set(ops.map(o => String(o.id)))
-  const grupos = new Set(ops.filter(o => o.grupoTodoJunto && o.id_grupo != null).map(o => String(o.id_grupo)))
-  const suma = (lista) => redondear(lista.reduce((s, o) => s + (Number(o.resta) || 0), 0))
-  const cuentan = ops.filter(o => o.estado !== 'a_convenir')
-
-  const saldoLiquidacion = suma(cuentan)
-  const enCuentaMostrado = suma(cuentan.filter(o => o.enCuenta))
-  const contadoSinCobrar = suma(cuentan.filter(o => !o.enCuenta && o.metodo_pago !== 'cuenta_corriente'))
-  const enCursoSinCargo  = suma(cuentan.filter(o => !o.enCuenta && o.metodo_pago === 'cuenta_corriente'))
-
-  let incluidos = 0, anteriores = 0, posteriores = 0, filtradas = 0, manuales = 0
+//  cargos:   imputar(...).cargos del cliente, cada uno con fechaOp (fecha de su operación)
+//  aFavor, creditos: imputar(...): lo pagado sin aplicar y de qué pagos sale
+//  ops:      TODAS las operaciones del cliente con su estado de pago (enCuenta, estado, resta…)
+//  saldoCuenta: clientes.saldo · saldoMovimientos: Σ de sus movimientos (tienen que coincidir)
+//  desde / hasta: el período que se está mirando (opcional)
+function saldoDelCliente({ cargos, aFavor = 0, creditos = [], ops = [], saldoCuenta, saldoMovimientos = saldoCuenta, desde = null, hasta = null }) {
+  const enPeriodo = (f) => !!f && (!desde || f >= desde) && (!hasta || f <= hasta)
+  const desglose = { periodo: 0, anteriores: 0, posteriores: 0, manuales: 0 }
   for (const c of Object.values(cargos || {})) {
     const r = Number(c.restante) || 0
     if (r <= CENTAVO / 2) continue
-    if (!c.idOp) manuales += r
-    else if (mostradas.has(String(c.idOp)) || (c.grupo != null && grupos.has(String(c.grupo)))) incluidos += r
-    else if (desde && c.fechaOp && c.fechaOp < desde) anteriores += r
-    else if (hasta && c.fechaOp && c.fechaOp > hasta) posteriores += r
-    else filtradas += r
+    const clave = !c.idOp ? 'manuales'
+      : (desde && c.fechaOp && c.fechaOp < desde) ? 'anteriores'
+      : (hasta && c.fechaOp && c.fechaOp > hasta) ? 'posteriores' : 'periodo'
+    desglose[clave] += r
   }
-  const otras = redondear(incluidos - enCuentaMostrado)
-  const deudaMovimientos = redondear(enCuentaMostrado + otras + anteriores + posteriores + filtradas + manuales - aFavor)
-  const deudaCuenta = redondear(-(Number(saldoCuenta) || 0))
-  const sinExplicar = redondear(deudaCuenta - deudaMovimientos)
+  for (const k of Object.keys(desglose)) desglose[k] = redondear(desglose[k])
+  const deuda = redondear(Object.values(desglose).reduce((s, v) => s + v, 0))
 
-  // Renglones: solo los que tienen importe (signo: + suma a la deuda, − resta)
-  const renglones = [
-    { clave: 'contado',     signo: -1, importe: contadoSinCobrar, texto: 'Operaciones de contado o a convenir todavía sin cobrar (no van a la cuenta corriente)' },
-    { clave: 'en_curso',    signo: -1, importe: enCursoSinCargo,  texto: 'Alquileres a cuenta corriente en curso (el cargo se genera al cerrarlos)' },
-    { clave: 'anteriores',  signo: 1,  importe: redondear(anteriores),  texto: `Deuda de operaciones anteriores al ${desde ? desde.split('-').reverse().join('/') : 'período'}` },
-    { clave: 'posteriores', signo: 1,  importe: redondear(posteriores), texto: `Deuda de operaciones posteriores al ${hasta ? hasta.split('-').reverse().join('/') : 'período'}` },
-    { clave: 'filtradas',   signo: 1,  importe: redondear(filtradas),   texto: 'Deuda de operaciones del período que no se muestran por los filtros elegidos' },
-    { clave: 'manuales',    signo: 1,  importe: redondear(manuales),    texto: 'Cargos cargados a mano en la cuenta corriente (sin operación)' },
-    { clave: 'otras',       signo: otras < 0 ? -1 : 1, importe: Math.abs(otras), texto: 'Diferencia por alquileres agrupados cobrados todo junto' },
-    { clave: 'a_favor',     signo: -1, importe: redondear(aFavor), texto: 'Pagos a favor todavía sin aplicar' },
-    { clave: 'sin_explicar', signo: sinExplicar < 0 ? -1 : 1, importe: Math.abs(sinExplicar), texto: 'Diferencia entre el saldo guardado de la cuenta y sus movimientos (avisar a sistemas)' },
-  ].filter(r => r.importe > CENTAVO)
+  // Fuera de la cuenta corriente, con algo pendiente
+  const ficha = (o) => ({
+    id: o.id, nro_op: o.nro_op, nro_remito: o.nro_remito, fecha: o.fecha, tipo: o.tipo, tipoTexto: o.tipoTexto, obra: o.obra,
+    metodoTexto: o.metodoTexto, total: o.total, resta: o.resta, estimado: !!o.estimado, enPeriodo: enPeriodo(o.fecha),
+  })
+  const bloque = (lista) => ({
+    ops: lista.map(ficha),
+    total: redondear(lista.reduce((s, o) => s + (Number(o.resta) || 0), 0)),
+    enPeriodo: redondear(lista.filter(o => enPeriodo(o.fecha)).reduce((s, o) => s + (Number(o.resta) || 0), 0)),
+  })
+  const pendientes = ops.filter(o => o.estado !== 'a_convenir' && !o.enCuenta && (Number(o.resta) || 0) > CENTAVO)
+  const sinEntregar = (o) => o.estadoOp === 'pendiente' || o.estadoOp === 'despachado'
+  const programadas = pendientes.filter(sinEntregar)
+  const enCurso = pendientes.filter(o => !sinEntregar(o) && o.enCurso)
+  const sinCobrar = pendientes.filter(o => !sinEntregar(o) && !o.enCurso)
 
-  return { saldoLiquidacion, deudaCuenta, renglones, coincide: Math.abs(deudaCuenta - saldoLiquidacion) <= CENTAVO }
+  const saldo = redondear(saldoCuenta)
+  const bSinCobrar = bloque(sinCobrar)
+  return {
+    desde, hasta,
+    cuenta: {
+      saldo, deuda, aFavor: redondear(aFavor), desglose,
+      creditos: (creditos || []).map(c => ({ ...c, fecha: c.fecha ? String(c.fecha).slice(0, 10) : null })),
+      saldoMovimientos: redondear(saldoMovimientos),
+      coincideConMovimientos: Math.abs(saldo - redondear(saldoMovimientos)) <= CENTAVO,
+    },
+    sinCobrar: bSinCobrar,
+    enCurso: bloque(enCurso),
+    programadas: bloque(programadas),
+    total: redondear(-saldo + bSinCobrar.total),
+  }
 }
 
 function nroLiquidacion(hoy, clienteId) {
@@ -177,7 +199,7 @@ function diasEntre(desde, hasta) {
 }
 
 module.exports = {
-  TIPOS, ESTADOS, METODOS,
+  TIPOS, ESTADOS, METODOS, METODOS_EN_CUENTA, METODOS_SIN_COBRO,
   rangoMes, normalizarFiltros, tipoDeOperacion, estadoPago, repartirGrupos,
-  filtrarPorEstado, resumir, agruparPor, nroLiquidacion, diasEntre, conciliarConCuenta,
+  filtrarPorEstado, resumir, agruparPor, nroLiquidacion, diasEntre, saldoDelCliente,
 }

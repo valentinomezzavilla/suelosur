@@ -16,10 +16,17 @@ async function crearContenedores(n) {
   return ids
 }
 
+// El saldo de un cliente es la suma de sus movimientos (lo mantiene la base): un saldo
+// inicial se carga como un ajuste en su cuenta.
 async function crearCliente({ cuentaCorriente = false, saldo = 0 } = {}) {
-  return (await q(
-    `INSERT INTO clientes (nombre, apellido, cuenta_corriente, activo, saldo) VALUES ('PRUEBA', 'GRUPOS', ?, 1, ?) RETURNING id`,
-    [cuentaCorriente ? 1 : 0, saldo])).rows[0].id
+  const id = (await q(
+    `INSERT INTO clientes (nombre, apellido, cuenta_corriente, activo) VALUES ('PRUEBA', 'GRUPOS', ?, 1) RETURNING id`,
+    [cuentaCorriente ? 1 : 0])).rows[0].id
+  if (Number(saldo)) {
+    await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, created_at) VALUES (?, 'ajuste', 'Saldo inicial (prueba)', ?, '2000-01-01 00:00:00')`,
+      [id, Number(saldo)])
+  }
+  return id
 }
 
 // Chofer con usuario propio (como el que entra a la hoja de ruta): { id_usuario, id_empleado }.

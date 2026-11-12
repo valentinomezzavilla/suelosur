@@ -877,14 +877,20 @@ async function initDB() {
   // Sin await a propósito: es "mejor esfuerzo", no crítica para arrancar. Si se
   // queda esperando una conexión (ej. problema de red puntual), no puede trabar el
   // arranque del server ni el bind del puerto.
+  // Solo se vinculan a operaciones que todavía no tienen su cargo, y nunca un "Cargo manual":
+  // antes se podía vincular un cargo a mano a una venta que ya tenía el suyo (mismo cliente e
+  // importe) y la puesta en regla de los cargos lo borraba como duplicado.
   ;(async () => {
     const sinVincular = (await pool.query(
-      `SELECT id, cliente_id, monto, created_at FROM movimientos_cuenta WHERE tipo = 'deuda' AND id_op_encabezado IS NULL`
+      `SELECT id, cliente_id, monto, created_at FROM movimientos_cuenta
+       WHERE tipo = 'deuda' AND id_op_encabezado IS NULL AND descripcion <> 'Cargo manual'`
     )).rows
     if (!sinVincular.length) return
     const candidatas = (await pool.query(
-      `SELECT id_op_encabezado, cliente_id, monto, COALESCE(fecha, created_at) AS fecha FROM transacciones
-       WHERE metodo_pago = 'cuenta_corriente' AND id_op_encabezado IS NOT NULL`
+      `SELECT t.id_op_encabezado, t.cliente_id, t.monto, COALESCE(t.fecha, t.created_at) AS fecha FROM transacciones t
+       WHERE t.metodo_pago = 'cuenta_corriente' AND t.id_op_encabezado IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = t.id_op_encabezado
+                         AND m.tipo IN ('deuda', 'uso_saldo_favor'))`
     )).rows
     const usadas = new Set()
     for (const d of sinVincular) {
@@ -1311,6 +1317,10 @@ async function initDB() {
     console.log(`  ↳ Empleado-chofer creado para usuario "${u.usuario}"`)
   }
 
+  // Importes en DOUBLE PRECISION (antes de crear las vistas, que dependen de algunas columnas)
+  const importes = await migrarImportesADoble()
+  if (importes.length) console.log(`💲 Importes pasados a DOUBLE PRECISION: ${importes.join(', ')}`)
+
   // ─────────────────────────────────────────────────────────────────
   // VISTAS LEGIBLES — para consultar en Supabase con nombres en vez de UUIDs.
   // No tocan los datos: son "tablas traducidas" de solo lectura.
@@ -1668,7 +1678,123 @@ async function initDB() {
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS registrado_en TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`).catch(() => {})
 
+  // Saldo de la cuenta corriente = suma de sus movimientos, mantenido por la base
+  const corregidos = await instalarSaldoCalculado()
+  if (corregidos.length) {
+    console.log(`💳 Saldo de cuenta corriente puesto igual a sus movimientos en ${corregidos.length} cliente(s) (copia del anterior en bkp_saldo_clientes):\n   ` +
+      corregidos.map(c => `cliente ${c.cliente_id}: ${c.saldo_guardado} → ${c.saldo_movimientos}`).join('\n   '))
+  }
+
   console.log('✅ Base de datos PostgreSQL inicializada')
+}
+
+// ─────────────────────────────────────────────────────────────────
+// IMPORTES EN DOUBLE PRECISION. Antes eran REAL (float4: unas 7 cifras): con montos de
+// millones se perdían los centavos y hasta pesos, y el saldo del cliente, que se iba sumando
+// en REAL, se corría de la suma de sus movimientos. DOUBLE PRECISION llega devuelto como
+// número igual que REAL, así que el código no cambia.
+// La conversión pasa por el texto con todas las cifras (extra_float_digits): cada valor queda
+// como lo veía la app. Los importes se redondean a centavos; cantidades y precios unitarios
+// (pueden tener más decimales, ej. un subtotal editado dividido la cantidad) no.
+// Idempotente: solo convierte las columnas que siguen siendo REAL. Si falla, se reintenta en
+// el próximo arranque (la app sigue funcionando con REAL).
+// ─────────────────────────────────────────────────────────────────
+const COLUMNAS_IMPORTE = [
+  ['clientes', 'saldo', true], ['movimientos_cuenta', 'monto', true], ['transacciones', 'monto', true],
+  ['op_encabezado', 'monto_total', true], ['op_encabezado', 'precio_flete', true], ['op_encabezado', 'monto_facturar', true],
+  ['op_detalle_material', 'cantidad_pedida', false], ['op_detalle_material', 'precio_unitario', false], ['op_detalle_material', 'precio_dia', false],
+  ['op_detalle_contenedor', 'precio_alquiler', true],
+  ['op_detalle_maquinaria', 'precio_por_hora', false], ['op_detalle_maquinaria', 'horas_pactadas', false], ['op_detalle_maquinaria', 'precio_total', true],
+  ['cheques', 'monto', true],
+]
+
+// `cliente` (opcional): una conexión con una transacción ya abierta (el arnés de pruebas la
+// aplica dentro de la suya); sin él, abre la propia.
+async function migrarImportesADoble(cliente = null) {
+  const c = cliente || await pool.connect()
+  try {
+    const pendientes = []
+    for (const [tabla, col, centavos] of COLUMNAS_IMPORTE) {
+      const r = await c.query(
+        `SELECT data_type FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = $1 AND column_name = $2`, [tabla, col])
+      if (r.rows[0] && r.rows[0].data_type === 'real') pendientes.push([tabla, col, centavos])
+    }
+    if (!pendientes.length) return []
+    if (!cliente) await c.query('BEGIN')
+    await c.query('SET LOCAL extra_float_digits = 3')
+    // Las vistas legibles usan algunas de estas columnas: se borran acá y initDB las vuelve a crear
+    await c.query('DROP VIEW IF EXISTS v_movimientos_cuenta, v_transacciones, v_detalle_material')
+    for (const [tabla, col, centavos] of pendientes) {
+      const valor = centavos ? `ROUND(${col}::text::numeric, 2)` : `${col}::text::numeric`
+      await c.query(`ALTER TABLE ${tabla} ALTER COLUMN ${col} TYPE DOUBLE PRECISION USING (${valor})::double precision`)
+    }
+    if (!cliente) await c.query('COMMIT')
+    return pendientes.map(([tabla, col]) => `${tabla}.${col}`)
+  } catch (e) {
+    if (cliente) throw e
+    await c.query('ROLLBACK').catch(() => {})
+    console.error('Importes a DOUBLE PRECISION (se reintenta en el próximo arranque):', e.message)
+    return []
+  } finally {
+    if (!cliente) c.release()
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SALDO DE LA CUENTA CORRIENTE = SUMA DE SUS MOVIMIENTOS. clientes.saldo es una copia de
+// Σ movimientos_cuenta.monto (sin los pagos anulados) que mantiene la base con un trigger:
+// cualquier alta, baja o cambio de un movimiento la recalcula. Ningún camino del código la
+// suma o resta a mano, así que no puede quedar distinta de los movimientos que muestran la
+// Cuenta corriente y la Liquidación. El recálculo bloquea la fila del cliente: dos
+// movimientos simultáneos no se pisan.
+// Al instalarlo pone en regla los saldos que se habían corrido (copia en bkp_saldo_clientes)
+// y devuelve los corregidos.
+// ─────────────────────────────────────────────────────────────────
+const SQL_SALDO_MOVIMIENTOS = (cliente) => `COALESCE((SELECT ROUND(SUM(m.monto)::numeric, 2) FROM movimientos_cuenta m
+  WHERE m.cliente_id = ${cliente} AND COALESCE(m.anulado, 0) = 0), 0)::double precision`
+
+// `cliente` (opcional): una conexión con una transacción ya abierta (el arnés de pruebas);
+// sin él, abre la propia.
+async function instalarSaldoCalculado(cliente = null) {
+  const c = cliente || await pool.connect()
+  try {
+    if (!cliente) await c.query('BEGIN')
+    await c.query(`
+      CREATE OR REPLACE FUNCTION recalcular_saldo_cliente(p_cliente BIGINT) RETURNS VOID AS $$
+      BEGIN
+        IF p_cliente IS NULL THEN RETURN; END IF;
+        PERFORM 1 FROM clientes WHERE id = p_cliente FOR UPDATE;
+        UPDATE clientes SET saldo = ${SQL_SALDO_MOVIMIENTOS('p_cliente')} WHERE id = p_cliente;
+      END $$ LANGUAGE plpgsql`)
+    await c.query(`
+      CREATE OR REPLACE FUNCTION trg_saldo_cliente() RETURNS trigger AS $$
+      BEGIN
+        IF TG_OP <> 'INSERT' THEN PERFORM recalcular_saldo_cliente(OLD.cliente_id); END IF;
+        IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND NEW.cliente_id IS DISTINCT FROM OLD.cliente_id) THEN
+          PERFORM recalcular_saldo_cliente(NEW.cliente_id);
+        END IF;
+        RETURN NULL;
+      END $$ LANGUAGE plpgsql`)
+    await c.query(`DROP TRIGGER IF EXISTS movimientos_cuenta_saldo ON movimientos_cuenta`)
+    await c.query(`CREATE TRIGGER movimientos_cuenta_saldo AFTER INSERT OR DELETE OR UPDATE OF monto, anulado, cliente_id
+                   ON movimientos_cuenta FOR EACH ROW EXECUTE PROCEDURE trg_saldo_cliente()`)
+    await c.query(`CREATE TABLE IF NOT EXISTS bkp_saldo_clientes (cliente_id BIGINT, saldo_guardado DOUBLE PRECISION,
+                   saldo_movimientos DOUBLE PRECISION, corregido_en TEXT DEFAULT ahora_local())`)
+    const { rows } = await c.query(`
+      WITH calc AS (SELECT c.id, c.saldo, ${SQL_SALDO_MOVIMIENTOS('c.id')} AS real FROM clientes c),
+      distintos AS (SELECT * FROM calc WHERE ABS(COALESCE(saldo, 0) - real) > 0.004),
+      copia AS (INSERT INTO bkp_saldo_clientes (cliente_id, saldo_guardado, saldo_movimientos)
+                SELECT id, saldo, real FROM distintos)
+      UPDATE clientes c SET saldo = d.real FROM distintos d WHERE c.id = d.id
+      RETURNING c.id AS cliente_id, d.saldo AS saldo_guardado, d.real AS saldo_movimientos`)
+    if (!cliente) await c.query('COMMIT')
+    return rows
+  } catch (e) {
+    if (!cliente) await c.query('ROLLBACK').catch(() => {})
+    throw e
+  } finally {
+    if (!cliente) c.release()
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -1860,4 +1986,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock, migrarImportesADoble, instalarSaldoCalculado }

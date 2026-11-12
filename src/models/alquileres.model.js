@@ -5,7 +5,7 @@ const FlotaModel = require('./flota.model')
 const ConfigContenedoresModel = require('./config_contenedores.model')
 const TransaccionesModel = require('./transacciones.model')
 const ClientesModel = require('./clientes.model')
-const { conIva } = require('../utils/iva')
+const { conIva, sinIva } = require('../utils/iva')
 const { textoDestino, numeroSinRepetirCalle } = require('../utils/destino')
 const { sumarDiasHabiles } = require('../utils/diasHabiles')
 
@@ -390,6 +390,9 @@ const AlquileresModel = {
     const direccionCambio = !!previo
       && (normDir(previo.domicilio_calle) !== normDir(calle) || normDir(previo.domicilio_numero) !== normDir(numero))
     const sinPrecio = !!previo && previo.precio_alquiler == null
+    // Ya cobrado: si se cambia el precio o el método de pago, el cobro y la cuenta del cliente
+    // acompañan (si no, la Liquidación y la Cuenta corriente quedaban diciendo cosas distintas)
+    const correccion = sinPrecio ? null : await this._correccionDeCobro(id_op, { precio: precio_alquiler, metodo: metodo_pago })
     await transaction(async (q) => {
       await q(sinPrecio
         ? `UPDATE op_encabezado SET observaciones = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`
@@ -411,8 +414,39 @@ const AlquileresModel = {
       if (direccionCambio) {
         await q(`UPDATE op_detalle_contenedor SET domicilio_lat = NULL, domicilio_lng = NULL, geo_estado = NULL, geo_detalle = NULL, geo_actualizado_en = NULL WHERE id_orden_pedido = ?`, [id_op])
       }
+      if (correccion) await AlquileresModel.corregirCobro(id_op, correccion, q)
     })
     return { direccionCambio }
+  },
+
+  // Edición de un alquiler (contenedor o maquinaria) ya cobrado: qué hay que corregir del
+  // cobro ({ neto, metodo }) o null si no cambió el precio ni el método. El precio se compara
+  // con el neto COBRADO (es lo que muestra el formulario de un alquiler cobrado), no con el de
+  // alta. Valida que se pueda: no en un alquiler cobrado todo junto, no "a convenir", cuenta
+  // corriente habilitada y saldo a favor suficiente.
+  async _correccionDeCobro(id_op, { precio, metodo }) {
+    const cobro = await this.cobroRegistrado(id_op)
+    if (!cobro.cobrado) return null
+    const precioNuevo = parseFloat(precio)
+    const cambiaPrecio = Number.isFinite(precioNuevo) && Math.abs(precioNuevo - cobro.neto) > 0.005
+    const cambiaMetodo = !!metodo && metodo !== cobro.metodo
+    if (!cambiaPrecio && !cambiaMetodo) return null
+    if (cobro.grupoTodoJunto) {
+      throw new Error('Este alquiler se cobró todo junto con los demás contenedores: el precio y el método de pago ya no se cambian por separado.')
+    }
+    if (cambiaMetodo && !METODOS_PAGO.includes(metodo)) throw new Error('El alquiler ya se cobró: elegí el método con el que se cobró.')
+    const op = (await query(`SELECT id_cliente, iva_alicuota FROM op_encabezado WHERE id = ?`, [id_op])).rows[0]
+    const metodoFinal = cambiaMetodo ? metodo : cobro.metodo
+    if (cambiaMetodo && metodoFinal === 'cuenta_corriente') {
+      const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
+      if (errCC) throw new Error(errCC)
+    }
+    if (metodoFinal === 'saldo_a_favor') {
+      const monto = cambiaPrecio ? conIva(precioNuevo, op.iva_alicuota) : cobro.monto
+      const errSaldo = await ClientesModel.errorSaldoFavor(op.id_cliente, { monto, opId: id_op })
+      if (errSaldo) throw new Error(errSaldo)
+    }
+    return { neto: cambiaPrecio ? precioNuevo : null, metodo: cambiaMetodo ? metodo : null }
   },
 
   // Datos compartidos del alquiler agrupado (dirección, obra, zona, método de pago y
@@ -979,16 +1013,8 @@ const AlquileresModel = {
 
       const principal = ops[0]
       const detalle = `Alquiler contenedores ${numeros.join(', ')} — ${ops.map(o => 'OP-' + String(o.nro_op).padStart(4, '0')).join(', ')}`
-      if (metodoPago === 'cuenta_corriente' && principal.id_cliente) {
-        await ClientesModel.agregarMovimiento(principal.id_cliente, {
-          tipo: 'deuda', descripcion: detalle, monto: -total, id_op_encabezado: principal.id,
-        }, q)
-      }
-      if (metodoPago === 'saldo_a_favor' && principal.id_cliente) {
-        await ClientesModel.agregarMovimiento(principal.id_cliente, {
-          tipo: 'uso_saldo_favor', descripcion: `${detalle} — pagado con saldo a favor`, monto: -total, id_op_encabezado: principal.id,
-        }, q)
-      }
+      // Cuenta corriente / saldo a favor: un solo cargo por el total, en la OP principal
+      await ClientesModel.cargarOperacion(principal.id_cliente, { metodo: metodoPago, monto: total, descripcion: detalle, idOp: principal.id }, q)
       return total
     }
     return qExterno ? cobrar(qExterno) : await transaction(cobrar)
@@ -1015,22 +1041,11 @@ const AlquileresModel = {
       descripcion: detalle + referencia,
       metodo_pago: metodoPago || 'efectivo',
     }, q)
-    if (metodoPago === 'cuenta_corriente' && op.id_cliente) {
-      await ClientesModel.agregarMovimiento(op.id_cliente, {
-        tipo: 'deuda',
-        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
-        monto: -monto,
-        id_op_encabezado: op.id,
-      }, q)
-    }
-    if (metodoPago === 'saldo_a_favor' && op.id_cliente) {
-      await ClientesModel.agregarMovimiento(op.id_cliente, {
-        tipo: 'uso_saldo_favor',
-        descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
-        monto: -monto,
-        id_op_encabezado: op.id,
-      }, q)
-    }
+    // Cuenta corriente / saldo a favor: el cargo en la cuenta del cliente por lo cobrado
+    await ClientesModel.cargarOperacion(op.id_cliente, {
+      metodo: metodoPago, monto, idOp: op.id,
+      descripcion: `Alquiler contenedor #${cierre.numero_contenedor || '?'} OP-${String(op.nro_op).padStart(4, '0')}`,
+    }, q)
     return monto
   },
 
@@ -1252,6 +1267,11 @@ const AlquileresModel = {
       // el precio queda fijado y pasa a Cobranzas → A convenir hasta que se elija el método.
       const cobrar = !!op.retirado && metodo_pago !== 'a_convenir'
       if (cobrar) {
+        if (metodo_pago === 'saldo_a_favor') {
+          const { iva_alicuota } = (await q(`SELECT iva_alicuota FROM op_encabezado WHERE id = ?`, [op.id])).rows[0] || {}
+          const errSaldo = await ClientesModel.errorSaldoFavor(op.id_cliente, { monto: conIva(monto, iva_alicuota) }, q)
+          if (errSaldo) throw new Error(errSaldo)
+        }
         const cierre = await this.datosCierre(op.id, { alRetiro: true, q })
         await this._registrarCobro({ op, cierre, monto, metodoPago: metodo_pago }, q)
       }
@@ -1359,6 +1379,220 @@ const AlquileresModel = {
         [oc.id_contenedor, oc.id])
     }
   },
+}
+
+// ── Cargo en la cuenta del cliente de un alquiler cobrado ──────────
+// Regla única (la misma idea que VentasModel.sincronizarCargoCC para las ventas): un alquiler
+// (contenedor o maquinaria) cobrado a cuenta corriente o con saldo a favor, sin anular, tiene
+// en la cuenta del cliente exactamente lo que se cobró (Σ de sus transacciones, IVA incluido).
+// Cualquier otro alquiler no tiene nada en la cuenta. Un alquiler agrupado que se cobra "todo
+// junto" tiene UN cargo por el total del grupo, en su OP principal (la de menor id).
+//  · Si lo que hay en la cuenta ya suma lo cobrado no toca nada (respeta los renglones de IVA).
+//  · Si no, corrige el cargo principal por la diferencia (o lo rehace si no hay).
+//  · El método es el de la transacción. Si la transacción y la operación dicen métodos
+//    distintos (un alquiler viejo editado después de cobrado) no se sabe cuál vale: no toca
+//    nada y devuelve 'revisar' (lo lista scripts/revisar-saldos.js).
+//  · Un cargo a mano que quedó vinculado por error (ver ClientesModel.esCargoDelSistema) nunca
+//    se borra: se desvincula y sigue en la cuenta como cargo a mano.
+// conservador (la puesta en regla del arranque): solo completa el cargo que falta del todo y
+// desvincula cargos a mano; cualquier otra diferencia la devuelve como 'revisar'.
+// Devuelve qué cambió (texto), 'revisar' o null. `q` permite correrlo dentro de una transacción.
+const TIPOS_EN_CUENTA = ['deuda', 'uso_saldo_favor', 'ajuste']
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
+const nroOp = (n) => `OP-${String(n).padStart(4, '0')}`
+
+AlquileresModel.sincronizarCargoCC = async function (idOp, q = query, { conservador = false } = {}) {
+  const op = (await q(`
+    SELECT op.id, op.tipo_op, op.id_grupo, ag.cobro_modo
+    FROM op_encabezado op LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo WHERE op.id = ?
+  `, [idOp])).rows[0]
+  if (!op || !['C', 'MA'].includes(op.tipo_op)) return null
+  // Las OP que comparten el cargo: el grupo cobrado todo junto, o la OP sola
+  const ops = (await q(`
+    SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.id_cliente,
+           COALESCE(op.metodo_pago,
+             (SELECT oc.metodo_pago FROM op_detalle_contenedor oc WHERE oc.id_orden_pedido = op.id ORDER BY oc.id LIMIT 1),
+             (SELECT om.metodo_pago FROM op_detalle_maquinaria om WHERE om.id_orden_pedido = op.id ORDER BY om.id LIMIT 1)) AS metodo_pago,
+           (SELECT cont.numero_contenedor FROM op_detalle_contenedor oc LEFT JOIN contenedores cont ON cont.id = oc.id_contenedor
+             WHERE oc.id_orden_pedido = op.id ORDER BY oc.id LIMIT 1) AS numero_contenedor,
+           (SELECT maq.nombre FROM op_detalle_maquinaria om LEFT JOIN maquinaria maq ON maq.id = om.id_maquinaria
+             WHERE om.id_orden_pedido = op.id ORDER BY om.id LIMIT 1) AS maquina
+    FROM op_encabezado op
+    WHERE ${op.cobro_modo === 'alquiler' && op.id_grupo ? 'op.id_grupo = ?' : 'op.id = ?'}
+    ORDER BY op.id
+  `, [op.cobro_modo === 'alquiler' && op.id_grupo ? op.id_grupo : op.id])).rows
+  const ids = ops.map(o => Number(o.id))
+  const vivas = ops.filter(o => o.estado !== 'anulado')
+  const txs = (await q(`SELECT id_op_encabezado, monto, metodo_pago FROM transacciones
+                        WHERE id_op_encabezado = ANY(?::bigint[]) AND tipo <> 'Ajuste'`, [ids])).rows
+  const movs = (await q(`SELECT id, cliente_id, tipo, monto, id_op_encabezado, descripcion FROM movimientos_cuenta
+                         WHERE id_op_encabezado = ANY(?::bigint[]) AND tipo = ANY(?) AND COALESCE(anulado, 0) = 0
+                         ORDER BY id`, [ids, TIPOS_EN_CUENTA])).rows
+
+  const metodosTx = [...new Set(txs.map(t => t.metodo_pago || 'efectivo'))]
+  const metodosOp = [...new Set(vivas.filter(o => txs.some(t => String(t.id_op_encabezado) === String(o.id))).map(o => o.metodo_pago).filter(Boolean))]
+  if (metodosTx.length > 1 || metodosOp.length > 1 || (metodosTx.length && metodosOp.length && metodosOp[0] !== metodosTx[0])) return 'revisar'
+
+  const metodo = metodosTx[0]
+  const tipo = ClientesModel.TIPO_CARGO_POR_METODO[metodo]
+  const principal = vivas[0]
+  const cliente = principal ? principal.id_cliente : null
+  const objetivo = -r2(txs.reduce((s, t) => s + (Number(t.monto) || 0), 0))
+  const corresponde = !!(tipo && cliente && txs.length && Math.abs(objetivo) >= 0.005)
+  const suma = (lista) => r2(lista.reduce((s, m) => s + Number(m.monto), 0))
+  // Un cargo cargado a mano que quedó vinculado por error no se borra nunca: se desvincula
+  // (sigue en la cuenta como cargo a mano; el saldo no cambia)
+  const nros = ops.map(o => o.nro_op)
+  const ajenos = movs.filter(m => !ClientesModel.esCargoDelSistema(m, nros))
+  const propios = movs.filter(m => !ajenos.includes(m))
+  const desvincular = async (lista) => { for (const m of lista) await q(`UPDATE movimientos_cuenta SET id_op_encabezado = NULL WHERE id = ?`, [m.id]) }
+  const borrar = async (m) => {
+    if (ajenos.includes(m)) await desvincular([m])
+    else await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [m.id])
+  }
+
+  // Modo conservador (la puesta en regla del arranque): solo lo seguro. Completa el cargo que
+  // falta del todo y desvincula los cargos a mano que sobran; cualquier otra diferencia la
+  // informa para revisarla a mano (no cambia importes de datos viejos que no se entienden).
+  if (conservador) {
+    if (!corresponde) {
+      if (!movs.length) return null
+      if (!propios.length) { await desvincular(ajenos); return 'cargo a mano desvinculado' }
+      return 'revisar'
+    }
+    if (!movs.length) {
+      // (sigue abajo: se crea el cargo)
+    } else if (Math.abs(suma(movs) - objetivo) < 0.005) {
+      return null
+    } else if (ajenos.length && Math.abs(suma(propios) - objetivo) < 0.005) {
+      await desvincular(ajenos)
+      return 'cargo a mano desvinculado'
+    } else {
+      return 'revisar'
+    }
+  }
+
+  if (!corresponde) {
+    for (const m of movs) await borrar(m)
+    return movs.length ? 'cargo borrado' : null
+  }
+  // Los cargos a mano que sobran se desvinculan; los del otro tipo (pasó de cuenta corriente a
+  // saldo a favor o al revés) o de otro cliente quedan obsoletos
+  let cambio = null
+  if (ajenos.length && Math.abs(suma(propios) - objetivo) < 0.005) {
+    await desvincular(ajenos)
+    return 'cargo a mano desvinculado'
+  }
+  const quedan = []
+  for (const m of movs) {
+    if ((m.tipo !== 'ajuste' && m.tipo !== tipo) || String(m.cliente_id) !== String(cliente)) { await borrar(m); cambio = 'cargo obsoleto borrado' }
+    else quedan.push(m)
+  }
+  const diferencia = r2(objetivo - suma(quedan))
+  if (Math.abs(diferencia) < 0.005) return cambio
+
+  const main = quedan.find(m => m.tipo === tipo && propios.includes(m) && String(m.id_op_encabezado) === String(principal.id))
+    || quedan.find(m => m.tipo === tipo && propios.includes(m)) || quedan.find(m => m.tipo === tipo)
+  if (main && Number(main.monto) + diferencia < -0.005) {
+    await q(`UPDATE movimientos_cuenta SET monto = ? WHERE id = ?`, [r2(Number(main.monto) + diferencia), main.id])
+    return `cargo ajustado a ${-objetivo}`
+  }
+  // Sin cargo (o la diferencia lo dejaría en cero o a favor): uno solo por lo cobrado
+  for (const m of quedan) await borrar(m)
+  const descripcion = principal.tipo_op === 'MA'
+    ? `Alquiler ${principal.maquina || 'maquinaria'} ${nroOp(principal.nro_op)}`
+    : vivas.length > 1
+      ? `Alquiler contenedores ${vivas.map(o => '#' + (o.numero_contenedor || '?')).join(', ')} — ${vivas.map(o => nroOp(o.nro_op)).join(', ')}`
+      : `Alquiler contenedor #${principal.numero_contenedor || '?'} ${nroOp(principal.nro_op)}`
+  await ClientesModel.cargarOperacion(cliente, { metodo, monto: -objetivo, descripcion, idOp: principal.id }, q)
+  return `cargo creado por ${-objetivo}`
+}
+
+// Pone en regla los cargos de todos los alquileres cobrados (idempotente; corre al arrancar),
+// en modo conservador: completa los que faltan (p. ej. un alquiler histórico pagado con saldo
+// a favor que no descontaba el crédito) y desvincula cargos a mano vinculados por error. Lo que
+// no cierra por otra cosa queda en `revisar` (lo detalla npm run revisar:saldos).
+// Devuelve { cambios, revisar } con los N° de OP.
+AlquileresModel.sincronizarTodosLosCargosCC = async function () {
+  const ops = (await query(`
+    SELECT op.id, op.nro_op FROM op_encabezado op
+    WHERE op.tipo_op IN ('C', 'MA') AND (
+      EXISTS (SELECT 1 FROM transacciones t WHERE t.id_op_encabezado = op.id)
+      OR EXISTS (SELECT 1 FROM movimientos_cuenta m WHERE m.id_op_encabezado = op.id AND m.tipo = ANY(?)))
+    ORDER BY op.id
+  `, [TIPOS_EN_CUENTA])).rows
+  const cambios = [], revisar = []
+  for (const o of ops) {
+    const r = await transaction(q => AlquileresModel.sincronizarCargoCC(o.id, q, { conservador: true }))
+    if (r === 'revisar') revisar.push(nroOp(o.nro_op))
+    else if (r) cambios.push(`${nroOp(o.nro_op)}: ${r}`)
+  }
+  return { cambios, revisar: [...new Set(revisar)] }
+}
+
+// Corrige el cobro ya registrado de un alquiler (al editarlo después de cobrado): el importe
+// (neto → la transacción pasa a neto + IVA) y/o el método de pago. La cuenta del cliente y el
+// egreso a tercero acompañan. Un alquiler agrupado cobrado todo junto no se corrige por
+// separado. Las validaciones de cuenta corriente / saldo a favor las hace quien llama.
+// Devuelve true si cambió algo.
+AlquileresModel.corregirCobro = async function (idOp, { neto = null, metodo = null } = {}, q = query) {
+  const op = (await q(`
+    SELECT op.id, op.tipo_op, op.iva_alicuota, ag.cobro_modo
+    FROM op_encabezado op LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo WHERE op.id = ?
+  `, [idOp])).rows[0]
+  const txs = (await q(`SELECT * FROM transacciones WHERE id_op_encabezado = ? AND tipo <> 'Ajuste' ORDER BY id`, [idOp])).rows
+  if (!op || !txs.length) return false
+  const ultima = txs[txs.length - 1]
+  const cobrado = r2(txs.reduce((s, t) => s + (Number(t.monto) || 0), 0))
+  const montoNuevo = neto != null ? conIva(neto, op.iva_alicuota) : null
+  const cambiaMonto = montoNuevo != null && Math.abs(montoNuevo - cobrado) > 0.005
+  const cambiaMetodo = !!metodo && metodo !== (ultima.metodo_pago || 'efectivo')
+  if (!cambiaMonto && !cambiaMetodo) return false
+  if (op.cobro_modo === 'alquiler') {
+    throw new Error('Este alquiler se cobró todo junto con los demás contenedores: el precio y el método de pago ya no se cambian por separado.')
+  }
+  if (cambiaMetodo && !METODOS_PAGO.includes(metodo)) throw new Error('El alquiler ya se cobró: elegí el método con el que se cobró.')
+  const Tercero = require('../services/tercero.service')
+
+  let montoUltima = Number(ultima.monto)
+  if (cambiaMonto) {
+    montoUltima = r2(montoNuevo - (cobrado - Number(ultima.monto)))
+    await q(`UPDATE transacciones SET monto = ? WHERE id = ?`, [montoUltima, ultima.id])
+    await q(`UPDATE op_encabezado SET monto_facturar = ? WHERE id = ?`, [r2(neto), idOp])
+  }
+  const metodoFinal = cambiaMetodo ? metodo : (ultima.metodo_pago || 'efectivo')
+  if (cambiaMetodo) {
+    await q(`UPDATE transacciones SET metodo_pago = ? WHERE id_op_encabezado = ? AND tipo <> 'Ajuste'`, [metodo, idOp])
+    await q(`UPDATE op_encabezado SET metodo_pago = ? WHERE id = ?`, [metodo, idOp])
+    await q(`UPDATE ${op.tipo_op === 'MA' ? 'op_detalle_maquinaria' : 'op_detalle_contenedor'} SET metodo_pago = ? WHERE id_orden_pedido = ?`, [metodo, idOp])
+  }
+  // Egreso a tercero: se rehace con el monto y el método nuevos (sin transferencia, no hay)
+  for (const t of txs) await Tercero.borrarDeTransaccion(t.id, q)
+  if (metodoFinal === 'transferencia') {
+    await Tercero.egresoDeCobro({ id_transaccion: ultima.id, id_op_encabezado: idOp, monto: montoUltima, fecha: ultima.fecha, cliente: ultima.cliente, tipo: ultima.tipo }, q)
+  } else if (cambiaMetodo) {
+    await Tercero.guardarEnOp(idOp, null, {}, q)
+  }
+  await AlquileresModel.sincronizarCargoCC(idOp, q)
+  return true
+}
+
+// ¿El alquiler ya tiene su cobro registrado? { cobrado, monto (con IVA), neto, metodo, grupoTodoJunto }
+// neto: el guardado al cobrar (monto_facturar) o, en los viejos, lo cobrado sin el IVA.
+AlquileresModel.cobroRegistrado = async function (idOp, q = query) {
+  const r = (await q(`
+    SELECT COUNT(t.id)::int AS n, COALESCE(SUM(t.monto), 0)::float8 AS monto, MAX(t.metodo_pago) AS metodo,
+           MAX(op.monto_facturar) AS monto_facturar, MAX(op.iva_alicuota) AS iva_alicuota,
+           BOOL_OR(ag.cobro_modo = 'alquiler') AS todo_junto
+    FROM op_encabezado op
+    LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo
+    LEFT JOIN transacciones t ON t.id_op_encabezado = op.id AND t.tipo <> 'Ajuste'
+    WHERE op.id = ?
+  `, [idOp])).rows[0]
+  if (!r || !r.n) return { cobrado: false, monto: 0, neto: null, metodo: null, grupoTodoJunto: !!(r && r.todo_junto) }
+  const monto = r2(r.monto)
+  const neto = r.monto_facturar != null ? r2(r.monto_facturar) : sinIva(monto, r.iva_alicuota)
+  return { cobrado: true, monto, neto, metodo: r.metodo, grupoTodoJunto: !!r.todo_junto }
 }
 
 module.exports = AlquileresModel

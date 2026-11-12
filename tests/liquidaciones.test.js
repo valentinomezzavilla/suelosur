@@ -54,8 +54,12 @@ describe('estadoPago', () => {
     assert.equal(L.estadoPago({ total: 500, metodoPago: 'a_convenir', cobrado: 500 }).estado, 'pagada')
     assert.equal(L.estadoPago({ total: 500, metodoPago: null, cobrado: 0 }).estado, 'pendiente')
   })
-  it('saldo a favor: pagada en el momento', () => {
-    assert.deepEqual(L.estadoPago({ total: 800, metodoPago: 'saldo_a_favor' }), { pagado: 800, resta: 0, estado: 'pagada' })
+  it('saldo a favor: pagada en lo que alcanzó el crédito (como en la cuenta corriente)', () => {
+    assert.deepEqual(L.estadoPago({ total: 800, metodoPago: 'saldo_a_favor', cc: { total: 800, pagado: 800 } }), { pagado: 800, resta: 0, estado: 'pagada' })
+    // El crédito no alcanzó: la diferencia la debe, igual que en su cuenta
+    assert.deepEqual(L.estadoPago({ total: 800, metodoPago: 'saldo_a_favor', cc: { total: 800, pagado: 500 } }), { pagado: 500, resta: 300, estado: 'parcial' })
+    // Sin cargo todavía (un alquiler en curso): no está pagada
+    assert.deepEqual(L.estadoPago({ total: 800, metodoPago: 'saldo_a_favor' }), { pagado: 0, resta: 800, estado: 'pendiente' })
   })
   it('cuenta corriente: según la imputación FIFO', () => {
     assert.deepEqual(L.estadoPago({ total: 1000, metodoPago: 'cuenta_corriente', cc: { total: 1000, pagado: 400 } }), { pagado: 400, resta: 600, estado: 'parcial' })

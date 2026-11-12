@@ -6,6 +6,11 @@ const { hoyISO } = require('../utils/fecha')
 const { fechaDeOperacion } = require('../utils/fechaOperacion')
 const { imputar, porOperacion } = require('../utils/imputacion')
 
+const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
+const pesos = (n) => '$' + redondear(n).toLocaleString('es-AR')
+// Métodos de pago que no se cobran en el momento sino contra la cuenta del cliente
+const TIPO_CARGO_POR_METODO = { cuenta_corriente: 'deuda', saldo_a_favor: 'uso_saldo_favor' }
+
 // Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
 // En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
 // (anclado a su OP principal): un cargo de cualquier OP del grupo cuenta para todas.
@@ -19,6 +24,7 @@ const SQL_OP_SIN_CARGO = `op.metodo_pago = 'cuenta_corriente' AND op.estado <> '
 const SQL_PENDIENTES_CC = `SELECT COUNT(*) FROM op_encabezado op WHERE op.id_cliente = c.id AND ${SQL_OP_SIN_CARGO}`
 
 const ClientesModel = {
+  TIPO_CARGO_POR_METODO,
 
   async listar() {
     return (await query(`SELECT * FROM clientes WHERE activo = 1 ORDER BY numero ASC NULLS LAST, apellido, nombre`)).rows
@@ -162,11 +168,22 @@ const ClientesModel = {
   },
 
   // Devuelve null si el cliente puede pagar usando su saldo a favor, o el mensaje de error.
-  async errorSaldoFavor(clienteId) {
+  // monto (opcional): lo que hay que pagar; si el saldo a favor no alcanza, no se puede (si
+  // no, la operación figuraría pagada y la cuenta quedaría debiendo la diferencia).
+  // opId (opcional): la operación que se está editando; lo que ya usó de saldo a favor vuelve
+  // a estar disponible para ella.
+  async errorSaldoFavor(clienteId, { monto = null, opId = null } = {}, q = query) {
     if (!clienteId) return 'Para usar saldo a favor hay que elegir un cliente (no puede ser "particular").'
-    const c = (await query(`SELECT nombre, apellido, saldo, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+    const c = (await q(`SELECT nombre, apellido, saldo, activo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
     if (!c) return 'El cliente no existe.'
-    if (!(Number(c.saldo) > 0)) return `${ClientesModel.nombreCompleto(c)} no tiene saldo a favor. Elegí otro método de pago.`
+    const yaUsado = opId ? -Number((await q(
+      `SELECT COALESCE(SUM(monto), 0) AS s FROM movimientos_cuenta WHERE id_op_encabezado = ? AND cliente_id = ? AND tipo = 'uso_saldo_favor'`,
+      [opId, clienteId])).rows[0].s) || 0 : 0
+    const disponible = redondear(Number(c.saldo) + yaUsado)
+    if (!(disponible > 0)) return `${ClientesModel.nombreCompleto(c)} no tiene saldo a favor. Elegí otro método de pago.`
+    if (monto != null && redondear(monto) - disponible > 0.005) {
+      return `El saldo a favor de ${ClientesModel.nombreCompleto(c)} es ${pesos(disponible)} y no alcanza para pagar ${pesos(monto)}. Elegí otro método de pago.`
+    }
     return null
   },
 
@@ -186,21 +203,41 @@ const ClientesModel = {
   // Un cargo o ajuste de una operación va en la fecha de la operación; un pago, en su fecha
   // de pago (`fecha`, 'AAAA-MM-DD HH:MM:SS' de utils/fechaPago) o, sin ella, en el momento.
   // El momento real de carga queda en registrado_en (default de la columna).
+  // clientes.saldo lo recalcula la base (trigger movimientos_cuenta_saldo, ver config/db).
   async agregarMovimiento(id, { tipo, descripcion, monto, metodo_pago, id_op_encabezado, fecha }, q = query) {
     const creadoEn = fecha || (id_op_encabezado && tipo !== 'pago' ? await this.fechaCargoDeOperacion(id_op_encabezado, q) : null)
     const { rows } = await q(`INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, metodo_pago, id_op_encabezado, created_at) VALUES (?, ?, ?, ?, ?, ?, COALESCE(?, ahora_local())) RETURNING id`,
-      [id, tipo, descripcion, Number(monto), metodo_pago || null, id_op_encabezado || null, creadoEn])
-    await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [Number(monto), id])
+      [id, tipo, descripcion, redondear(monto), metodo_pago || null, id_op_encabezado || null, creadoEn])
     return rows[0].id
   },
 
-  // Elimina un movimiento y revierte su efecto en el saldo (usado para deshacer
-  // el crédito de un cheque cuando se deshabilita).
+  // Cargo de una operación cobrada a cuenta corriente o con saldo a favor (alquileres: se
+  // conoce el importe al cobrar). Con otro método no hace nada. Devuelve el id o null.
+  async cargarOperacion(clienteId, { metodo, monto, descripcion, idOp }, q = query) {
+    const tipo = TIPO_CARGO_POR_METODO[metodo]
+    if (!tipo || !clienteId) return null
+    return this.agregarMovimiento(clienteId, {
+      tipo, monto: -redondear(monto), id_op_encabezado: idOp,
+      descripcion: tipo === 'uso_saldo_favor' ? `${descripcion} — pagado con saldo a favor` : descripcion,
+    }, q)
+  },
+
+  // ¿El movimiento vinculado a una operación lo generó el sistema para ella? Los cargos
+  // automáticos dicen de qué son (Venta…, Alquiler…, IVA…, o el N° de OP) y el uso de saldo a
+  // favor y los ajustes vinculados solo los genera el sistema. Uno que no (un cargo cargado a
+  // mano que quedó vinculado por error) las puestas en regla no lo borran nunca: lo desvinculan
+  // y sigue en la cuenta como cargo a mano.
+  esCargoDelSistema(m, nrosOp = []) {
+    if (m.tipo === 'uso_saldo_favor' || m.tipo === 'ajuste') return true
+    const d = String(m.descripcion || '').trim()
+    if (/^(venta|alquiler|maquinaria|iva)\b/i.test(d)) return true
+    return nrosOp.some(n => d.includes(`OP-${String(n).padStart(4, '0')}`))
+  },
+
+  // Elimina un movimiento (usado para deshacer el crédito de un cheque cuando se
+  // deshabilita). El saldo lo recalcula la base.
   async eliminarMovimiento(movId) {
-    const m = (await query(`SELECT cliente_id, monto FROM movimientos_cuenta WHERE id = ?`, [movId])).rows[0]
-    if (!m) return
     await query(`DELETE FROM movimientos_cuenta WHERE id = ?`, [movId])
-    await query(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(m.monto), m.cliente_id])
   },
 
   async movimientos(clienteId) {
@@ -241,7 +278,7 @@ const ClientesModel = {
   // Movimientos vigentes (sin anulados) en el orden de la cuenta, para imputar pagos
   async movimientosParaImputar(clientesIds) {
     return (await query(
-      `SELECT id, cliente_id, id_op_encabezado, monto, tipo, created_at FROM movimientos_cuenta
+      `SELECT id, cliente_id, id_op_encabezado, monto, tipo, created_at, descripcion, metodo_pago FROM movimientos_cuenta
        WHERE cliente_id = ANY(?::bigint[]) AND COALESCE(anulado, 0) = 0
        ORDER BY cliente_id, created_at ASC, id ASC`,
       [clientesIds.map(Number)]
@@ -392,9 +429,9 @@ const ClientesModel = {
       if (Number(m.anulado)) throw new Error('Ese pago ya estaba anulado.')
       const cheque = (await q(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [movId])).rows[0]
       if (cheque) throw new Error('Este pago es de un cheque: anulalo desde Cheques (deshabilitando el cheque).')
+      // El saldo lo recalcula la base (los anulados no suman)
       await q(`UPDATE movimientos_cuenta SET anulado = 1, anulado_en = ahora_local(), anulado_por = ?, anulado_motivo = ? WHERE id = ?`,
         [usuario || null, motivo, movId])
-      await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(m.monto), clienteId])
       await require('../services/tercero.service').borrarDeMovimiento(movId, q)
       return m
     })

@@ -30,6 +30,13 @@ initDB()
       const cambios = await require('./src/models/ventas.model').sincronizarTodosLosCargosCC()
       if (cambios.length) console.log(`💳 Cuenta corriente: ${cambios.length} cargo(s) corregido(s)\n   ` + cambios.join('\n   '))
     } catch (e) { console.error('Sincronizar cargos de cuenta corriente:', e.message) }
+    // Lo mismo con los alquileres cobrados: en la cuenta del cliente, exactamente lo cobrado
+    // (completa el uso del saldo a favor que no se descontaba, quita cargos que no corresponden)
+    try {
+      const { cambios, revisar } = await require('./src/models/alquileres.model').sincronizarTodosLosCargosCC()
+      if (cambios.length) console.log(`💳 Cuenta corriente (alquileres): ${cambios.length} cargo(s) corregido(s)\n   ` + cambios.join('\n   '))
+      if (revisar.length) console.log(`⚠️  Alquileres cuya cuenta no coincide con el cobro y no se corrigen solos (revisar con "npm run revisar:saldos"): ${revisar.join(', ')}`)
+    } catch (e) { console.error('Sincronizar cargos de alquileres:', e.message) }
 
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`✅ Suelosur corriendo en puerto ${PORT}`)

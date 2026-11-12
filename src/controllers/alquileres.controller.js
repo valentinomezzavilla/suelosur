@@ -228,14 +228,12 @@ const AlquileresController = {
           metodo_pago: metodoPago || 'efectivo',
           fecha: fechaFinReal || fechaInicio || null,
         })
-        if (metodoPago === 'cuenta_corriente' && clienteIdClean) {
-          await ClientesModel.agregarMovimiento(clienteIdClean, {
-            tipo: 'deuda',
-            descripcion: `Alquiler contenedor (histórico) OP-${String(result.nro_op).padStart(4, '0')}`,
-            monto: -monto,
-            id_op_encabezado: result.id,
-          })
-        }
+        // Cuenta corriente: el cargo; saldo a favor: el uso del crédito (antes no se descontaba
+        // y el cliente seguía figurando con saldo a favor)
+        await ClientesModel.cargarOperacion(clienteIdClean, {
+          metodo: metodoPago, monto, idOp: result.id,
+          descripcion: `Alquiler contenedor (histórico) OP-${String(result.nro_op).padStart(4, '0')}`,
+        })
         req.flash('success', `Alquiler finalizado OP-${String(result.nro_op).padStart(4, '0')} cargado (histórico).`)
         return res.redirect('/alquileres/contenedores')
       }
@@ -353,6 +351,7 @@ const AlquileresController = {
       if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/contenedores/${alquiler.id}`) }
       res.render('pages/alquileres/editar', {
         titulo: `Editar OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler,
+        cobro: await AlquileresModel.cobroRegistrado(alquiler.id),
         zonas: await require('../models/zonas.model').listarActivas(),
       })
     } catch (err) {
@@ -711,8 +710,20 @@ const AlquileresController = {
       }
       const alquiler = await AlquileresModel.obtener(req.params.id)
       if (metodo_pago_final === 'saldo_a_favor') {
-        const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente)
+        // Un contenedor solo: el crédito tiene que alcanzar para lo que se cobra (con el IVA)
+        let monto = null
+        if (alquiler && !(alquiler.grupo && alquiler.grupo.cobro_modo === 'alquiler')) {
+          const manual = typeof precio_final === 'string' && precio_final.trim() !== '' ? parseFloat(precio_final) : null
+          const cierre = await AlquileresModel.datosCierre(alquiler.id, { alRetiro: true })
+          const neto = Number.isFinite(manual) ? manual : (cierre ? cierre.precioACobrar : null)
+          if (neto != null) monto = require('../utils/iva').conIva(neto, alquiler.iva_alicuota)
+        }
+        const errSaldo = await ClientesModel.errorSaldoFavor(alquiler?.id_cliente, { monto })
         if (errSaldo) { req.flash('error', errSaldo); return res.redirect(back) }
+      }
+      if (metodo_pago_final === 'cuenta_corriente') {
+        const errCC = await ClientesModel.errorCuentaCorriente(alquiler?.id_cliente)
+        if (errCC) { req.flash('error', errCC); return res.redirect(back) }
       }
       await Tercero.guardarEnOp(req.params.id, await Tercero.leer(req.body, metodo_pago_final), { grupo: alquiler?.grupo?.cobro_modo === 'alquiler' })
       const monto = await AlquileresModel.cobrarAlCerrar(req.params.id, leerMontosPorOp(precio_final), metodo_pago_final)

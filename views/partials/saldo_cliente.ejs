@@ -1,0 +1,108 @@
+<%#
+  Saldo del cliente: el MISMO bloque en el estado de cuenta (Cuenta corriente) y en la
+  Liquidación, con los mismos números (LiquidacionesModel.saldoCliente).
+  Locals: saldo (utils/liquidaciones.saldoDelCliente), idCliente, linkCuenta (opcional: mostrar
+  el link al estado de cuenta).
+%>
+<%
+  const s = saldo
+  const c = s.cuenta
+  const $m = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fecha = (f) => f ? String(f).slice(0, 10).split('-').reverse().join('/') : ''
+  // Cuenta: negativo = debe. Total: positivo = debe.
+  const txtCuenta = (v) => v < -0.005 ? 'Debe ' + $m(-v) : (v > 0.005 ? 'A favor ' + $m(v) : 'Al día')
+  const clsCuenta = (v) => v < -0.005 ? 'text-danger' : (v > 0.005 ? 'text-success' : 'text-muted')
+  const txtTotal = (v) => v > 0.005 ? 'Debe ' + $m(v) : (v < -0.005 ? 'A favor ' + $m(-v) : 'Al día')
+  const periodo = s.desde && s.hasta ? `del ${fecha(s.desde)} al ${fecha(s.hasta)}` : 'del período'
+  const nro = (o) => o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0')
+  const href = (o) => o.tipo === 'contenedor' ? '/alquileres/contenedores/' + o.id : o.tipo === 'maquinaria' ? '/alquileres/maquinaria/' + o.id : '/ventas/' + o.id
+  const renglones = [
+    [`Deuda de operaciones ${periodo}`, c.desglose.periodo],
+    ['Deuda de operaciones anteriores', c.desglose.anteriores],
+    ['Deuda de operaciones posteriores', c.desglose.posteriores],
+    ['Cargos cargados a mano en la cuenta', c.desglose.manuales],
+  ].filter(([, v]) => v > 0.005)
+%>
+<div class="card shadow-sm mb-3 saldo-cliente">
+  <div class="card-body">
+    <div class="saldo-cliente__cabecera">
+      <div class="saldo-cliente__dato">
+        <span>Saldo de la cuenta corriente</span>
+        <strong class="<%= clsCuenta(c.saldo) %>"><%= txtCuenta(c.saldo) %></strong>
+      </div>
+      <% if (s.sinCobrar.total > 0.005) { %>
+        <div class="saldo-cliente__dato">
+          <span>Sin cobrar fuera de la cuenta corriente</span>
+          <strong class="text-danger"><%= $m(s.sinCobrar.total) %></strong>
+        </div>
+        <div class="saldo-cliente__dato">
+          <span>Total del cliente</span>
+          <strong class="<%= s.total > 0.005 ? 'text-danger' : (s.total < -0.005 ? 'text-success' : 'text-muted') %>"><%= txtTotal(s.total) %></strong>
+        </div>
+      <% } %>
+    </div>
+    <p class="saldo-cliente__nota">Mismo saldo en Cuentas corrientes, en el estado de cuenta y en la Liquidación<% if (locals.linkCuenta) { %> · <a href="/clientes/cuentas/<%= idCliente %>">Ver estado de cuenta →</a><% } %></p>
+
+    <%# Liquidación: cómo se forma lo pendiente de las operaciones del período (solo si sin filtros cierra exacto) %>
+    <% if (locals.pendientePeriodo != null) {
+         const partes = [
+           [c.desglose.periodo, 'en la cuenta corriente'],
+           [s.sinCobrar.enPeriodo, 'sin cobrar fuera de la cuenta'],
+           [s.enCurso.enPeriodo, 'de alquileres en curso'],
+           [s.programadas.enPeriodo, 'sin entregar o sin iniciar'],
+         ].filter(([v]) => v > 0.005)
+         const suma = Math.round(partes.reduce((t, [v]) => t + v, 0) * 100) / 100
+         if (partes.length > 1 && Math.abs(suma - pendientePeriodo) <= 0.01) { %>
+      <p class="saldo-cliente__nota">Pendiente de las operaciones <%= periodo %>: <strong><%= $m(pendientePeriodo) %></strong> =
+        <%= partes.map(([v, t]) => $m(v) + ' ' + t).join(' + ') %>.</p>
+    <% } } %>
+
+    <% if (renglones.length) { %>
+      <table class="table table-sm mb-2 saldo-cliente__tabla">
+        <tbody>
+          <% renglones.forEach(([texto, v]) => { %>
+            <tr><td><%= texto %></td><td class="text-end text-danger"><%= $m(v) %></td></tr>
+          <% }) %>
+          <% if (c.aFavor > 0.005) { %>
+            <tr><td>Pagos que quedaron a favor (todavía sin aplicar a ninguna compra)</td><td class="text-end text-success">− <%= $m(c.aFavor) %></td></tr>
+          <% } %>
+          <tr class="fw-bold"><td>Cuenta corriente</td><td class="text-end <%= clsCuenta(c.saldo) %>"><%= txtCuenta(c.saldo) %></td></tr>
+        </tbody>
+      </table>
+    <% } %>
+
+    <% if (c.aFavor > 0.005 && c.creditos.length) { %>
+      <details class="saldo-cliente__detalle" open>
+        <summary>¿De dónde sale el saldo a favor?</summary>
+        <p class="small text-muted mb-1">Son pagos (o ajustes a favor) por más de lo que el cliente debía en su cuenta corriente. Se descuentan solos de las próximas compras a cuenta corriente, o se pueden usar con el método de pago "Saldo a favor".<% if (s.enCurso.ops.length) { %> Cuando se cargue el alquiler en curso, se aplica a ese cargo.<% } %></p>
+        <ul class="saldo-cliente__lista">
+          <% c.creditos.forEach(cr => { %>
+            <li><span><%= fecha(cr.fecha) %> · <%= cr.descripcion || (cr.tipo === 'ajuste' ? 'Ajuste a favor' : 'Pago') %></span>
+                <span><%= $m(cr.sobrante) %><% if (cr.sobrante < cr.monto - 0.005) { %> <small class="text-muted">(de <%= $m(cr.monto) %>)</small><% } %></span></li>
+          <% }) %>
+        </ul>
+      </details>
+    <% } %>
+
+    <% [
+         [s.sinCobrar, 'Sin cobrar fuera de la cuenta corriente', 'Operaciones ya hechas que no van a la cuenta corriente (contado o "a convenir") y todavía no se cobraron del todo. Suman a lo que debe el cliente.'],
+         [s.enCurso, 'Alquileres de contenedor en curso', 'Todavía no son deuda: se cobran o se cargan en la cuenta al retirar el contenedor. Importe estimado a hoy.'],
+         [s.programadas, 'Todavía sin entregar o sin iniciar', 'Todavía no son deuda: se cobran o se cargan al entregarlas o iniciarlas.'],
+       ].forEach(([b, titulo, ayuda]) => { if (!b.ops.length) return %>
+      <details class="saldo-cliente__detalle">
+        <summary><%= titulo %>: <strong><%= $m(b.total) %></strong> <small class="text-muted">(<%= b.ops.length %> operación<%= b.ops.length === 1 ? '' : 'es' %>)</small></summary>
+        <p class="small text-muted mb-1"><%= ayuda %></p>
+        <ul class="saldo-cliente__lista">
+          <% b.ops.forEach(o => { %>
+            <li><span><a href="<%= href(o) %>"><%= nro(o) %></a> · <%= fecha(o.fecha) %> · <%= o.tipoTexto %><%= o.obra ? ' · ' + o.obra : '' %> · <%= o.metodoTexto %></span>
+                <span><%= $m(o.resta) %><%= o.estimado ? ' (estimado)' : '' %></span></li>
+          <% }) %>
+        </ul>
+      </details>
+    <% }) %>
+
+    <% if (!c.coincideConMovimientos) { %>
+      <div class="alert alert-warning mt-2 mb-0 small">El saldo guardado (<%= txtCuenta(c.saldo) %>) no coincide con la suma de los movimientos (<%= txtCuenta(c.saldoMovimientos) %>). Se corrige solo al reiniciar el sistema; si sigue, avisar a sistemas.</div>
+    <% } %>
+  </div>
+</div>

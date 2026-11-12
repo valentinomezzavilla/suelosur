@@ -1,6 +1,10 @@
 <%
   const d = alquiler.detalle || {}
   const metodos = [['efectivo','Efectivo'],['transferencia','Transferencia'],['cheque','Cheque'],['echeq','Echeq'],['cuenta_corriente','Cuenta corriente']]
+  // El método actual siempre entre las opciones (si no, guardar lo cambiaba sin querer)
+  const metodoActual = alquiler.metodo_pago || d.metodo_pago || ''
+  if (metodoActual && !metodos.some(([k]) => k === metodoActual)) metodos.push([metodoActual, metodoActual === 'saldo_a_favor' ? 'Saldo a favor' : metodoActual])
+  const infoCobro = locals.cobro || null
   const calle = d.domicilio_calle || d.domicilio_entrega || ''
   const numero = d.domicilio_numero || ''
 %>
@@ -21,14 +25,17 @@
         <div class="col-md-3"><label class="form-label">Días pactados</label><input type="number" min="1" name="plazo_alquiler" class="form-control" value="<%= d.plazo_alquiler || 1 %>"></div>
         <div class="col-md-3"><label class="form-label">Horas pactadas</label><input type="number" step="0.5" min="0" name="horas_pactadas" class="form-control" value="<%= d.horas_pactadas || 0 %>"></div>
         <div class="col-md-3"><label class="form-label">Precio por hora</label><input type="number" step="0.01" min="0" name="precio_por_hora" class="form-control" value="<%= d.precio_por_hora || 0 %>"></div>
-        <div class="col-md-3"><label class="form-label">Precio total</label><input type="number" step="0.01" min="0" name="precio_total" class="form-control" value="<%= d.precio_total || 0 %>"></div>
+        <div class="col-md-3"><label class="form-label"><%= infoCobro && infoCobro.cobrado ? 'Precio total cobrado (neto)' : 'Precio total' %></label><input type="number" step="0.01" min="0" name="precio_total" class="form-control" value="<%= infoCobro && infoCobro.cobrado ? infoCobro.neto : (d.precio_total || 0) %>"></div>
         <div class="col-md-4"><label class="form-label">Fecha de entrega</label><input type="date" name="fecha_entrega_planificada" class="form-control" value="<%= alquiler.fecha_entrega_planificada || '' %>"></div>
         <div class="col-md-4"><label class="form-label">Método de pago</label>
           <select name="metodo_pago" class="form-select">
             <option value="">— Sin especificar —</option>
-            <% metodos.forEach(([k,l]) => { %><option value="<%= k %>" <%= (alquiler.metodo_pago||d.metodo_pago)===k?'selected':'' %>><%= l %></option><% }) %>
+            <% metodos.forEach(([k,l]) => { %><option value="<%= k %>" <%= metodoActual===k?'selected':'' %>><%= l %></option><% }) %>
           </select>
         </div>
+        <% if (infoCobro && infoCobro.cobrado) { %>
+          <div class="col-12"><p class="form-hint mb-0">Este alquiler ya se cobró. Si cambiás el precio total o el método de pago, se corrige el cobro y la cuenta corriente del cliente.</p></div>
+        <% } %>
         <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= alquiler.observaciones || '' %></textarea></div>
       </div>
       <div class="d-flex gap-2 mt-3">
