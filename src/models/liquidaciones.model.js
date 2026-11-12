@@ -273,6 +273,12 @@ const LiquidacionesModel = {
     return Object.fromEntries(ops.map(o => [o.id, o]))
   },
 
+  // Una operación armada con su estado de pago (o null si no existe). Sin filtros de fecha.
+  async operacion(idOp) {
+    const { ops } = await calcularOperaciones({ tipos: Object.keys(L.TIPOS), opIds: [idOp] })
+    return ops[0] || null
+  },
+
   // filtros: salida de normalizarFiltros (utils/liquidaciones)
   async liquidacion({ clienteId, obra, desde, hasta, tipos, estadoPago }) {
     if (clienteId) {

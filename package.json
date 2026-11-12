@@ -12,6 +12,7 @@
     "corregir:fecha-cargos": "node scripts/corregir-fecha-cargos.js",
     "revisar:tercero": "node scripts/revisar-transferencias-tercero.js",
     "revisar:saldos": "node scripts/revisar-saldos.js",
+    "revisar:pagos": "node scripts/revisar-pagos.js",
     "vincular:estacion": "node scripts/vincular-estacion.js",
     "test": "node --test --test-concurrency=1 \"tests/**/*.test.js\""
   },
