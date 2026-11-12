@@ -43,7 +43,7 @@ async function operacionesBase({ clienteId, desde, hasta, tipos, opIds, conAnula
   return (await query(`
     SELECT op.id, op.nro_op, op.nro_remito, op.tipo_op, op.modalidad, op.id_cliente, op.id_grupo, op.estado,
            ${FECHA} AS fecha, op.obra, op.domicilio_calle, op.domicilio_altura,
-           op.precio_flete, op.monto_total, op.monto_facturar, op.iva_alicuota, op.para_facturar, op.facturado,
+           op.precio_flete, op.monto_total, op.monto_facturar, op.iva_alicuota, op.para_facturar, op.facturado, op.nro_factura,
            COALESCE(op.metodo_pago, oc.metodo_pago, om.metodo_pago) AS metodo_pago,
            (ag.cobro_modo = 'alquiler') AS grupo_todo_junto,
            oc.id AS oc_id, oc.precio_alquiler, oc.domicilio_entrega AS cont_entrega,
@@ -130,7 +130,7 @@ function armar(r, materiales, cobro) {
     metodo_pago: r.metodo_pago, metodoTexto: L.METODOS[r.metodo_pago] || 'Sin definir', estadoOp: r.estado,
     aConvenir: false, renglones: [], total: 0, cobrado: false, estimado: false,
     enCurso: r.tipo_op === 'C' && r.estado === 'entregado' && !r.cont_hasta,
-    paraFacturar: Number(r.para_facturar) === 1, facturado: Number(r.facturado) === 1,
+    paraFacturar: Number(r.para_facturar) === 1, facturado: Number(r.facturado) === 1, nroFactura: r.nro_factura || null,
   }
   const netoCobrado = () => r.monto_facturar != null ? Number(r.monto_facturar) : sinIva(cobro.registrado, r.iva_alicuota)
   if (r.tipo_op === 'M') {

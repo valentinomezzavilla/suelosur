@@ -167,8 +167,9 @@
                                     <% } %>
                                 </td>
                                 <td class="td-acciones">
+                                    <div class="acciones-fila acciones-fila--fin">
                                     <% if (esTx) { %>
-                                        <button type="button" class="btn-secondary btn-sm btn-ver-transaccion"
+                                        <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-ver-transaccion" title="Ver detalle" aria-label="Ver detalle" data-bs-toggle="tooltip" data-bs-placement="top"
                                             data-real-id="<%= t.id %>"
                                             data-id="<%= codigoMov(t) %>" data-tipo="<%= t.tipo %>"
                                             data-cliente="<%= t.persona %>" data-cliente-id="<%= t.cliente_id || '' %>"
@@ -179,29 +180,26 @@
                                             data-metodo-pago="<%= t.metodo_pago || '' %>"
                                             data-op-id="<%= t.id_op_encabezado || '' %>"
                                             data-nro-remito="<%= t.nro_remito || '' %>"
-                                            data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
-                                            Ver
-                                        </button>
-                                        <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[t.id_op_encabezado] }) %>
+                                            data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>"><%- icon('eye', { size: 16 }) %></button>
+                                        <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[t.id_op_encabezado], compacto: true }) %>
                                         <% if (puedeCorregir) { %>
-                                            <button type="button" class="btn-secondary btn-sm btn-borrar-transaccion"
+                                            <button type="button" class="btn btn-sm btn-icon btn-outline-secondary btn-borrar-transaccion" title="Eliminar" aria-label="Eliminar" data-bs-toggle="tooltip" data-bs-placement="top"
                                                 data-id="<%= t.id %>" data-codigo="<%= codigoMov(t) %>"
                                                 data-cliente="<%= t.persona %>"
                                                 data-monto="<%= money(t.monto) %>"
                                                 data-tiene-op="<%= t.id_op_encabezado ? '1' : '' %>"
-                                                title="Eliminar">
-                                                <%- icon('trash', { size: 14 }) %>
-                                            </button>
+                                                ><%- icon('trash', { size: 16 }) %></button>
                                         <% } %>
                                     <% } else if (t.origen === 'pago_cliente') { %>
-                                        <a href="/clientes/cuentas/<%= t.cliente_id %>" class="btn-secondary btn-sm" title="Ver la cuenta corriente del cliente">Ver cuenta</a>
+                                        <a href="/clientes/cuentas/<%= t.cliente_id %>" class="btn btn-sm btn-icon btn-outline-secondary" title="Ver la cuenta corriente del cliente" aria-label="Ver la cuenta corriente del cliente" data-bs-toggle="tooltip" data-bs-placement="top"><%- icon('user', { size: 16 }) %></a>
                                     <% } else { %>
                                         <% if (t.id_pago_empleado) { %>
-                                            <a href="/compras/recibo/<%= t.id_pago_empleado %>" class="btn-secondary btn-sm" target="_blank" rel="noopener">Recibo</a>
+                                            <a href="/compras/recibo/<%= t.id_pago_empleado %>" class="btn btn-sm btn-icon btn-outline-secondary" target="_blank" rel="noopener" title="Recibo de pago" aria-label="Recibo de pago" data-bs-toggle="tooltip" data-bs-placement="top"><%- icon('printer', { size: 16 }) %></a>
                                         <% } %>
                                         <a href="/compras?<%= new URLSearchParams(Object.assign({ preset: 'rango', fechaDesde: String(t.fecha).slice(0, 10), fechaHasta: String(t.fecha).slice(0, 10), categoria: t.categoria_egreso || '' }, t.id_empleado ? { empleado: t.id_empleado } : {})).toString() %>"
-                                           class="btn-secondary btn-sm" title="Ver en Compras / Pagos">Ver</a>
+                                           class="btn btn-sm btn-icon btn-outline-secondary" title="Ver en Compras / Pagos" aria-label="Ver en Compras / Pagos" data-bs-toggle="tooltip" data-bs-placement="top"><%- icon('eye', { size: 16 }) %></a>
                                     <% } %>
+                                    </div>
                                 </td>
                             </tr>
                         <% }) %>

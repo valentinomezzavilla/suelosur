@@ -145,7 +145,7 @@
           <th><%- thSort('fecha', 'Fecha') %></th>
           <th class="text-end"><%- thSort('total', 'Total') %></th>
           <th class="text-center"><%- thSort('estado', 'Estado') %></th>
-          <th class="text-center">Acciones</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -167,10 +167,10 @@
             <span class="badge rounded-pill px-3 py-1 <%= badgeMap[op.estado] %>"><%= labelEstado[op.estado] || op.estado %></span>
           </td>
           <td class="text-center">
-            <div class="d-flex flex-wrap gap-1 justify-content-center">
-              <a href="/ventas/<%= op.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+            <div class="acciones-fila">
+              <%- include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', clase: 'btn-outline-secondary', href: '/ventas/' + op.id }) %>
               <%- include('../../partials/boton_nro_factura', { op }) %>
-              <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[op.id] }) %>
+              <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[op.id], compacto: true }) %>
             </div>
           </td>
         </tr>

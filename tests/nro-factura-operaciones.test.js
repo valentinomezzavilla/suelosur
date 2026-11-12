@@ -29,6 +29,20 @@ function llamar(Controller, accion, { body = {}, params = {}, query = {}, user }
   })
 }
 
+// Botones de solo ícono (.btn-icon): cada uno con nombre accesible (aria-label, igual al tooltip) y
+// ninguno con texto visible. Devuelve cuántos hay.
+function revisarIconos(html) {
+  const botones = html.match(/<(button|a)\b[^>]*\bbtn-icon\b[^>]*>[\s\S]*?<\/\1>/g) || []
+  for (const b of botones) {
+    const etiqueta = (b.match(/aria-label="([^"]+)"/) || [])[1]
+    assert.ok(etiqueta, 'botón de ícono sin aria-label: ' + b.slice(0, 120))
+    assert.equal((b.match(/\btitle="([^"]*)"/) || [])[1], etiqueta, 'el tooltip (title) tiene que ser el mismo nombre: ' + etiqueta)
+    assert.match(b, /data-bs-toggle="tooltip"/)
+    assert.equal(b.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '').trim(), '', 'el botón "' + etiqueta + '" no debe llevar texto visible')
+  }
+  return botones.length
+}
+
 describe('N° de Factura en cualquier operación', () => {
   let admin, user, producto, cliente
 
@@ -200,7 +214,8 @@ describe('N° de Factura en cualquier operación', () => {
   })
 
   describe('botón en la columna de acciones', () => {
-    const boton = (id, etiqueta) => new RegExp(`class="[^"]*btn-nro-factura[^"]*"[^>]*data-id="${id}"[^>]*>\\s*${etiqueta}\\s*<`)
+    // El botón es de solo ícono: su nombre es el aria-label ("Agregar N°Factura" / "Editar N°Factura: <número>")
+    const boton = (id, etiqueta) => new RegExp(`<(?:button|a)[^>]*btn-nro-factura[^>]*aria-label="${etiqueta}[^"]*"[^>]*data-id="${id}"`)
     const render = (r, extra = {}) => renderVista(r.vista, { ...r.data, user, scripts: [], ...extra })
 
     it('el parcial dice "Agregar N°Factura" sin número y "Editar N°Factura" con número', async () => {
@@ -234,6 +249,9 @@ describe('N° de Factura en cualquier operación', () => {
       assert.match(html, boton(conNro, 'Editar N°Factura'))
       assert.doesNotMatch(html, new RegExp(`btn-nro-factura[^>]*data-id="${facturada}"`))
       assert.match(html, /id="modal-nro-factura"/)
+      assert.ok(revisarIconos(html) >= 3, 'Ver + N°Factura en cada fila')
+      assert.match(html, /aria-label="Ver detalle"/)
+      assert.doesNotMatch(html, />\s*(Ver|Agregar N°Factura|Marcar como pagada|Marcar pendiente)\s*</)   // ya no hay botones con texto
     })
 
     it('Alquileres de contenedores: botón en la tabla', async () => {
@@ -244,6 +262,9 @@ describe('N° de Factura en cualquier operación', () => {
       const html = await render(r)
       assert.match(html, boton(id, 'Agregar N°Factura'))
       assert.match(html, /id="modal-nro-factura"/)
+      assert.ok(revisarIconos(html) >= 4, 'Ver, Editar, Imprimir y N°Factura')
+      assert.match(html, /aria-label="Editar alquiler"/)
+      assert.match(html, /href="\/remitos\/\d+\/pdf" target="_blank" rel="noopener"/)   // el remito sigue abriendo en otra pestaña
       await guardar(id, '0001-00000088')
       const r2 = await llamar(AlquileresController, 'index', { user, query: {} })
       assert.match(await render(r2), boton(id, 'Editar N°Factura'))
@@ -257,6 +278,79 @@ describe('N° de Factura en cualquier operación', () => {
       const html = await render(r)
       assert.match(html, boton(id, 'Agregar N°Factura'))
       assert.match(html, /id="modal-nro-factura"/)
+      assert.ok(revisarIconos(html) >= 2)
+    })
+  })
+
+  describe('Cuenta corriente y Liquidaciones', () => {
+    const ClientesController = require('../src/controllers/clientes.controller')
+    const LiquidacionesController = require('../src/controllers/liquidaciones.controller')
+    // El botón es de solo ícono: su nombre es el aria-label ("Agregar N°Factura" / "Editar N°Factura: <número>")
+    const boton = (id, etiqueta) => new RegExp(`<(?:button|a)[^>]*btn-nro-factura[^>]*aria-label="${etiqueta}[^"]*"[^>]*data-id="${id}"`)
+    const cuantos = (html, id) => (html.match(new RegExp(`btn-nro-factura[^>]*data-id="${id}"`, 'g')) || []).length
+
+    // Tres ventas a cuenta corriente de octubre: una sin número, una con número (y marcada para
+    // facturar: tiene un cargo más por el IVA) y una ya facturada
+    let cli, sinNro, conNro, facturada
+    before(async () => {
+      cli = await datos.crearCliente({ cuentaCorriente: true })
+      const ventaCC = async (fecha) => {
+        const id = (await VentasModel.crear({
+          id_cliente: cli, id_administrativo: admin, tipo_op: 'M', modalidad: 'flete', metodo_pago: 'cuenta_corriente',
+          fecha_emision: fecha, fecha_entrega_planificada: fecha, domicilio: { calle: 'Colón', altura: '100' }, obra: null,
+          precio_flete: 0, monto_total: 1000, detalles: [{ id_producto: producto, cantidad_pedida: 1, precio_unitario: 1000 }],
+        })).id
+        await VentasModel.sincronizarCargoCC(id)
+        return id
+      }
+      sinNro = await ventaCC('2026-10-05')
+      conNro = await ventaCC('2026-10-06')
+      await llamar(FacturacionController, 'marcar', { user, params: { id: conNro }, body: { nroFactura: '0001-00000123' } })
+      facturada = await ventaCC('2026-10-07')
+      await prueba.q(`UPDATE op_encabezado SET facturado = 1, nro_factura = 'A-77' WHERE id = ?`, [facturada])
+    })
+
+    it('Cuenta corriente: un botón por operación (aunque tenga varios cargos) y ninguno en la facturada', async () => {
+      const r = await llamar(ClientesController, 'cuentaDetalle', { user, params: { id: cli }, query: { desde: '2026-10-01' } })
+      assert.equal(r.vista, 'pages/clientes/cuenta_detalle', JSON.stringify(r.flashes))
+      assert.ok(r.data.scripts.includes('/js/nroFactura.js'))
+      const html = await renderVista(r.vista, { ...r.data, user })
+      assert.match(html, boton(sinNro, 'Agregar N°Factura'))
+      assert.match(html, boton(conNro, 'Editar N°Factura'))
+      assert.match(html, new RegExp(`btn-nro-factura[^>]*data-id="${conNro}"[^>]*data-nro="0001-00000123"`))
+      assert.equal(cuantos(html, conNro), 1)
+      assert.equal(cuantos(html, facturada), 0)
+      assert.match(html, /id="modal-nro-factura"/)
+      // quien no carga operaciones no lo ve
+      assert.doesNotMatch(await renderVista(r.vista, { ...r.data, user: { rol: 'chofer' } }), /btn-nro-factura/)
+      // las acciones de cada movimiento son de solo ícono: marcar pagada (verde) y N°Factura
+      assert.ok(revisarIconos(html) >= 3)
+      assert.match(html, /aria-label="Marcar como pagada[^"]*"/)
+      assert.doesNotMatch(html, />\s*(Marcar como pagada|Marcar pendiente|Anular)[^<]*</)
+    })
+
+    it('Liquidaciones: botón en la tarjeta de cada operación y ninguno en la facturada', async () => {
+      const r = await llamar(LiquidacionesController, 'index', { user, query: { clienteId: String(cli), desde: '2026-10-01', hasta: '2026-10-31' } })
+      assert.equal(r.vista, 'pages/liquidaciones/index', JSON.stringify(r.flashes))
+      assert.ok(r.data.scripts.includes('/js/nroFactura.js'))
+      const html = await renderVista(r.vista, { ...r.data, user })
+      assert.match(html, boton(sinNro, 'Agregar N°Factura'))
+      assert.match(html, boton(conNro, 'Editar N°Factura'))
+      assert.match(html, new RegExp(`btn-nro-factura[^>]*data-id="${conNro}"[^>]*data-nro="0001-00000123"`))
+      assert.equal(cuantos(html, facturada), 0)
+      assert.match(html, /id="modal-nro-factura"/)
+      // la tarjeta se nombra por remito: el modal también (Cuenta corriente y listados usan OP-0001)
+      assert.match(html, new RegExp(`btn-nro-factura[^>]*data-id="${sinNro}"[^>]*data-nombre="Remito \\d+"`))
+      assert.ok(revisarIconos(html) >= 4, 'Ver y N°Factura por tarjeta, y Marcar como pagada en el pie')
+      assert.match(html, /<div class="acciones-fila">/)
+    })
+
+    it('guardar desde ahí funciona igual y se ve en las dos pantallas', async () => {
+      await guardar(sinNro, '0001-00000555')
+      const cuenta = await llamar(ClientesController, 'cuentaDetalle', { user, params: { id: cli }, query: { desde: '2026-10-01' } })
+      assert.match(await renderVista(cuenta.vista, { ...cuenta.data, user }), boton(sinNro, 'Editar N°Factura'))
+      const liq = await llamar(LiquidacionesController, 'index', { user, query: { clienteId: String(cli), desde: '2026-10-01', hasta: '2026-10-31' } })
+      assert.match(await renderVista(liq.vista, { ...liq.data, user }), boton(sinNro, 'Editar N°Factura'))
     })
   })
 

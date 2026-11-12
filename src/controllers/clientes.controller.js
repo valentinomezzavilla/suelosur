@@ -131,12 +131,14 @@ const ClientesController = {
       // corriente, de qué período es la deuda, de dónde sale el saldo a favor, lo que falta
       // cobrar fuera de la cuenta y los alquileres en curso con el importe estimado a hoy
       const saldo = await require('../models/liquidaciones.model').saldoCliente(cli.id, { desde: filtros.desde, hasta: filtros.hasta })
+      // N° de factura de las operaciones de la cuenta (botón "Agregar / Editar N°Factura")
+      const opsNroFactura = await require('../models/facturacion.model').datosNroFactura(estado.movimientos.map(m => m.id_op_encabezado))
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS,
+        cliente, estado, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.clave : null },
-        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js'],
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')

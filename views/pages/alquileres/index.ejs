@@ -51,7 +51,7 @@
           <span class="finalizar-card__dr ${semaforoDias(dr)}">${drTxt}</span>
         </div>
         <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-naranja w-100 mt-2">Ver / gestionar retiro</a>
-        <div class="d-flex flex-wrap gap-1 mt-2">${include('../../partials/boton_nro_factura', { op: a })}${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] })}</div>
+        <div class="acciones-fila mt-2">${include('../../partials/boton_nro_factura', { op: a })}${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id], compacto: true })}</div>
       </div>`
     }).join('') + `</div>`
   }
@@ -71,7 +71,7 @@
           <th class="text-center">Fin de alquiler</th>
           <th class="text-center">${opts.colDias || 'Días restantes'}</th>
           <th class="text-center">Estado</th>
-          <th class="text-center">Acciones</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -99,12 +99,12 @@
             </td>
             <td class="text-center"><span class="badge rounded-pill px-3 ${est.badge}">${est.label}</span></td>
             <td class="text-center">
-              <div class="d-flex flex-wrap gap-1 justify-content-center">
-                <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-outline-secondary" title="Ver">${icon('eye', { size: 15 })}</a>
-                ${a.estado !== 'anulado' ? `<a href="/alquileres/contenedores/${a.id}/editar" class="btn btn-sm btn-outline-secondary" title="Editar">${icon('edit', { size: 15 })}</a>` : ''}
-                <a href="/remitos/${a.id}/pdf" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir remito PDF">${icon('printer', { size: 15 })}</a>
+              <div class="acciones-fila">
+                ${include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', href: '/alquileres/contenedores/' + a.id })}
+                ${a.estado !== 'anulado' ? include('../../partials/btn_icono', { icono: 'edit', etiqueta: 'Editar alquiler', href: '/alquileres/contenedores/' + a.id + '/editar' }) : ''}
+                ${include('../../partials/btn_icono', { icono: 'printer', etiqueta: 'Imprimir remito PDF', href: '/remitos/' + a.id + '/pdf', target: '_blank' })}
                 ${include('../../partials/boton_nro_factura', { op: a })}
-                ${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] })}
+                ${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id], compacto: true })}
               </div>
             </td>
           </tr>`
