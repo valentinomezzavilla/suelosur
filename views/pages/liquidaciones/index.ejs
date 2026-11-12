@@ -77,7 +77,8 @@
   <div class="card shadow-sm"><div class="card-body text-center text-muted py-5">Sin operaciones en el período.</div></div>
 <% } else if (conCliente) { %>
   <% const c = liquidacion.clientes[0] %>
-  <% c.operaciones.forEach(o => { %><%- include('../../partials/liquidacion_operacion', { o, ESTADOS }) %><% }) %>
+  <% const saldar = c.cliente ? { idCliente: c.cliente.id, nombre: c.cliente.nombreCompleto } : null %>
+  <% c.operaciones.forEach(o => { %><%- include('../../partials/liquidacion_operacion', { o, ESTADOS, saldar }) %><% }) %>
 <% } else { %>
   <div class="card shadow-sm mb-3">
     <div class="card-body">
@@ -142,3 +143,6 @@
     </div>
   </div>
 <% } %>
+
+<%# Pago de la cuenta corriente ("Saldar" en las operaciones del cliente) %>
+<% if (conCliente) { %><%- include('../../partials/modal_pago_cuenta') %><% } %>

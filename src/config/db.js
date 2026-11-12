@@ -1678,6 +1678,9 @@ async function initDB() {
   await pool.query(`ALTER TABLE movimientos_cuenta ADD COLUMN IF NOT EXISTS registrado_en TEXT`).catch(() => {})
   await pool.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`).catch(() => {})
 
+  // A qué operaciones se aplica cada pago (lo que se eligió al registrarlo)
+  await migrarImputacionesPago()
+
   // Saldo de la cuenta corriente = suma de sus movimientos, mantenido por la base
   const corregidos = await instalarSaldoCalculado()
   if (corregidos.length) {
@@ -1752,6 +1755,27 @@ async function migrarImportesADoble(cliente = null) {
 // ─────────────────────────────────────────────────────────────────
 const SQL_SALDO_MOVIMIENTOS = (cliente) => `COALESCE((SELECT ROUND(SUM(m.monto)::numeric, 2) FROM movimientos_cuenta m
   WHERE m.cliente_id = ${cliente} AND COALESCE(m.anulado, 0) = 0), 0)::double precision`
+
+// ─────────────────────────────────────────────────────────────────
+// IMPUTACIONES DE PAGOS: a qué operación (o cargo a mano) se aplica cada pago de la cuenta
+// corriente, según lo que se eligió al registrarlo (utils/imputacion). Lo que no se eligió
+// se aplica a las deudas más viejas. Se borran solas con el pago, el cargo o la operación.
+// `cliente` (opcional): conexión con una transacción abierta (el arnés de pruebas).
+// ─────────────────────────────────────────────────────────────────
+async function migrarImputacionesPago(cliente = null) {
+  const ejecutar = (sql) => (cliente ? cliente.query(sql) : pool.query(sql))
+  await ejecutar(`
+    CREATE TABLE IF NOT EXISTS imputaciones_pago (
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_pago          BIGINT NOT NULL REFERENCES movimientos_cuenta(id) ON DELETE CASCADE,
+      id_op_encabezado BIGINT REFERENCES op_encabezado(id) ON DELETE CASCADE,
+      id_cargo         BIGINT REFERENCES movimientos_cuenta(id) ON DELETE CASCADE,
+      monto            DOUBLE PRECISION NOT NULL CHECK (monto > 0),
+      created_at       TEXT DEFAULT ahora_local(),
+      CHECK (id_op_encabezado IS NOT NULL OR id_cargo IS NOT NULL)
+    )`)
+  await ejecutar(`CREATE INDEX IF NOT EXISTS idx_imputaciones_pago_pago ON imputaciones_pago(id_pago)`)
+}
 
 // `cliente` (opcional): una conexión con una transacción ya abierta (el arnés de pruebas);
 // sin él, abre la propia.
@@ -1986,4 +2010,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock, migrarImportesADoble, instalarSaldoCalculado }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock, migrarImportesADoble, instalarSaldoCalculado, migrarImputacionesPago }

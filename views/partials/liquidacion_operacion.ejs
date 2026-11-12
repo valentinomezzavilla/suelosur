@@ -1,4 +1,5 @@
-<%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS %>
+<%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS y, opcional,
+    saldar ({ idCliente, nombre }): botón "Saldar" en las que deben algo en la cuenta corriente %>
 <% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
 <% const nroTxt = o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0') %>
 <%# Lo que todavía no es deuda lo dice: un alquiler en curso, o algo sin entregar que no está en la cuenta %>
@@ -48,6 +49,11 @@
       <span>Total <strong><%= $(o.total) %></strong><% if (o.estimado) { %> <small class="text-muted" title="Alquiler todavía sin cobrar: lo que se cobraría hoy">(estimado a hoy)</small><% } %></span>
       <span class="text-success">Pagado <strong><%= $(o.pagado) %></strong></span>
       <span class="<%= o.resta > 0.005 ? 'text-danger' : 'text-success' %>">Resta <strong><%= $(o.resta) %></strong></span>
+      <%# Saldar: lo que le falta exacto, aplicado a esta operación (las de un alquiler cobrado todo junto se saldan desde la cuenta) %>
+      <% if (locals.saldar && o.enCuenta && !o.grupoTodoJunto && o.resta > 0.005) { %>
+        <button type="button" class="btn btn-sm btn-outline-success btn-abonar" data-id="<%= saldar.idCliente %>" data-nombre="<%= saldar.nombre %>"
+                data-clave="op:<%= o.id %>" data-deuda="<%= o.resta %>" data-descripcion="<%= nroTxt %> · <%= o.tipoTexto %>">Saldar</button>
+      <% } %>
     <% } %>
   </div>
 </div>
