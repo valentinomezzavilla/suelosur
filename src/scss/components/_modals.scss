@@ -261,3 +261,92 @@
     padding-left: 1.65rem !important;
   }
 }
+
+// Modal "Registrar pago" (partials/modal_pago_cuenta + js/modalAbonar): monto, método y
+// fecha arriba; debajo, a qué operaciones se aplica el pago.
+.pago-cuenta {
+  &__datos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 0 1rem;
+  }
+
+  &__ops {
+    border-top: 1px solid $border-soft;
+    padding-top: 0.9rem;
+    margin-top: 0.25rem;
+  }
+  &__ops-cabecera {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  &__titulo { font-size: $fs-base; font-weight: 600; color: $ink; margin: 0; }
+  &__acciones { display: flex; gap: 0.4rem; align-items: baseline; color: $muted; font-size: $fs-xs; }
+
+  &__criterios {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1rem;
+    margin: 0.6rem 0 0.7rem;
+  }
+  &__criterio {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: $fs-sm;
+    color: $ink-soft;
+    cursor: pointer;
+    input { accent-color: $accent; }
+  }
+
+  &__lista {
+    max-height: 46vh;
+    overflow-y: auto;
+    border: 1px solid $border-soft;
+    border-radius: $radius-lg;
+  }
+  &__cargando { margin: 0; padding: 0.9rem 1rem; font-size: $fs-sm; color: $muted; }
+
+  &__resumen {
+    margin: 0.65rem 0 0.25rem;
+    font-size: $fs-sm;
+    color: $ink-soft;
+    min-height: 1.2em;
+    &--error { color: $danger-text; font-weight: 500; }
+  }
+}
+
+.pago-op {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto 9.5rem 9rem;
+  align-items: center;
+  gap: 0.35rem 0.85rem;
+  padding: 0.55rem 0.85rem;
+  border-bottom: 1px solid $border-soft;
+  font-size: $fs-sm;
+  &:last-child { border-bottom: 0; }
+  &.is-marcada { background: $accent-soft; }
+
+  &__check { accent-color: $accent; width: 16px; height: 16px; cursor: pointer; }
+  &__info { display: flex; flex-direction: column; min-width: 0; cursor: pointer; margin: 0; }
+  &__nro { font-weight: 600; color: $ink; }
+  &__desc { color: $muted; font-size: $fs-xs; @include truncate; }
+  &__debe { white-space: nowrap; color: $ink-soft; font-variant-numeric: tabular-nums; small { color: $muted; } }
+  &__aplica { font-variant-numeric: tabular-nums; color: $ink; text-align: right; }
+  &__input { text-align: right; }
+  &__queda {
+    font-size: $fs-xs;
+    font-weight: 600;
+    text-align: right;
+    &--pagada  { color: $success-text; }
+    &--parcial { color: $warning-text; }
+  }
+
+  @include md-down {
+    grid-template-columns: auto minmax(0, 1fr);
+    &__debe, &__aplica, &__queda { grid-column: 2; text-align: left; }
+  }
+}

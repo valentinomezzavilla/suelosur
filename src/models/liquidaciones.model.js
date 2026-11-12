@@ -24,7 +24,6 @@ const { nombreObra, claveObra } = require('../utils/obras')
 const { fmtFecha } = require('../utils/fecha')
 const L = require('../utils/liquidaciones')
 const { ivaDe, sinIva, etiqueta: etiquetaIva } = require('../utils/iva')
-const { imputar } = require('../utils/imputacion')
 
 // Fecha de la operación: regla única del sistema (venta = fecha de compra; alquiler = inicio).
 // La misma que usan la cuenta corriente y el Libro de ventas: ver utils/fechaOperacion.
@@ -316,8 +315,7 @@ const LiquidacionesModel = {
     const cliente = (await query(`SELECT saldo FROM clientes WHERE id = ?`, [clienteId])).rows[0]
     if (!cliente) return null
     const { ops } = await calcularOperaciones({ clienteId, tipos: Object.keys(L.TIPOS) })
-    const movs = await ClientesModel.movimientosParaImputar([clienteId])
-    const { cargos, aFavor, creditos } = imputar(movs)
+    const { movs, cargos, aFavor, creditos } = await ClientesModel.imputacionDe(clienteId)
     // Fecha de la operación de cada cargo (para separar la deuda por período)
     const idsOp = [...new Set(Object.values(cargos).map(c => c.idOp).filter(Boolean).map(Number))]
     const datosOp = idsOp.length ? Object.fromEntries((await query(

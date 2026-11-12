@@ -19,11 +19,15 @@ const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.i
 // estación de servicio), el pago del cliente y el egreso al tercero son UN solo movimiento:
 // se guardan juntos en la misma transacción (o ninguno), y el pago dice a quién se le transfirió.
 // fechaDia: 'AAAA-MM-DD' (fecha de pago, ya validada); el egreso a tercero lleva la misma.
-async function registrarMovimientoCC(req, { tipo = 'pago', descripcion, monto, signed = monto, metodo_pago, fechaDia }, tercero) {
+// imputaciones (pagos): [{ clave, monto }] las operaciones que se eligió pagar; se validan
+// contra lo que debía el cliente y se guardan con el pago (lo que no se eligió va a lo más viejo).
+async function registrarMovimientoCC(req, { tipo = 'pago', descripcion, monto, signed = monto, metodo_pago, fechaDia, imputaciones = [] }, tercero) {
   const cli = tercero ? await ClientesModel.obtener(req.params.id) : null
   return transaction(async (q) => {
+    const elegidas = tipo === 'pago' ? await ClientesModel.validarImputaciones(req.params.id, imputaciones, monto, q) : []
     const desc = tercero ? `${descripcion} — transferido a ${await Tercero.destino(tercero, q)}` : descripcion
     const movId = await ClientesModel.agregarMovimiento(req.params.id, { tipo, descripcion: desc, monto: signed, metodo_pago, fecha: fechaHoraDePago(fechaDia) }, q)
+    await ClientesModel.guardarImputaciones(movId, elegidas, q)
     if (tercero) {
       await Tercero.crearEgreso(tercero, {
         monto, fecha: fechaDia || null, id_movimiento_cuenta: movId, id_usuario: req.session.user?.id,
@@ -113,15 +117,23 @@ const ClientesController = {
       const estado = await ClientesModel.estadoCuenta(cli.id, { desde: filtros.desde, hasta: filtros.hasta, obra })
       const obras = await ClientesModel.obras(cli.id)
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
-      // Cuánto falta de cada cargo: "Saldar" solo en los que todavía deben algo
-      const pendientes = await ClientesModel.pendientePorCargo(cli.id)
+      // Imputación de la cuenta: cuánto falta de cada cargo, "Saldar" por operación (todos sus
+      // cargos juntos, p. ej. con el IVA, por lo que falta exacto) y a qué se aplicó cada pago
+      const imp = await ClientesModel.imputacionDe(cli.id)
+      const pendientes = Object.fromEntries(Object.entries(imp.cargos).map(([id, c]) => [id, c.restante]))
+      const saldarPorCargo = {}
+      for (const it of await ClientesModel.pendientesDeCobro(cli.id, undefined, imp)) {
+        it.cargoIds.forEach(id => { saldarPorCargo[id] = { clave: it.clave, resta: it.resta, total: it.total } })
+      }
+      const aplicadoA = await ClientesModel.aplicacionesPorPago(imp)
+      const aFavorPorPago = Object.fromEntries(imp.creditos.map(c => [c.id, c.sobrante]))
       // Saldo del cliente: el mismo cálculo (y el mismo bloque) que la Liquidación — cuenta
       // corriente, de qué período es la deuda, de dónde sale el saldo a favor, lo que falta
       // cobrar fuera de la cuenta y los alquileres en curso con el importe estimado a hoy
       const saldo = await require('../models/liquidaciones.model').saldoCliente(cli.id, { desde: filtros.desde, hasta: filtros.hasta })
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, saldo, obras, obra, TIPOS,
+        cliente, estado, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.clave : null },
         scripts: ['/js/modalAbonar.js'],
@@ -304,23 +316,47 @@ const ClientesController = {
     res.redirect('back')
   },
 
+  // Pago de la cuenta corriente (modal "Registrar pago" / "Saldar"). imputaciones (JSON): las
+  // operaciones que se eligió pagar y cuánto a cada una; lo que no se elige va a lo más viejo.
   async abonar(req, res) {
     try {
-      const monto = Number(req.body.monto)
-      if (!monto || monto <= 0) { req.flash('error', 'Monto inválido.'); return res.redirect('/clientes') }
-      // Si viene de "Saldar" en una fila puntual del ledger, la descripción hace
-      // referencia a esa operación; si no, queda el genérico de siempre.
+      const monto = Math.round(Number(req.body.monto) * 100) / 100
+      if (!monto || monto <= 0) { req.flash('error', 'Monto inválido.'); return res.redirect('back') }
+      let imputaciones = []
+      try { imputaciones = JSON.parse(req.body.imputaciones || '[]') } catch (_) { imputaciones = [] }
+      // Si viene de "Saldar" en una operación puntual, la descripción hace referencia a ella;
+      // si no, queda el genérico de siempre.
       const concepto = (req.body.descripcion || '').trim()
       const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
       const fechaLeida = leerFechaPago(req.body.fecha)
       if (fechaLeida.error) { req.flash('error', fechaLeida.error); return res.redirect('back') }
       const tercero = await Tercero.leer(req.body, req.body.metodo_pago)
-      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null, fechaDia: fechaLeida.fecha }, tercero)
-      req.flash('success', `Abono de $${monto.toLocaleString('es-AR')} registrado.`)
+      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null, fechaDia: fechaLeida.fecha, imputaciones }, tercero)
+      req.flash('success', `Pago de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
     }
     res.redirect('back')
+  },
+
+  // API JSON para el modal de pago: lo que debe el cliente en su cuenta, operación por
+  // operación (de la más vieja a la más nueva), y su saldo.
+  async pendientesApi(req, res) {
+    try {
+      const cli = await ClientesModel.obtener(req.params.id)
+      if (!cli) return res.status(404).json({ error: 'Cliente no encontrado.' })
+      const imp = await ClientesModel.imputacionDe(cli.id)
+      const pendientes = await ClientesModel.pendientesDeCobro(cli.id, undefined, imp)
+      res.json({
+        saldo: Number(cli.saldo) || 0, aFavor: imp.aFavor,
+        pendientes: pendientes.map(it => ({
+          clave: it.clave, nro: it.idOp ? `OP-${String(it.nroOp).padStart(4, '0')}` : null, remito: it.nroRemito || null,
+          fecha: it.fecha, descripcion: it.descripcion, total: it.total, resta: it.resta,
+        })),
+      })
+    } catch (err) {
+      console.error(err); res.status(500).json({ error: 'Error.' })
+    }
   },
 
   // API JSON: obras del cliente para el filtro por obra (libro de ventas)

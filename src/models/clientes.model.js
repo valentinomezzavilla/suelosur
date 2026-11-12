@@ -253,9 +253,8 @@ const ClientesModel = {
   },
 
   // Cargo en cuenta corriente de cada operación y cuánto se le imputó: { [id_op]: { total, pagado } }.
-  // No hay un vínculo pago↔venta explícito: los pagos se aplican en orden FIFO contra las
-  // deudas más antiguas del cliente, igual que ya refleja el saldo corrido de estadoCuenta().
-  // Solo trae las operaciones que tienen cargo.
+  // Pagos aplicados a lo que se eligió al registrarlos y el resto a las deudas más antiguas
+  // (utils/imputacion), igual que el estado de cuenta. Solo trae las operaciones que tienen cargo.
   async pagadoPorOperacion(opIds) {
     const ids = [...new Set((opIds || []).filter(Boolean).map(String))]
     if (!ids.length) return {}
@@ -265,10 +264,13 @@ const ClientesModel = {
     if (!clientesIds.length) return {}
 
     const movs = await this.movimientosParaImputar(clientesIds)
+    const asignaciones = await this.asignacionesDe(clientesIds)
     const porCliente = new Map()
     movs.forEach(m => { const k = String(m.cliente_id); if (!porCliente.has(k)) porCliente.set(k, []); porCliente.get(k).push(m) })
     const deudas = {}
-    for (const lista of porCliente.values()) Object.assign(deudas, porOperacion(imputar(lista).cargos))
+    for (const [cli, lista] of porCliente) {
+      Object.assign(deudas, porOperacion(imputar(lista, asignaciones.filter(a => String(a.cliente_id) === cli)).cargos))
+    }
 
     const resultado = {}
     for (const id of ids) if (deudas[id]) resultado[id] = deudas[id]
@@ -276,13 +278,29 @@ const ClientesModel = {
   },
 
   // Movimientos vigentes (sin anulados) en el orden de la cuenta, para imputar pagos
-  async movimientosParaImputar(clientesIds) {
-    return (await query(
+  async movimientosParaImputar(clientesIds, q = query) {
+    return (await q(
       `SELECT id, cliente_id, id_op_encabezado, monto, tipo, created_at, descripcion, metodo_pago FROM movimientos_cuenta
        WHERE cliente_id = ANY(?::bigint[]) AND COALESCE(anulado, 0) = 0
        ORDER BY cliente_id, created_at ASC, id ASC`,
       [clientesIds.map(Number)]
     )).rows
+  },
+
+  // A qué se eligió aplicar cada pago (imputaciones_pago) de los pagos vigentes de los clientes
+  async asignacionesDe(clientesIds, q = query) {
+    return (await q(`
+      SELECT i.id_pago, i.id_op_encabezado, i.id_cargo, i.monto, m.cliente_id
+      FROM imputaciones_pago i JOIN movimientos_cuenta m ON m.id = i.id_pago
+      WHERE m.cliente_id = ANY(?::bigint[]) AND COALESCE(m.anulado, 0) = 0
+      ORDER BY i.id
+    `, [clientesIds.map(Number)])).rows
+  },
+
+  // Imputación completa de la cuenta de un cliente (utils/imputacion) con sus movimientos
+  async imputacionDe(clienteId, q = query) {
+    const movs = await this.movimientosParaImputar([clienteId], q)
+    return { movs, ...imputar(movs, await this.asignacionesDe([clienteId], q)) }
   },
 
   // ¿El cliente ya saldó cada operación? { [id_op_encabezado]: boolean } (sin cargo = saldada).
@@ -300,8 +318,103 @@ const ClientesModel = {
   // Cuánto falta pagar de cada cargo del cliente: { [movimiento_id]: restante }.
   // Misma imputación que Liquidaciones y Transacciones (utils/imputacion).
   async pendientePorCargo(clienteId) {
-    const { cargos } = imputar(await this.movimientosParaImputar([clienteId]))
+    const { cargos } = await this.imputacionDe(clienteId)
     return Object.fromEntries(Object.entries(cargos).map(([id, c]) => [id, c.restante]))
+  },
+
+  // Lo que el cliente debe en su cuenta, operación por operación (los cargos de una misma OP
+  // juntos, p. ej. con el IVA) y los cargos a mano: lo que se puede elegir al registrar un pago.
+  // De la más vieja a la más nueva: [{ clave ('op:ID' | 'cargo:ID'), idOp, idCargo, nroOp,
+  // nroRemito, fecha, descripcion, total, resta, cargoIds }]. `imp`: una imputacionDe ya hecha.
+  async pendientesDeCobro(clienteId, q = query, imp = null) {
+    const { movs, cargos } = imp || await this.imputacionDe(clienteId, q)
+    const porMov = new Map(movs.map(m => [String(m.id), m]))
+    const items = new Map()
+    for (const [id, c] of Object.entries(cargos)) {
+      const m = porMov.get(String(id))
+      const clave = c.idOp ? `op:${c.idOp}` : `cargo:${id}`
+      if (!items.has(clave)) {
+        items.set(clave, {
+          clave, idOp: c.idOp ? Number(c.idOp) : null, idCargo: c.idOp ? null : Number(id), nroOp: null, nroRemito: null,
+          fecha: String(m.created_at || '').slice(0, 10), descripcion: m.descripcion || '', total: 0, resta: 0, cargoIds: [],
+        })
+      }
+      const it = items.get(clave)
+      it.total += c.total - (c.creditoPropio || 0)
+      it.resta += c.restante
+      it.cargoIds.push(Number(id))
+    }
+    const lista = [...items.values()].filter(it => it.resta > 0.005)
+    const idsOp = lista.filter(it => it.idOp).map(it => it.idOp)
+    if (idsOp.length) {
+      const ops = Object.fromEntries((await q(
+        `SELECT id, nro_op, nro_remito, tipo_op, fecha_emision, fecha_entrega_planificada FROM op_encabezado WHERE id = ANY(?::bigint[])`, [idsOp]
+      )).rows.map(r => [String(r.id), r]))
+      for (const it of lista) {
+        const op = it.idOp ? ops[String(it.idOp)] : null
+        if (!op) continue
+        it.nroOp = op.nro_op
+        it.nroRemito = op.nro_remito
+        it.fecha = fechaDeOperacion(op) || it.fecha
+      }
+    }
+    for (const it of lista) { it.total = redondear(it.total); it.resta = redondear(it.resta) }
+    return lista.sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)) || a.cargoIds[0] - b.cargoIds[0])
+  },
+
+  // Valida lo elegido para un pago ([{ clave, monto }], del formulario) contra lo que debe el
+  // cliente ANTES de registrar el pago. Devuelve [{ idOp, idCargo, monto }] para guardarImputaciones.
+  // Tira un Error con el mensaje para el usuario si algo no corresponde.
+  async validarImputaciones(clienteId, pedidas, montoPago, q = query) {
+    const lista = (Array.isArray(pedidas) ? pedidas : []).map(p => ({ clave: String((p && p.clave) || ''), monto: redondear(p && p.monto) }))
+      .filter(p => p.monto > 0)
+    if (!lista.length) return []
+    const pendientes = new Map((await this.pendientesDeCobro(clienteId, q)).map(it => [it.clave, it]))
+    const nombre = (it) => it.idOp ? `OP-${String(it.nroOp).padStart(4, '0')}` : `"${it.descripcion}"`
+    let total = 0
+    const vistas = new Set()
+    const resultado = []
+    for (const p of lista) {
+      const it = pendientes.get(p.clave)
+      if (!it) throw new Error('Una de las operaciones elegidas ya no tiene deuda. Volvé a abrir el pago para ver lo que debe ahora.')
+      if (vistas.has(p.clave)) throw new Error(`${nombre(it)} está elegida dos veces.`)
+      vistas.add(p.clave)
+      if (p.monto - it.resta > 0.005) throw new Error(`A ${nombre(it)} le aplicaste ${pesos(p.monto)} y debe ${pesos(it.resta)}.`)
+      total += p.monto
+      resultado.push({ idOp: it.idOp, idCargo: it.idCargo, monto: p.monto })
+    }
+    if (redondear(total) - redondear(montoPago) > 0.005) {
+      throw new Error(`Lo aplicado a las operaciones (${pesos(total)}) es más que el pago (${pesos(montoPago)}).`)
+    }
+    return resultado
+  },
+
+  // A qué se aplicó cada pago (de una imputacionDe), para mostrarlo en el estado de cuenta:
+  // { [id del pago]: [{ etiqueta ('OP-0001' o el cargo a mano), monto, elegida }] }
+  async aplicacionesPorPago(imp, q = query) {
+    const idsOp = [...new Set(Object.values(imp.aplicaciones).flat().map(a => a.idOp).filter(Boolean).map(Number))]
+    const nros = idsOp.length ? Object.fromEntries((await q(
+      `SELECT id, nro_op FROM op_encabezado WHERE id = ANY(?::bigint[])`, [idsOp])).rows.map(r => [String(r.id), r.nro_op])) : {}
+    const desc = new Map(imp.movs.map(m => [String(m.id), m.descripcion || 'Cargo a mano']))
+    const resultado = {}
+    for (const [idPago, lista] of Object.entries(imp.aplicaciones)) {
+      const porEtiqueta = new Map()
+      for (const a of lista) {
+        const etiqueta = a.idOp ? `OP-${String(nros[String(a.idOp)] ?? '?').padStart(4, '0')}` : String(desc.get(String(a.idCargo)) || '').slice(0, 40)
+        const previa = porEtiqueta.get(etiqueta)
+        if (previa) { previa.monto = redondear(previa.monto + a.monto); previa.elegida = previa.elegida && a.elegida }
+        else porEtiqueta.set(etiqueta, { etiqueta, monto: redondear(a.monto), elegida: a.elegida })
+      }
+      resultado[idPago] = [...porEtiqueta.values()]
+    }
+    return resultado
+  },
+
+  async guardarImputaciones(idPago, lista, q = query) {
+    for (const a of lista || []) {
+      await q(`INSERT INTO imputaciones_pago (id_pago, id_op_encabezado, id_cargo, monto) VALUES (?, ?, ?, ?)`,
+        [idPago, a.idOp || null, a.idCargo || null, redondear(a.monto)])
+    }
   },
 
   // ── Submódulo Cuenta Corriente ────────────────────────────────

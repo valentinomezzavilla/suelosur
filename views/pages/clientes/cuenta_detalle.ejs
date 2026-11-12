@@ -38,11 +38,10 @@
        class="btn btn-sm btn-outline-secondary" title="Las operaciones del período con su detalle, y por qué el saldo puede ser distinto">
       <%- icon('fileText', { size: 15 }) %> Ver liquidación del período
     </a>
-    <% if (cliente.saldo < 0) { %>
-      <button type="button" class="btn btn-success btn-abonar"
-              data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
-              data-deuda="<%= Math.abs(cliente.saldo) %>">Saldar deuda total</button>
-    <% } %>
+    <%# Registrar un pago: se elige a qué operaciones se aplica (también un adelanto, sin deuda) %>
+    <button type="button" class="btn btn-success btn-abonar"
+            data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
+            data-deuda="<%= Math.max(0, -Number(cliente.saldo) || 0) %>">Registrar pago</button>
     <% if (cliente.cuenta_corriente) { %>
     <form action="/clientes/<%= cliente.id %>/deshabilitar-cuenta" method="POST" class="d-inline"
           onsubmit="return confirm('¿Deshabilitar la cuenta corriente de <%= nombre %>? No va a poder comprar a cuenta corriente. El historial y el saldo se conservan.')">
@@ -134,46 +133,36 @@
   </div>
 </div>
 
-<!-- Registrar movimiento -->
+<!-- Cargo o ajuste a mano (los pagos se registran con "Registrar pago", donde se elige qué operaciones pagan) -->
 <div class="card shadow-sm mb-3">
-  <div class="card-header bg-white fw-semibold">Registrar movimiento</div>
+  <div class="card-header bg-white fw-semibold">Cargo o ajuste a mano</div>
   <div class="card-body">
     <form action="/clientes/<%= cliente.id %>/cuenta/movimiento" method="POST">
       <div class="row g-2 align-items-end">
-        <div class="col-md-2">
-          <label class="form-label">Tipo</label>
-          <select name="clase" class="form-select form-select-sm">
-            <option value="pago">Pago / abono</option>
+        <div class="col-md-3">
+          <label class="form-label" for="claseMovimiento">Tipo</label>
+          <select name="clase" id="claseMovimiento" class="form-select form-select-sm">
             <option value="cargo">Cargo / deuda</option>
             <option value="ajuste">Ajuste a favor</option>
           </select>
         </div>
         <div class="col-md-2">
-          <label class="form-label">Monto</label>
-          <input type="number" name="monto" min="1" step="1" class="form-control form-control-sm" placeholder="Ej: 15000" required>
-        </div>
-        <div class="col-md-2">
-          <label class="form-label">Método (si es pago)</label>
-          <select name="metodo_pago" class="form-select form-select-sm" data-tercero>
-            <option value="">—</option>
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
-          </select>
+          <label class="form-label" for="montoMovimiento">Monto</label>
+          <input type="number" name="monto" id="montoMovimiento" min="0.01" step="0.01" class="form-control form-control-sm" placeholder="Ej: 15000" required>
         </div>
         <div class="col-md-2">
           <label class="form-label" for="fechaMovimiento">Fecha</label>
           <input type="date" name="fecha" id="fechaMovimiento" class="form-control form-control-sm" value="<%= hoyISO() %>" max="<%= hoyISO() %>" required>
         </div>
-        <div class="col-md-2">
-          <label class="form-label">Descripción</label>
-          <input type="text" name="descripcion" class="form-control form-control-sm" placeholder="(opcional)">
+        <div class="col-md-3">
+          <label class="form-label" for="descMovimiento">Descripción</label>
+          <input type="text" name="descripcion" id="descMovimiento" class="form-control form-control-sm" placeholder="(opcional)">
         </div>
         <div class="col-auto">
           <button type="submit" class="btn btn-sm btn-naranja">Registrar</button>
         </div>
       </div>
-      <p class="form-hint mb-0 mt-2">Fecha: para un pago, el día en que pagó el cliente (puede ser anterior a hoy). El día en que se carga queda registrado aparte.</p>
+      <p class="form-hint mb-0 mt-2">Para registrar un pago del cliente usá <strong>Registrar pago</strong> (arriba) o <strong>Saldar</strong> en una operación: ahí se elige a qué operaciones se aplica.</p>
     </form>
   </div>
 </div>
@@ -206,6 +195,7 @@
           <td></td>
         </tr>
         <% } %>
+        <% const saldarMostrado = new Set() %>
         <% estado.movimientos.forEach(m => { %>
         <% const anulado = !!Number(m.anulado) %>
         <tr class="<%= anulado ? 'mov-anulado' : '' %>">
@@ -225,6 +215,13 @@
           <td>
             <%= m.descripcion %>
             <% if (anulado) { %><div class="small text-danger">Anulado el <%= formatFechaHora(m.anulado_en) %> — <%= m.anulado_motivo %></div><% } %>
+            <%# A qué se aplicó el pago (lo elegido al registrarlo y, si no, lo más antiguo) y lo que quedó a favor %>
+            <% if (!anulado && m.monto > 0) {
+                 const ap = aplicadoA[m.id] || []
+                 const sobra = aFavorPorPago[m.id] || 0 %>
+              <% if (ap.length) { %><div class="small text-muted">Aplicado a: <%= ap.map(a => `${a.etiqueta} ${money(a.monto)}`).join(' · ') %></div><% } %>
+              <% if (sobra > 0.005) { %><div class="small text-success">Quedan a favor: <%= money(sobra) %></div><% } %>
+            <% } %>
           </td>
           <td><small class="text-muted"><%= metodoDe(m) %></small></td>
           <td class="text-end text-danger"><span class="<%= anulado ? 'text-decoration-line-through' : '' %>"><%= m.monto < 0 ? money(Math.abs(m.monto)) : '—' %></span></td>
@@ -239,16 +236,18 @@
               </form>
             <% } %>
             <% if (m.tipo === 'deuda') { %>
-              <%# Pagos aplicados FIFO: "Saldar" solo si a este cargo le falta algo,
-                  y por lo que le falta (evita pagar dos veces lo mismo) %>
-              <% const resta = pendientes[m.id] ?? Math.abs(m.monto) %>
-              <% if (resta > 0.005) { %>
+              <%# "Saldar" por operación: exactamente lo que le falta (todos sus cargos juntos, p. ej.
+                  con el IVA) y el pago se aplica a ella. Una vez por operación. %>
+              <% const sd = saldarPorCargo[m.id] %>
+              <% if (sd && !saldarMostrado.has(sd.clave)) { saldarMostrado.add(sd.clave) %>
                 <button type="button" class="btn btn-sm btn-outline-success btn-abonar"
-                        data-id="<%= cliente.id %>" data-nombre="<%= nombre %>"
-                        data-deuda="<%= resta %>" data-descripcion="<%= m.descripcion %>">
-                  Saldar<%= resta < Math.abs(m.monto) - 0.005 ? ' ' + money(resta) : '' %>
+                        data-id="<%= cliente.id %>" data-nombre="<%= nombre %>" data-clave="<%= sd.clave %>"
+                        data-deuda="<%= sd.resta %>" data-descripcion="<%= m.descripcion %>">
+                  Saldar<%= sd.resta < sd.total - 0.005 ? ' ' + money(sd.resta) : '' %>
                 </button>
-              <% } else if (Math.abs(m.monto) > 0.005) { %>
+              <% } else if (sd) { %>
+                <small class="text-muted">Se salda con su operación</small>
+              <% } else if (Math.abs(m.monto) > 0.005 && !((pendientes[m.id] || 0) > 0.005)) { %>
                 <span class="badge rounded-pill px-3 badge-activo">Saldado</span>
               <% } %>
             <% } %>
@@ -270,47 +269,8 @@
   </div>
 </div>
 
-<!-- Modal abonar -->
-<div id="modal-abonar" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <div class="modal-header">
-      <h2 class="modal-title">Saldar deuda — <span id="modal-abonar-nombre"></span></h2>
-      <button type="button" class="modal-close" id="cerrarModalAbonar" aria-label="Cerrar">✕</button>
-    </div>
-    <div class="modal-body">
-      <div class="abonar-resumen">
-        <p class="abonar-resumen__label" id="modal-abonar-deuda-label">Deuda total</p>
-        <div class="abonar-resumen__monto" id="modal-abonar-deuda"></div>
-        <p id="modal-abonar-concepto" class="abonar-resumen__concepto d-none"></p>
-      </div>
-      <form id="formAbonar" method="POST">
-        <input type="hidden" name="descripcion" id="inputDescripcionAbonar">
-        <div class="form-group">
-          <div class="d-flex justify-content-between align-items-center">
-            <label for="inputMonto" class="mb-0">Monto a abonar</label>
-            <button type="button" class="abonar-quickfill" id="btnPagarTotal">Usar el total</button>
-          </div>
-          <div class="abonar-input-monto">
-            <input type="number" name="monto" id="inputMonto" min="1" step="1" required placeholder="0" inputmode="numeric">
-          </div>
-        </div>
-        <div class="form-group">
-          <label for="inputMetodoAbonar">Método de pago</label>
-          <select name="metodo_pago" id="inputMetodoAbonar" data-tercero>
-            <option value="efectivo">Efectivo</option>
-            <option value="transferencia">Transferencia</option>
-            <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
-          </select>
-        </div>
-        <%- include('../../partials/fecha_pago', { nombre: 'fecha', idCampo: 'inputFechaAbonar', metodoSel: '' }) %>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-outline-secondary" id="cancelarModalAbonar">Cancelar</button>
-          <button type="submit" class="btn btn-success">Confirmar pago</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
+<!-- Modal de pago (elige a qué operaciones se aplica) -->
+<%- include('../../partials/modal_pago_cuenta') %>
 
 <script>
 // Anular pago: confirma y pide el motivo (queda registrado en el historial)
