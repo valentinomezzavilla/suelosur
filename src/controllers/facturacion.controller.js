@@ -259,7 +259,8 @@ module.exports = {
     res.redirect(destinoSeguro(req.body.volver, volver('pendiente')))
   },
 
-  // Carga o corrige el N° de factura de una operación pendiente (desde su detalle)
+  // Carga o corrige el N° de factura de cualquier operación sin facturar (desde el botón de
+  // su fila en los listados o desde su detalle); vacío lo borra
   async nroFactura(req, res) {
     try {
       await FacturacionModel.guardarNroFactura(req.params.id, req.body.nroFactura)

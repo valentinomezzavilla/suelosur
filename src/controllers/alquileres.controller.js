@@ -51,7 +51,7 @@ const AlquileresController = {
       const sinPrecio = await AlquileresModel.cantidadSinPrecio()
       const estadosPago = await require('../models/liquidaciones.model').estadosPago(
         Object.values(grupos).flatMap(g => Array.isArray(g) ? g.map(a => a.id) : []))
-      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q }, sinPrecio, estadosPago, scripts: ['/js/estadoPago.js'] })
+      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q }, sinPrecio, estadosPago, scripts: ['/js/estadoPago.js', '/js/nroFactura.js'] })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los alquileres.')

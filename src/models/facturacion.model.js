@@ -208,8 +208,8 @@ async function quitarEn(q, id) {
   const op = (await q(`SELECT id, facturado, para_facturar, iva_alicuota FROM op_encabezado WHERE id = ? FOR UPDATE`, [id])).rows[0]
   if (!op || Number(op.facturado) === 1) return false
   if (Number(op.para_facturar) !== 1 && !Number(op.iva_alicuota)) return false
-  // Sin facturar y fuera de la lista: el N° de factura cargado tampoco queda
-  await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL, nro_factura = NULL WHERE id = ?`, [id])
+  // El N° de factura cargado se conserva: es un dato de la operación, no de la lista
+  await q(`UPDATE op_encabezado SET para_facturar = 0, iva_alicuota = NULL WHERE id = ?`, [id])
   if (Number(op.iva_alicuota)) await ajustarDeudaIva(q, id, Number(op.iva_alicuota), 0)
   return true
 }
@@ -238,14 +238,16 @@ module.exports = {
     return transaction((q) => marcarEn(q, id, nroFactura))
   },
 
-  // Carga o corrige el N° de factura de una OP pendiente de facturar (vacío lo borra). Las
-  // ya facturadas no se tocan: su número es el de la factura registrada.
-  async guardarNroFactura(id, nroFactura) {
-    const { rowCount } = await query(`
-      UPDATE op_encabezado SET nro_factura = ?
-      WHERE id = ? AND para_facturar = 1 AND COALESCE(facturado, 0) = 0
-    `, [nroFacturaDe(nroFactura), id])
-    if (!rowCount) throw errorUsuario('La operación no está pendiente de facturar.')
+  // Carga o corrige el N° de factura de una OP (vacío lo borra). Vale para cualquier operación,
+  // esté o no marcada para facturar: cargar el número no la marca ni le suma IVA. Las ya
+  // facturadas no se tocan (su número es el de la factura registrada) ni las anuladas.
+  // `q` permite hacerlo dentro de la transacción de la edición de la operación.
+  async guardarNroFactura(id, nroFactura, q = query) {
+    const op = (await q(`SELECT estado, facturado FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    if (!op) throw errorUsuario('No se encontró la operación.')
+    if (Number(op.facturado) === 1) throw errorUsuario('La operación ya está facturada: su N° de factura es el de la factura registrada.')
+    if (op.estado === 'anulado') throw errorUsuario('La operación está anulada.')
+    await q(`UPDATE op_encabezado SET nro_factura = ? WHERE id = ? AND COALESCE(facturado, 0) = 0`, [nroFacturaDe(nroFactura), id])
   },
 
   // Marcar / quitar varias OP de una vez (desde Liquidaciones), todas en la misma

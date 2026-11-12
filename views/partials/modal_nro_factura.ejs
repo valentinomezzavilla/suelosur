@@ -1,0 +1,29 @@
+<%#
+  Modal "Agregar / Editar N° de factura" de una operación (public/js/nroFactura.js). Lo abre
+  cualquier botón .btn-nro-factura (views/partials/boton_nro_factura.ejs) con data-id
+  (operación), data-nombre (OP-0001) y data-nro (el número que ya tiene, si lo tiene). Se envía
+  a POST /facturacion/:id/nro-factura y vuelve a la misma pantalla (mismos filtros y página).
+  Cada pantalla lo incluye una vez.
+%>
+<div id="modal-nro-factura" class="modal-overlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="nroFacturaTitulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="nroFacturaTitulo"><span id="nroFacturaAccion"></span> — <span id="nroFacturaNombre"></span></h2>
+      <button type="button" class="modal-close" id="nroFacturaCerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="nroFacturaForm" method="POST">
+        <input type="hidden" name="volver" id="nroFacturaVolver">
+        <div class="form-group">
+          <label for="nroFacturaInput">N° de Factura</label>
+          <input type="text" name="nroFactura" id="nroFacturaInput" maxlength="40" placeholder="Ej: 0001-00001234" autocomplete="off">
+          <p class="form-hint">Dejalo vacío para quitar el número. Cargarlo no marca la operación para facturar ni le suma IVA.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline-secondary" id="nroFacturaCancelar">Cancelar</button>
+          <button type="submit" class="btn btn-naranja" id="nroFacturaConfirmar">Guardar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

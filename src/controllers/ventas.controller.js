@@ -91,7 +91,7 @@ const VentasController = {
         titulo: 'Ventas',
         ...paginacion,
         estadosPago: await require('../models/liquidaciones.model').estadosPago(paginacion.ops.map(o => o.id)),
-        scripts: ['/js/estadoPago.js'],
+        scripts: ['/js/estadoPago.js', '/js/nroFactura.js'],
         clientes,
         resumen,
         metricas,

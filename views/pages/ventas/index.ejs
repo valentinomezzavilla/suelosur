@@ -169,6 +169,7 @@
           <td class="text-center">
             <div class="d-flex flex-wrap gap-1 justify-content-center">
               <a href="/ventas/<%= op.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+              <%- include('../../partials/boton_nro_factura', { op }) %>
               <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[op.id] }) %>
             </div>
           </td>
@@ -182,3 +183,5 @@
 </div>
 <%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
 <%- include('../../partials/modal_estado_pago') %>
+<%# Agregar / editar el N° de factura de una operación %>
+<%- include('../../partials/modal_nro_factura') %>

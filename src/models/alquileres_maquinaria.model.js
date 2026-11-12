@@ -18,6 +18,7 @@ const AlquileresMaquinariaModel = {
   async listarPorEstado() {
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada,
+             op.nro_factura, op.facturado,
              ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              opm.id AS id_op_maquinaria, opm.domicilio_entrega, opm.zona_entrega,
              opm.plazo_alquiler, opm.precio_total, opm.horas_pactadas, opm.id_maquinaria,
@@ -106,11 +107,13 @@ const AlquileresMaquinariaModel = {
   // Edición de los datos comerciales / de trabajo del alquiler de maquinaria. Si ya se cobró
   // (al iniciar el trabajo) y cambia el precio o el método de pago, el cobro y la cuenta del
   // cliente acompañan (AlquileresModel.corregirCobro).
-  async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago, observaciones, fecha_entrega_planificada }) {
+  async actualizar(id_op, { calle, numero, zona_entrega, plazo_alquiler, precio_por_hora, horas_pactadas, precio_total, metodo_pago, observaciones, fecha_entrega_planificada, nroFactura }) {
     const domicilio_entrega = `${calle || ''} ${numero || ''}`.trim()
     const AlquileresModel = require('./alquileres.model')
     const correccion = await AlquileresModel._correccionDeCobro(id_op, { precio: parseFloat(precio_total) || 0, metodo: metodo_pago })
     await transaction(async (q) => {
+      // N° de factura (opcional): si el formulario no trae el campo, no se toca
+      if (nroFactura !== undefined) await require('./facturacion.model').guardarNroFactura(id_op, nroFactura, q)
       await q(`UPDATE op_encabezado SET observaciones = ?, metodo_pago = ?, fecha_entrega_planificada = ? WHERE id = ?`,
         [observaciones || '', metodo_pago || null, fecha_entrega_planificada || null, id_op])
       await q(`
