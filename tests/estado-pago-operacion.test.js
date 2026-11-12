@@ -405,6 +405,32 @@ describe('controlador y pantallas de marcar pendiente / pagada', () => {
       assert.deepEqual(await Reporte.buscarClientes('   '), [])
       assert.deepEqual(await Reporte.buscarClientes('nadie-se-llama-asi-xyz'), [])
     })
+
+    it('pagos repetidos: iguales y cargados con minutos de diferencia (no los de otro día ni los anulados)', async () => {
+      // Caso de la captura: cuatro pagos de $336.000 seguidos y uno de $24.000
+      const c = await datos.crearCliente({ cuentaCorriente: true })
+      const cargar = async (monto, registrado, extra = {}) => {
+        const id = await ClientesModel.agregarMovimiento(c, { tipo: 'pago', descripcion: 'Pago — Venta Viaje OP-0974', monto, metodo_pago: 'efectivo', fecha: '2026-11-06 12:00:00', ...extra })
+        await prueba.q(`UPDATE movimientos_cuenta SET registrado_en = ? WHERE id = ?`, [registrado, id])
+        return id
+      }
+      const a = await cargar(336000, '2026-11-07 10:00:00')
+      const b = await cargar(336000, '2026-11-07 10:00:20')
+      const d = await cargar(336000, '2026-11-07 10:01:05')
+      await cargar(24000, '2026-11-07 10:01:30')                 // otro importe: no es repetido
+      await cargar(336000, '2026-11-14 10:00:00')                // mismo pago pero una semana después: una cuota, no un repetido
+      const anulado = await cargar(336000, '2026-11-07 10:00:40')
+      await prueba.q(`UPDATE movimientos_cuenta SET anulado = 1 WHERE id = ?`, [anulado])
+
+      const grupos = await Reporte.pagosRepetidos(c)
+      assert.equal(grupos.length, 1)
+      assert.deepEqual(grupos[0].pagos.map(p => p.id), [a, b, d])
+      assert.equal(grupos[0].monto, 336000)
+      assert.match(grupos[0].cargado ?? grupos[0].pagos[0].cargado, /^2026-11-07 10:00:00/)
+      // y el detalle de la cuenta dice a qué hora se cargó cada pago
+      const detalle = await Reporte.detalleCliente(c)
+      assert.ok(detalle.pagos.every(p => p.cargado))
+    })
   })
 
   describe('marcar como pagada en cuenta corriente y botones en los demás módulos', () => {
