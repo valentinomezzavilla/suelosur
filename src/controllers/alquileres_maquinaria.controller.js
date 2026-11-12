@@ -116,7 +116,8 @@ const AlquileresMaquinariaController = {
       const alquiler = await AlquileresMaquinariaModel.obtener(req.params.id)
       if (!alquiler) { req.flash('error', 'Alquiler no encontrado.'); return res.redirect('/alquileres/maquinaria') }
       if (alquiler.estado === 'anulado') { req.flash('error', 'No se puede editar un alquiler anulado.'); return res.redirect(`/alquileres/maquinaria/${alquiler.id}`) }
-      res.render('pages/alquileres/maquinaria_editar', { titulo: `Editar Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler })
+      const cobro = await require('../models/alquileres.model').cobroRegistrado(alquiler.id)
+      res.render('pages/alquileres/maquinaria_editar', { titulo: `Editar Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`, alquiler, cobro })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al cargar el alquiler.'); res.redirect('/alquileres/maquinaria')
     }
@@ -178,23 +179,12 @@ const AlquileresMaquinariaController = {
           descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} — ${alquiler.detalle?.domicilio_entrega || ''}`,
           metodo_pago: alquiler.metodo_pago || 'efectivo',
         })
-        if (alquiler.metodo_pago === 'cuenta_corriente' && alquiler.id_cliente) {
-          // Vinculado a la operación: si se borra o cambia la transacción, el cargo se revierte
-          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
-            tipo: 'deuda',
-            descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')}`,
-            monto: -monto,
-            id_op_encabezado: alquiler.id,
-          })
-        }
-        if (alquiler.metodo_pago === 'saldo_a_favor' && alquiler.id_cliente) {
-          await ClientesModel.agregarMovimiento(alquiler.id_cliente, {
-            tipo: 'uso_saldo_favor',
-            descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')} — pagado con saldo a favor`,
-            monto: -monto,
-            id_op_encabezado: alquiler.id,
-          })
-        }
+        // Cuenta corriente / saldo a favor: el cargo en la cuenta del cliente, vinculado a la
+        // operación (si se borra o cambia la transacción, el cargo acompaña)
+        await ClientesModel.cargarOperacion(alquiler.id_cliente, {
+          metodo: alquiler.metodo_pago, monto, idOp: alquiler.id,
+          descripcion: `Alquiler ${alquiler.detalle?.maquinaria_nombre || 'maquinaria'} OP-${String(alquiler.nro_op).padStart(4, '0')}`,
+        })
       }
       req.flash('success', 'Inicio de trabajo confirmado.')
     } catch (err) {

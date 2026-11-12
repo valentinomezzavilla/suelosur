@@ -133,16 +133,19 @@ describe('consistencia de fechas y pagos entre módulos', () => {
         (await prueba.q(`SELECT id FROM movimientos_cuenta WHERE id_op_encabezado = ?`, [id])).rows[0].id], 0)
     })
 
-    it('la liquidación de octubre explica la deuda de septiembre y llega exacto al saldo de la cuenta', async () => {
+    it('la liquidación de octubre muestra el mismo saldo que la cuenta corriente, con la deuda de septiembre aparte', async () => {
       const cliente = await datos.crearCliente({ cuentaCorriente: true })
       await ventaCC(cliente, { compra: '2026-09-20', envio: '2026-09-20', neto: 649800 })
       await ventaCC(cliente, { compra: '2026-10-10', envio: '2026-10-10', neto: 4719000 })
       const r = await liq(cliente, '2026-10-01', '2026-10-31')
       const saldo = (await prueba.q(`SELECT saldo FROM clientes WHERE id = ?`, [cliente])).rows[0].saldo
       assert.equal(r.resumen.saldo, 4719000)
-      assert.equal(r.conciliacion.deudaCuenta, -saldo)
-      assert.equal(r.conciliacion.deudaCuenta, 5368800)
-      assert.deepEqual(r.conciliacion.renglones.map(x => [x.clave, x.signo * x.importe]), [['anteriores', 649800]])
+      assert.equal(r.saldo.cuenta.saldo, saldo)
+      assert.equal(r.saldo.cuenta.saldo, -5368800)
+      assert.deepEqual(r.saldo.cuenta.desglose, { periodo: 4719000, anteriores: 649800, posteriores: 0, manuales: 0 })
+      // El estado de cuenta usa el mismo cálculo
+      const sc = await LiquidacionesModel.saldoCliente(cliente, { desde: '2026-10-01', hasta: '2026-10-31' })
+      assert.deepEqual(sc, r.saldo)
     })
   })
 

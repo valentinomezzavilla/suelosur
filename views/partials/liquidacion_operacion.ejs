@@ -1,6 +1,10 @@
 <%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS %>
 <% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
 <% const nroTxt = o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0') %>
+<%# Lo que todavía no es deuda lo dice: un alquiler en curso, o algo sin entregar que no está en la cuenta %>
+<% const estadoTxt = o.estado === 'pendiente' && o.enCurso ? 'En curso'
+     : o.estado === 'pendiente' && !o.enCuenta && ['pendiente', 'despachado'].includes(o.estadoOp) ? 'Sin entregar'
+     : ESTADOS[o.estado] %>
 <div class="liq-op liq-op--<%= o.estado %>">
   <div class="liq-op__head">
     <div class="liq-op__titulo">
@@ -15,7 +19,7 @@
     </div>
     <div class="liq-op__acciones">
       <% if (o.facturado) { %><span class="badge badge-activo">Facturada</span><% } else if (o.paraFacturar) { %><span class="badge badge-pendiente">Para facturar</span><% } %>
-      <span class="liq-estado liq-estado--<%= o.estado %>"><%= ESTADOS[o.estado] %></span>
+      <span class="liq-estado liq-estado--<%= o.estado %>"><%= estadoTxt %></span>
       <% const href = o.tipo === 'contenedor' ? '/alquileres/contenedores/' + o.id : o.tipo === 'maquinaria' ? '/alquileres/maquinaria/' + o.id : '/ventas/' + o.id %>
       <a href="<%= href %>" class="btn btn-sm btn-outline-secondary">Ver</a>
     </div>
@@ -41,7 +45,7 @@
     <% if (o.estado === 'a_convenir') { %>
       <span class="text-muted">Precio a convenir</span>
     <% } else { %>
-      <span>Total <strong><%= $(o.total) %></strong></span>
+      <span>Total <strong><%= $(o.total) %></strong><% if (o.estimado) { %> <small class="text-muted" title="Alquiler todavía sin cobrar: lo que se cobraría hoy">(estimado a hoy)</small><% } %></span>
       <span class="text-success">Pagado <strong><%= $(o.pagado) %></strong></span>
       <span class="<%= o.resta > 0.005 ? 'text-danger' : 'text-success' %>">Resta <strong><%= $(o.resta) %></strong></span>
     <% } %>

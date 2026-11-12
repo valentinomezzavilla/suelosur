@@ -144,3 +144,51 @@
   &__info { color: $muted; }
   &__botones { display: flex; gap: 0.5rem; margin-left: auto; flex-wrap: wrap; }
 }
+
+// Saldo del cliente (partials/saldo_cliente): el mismo bloque en el estado de cuenta y en la
+// Liquidación
+.saldo-cliente {
+  &__cabecera {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 2.5rem;
+    align-items: flex-end;
+  }
+  &__dato {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+
+    span { font-size: $fs-sm; color: $muted; font-weight: 500; }
+    strong { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  }
+  &__nota { margin: 0.35rem 0 0.75rem; font-size: $fs-sm; color: $muted; }
+  &__tabla {
+    max-width: 640px;
+    td { font-size: $fs-sm; font-variant-numeric: tabular-nums; }
+  }
+  &__detalle {
+    border-top: 1px solid $border-soft;
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+
+    summary { cursor: pointer; font-size: $fs-sm; font-weight: 500; color: $ink; }
+  }
+  &__lista {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: 760px;
+
+    li {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.25rem 0;
+      font-size: $fs-sm;
+      border-bottom: 1px dashed $border-soft;
+      span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
+    }
+    li:last-child { border-bottom: 0; }
+  }
+}

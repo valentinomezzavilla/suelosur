@@ -10,8 +10,13 @@ const { resolverPeriodo, etiquetaPeriodo } = require('../utils/periodos')
 const { textoDestino } = require('../utils/destino')
 const { leerRemito, opConRemito } = require('../utils/remito')
 const { hoyISO }        = require('../utils/fecha')
-const { conIva }        = require('../utils/iva')
+const { conIva, ALICUOTA_FACTURAR } = require('../utils/iva')
 const { leerFechaPago, fechaHoraDePago } = require('../utils/fechaPago')
+
+// Lo que se le cobra al cliente por una venta nueva: el total cargado más el IVA si se marcó
+// "Operación para facturar" (mismo criterio que facturacion.marcarAlCrear)
+const marcadaParaFacturar = (v) => v === true || v === 1 || ['1', 'on', 'true'].includes(String(v))
+const totalConIva = (total, paraFacturar) => conIva(total, marcadaParaFacturar(paraFacturar) ? ALICUOTA_FACTURAR : 0)
 
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
@@ -163,6 +168,12 @@ const VentasController = {
       }
 
       const total  = precioTotal ? Number(precioTotal) : detalles.reduce((a, d) => a + d.precio_unitario * d.cantidad_pedida, 0)
+      // Pagada con saldo a favor: el crédito tiene que alcanzar (si no, figuraría pagada y la
+      // cuenta del cliente quedaría debiendo la diferencia)
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteIdClean, { monto: totalConIva(total, req.body.paraFacturar) })
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/ventas/cantera') }
+      }
       const nombre = clienteNombre || 'Particular'
       const obsUser = (req.body.observaciones || '').trim()
       const detalleCarrito = detalles.map(d => `${d.nombre} x${d.cantidad_pedida}`).join(', ')
@@ -349,6 +360,10 @@ const VentasController = {
       const total = String(precioTotal ?? '').trim() !== ''
         ? Math.max(0, Number(precioTotal) || 0)
         : detalle.precio_unitario * detalle.cantidad_pedida + flete
+      if (metodoPago === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(clienteId || null, { monto: totalConIva(total, req.body.paraFacturar) })
+        if (errSaldo) { req.flash('error', errSaldo); return res.redirect('/ventas/viaje') }
+      }
 
       // Crear OP tipo M con modalidad flete
       const { id: id_op, nro_op, nro_remito } = await VentasModel.crear({

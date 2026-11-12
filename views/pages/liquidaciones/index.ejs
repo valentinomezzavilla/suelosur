@@ -61,39 +61,16 @@
 </div>
 
 <div class="liq-resumen mb-3">
-  <div class="liq-resumen__caja"><span>Total consumido</span><strong><%= $(r.consumido) %></strong></div>
+  <div class="liq-resumen__caja"><span>Consumido en el período</span><strong><%= $(r.consumido) %></strong></div>
   <div class="liq-resumen__caja"><span>Pagado</span><strong class="text-success"><%= $(r.pagado) %></strong></div>
-  <div class="liq-resumen__caja"><span>Saldo pendiente</span><strong class="<%= r.saldo > 0.005 ? 'text-danger' : 'text-success' %>"><%= $(r.saldo) %></strong></div>
+  <div class="liq-resumen__caja"><span>Pendiente de estas operaciones</span><strong class="<%= r.saldo > 0.005 ? 'text-danger' : 'text-success' %>"><%= $(r.saldo) %></strong></div>
   <div class="liq-resumen__caja"><span>Operaciones</span><strong><%= r.cantidad %></strong></div>
 </div>
 
-<%# Relación con la cuenta corriente: de dónde sale la diferencia entre los dos números %>
-<% if (conCliente && liquidacion.conciliacion) {
-     const cc = liquidacion.conciliacion
-     const textoCuenta = cc.deudaCuenta > 0.005 ? 'Debe ' + $(cc.deudaCuenta) : (cc.deudaCuenta < -0.005 ? 'A favor ' + $(Math.abs(cc.deudaCuenta)) : 'Al día')
-     const idCli = liquidacion.clientes[0] && liquidacion.clientes[0].cliente ? liquidacion.clientes[0].cliente.id : filtros.clienteId
-%>
-  <div class="card shadow-sm mb-3 liq-conciliacion">
-    <div class="card-body">
-      <% if (cc.coincide) { %>
-        <p class="mb-0"><strong>Coincide con la cuenta corriente:</strong> <%= textoCuenta %>.
-          <a href="/clientes/cuentas/<%= idCli %>" class="ms-1">Ver cuenta corriente →</a></p>
-      <% } else { %>
-        <h6 class="fw-bold mb-1">¿Por qué este saldo no es igual al de la cuenta corriente?</h6>
-        <p class="text-muted small mb-2">Esta liquidación muestra lo que el cliente consumió en el período, pagado de cualquier forma. La cuenta corriente muestra toda su deuda acumulada. Los dos incluyen todos los pagos registrados hasta hoy.</p>
-        <table class="table table-sm mb-0 liq-conciliacion__tabla">
-          <tbody>
-            <tr><td>Saldo pendiente de esta liquidación</td><td class="text-end fw-semibold"><%= $(cc.saldoLiquidacion) %></td></tr>
-            <% cc.renglones.forEach(x => { %>
-              <tr><td><%= x.signo < 0 ? 'Menos' : 'Más' %>: <%= x.texto %></td><td class="text-end <%= x.signo < 0 ? 'text-success' : 'text-danger' %>"><%= x.signo < 0 ? '−' : '+' %> <%= $(x.importe) %></td></tr>
-            <% }) %>
-            <tr class="fw-bold"><td>Cuenta corriente hoy</td><td class="text-end"><%= textoCuenta %></td></tr>
-          </tbody>
-        </table>
-        <a href="/clientes/cuentas/<%= idCli %>" class="small">Ver cuenta corriente →</a>
-      <% } %>
-    </div>
-  </div>
+<%# Saldo del cliente: el mismo bloque y los mismos números que su estado de cuenta %>
+<% if (conCliente && liquidacion.saldo) {
+     const idCli = liquidacion.clientes[0] && liquidacion.clientes[0].cliente ? liquidacion.clientes[0].cliente.id : filtros.clienteId %>
+  <%- include('../../partials/saldo_cliente', { saldo: liquidacion.saldo, idCliente: idCli, linkCuenta: true, pendientePeriodo: r.saldo }) %>
 <% } %>
 
 <% if (!r.cantidad) { %>
@@ -107,15 +84,16 @@
       <h6 class="fw-bold mb-2">Resumen por cliente</h6>
       <div class="table-responsive">
         <table class="table table-sm mb-0">
-          <thead><tr><th>Cliente</th><th class="text-end">Ops.</th><th class="text-end">Consumido</th><th class="text-end">Pagado</th><th class="text-end">Saldo</th><th></th></tr></thead>
+          <thead><tr><th>Cliente</th><th class="text-end">Ops.</th><th class="text-end">Consumido</th><th class="text-end">Pagado</th><th class="text-end">Pendiente del período</th><th class="text-end" title="El saldo de su cuenta corriente, igual que en Cuentas corrientes">Cuenta corriente</th><th></th></tr></thead>
           <tbody>
-            <% liquidacion.clientes.forEach(c => { %>
+            <% liquidacion.clientes.forEach(c => { const sc = Number(c.cliente.saldoCuenta) || 0 %>
               <tr>
                 <td><%= c.cliente.nombreCompleto %></td>
                 <td class="text-end"><%= c.resumen.cantidad %></td>
                 <td class="text-end"><%= $(c.resumen.consumido) %></td>
                 <td class="text-end"><%= $(c.resumen.pagado) %></td>
                 <td class="text-end <%= c.resumen.saldo > 0.005 ? 'text-danger' : '' %>"><%= $(c.resumen.saldo) %></td>
+                <td class="text-end <%= sc < -0.005 ? 'text-danger' : (sc > 0.005 ? 'text-success' : 'text-muted') %>"><%= sc < -0.005 ? 'Debe ' + $(-sc) : (sc > 0.005 ? 'A favor ' + $(sc) : 'Al día') %></td>
                 <td class="text-end"><a href="/liquidaciones?<%= qs({ clienteId: String(c.cliente.id), obra: null }) %>">Ver liquidación</a></td>
               </tr>
             <% }) %>

@@ -69,7 +69,8 @@ describe('alquileres sin precio', () => {
     SELECT oc.precio_alquiler, oc.metodo_pago AS metodo_detalle, oc.precio_asignado_en, op.metodo_pago AS metodo_op, op.estado
     FROM op_encabezado op JOIN op_detalle_contenedor oc ON oc.id_orden_pedido = op.id WHERE op.id = ?`, [id])).rows[0]
   const txDe = async (id) => (await prueba.q(`SELECT monto, metodo_pago, descripcion FROM transacciones WHERE id_op_encabezado = ? ORDER BY id`, [id])).rows
-  const movsDe = async (id_cliente) => (await prueba.q(`SELECT tipo, monto, id_op_encabezado FROM movimientos_cuenta WHERE cliente_id = ? ORDER BY id`, [id_cliente])).rows
+  // Sin el saldo inicial del cliente de prueba (datos.crearCliente lo carga como un ajuste)
+  const movsDe = async (id_cliente) => (await prueba.q(`SELECT tipo, monto, id_op_encabezado FROM movimientos_cuenta WHERE cliente_id = ? AND descripcion <> 'Saldo inicial (prueba)' ORDER BY id`, [id_cliente])).rows
   const saldoDe = async (id_cliente) => (await prueba.q(`SELECT saldo FROM clientes WHERE id = ?`, [id_cliente])).rows[0].saldo
   const filasSinPrecio = async () => (await AlquileresModel.sinPrecio()).flatMap(b => b.filas)
   const estaEnAsignar = async (id) => (await filasSinPrecio()).some(f => f.id === id)
@@ -309,6 +310,11 @@ describe('alquileres sin precio', () => {
     it('saldo a favor: solo con saldo, y consume el crédito', async () => {
       const sin = await retirado({ saldo: 0 })
       await assert.rejects(AlquileresModel.asignarPrecio(sin.id, { precio: '1000', metodo_pago: 'saldo_a_favor' }), /no tiene saldo a favor/)
+
+      // Ya retirado se cobra en el momento: el crédito tiene que alcanzar
+      const poco = await retirado({ saldo: 500 })
+      await assert.rejects(AlquileresModel.asignarPrecio(poco.id, { precio: '1000', metodo_pago: 'saldo_a_favor' }), /no alcanza para pagar/)
+      assert.equal(await saldoDe(poco.id_cliente), 500)
 
       const con = await retirado({ saldo: 5000 })
       await AlquileresModel.asignarPrecio(con.id, { precio: '1000', metodo_pago: 'saldo_a_favor' })

@@ -74,6 +74,11 @@ async function abrir() {
   await cliente.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
+  // Importes en DOUBLE PRECISION y el saldo de los clientes mantenido por la base (trigger):
+  // sin desplegar, se aplican dentro de la prueba (y se deshacen con el ROLLBACK)
+  if (typeof db.migrarImportesADoble === 'function') await db.migrarImportesADoble(cliente)
+  const haySaldoCalculado = (await cliente.query(`SELECT 1 FROM pg_trigger WHERE tgname = 'movimientos_cuenta_saldo'`)).rowCount
+  if (!haySaldoCalculado && typeof db.instalarSaldoCalculado === 'function') await db.instalarSaldoCalculado(cliente)
 }
 
 async function cerrar() {

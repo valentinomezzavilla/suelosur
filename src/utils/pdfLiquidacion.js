@@ -109,13 +109,19 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   }
 
   // Resumen: una franja con tres columnas separadas por filetes (solo pendientes: solo el saldo)
-  function tarjetasResumen(r) {
+  // saldoCuenta (con un cliente): el saldo de su cuenta corriente, el mismo de Cuentas corrientes
+  function tarjetasResumen(r, saldoCuenta = null) {
     const cajas = [
       ...(soloPendiente ? [] : [
         { label: 'TOTAL CONSUMIDO', valor: B.money(r.consumido) },
         { label: 'PAGADO', valor: B.money(r.pagado) },
       ]),
-      { label: 'SALDO PENDIENTE', valor: B.money(r.saldo), fuerte: true },
+      { label: 'PENDIENTE DEL PERÍODO', valor: B.money(r.saldo), fuerte: true },
+      ...(saldoCuenta == null ? [] : [{
+        label: 'CUENTA CORRIENTE',
+        valor: saldoCuenta < -0.005 ? 'Debe ' + B.money(-saldoCuenta) : (saldoCuenta > 0.005 ? 'A favor ' + B.money(saldoCuenta) : 'Al día'),
+        fuerte: true,
+      }]),
     ]
     const w = width / cajas.length, h = 44
     doc.rect(left, y, width, h).lineWidth(0.8).strokeColor(NEGRO).stroke()
@@ -123,7 +129,11 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
       const x = left + i * w
       if (i > 0) doc.moveTo(x, y).lineTo(x, y + h).lineWidth(0.5).strokeColor(LINEA).stroke()
       doc.fillColor(GRIS).fontSize(7.5).font('Helvetica-Bold').text(c.label, x + 12, y + 9, { width: w - 24, lineBreak: false })
-      doc.fillColor(NEGRO).fontSize(c.fuerte ? 15 : 13).font('Helvetica-Bold').text(c.valor, x + 12, y + 21, { width: w - 24, lineBreak: false })
+      // Que entre en la caja ("Debe $5.368.800,00" con cuatro cajas): achica la letra si hace falta
+      let tam = c.fuerte ? 15 : 13
+      doc.font('Helvetica-Bold')
+      while (tam > 8 && doc.fontSize(tam).widthOfString(c.valor) > w - 24) tam -= 0.5
+      doc.fillColor(NEGRO).fontSize(tam).text(c.valor, x + 12, y + 21 + (c.fuerte ? 15 : 13) - tam, { width: w - 24, lineBreak: false })
     })
     y += h + 8
     doc.fillColor(GRIS).fontSize(8).font('Helvetica')
@@ -165,7 +175,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     const franja = altoFranja(o)
     doc.rect(left, y, width, franja).fill(BANDA)
     doc.fillColor(NEGRO).fontSize(8.5).font('Helvetica-Bold').text(tituloOperacion(o), left + 8, y + 6, { width: width - 140 })
-    doc.fillColor(NEGRO).fontSize(7.5).font('Helvetica-Bold').text(ESTADOS[o.estado].toUpperCase(), right - 124, y + 6.5, { width: 116, align: 'right', lineBreak: false })
+    doc.fillColor(NEGRO).fontSize(7.5).font('Helvetica-Bold').text((o.estado === 'pendiente' && o.enCurso ? 'EN CURSO' : ESTADOS[o.estado].toUpperCase()), right - 124, y + 6.5, { width: 116, align: 'right', lineBreak: false })
     y += franja
 
     // Pago parcial: la última columna muestra lo que resta de cada renglón (en proporción a
@@ -290,18 +300,35 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     const c = liquidacion.clientes[0]
     encabezado(titulo)
     ficha(c.cliente)
-    tarjetasResumen(c.resumen)
-    // Si la deuda de la cuenta corriente no es la misma que el saldo del período, se aclara
-    // (incluye operaciones de otros períodos, cargos de la cuenta y pagos a favor)
-    const conc = liquidacion.conciliacion
-    if (conc && !conc.coincide) {
-      const d = conc.deudaCuenta
-      const texto = d > 0.005 ? `Deuda total de la cuenta corriente al ${fmtFecha(hoyISO())}: ${B.money(d)}`
-        : (d < -0.005 ? `Saldo a favor en la cuenta corriente al ${fmtFecha(hoyISO())}: ${B.money(-d)}` : `Cuenta corriente al día al ${fmtFecha(hoyISO())}`)
+    tarjetasResumen(c.resumen, liquidacion.saldo ? liquidacion.saldo.cuenta.saldo : null)
+    // Saldo del cliente: el mismo de su cuenta corriente (y del estado de cuenta), con lo que
+    // lo forma si no es solo este período
+    const s = liquidacion.saldo
+    if (s) {
+      const saldo = s.cuenta.saldo
+      const texto = saldo < -0.005 ? `Saldo de la cuenta corriente al ${fmtFecha(hoyISO())}: debe ${B.money(-saldo)}`
+        : (saldo > 0.005 ? `Saldo de la cuenta corriente al ${fmtFecha(hoyISO())}: a favor ${B.money(saldo)}` : `Cuenta corriente al día al ${fmtFecha(hoyISO())}`)
+      const d = s.cuenta.desglose
+      const partes = [
+        d.periodo > 0.005 && `operaciones del período ${B.money(d.periodo)}`,
+        d.anteriores > 0.005 && `operaciones anteriores ${B.money(d.anteriores)}`,
+        d.posteriores > 0.005 && `operaciones posteriores ${B.money(d.posteriores)}`,
+        d.manuales > 0.005 && `cargos de la cuenta ${B.money(d.manuales)}`,
+        s.cuenta.aFavor > 0.005 && `pagos a favor sin aplicar −${B.money(s.cuenta.aFavor)}`,
+      ].filter(Boolean)
+      const lineas = []
+      if (partes.length > 1 || d.anteriores > 0.005 || d.posteriores > 0.005 || d.manuales > 0.005) lineas.push(`Se compone de: ${partes.join(' · ')}.`)
+      if (s.sinCobrar.total > 0.005) {
+        const t = s.total
+        lineas.push(`Además, operaciones sin cobrar fuera de la cuenta corriente: ${B.money(s.sinCobrar.total)}. Total: ${t > 0.005 ? 'debe ' + B.money(t) : (t < -0.005 ? 'a favor ' + B.money(-t) : 'al día')}.`)
+      }
       doc.fillColor(NEGRO).fontSize(9).font('Helvetica-Bold').text(texto, left, y, { width, lineBreak: false })
-      doc.fillColor(GRIS).fontSize(7.5).font('Helvetica')
-         .text('Incluye operaciones de otros períodos, cargos de la cuenta y pagos a favor; puede no coincidir con el saldo de esta liquidación.', left, y + 13, { width })
-      y += 34
+      y += 13
+      if (lineas.length) {
+        doc.fillColor(GRIS).fontSize(7.5).font('Helvetica').text(lineas.join(' '), left, y, { width })
+        y = doc.y + 4
+      }
+      y += 8
     }
     operaciones(c, titulo)
     resumenPorObra(c.porObra, titulo)

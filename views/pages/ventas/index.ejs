@@ -150,7 +150,7 @@
       </thead>
       <tbody>
         <% ops.forEach(op => {
-          const sinSaldar = op.metodo_pago === 'cuenta_corriente' && op.saldada === false
+          const sinSaldar = ['cuenta_corriente', 'saldo_a_favor'].includes(op.metodo_pago) && op.saldada === false
         %>
         <tr class="<%= sinSaldar ? 'venta-cc-pendiente' : '' %>" <%= sinSaldar ? 'title="Venta a cuenta corriente — todavía no se saldó"' : '' %>>
           <td class="fw-semibold text-orange">OP-<%= String(op.nro_op).padStart(4,'0') %></td>

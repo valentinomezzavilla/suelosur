@@ -115,20 +115,13 @@ const ClientesController = {
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
       // Cuánto falta de cada cargo: "Saldar" solo en los que todavía deben algo
       const pendientes = await ClientesModel.pendientePorCargo(cli.id)
-      // Operaciones a cta. cte. que todavía no generaron cargo (alquileres en curso),
-      // con el importe estimado a hoy
-      const AlquileresModel = require('../models/alquileres.model')
-      const sinCargo = await Promise.all((await ClientesModel.operacionesSinCargo(cli.id)).map(async o => {
-        let estimado = null
-        if (o.tipo_op === 'C') estimado = (await AlquileresModel.datosCierre(o.id))?.precioACobrar ?? (Number(o.precio_alquiler) || null)
-        else if (o.tipo_op === 'MA') estimado = Number(o.precio_maquinaria) || null
-        // Para facturar: el cargo va a ser el neto + IVA
-        if (estimado != null) estimado = require('../utils/iva').conIva(estimado, o.iva_alicuota)
-        return { ...o, estimado }
-      }))
+      // Saldo del cliente: el mismo cálculo (y el mismo bloque) que la Liquidación — cuenta
+      // corriente, de qué período es la deuda, de dónde sale el saldo a favor, lo que falta
+      // cobrar fuera de la cuenta y los alquileres en curso con el importe estimado a hoy
+      const saldo = await require('../models/liquidaciones.model').saldoCliente(cli.id, { desde: filtros.desde, hasta: filtros.hasta })
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, sinCargo, obras, obra, TIPOS,
+        cliente, estado, pendientes, saldo, obras, obra, TIPOS,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.clave : null },
         scripts: ['/js/modalAbonar.js'],
@@ -422,14 +415,18 @@ const ClientesController = {
       // Construir las filas de movimientos (transacciones y/o cuenta corriente)
       const filas = []
       if (incluir.includes('transacciones')) {
-        transacciones.forEach(t => filas.push({
-          fechaISO: t.fecha || t.created_at,
-          fecha: fmtFecha(t.fecha || t.created_at),
-          tipo:  t.tipo || '—',
-          desc:  t.descripcion || `Remito ${t.nro_remito || '—'}`,
-          // Las transacciones (ventas/alquileres) representan cargos → débito
-          monto: -Math.abs(Number(t.monto || 0)),
-        }))
+        const { METODOS_SIN_COBRO, METODOS } = require('../utils/liquidaciones')
+        transacciones.forEach(t => {
+          const aCuenta = METODOS_SIN_COBRO.includes(t.metodo_pago)
+          // A cuenta corriente / con saldo a favor: el cargo ya figura en los movimientos de la
+          // cuenta (si se incluyen); listarlo también acá lo contaba dos veces
+          if (aCuenta && incluir.includes('movimientos')) return
+          const fila = { fechaISO: t.fecha || t.created_at, fecha: fmtFecha(t.fecha || t.created_at) }
+          // La venta / alquiler es un consumo (débito)…
+          filas.push({ ...fila, tipo: t.tipo || '—', desc: t.descripcion || `Remito ${t.nro_remito || '—'}`, monto: -Math.abs(Number(t.monto || 0)) })
+          // …y si se cobró en el momento, el cobro lo compensa (crédito)
+          if (!aCuenta) filas.push({ ...fila, tipo: 'Cobro', desc: `Cobro ${(METODOS[t.metodo_pago] || t.metodo_pago || '').toLowerCase()}`.trim(), monto: Math.abs(Number(t.monto || 0)) })
+        })
       }
       if (incluir.includes('movimientos')) {
         movs.forEach(m => filas.push({

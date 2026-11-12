@@ -8,7 +8,7 @@ const FlotaModel = require('./flota.model')
 const ClientesModel = require('./clientes.model')
 const { SQL_MUEVE_STOCK, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 const { textoDestino } = require('../utils/destino')
-const { ivaDe, sqlFactorIva } = require('../utils/iva')
+const { ivaDe, conIva, sqlFactorIva } = require('../utils/iva')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
 // Es el NETO; si la venta es para facturar se le suma el IVA (iva_alicuota) y eso es lo que
@@ -103,7 +103,8 @@ const VentasModel = {
 
     // Ventas a cuenta corriente no anuladas (tienen su cargo desde que se registran): venta por venta,
     // ¿el cliente ya la saldó? (ver ClientesModel.saldadaPorOperacion)
-    const idsCC = ops.filter(o => o.metodo_pago === 'cuenta_corriente' && o.estado !== 'anulado').map(o => o.id)
+    // (también las pagadas con saldo a favor: si el crédito no alcanzó, quedan debiendo)
+    const idsCC = ops.filter(o => ['cuenta_corriente', 'saldo_a_favor'].includes(o.metodo_pago) && o.estado !== 'anulado').map(o => o.id)
     const saldadas = await ClientesModel.saldadaPorOperacion(idsCC)
     ops.forEach(o => { if (idsCC.includes(o.id)) o.saldada = !!saldadas[o.id] })
 
@@ -209,7 +210,7 @@ const VentasModel = {
   // Actualiza datos editables de un viaje (estado != entregado/anulado).
   // Ajusta el stock pendiente si cambió la cantidad pedida.
   async actualizarViaje(id, datos) {
-    const op = (await query(`SELECT estado, modalidad, precio_flete, id_cliente FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    const op = (await query(`SELECT estado, modalidad, precio_flete, id_cliente, metodo_pago, iva_alicuota FROM op_encabezado WHERE id = ?`, [id])).rows[0]
     if (!op) throw new Error('Orden no encontrada.')
     if (datos.metodoPago === 'cuenta_corriente') {
       const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
@@ -270,6 +271,11 @@ const VentasModel = {
       // Total: el editado a mano si se tildó, si no productos + flete
       const totalManual = String(datos.editarTotal) === '1' && !vacio(datos.precioTotal)
       const total = totalManual ? Math.max(0, Number(datos.precioTotal) || 0) : subtotal + flete
+      // Pagada con saldo a favor: el crédito (más lo que ya usó esta venta) tiene que alcanzar
+      if ((metodoPago || op.metodo_pago) === 'saldo_a_favor') {
+        const errSaldo = await ClientesModel.errorSaldoFavor(op.id_cliente, { monto: conIva(total, op.iva_alicuota), opId: id }, q)
+        if (errSaldo) throw new Error(errSaldo)
+      }
 
       await q(`
         UPDATE op_encabezado
@@ -419,8 +425,8 @@ const TIPOS_CARGO = Object.values(TIPO_CARGO_POR_METODO)
 // anulada, tiene EXACTAMENTE UN cargo en la cuenta del cliente, por su total, desde
 // el momento en que se registra. Cualquier otra venta no tiene ninguno. Se llama
 // después de crear, editar, entregar, anular o cambiar el método de pago: deja el
-// cargo como corresponde (lo crea, ajusta el importe/cliente/tipo, o lo borra) y
-// mantiene clientes.saldo en línea. `q` permite correrlo dentro de una transacción abierta.
+// cargo como corresponde (lo crea, ajusta el importe/cliente/tipo, o lo borra); el saldo del
+// cliente lo recalcula la base. `q` permite correrlo dentro de una transacción abierta.
 // moverFecha: también lleva el cargo a la fecha de compra (al corregirla en la edición).
 VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha = false } = {}) {
   const op = (await q(`
@@ -436,16 +442,23 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha =
   // Cargos existentes de cualquiera de los dos tipos: si cambió el método de pago
   // (de cuenta corriente a saldo a favor o viceversa) el del tipo viejo queda obsoleto.
   const cargos = (await q(
-    `SELECT id, cliente_id, monto, tipo, created_at FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = ANY(?) ORDER BY id`,
+    `SELECT id, cliente_id, monto, tipo, created_at, descripcion FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo = ANY(?) ORDER BY id`,
     [idOp, TIPOS_CARGO]
   )).rows
-  // Se conserva a lo sumo uno, del tipo que corresponde ahora; el resto son duplicados u obsoletos
-  const actual = corresponde ? cargos.find(c => c.tipo === tipoCargo) : null
+  // Se conserva a lo sumo uno, del tipo que corresponde ahora (mejor uno que generó el sistema);
+  // el resto son duplicados u obsoletos. Un cargo a mano que quedó vinculado por error no se
+  // borra: se desvincula y sigue en la cuenta como cargo a mano.
+  const delSistema = (c) => ClientesModel.esCargoDelSistema(c, [op.nro_op])
+  const actual = corresponde ? (cargos.find(c => c.tipo === tipoCargo && delSistema(c)) || cargos.find(c => c.tipo === tipoCargo)) : null
   let cambio = null
   for (const c of cargos) {
     if (c === actual) continue
+    if (!delSistema(c)) {
+      await q(`UPDATE movimientos_cuenta SET id_op_encabezado = NULL WHERE id = ?`, [c.id])
+      cambio = 'cargo a mano desvinculado'
+      continue
+    }
     await q(`DELETE FROM movimientos_cuenta WHERE id = ?`, [c.id])
-    await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(c.monto), c.cliente_id])
     cambio = corresponde ? 'duplicado borrado' : 'cargo borrado'
   }
   if (!corresponde) return cambio
@@ -473,10 +486,8 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha =
     }
     const cambioCliente = String(actual.cliente_id) !== String(op.id_cliente)
     if (cambioCliente || Math.abs(Number(actual.monto) - monto) > 0.005) {
-      await q(`UPDATE clientes SET saldo = saldo - ? WHERE id = ?`, [Number(actual.monto), actual.cliente_id])
       await q(`UPDATE movimientos_cuenta SET cliente_id = ?, monto = ?, descripcion = ? WHERE id = ?`,
         [op.id_cliente, monto, descripcion, actual.id])
-      await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
       return `cargo ajustado a ${-monto}`
     }
     return cambio
@@ -485,7 +496,6 @@ VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha =
     INSERT INTO movimientos_cuenta (cliente_id, tipo, descripcion, monto, id_op_encabezado, created_at)
     VALUES (?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
   `, [op.id_cliente, tipoCargo, descripcion, monto, op.id, createdAt])
-  await q(`UPDATE clientes SET saldo = saldo + ? WHERE id = ?`, [monto, op.id_cliente])
   return `cargo creado por ${-monto}`
 }
 

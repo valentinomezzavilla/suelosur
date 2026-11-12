@@ -95,28 +95,37 @@ describe('vista Flota de Personal', () => {
   })
 })
 
-describe('vista Liquidación: relación con la cuenta corriente', () => {
+describe('vista Liquidación y estado de cuenta: el mismo saldo del cliente', () => {
   const filtros = { clienteId: '64', obra: null, desde: '2026-10-01', hasta: '2026-10-31', tipos: Object.keys(TIPOS), estadoPago: 'todas' }
   const cliente = { id: 64, numero: 64, nombreCompleto: 'LANFRANCONI', dni: '', telefono: '', direccion: '', email: '' }
   const base = { titulo: 'Liquidaciones', TIPOS, ESTADOS, nro: 'LIQ', obras: [], scripts: [], filtros, clienteSel: cliente }
   const resumen = { consumido: 4719000, pagado: 0, saldo: 4719000, cantidad: 0 }
+  const L = require('../src/utils/liquidaciones')
+  const saldoDeuda = L.saldoDelCliente({ cargos: { 1: { idOp: 10, restante: 4719000, fechaOp: '2026-10-10' }, 2: { idOp: 5, restante: 649800, fechaOp: '2026-09-20' } },
+    aFavor: 0, ops: [], saldoCuenta: -5368800, desde: '2026-10-01', hasta: '2026-10-31' })
+  const saldoAFavor = L.saldoDelCliente({ cargos: {}, aFavor: 30000, ops: [], saldoCuenta: 30000, desde: '2026-10-01', hasta: '2026-10-31',
+    creditos: [{ id: 3, fecha: '2026-10-02 12:00:00', tipo: 'pago', descripcion: 'Pago / abono de deuda', monto: 80000, sobrante: 30000 }] })
 
-  it('explica la diferencia y termina en el saldo de la cuenta', async () => {
+  it('la liquidación muestra el saldo de la cuenta corriente y de qué período es la deuda', async () => {
     const html = await renderVista('pages/liquidaciones/index', { ...base, liquidacion: {
-      clientes: [{ cliente, operaciones: [], resumen, pagos: [], porObra: [] }], resumen,
-      conciliacion: { saldoLiquidacion: 4719000, deudaCuenta: 5368800, coincide: false,
-        renglones: [{ clave: 'anteriores', signo: 1, importe: 649800, texto: 'Deuda de operaciones anteriores al 01/10/2026' }] } } })
-    assert.match(html, /¿Por qué este saldo no es igual al de la cuenta corriente\?/)
-    assert.match(html, /Más: Deuda de operaciones anteriores al 01\/10\/2026/)
-    assert.match(html, /\+ \$649\.800,00/)
-    assert.match(html, /Cuenta corriente hoy<\/td><td class="text-end">Debe \$5\.368\.800,00/)
+      clientes: [{ cliente, operaciones: [], resumen, pagos: [], porObra: [] }], resumen, saldo: saldoDeuda } })
+    assert.match(html, /Saldo de la cuenta corriente<\/span>\s*<strong class="text-danger">Debe \$5\.368\.800,00/)
+    assert.match(html, /Deuda de operaciones del 01\/10\/2026 al 31\/10\/2026<\/td><td class="text-end text-danger">\$4\.719\.000,00/)
+    assert.match(html, /Deuda de operaciones anteriores<\/td><td class="text-end text-danger">\$649\.800,00/)
+    assert.match(html, /Pendiente de estas operaciones/)
     assert.match(html, /href="\/clientes\/cuentas\/64"/)
   })
-  it('si coinciden, lo dice en una línea', async () => {
+  it('saldo a favor: dice de qué pago sale', async () => {
     const html = await renderVista('pages/liquidaciones/index', { ...base, liquidacion: {
-      clientes: [{ cliente, operaciones: [], resumen, pagos: [], porObra: [] }], resumen,
-      conciliacion: { saldoLiquidacion: 100, deudaCuenta: 100, coincide: true, renglones: [] } } })
-    assert.match(html, /Coincide con la cuenta corriente:<\/strong> Debe \$100,00/)
+      clientes: [{ cliente, operaciones: [], resumen, pagos: [], porObra: [] }], resumen, saldo: saldoAFavor } })
+    assert.match(html, /A favor \$30\.000,00/)
+    assert.match(html, /¿De dónde sale el saldo a favor\?/)
+    assert.match(html, /02\/10\/2026 · Pago \/ abono de deuda<\/span>\s*<span>\$30\.000,00 <small class="text-muted">\(de \$80\.000,00\)/)
+  })
+  it('el estado de cuenta muestra el mismo bloque con los mismos números', async () => {
+    const html = await renderVista('partials/saldo_cliente', { saldo: saldoDeuda, idCliente: 64 })
+    assert.match(html, /Debe \$5\.368\.800,00/)
+    assert.match(html, /Deuda de operaciones anteriores/)
   })
 })
 

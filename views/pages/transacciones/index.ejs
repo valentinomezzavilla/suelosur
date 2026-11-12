@@ -133,7 +133,7 @@
                         <% } %>
                         <% movimientos.forEach(t => {
                             const esTx = t.origen === 'transaccion'
-                            const sinSaldar = esTx && t.metodo_pago === 'cuenta_corriente' && t.saldada === false
+                            const sinSaldar = esTx && ['cuenta_corriente', 'saldo_a_favor'].includes(t.metodo_pago) && t.saldada === false
                             const cargadoOtroDia = t.cargado_en && String(t.cargado_en).slice(0, 10) !== String(t.fecha || '').slice(0, 10)
                             const tipoTxt = esTx ? (tipoCorto[t.tipo] || t.tipo) : (t.origen === 'pago_cliente' ? 'Pago de cliente' : t.tipo)
                             const tipoCls = esTx ? 'badge--tipo-' + t.tipo.toLowerCase().replace(/ /g, '-')
