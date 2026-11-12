@@ -1,0 +1,17 @@
+<%#
+  Botón "Agregar N°Factura" / "Editar N°Factura" de una operación, para la columna de acciones
+  de Ventas y de Alquileres (contenedores y maquinaria). Recibe `op` ({ id, nro_op, nro_factura,
+  facturado, estado }). No se muestra en una operación ya facturada (su número es el de la
+  factura registrada) ni anulada, ni para quien no carga operaciones. Lo abre
+  public/js/nroFactura.js con el modal views/partials/modal_nro_factura.ejs, que cada pantalla
+  incluye una vez.
+%>
+<%
+  const _op = locals.op
+  const _puede = !!(locals.user && ['admin_ventas', 'admin_contable', 'dueno'].includes(locals.user.rol))
+%>
+<% if (_op && _puede && Number(_op.facturado) !== 1 && _op.estado !== 'anulado') { %>
+  <button type="button" class="btn btn-sm btn-outline-secondary btn-nro-factura text-nowrap" data-id="<%= _op.id %>"
+          data-nombre="OP-<%= String(_op.nro_op).padStart(4, '0') %>" data-nro="<%= _op.nro_factura || '' %>"
+          title="<%= _op.nro_factura ? 'N° de factura cargado: ' + _op.nro_factura : 'Cargar el N° de factura de esta operación' %>"><%= _op.nro_factura ? 'Editar N°Factura' : 'Agregar N°Factura' %></button>
+<% } %>

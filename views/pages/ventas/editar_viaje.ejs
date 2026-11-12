@@ -151,6 +151,20 @@
                     </div>
                 </div>
 
+                <div class="form-section">
+                    <h3 class="form-section__title">Factura</h3>
+                    <div class="form-group">
+                        <label for="nroFactura">N° de Factura</label>
+                        <% if (viaje.facturado) { %>
+                        <input type="text" id="nroFactura" value="<%= viaje.nroFactura %>" disabled class="input-readonly">
+                        <p class="form-hint">Ya está facturada: es el número de la factura registrada.</p>
+                        <% } else { %>
+                        <input type="text" name="nroFactura" id="nroFactura" value="<%= viaje.nroFactura %>" maxlength="40" placeholder="Ej: 0001-00001234" autocomplete="off">
+                        <p class="form-hint">Opcional. Dejalo vacío para quitar el número. No la marca para facturar ni le suma IVA.</p>
+                        <% } %>
+                    </div>
+                </div>
+
                 <div style="display:flex; gap:0.5rem">
                     <button type="submit" class="btn-primary-green">Guardar cambios</button>
                     <a href="/ventas/<%= viaje.id %>" class="btn-secondary">Cancelar</a>

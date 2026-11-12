@@ -32,7 +32,13 @@
         <td class="fw-semibold"><%= a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—' %></td>
         <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
-        <td class="text-nowrap"><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a> <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %></td>
+        <td>
+          <div class="d-flex flex-wrap gap-1">
+            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+            <%- include('../../partials/boton_nro_factura', { op: a }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+          </div>
+        </td>
       </tr>
       <% }) %>
     </tbody></table>
@@ -59,7 +65,13 @@
         <td class="fw-semibold"><%= a.fecha_fin_estimada ? formatFecha(a.fecha_fin_estimada) : '—' %></td>
         <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
-        <td class="text-nowrap"><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a> <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %></td>
+        <td>
+          <div class="d-flex flex-wrap gap-1">
+            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+            <%- include('../../partials/boton_nro_factura', { op: a }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+          </div>
+        </td>
       </tr>
       <% }) %>
     </tbody></table>
@@ -85,7 +97,13 @@
         <td><small class="text-muted"><%= a.domicilio_entrega || '—' %></small></td>
         <td><small><%= a.fecha_entrega_planificada ? formatFecha(a.fecha_entrega_planificada) : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
-        <td class="text-nowrap"><a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a> <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %></td>
+        <td>
+          <div class="d-flex flex-wrap gap-1">
+            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+            <%- include('../../partials/boton_nro_factura', { op: a }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+          </div>
+        </td>
       </tr>
       <% }) %>
     </tbody></table>
@@ -94,3 +112,5 @@
 </div>
 <%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
 <%- include('../../partials/modal_estado_pago') %>
+<%# Agregar / editar el N° de factura de una operación %>
+<%- include('../../partials/modal_nro_factura') %>

@@ -75,6 +75,17 @@
           <div class="col-12"><p class="form-hint mb-0">Este alquiler ya se cobró. Si cambiás el precio o el método de pago, se corrige el cobro y la cuenta corriente del cliente.</p></div>
         <% } %>
         <% } %>
+        <%# N° de factura: de cualquier alquiler sin facturar (no la marca para facturar ni le suma IVA) %>
+        <div class="col-md-4">
+          <label class="form-label" for="nroFactura">N° de Factura</label>
+          <% if (Number(alquiler.facturado) === 1) { %>
+            <input id="nroFactura" class="form-control" value="<%= alquiler.nro_factura || '' %>" disabled>
+            <p class="form-hint mb-0">Ya está facturado: es el número de la factura registrada.</p>
+          <% } else { %>
+            <input name="nroFactura" id="nroFactura" class="form-control" maxlength="40" placeholder="Ej: 0001-00001234" autocomplete="off" value="<%= alquiler.nro_factura || '' %>">
+            <p class="form-hint mb-0">Opcional. Vacío lo quita.</p>
+          <% } %>
+        </div>
         <div class="col-12"><label class="form-label">Observaciones</label><textarea name="observaciones" class="form-control" rows="2"><%= alquiler.observaciones || '' %></textarea></div>
         <% // Las mismas OP que actualiza actualizarCompartidosGrupo: sin cobrar y, con cobro por
            // contenedor, todavía sin retirar.

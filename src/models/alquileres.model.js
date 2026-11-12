@@ -130,7 +130,7 @@ const AlquileresModel = {
     // Para calcular fechas de alquiler usamos el movimiento 'en_alquiler' (inicio del período)
     const baseSelect = `
       SELECT op.id, op.nro_op, op.nro_remito, op.estado, op.fecha_emision, op.fecha_entrega_planificada, op.obra,
-             op.id_grupo,
+             op.id_grupo, op.nro_factura, op.facturado,
              (SELECT COUNT(*) FROM op_encabezado g WHERE g.id_grupo = op.id_grupo AND g.estado <> 'anulado')::int AS grupo_cant,
              ${nombreCompleto('cli')} AS cliente_nombre, cli.tel_whatsapp,
              oc.id AS id_op_contenedor, oc.domicilio_entrega, oc.zona_entrega,
@@ -383,7 +383,7 @@ const AlquileresModel = {
   // Un alquiler SIN precio no se edita por acá: su precio y su método de pago se asignan en
   // Cobranzas → Asignar precio (con la validación de cuenta corriente), así que la edición
   // no los toca (y sobre todo no le pone un $0 por no venir en el formulario).
-  async actualizar(id_op, { calle, numero: numeroForm, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra }) {
+  async actualizar(id_op, { calle, numero: numeroForm, zona_entrega, plazo_alquiler, precio_alquiler, metodo_pago, observaciones, fecha_entrega_planificada, obra, nroFactura }) {
     const numero = numeroSinRepetirCalle(calle, numeroForm)
     const domicilio_entrega = `${calle || ''} ${numero}`.trim()
     const previo = (await query(`SELECT domicilio_calle, domicilio_numero, precio_alquiler FROM op_detalle_contenedor WHERE id_orden_pedido = ? LIMIT 1`, [id_op])).rows[0]
@@ -394,6 +394,8 @@ const AlquileresModel = {
     // acompañan (si no, la Liquidación y la Cuenta corriente quedaban diciendo cosas distintas)
     const correccion = sinPrecio ? null : await this._correccionDeCobro(id_op, { precio: precio_alquiler, metodo: metodo_pago })
     await transaction(async (q) => {
+      // N° de factura (opcional): si el formulario no trae el campo, no se toca
+      if (nroFactura !== undefined) await require('./facturacion.model').guardarNroFactura(id_op, nroFactura, q)
       await q(sinPrecio
         ? `UPDATE op_encabezado SET observaciones = ?, fecha_entrega_planificada = ?, obra = ? WHERE id = ?`
         : `UPDATE op_encabezado SET observaciones = ?, fecha_entrega_planificada = ?, obra = ?, metodo_pago = ? WHERE id = ?`,

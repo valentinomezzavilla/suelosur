@@ -1,7 +1,8 @@
 'use strict'
 // N° de Factura cargado con la operación "Para facturar": queda guardado con la OP (que sigue
 // pendiente en Facturación), se busca por él en Ventas y en Facturación y viene cargado al
-// facturarla. También se carga o se corrige desde el detalle de la operación.
+// facturarla. También se carga o se corrige desde el detalle de la operación (y, para cualquier
+// operación, con el botón de los listados: ver nro-factura-operaciones.test.js).
 // Corre dentro de la transacción de prueba (ROLLBACK al final: nada queda guardado).
 const prueba = require('./helpers/db')
 const datos = require('./helpers/datos')
@@ -79,20 +80,22 @@ describe('N° de Factura al crear una operación para facturar', () => {
     assert.equal((await FacturacionModel.estadoOp(op.id)).nro_factura, null)
   })
 
-  it('marcar desde el detalle con número lo guarda; quitarla de facturación lo borra', async () => {
+  it('marcar con número lo guarda; quitarla de facturación conserva el número (es un dato de la operación)', async () => {
     const otra = await ventaCantera()
     await llamar(FacturacionController, 'marcar', { user, params: { id: otra.id }, body: { nroFactura: '0002-00000001' } })
     const e = await FacturacionModel.estadoOp(otra.id)
     assert.equal(e.para_facturar, true)
     assert.equal(e.nro_factura, '0002-00000001')
     await llamar(FacturacionController, 'quitar', { user, params: { id: otra.id }, body: {} })
-    assert.equal((await FacturacionModel.estadoOp(otra.id)).nro_factura, null)
+    const q = await FacturacionModel.estadoOp(otra.id)
+    assert.equal(q.para_facturar, false)
+    assert.equal(q.nro_factura, '0002-00000001')
   })
 
   it('una operación ya facturada no cambia su número desde el detalle', async () => {
     await prueba.q(`UPDATE op_encabezado SET facturado = 1, nro_factura = 'A-1' WHERE id = ?`, [op.id])
     const r = await llamar(FacturacionController, 'nroFactura', { user, params: { id: op.id }, body: { nroFactura: 'otro' } })
-    assert.match(r.flashes[0].msg, /no está pendiente/)
+    assert.match(r.flashes[0].msg, /ya está facturada/)
     assert.equal((await FacturacionModel.estadoOp(op.id)).nro_factura, 'A-1')
   })
 })

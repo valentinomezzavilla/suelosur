@@ -92,6 +92,7 @@ const VentasModel = {
     `, params)).rows[0]?.n || 0
     const ops = (await query(`
       SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.modalidad, op.fecha_emision, op.nro_remito, op.metodo_pago,
+             op.nro_factura, op.facturado,
              COALESCE(${nombreClienteSQL('c')}, op.observaciones, 'Particular') AS cliente_nombre,
              u.nombre AS administrativo_nombre,
              ${SQL_TOTAL} AS total
@@ -244,6 +245,8 @@ const VentasModel = {
     const flete  = vacio(datos.precioFlete) ? (Number(op.precio_flete) || 0) : Math.max(0, Number(datos.precioFlete) || 0)
 
     await transaction(async (q) => {
+      // N° de factura (opcional): si el formulario no trae el campo, no se toca
+      if (datos.nroFactura !== undefined) await require('./facturacion.model').guardarNroFactura(id, datos.nroFactura, q)
       // Único detalle (cantidad/precio): si no vino un campo, se conserva el valor actual
       const detalle = (await q(`
         SELECT d.id, d.id_producto, d.cantidad_pedida, d.precio_unitario, d.dias,
@@ -327,6 +330,9 @@ const VentasModel = {
       metodoPago: op.metodo_pago || 'efectivo',
       tercero: op.tercero || '',
       descripcion: op.observaciones || '',
+      // N° de factura cargado con la operación; ya facturada (su número es el del comprobante) no se edita
+      nroFactura: op.nro_factura || '',
+      facturado: Number(op.facturado) === 1,
     }
   },
 
