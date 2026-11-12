@@ -71,6 +71,11 @@
                 <% if (filtros.categoria && filtros.categoria !== 'todas') { %><input type="hidden" name="categoria" value="<%= filtros.categoria %>"><% } %>
                 <% if (filtros.tipo && filtros.tipo !== 'todos') { %><input type="hidden" name="tipo" value="<%= filtros.tipo %>"><% } %>
                 <div class="filtro-group">
+                    <label>Código</label>
+                    <input type="text" name="codigo" value="<%= filtros.codigo %>" maxlength="14"
+                        placeholder="Ej: PAG-001240" autocomplete="off">
+                </div>
+                <div class="filtro-group">
                     <label>Cliente / persona</label>
                     <input type="text" name="cliente" value="<%= filtros.cliente %>" list="listaClientesTx"
                         placeholder="Nombre del cliente, empleado o proveedor..." autocomplete="off">

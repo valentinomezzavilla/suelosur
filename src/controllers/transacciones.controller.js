@@ -23,7 +23,7 @@ function leerFiltros(q) {
     periodo,
     filtros: {
       categoria,
-      id: q.id, tipo: q.tipo, clienteId: q.idCliente, cliente: q.cliente, remito: q.remito, nroOp: q.nroOp,
+      id: q.id, codigo: q.codigo, tipo: q.tipo, clienteId: q.idCliente, cliente: q.cliente, remito: q.remito, nroOp: q.nroOp,
       fechaDesde: periodo.desde, fechaHasta: periodo.hasta,
       montoMin: q.montoMin, montoMax: q.montoMax,
     },
@@ -33,7 +33,7 @@ function leerFiltros(q) {
 const TransaccionesController = {
   async index(req, res) {
     try {
-      const { id, tipo, idCliente, cliente, remito, nroOp, montoMin, montoMax, sortBy, sortDir } = req.query
+      const { id, codigo, tipo, idCliente, cliente, remito, nroOp, montoMin, montoMax, sortBy, sortDir } = req.query
       // Período: presets (hoy/semana/mes/rango). Default = mes en curso.
       const { periodo, filtros: baseFiltros } = leerFiltros(req.query)
 
@@ -47,7 +47,7 @@ const TransaccionesController = {
 
       const filtros = {
         categoria: baseFiltros.categoria,
-        id: id||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'', remito: remito||'', nroOp: nroOp||'',
+        id: id||'', codigo: codigo||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'', remito: remito||'', nroOp: nroOp||'',
         fechaDesde: periodo.desde||'', fechaHasta: periodo.hasta||'', montoMin: montoMin||'',
         montoMax: montoMax||'', mes: periodo.mes||'', preset: periodo.preset||'',
         sortBy: sortBy||'fecha', sortDir: sortDir||'DESC',
@@ -159,6 +159,7 @@ const TransaccionesController = {
         etiquetaPeriodo(periodo),
         filtros.categoria !== 'todas' && cat ? `Mostrando: ${cat.etiqueta}` : null,
         filtros.tipo && filtros.tipo !== 'todos' ? `Tipo: ${filtros.tipo}` : null,
+        filtros.codigo ? `Código: ${filtros.codigo}` : null,
         filtros.cliente ? `Cliente / persona: ${filtros.cliente}` : null,
         filtros.montoMin ? `Monto desde $${Number(filtros.montoMin).toLocaleString('es-AR')}` : null,
         filtros.montoMax ? `Monto hasta $${Number(filtros.montoMax).toLocaleString('es-AR')}` : null,

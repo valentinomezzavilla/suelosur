@@ -74,18 +74,50 @@ const SQL_UNION = `
 // N° de operación escrito a mano → número (misma regla que TransaccionesModel)
 const nroOpDeTexto = (t) => TransaccionesModel.nroOpDeTexto(t)
 
+// Código escrito a mano → qué fila es. Entiende lo que muestra la tabla: PAG-001240 (pago de un
+// cliente), EGR-000123 (egreso), CAN-000045 / VIA / CON / MAQ / AJU (transacciones, por su N° de
+// cada tipo); en cualquier mayúscula, con guion, espacio o sin nada ("pag 1240", "PAG1240").
+// Solo dígitos ("1240"): cualquier fila cuyo N° sea ese. Algo que no se entiende → null.
+// `estricto`: solo con prefijo conocido (para usarlo en la caja de nombres sin pisar un nombre).
+const TIPO_POR_PREFIJO = Object.fromEntries(Object.entries(TransaccionesModel.PREFIJO).map(([tipo, pre]) => [pre, tipo]))
+function codigoDeTexto(texto, { estricto = false } = {}) {
+  const t = String(texto ?? '').trim()
+  const m = /^([A-Za-z]{3})[\s-]*(\d+)$/.exec(t)
+  if (m) {
+    const pre = m[1].toUpperCase(), n = Number(m[2])
+    if (pre === 'PAG') return { origen: 'pago_cliente', id: n }
+    if (pre === 'EGR') return { origen: 'egreso', id: n }
+    if (TIPO_POR_PREFIJO[pre]) return { origen: 'transaccion', tipo: TIPO_POR_PREFIJO[pre], numero: n }
+    return null
+  }
+  if (!estricto && /^\d+$/.test(t)) return { cualquiera: Number(t) }
+  return null
+}
+
+// Condición SQL (sobre la unión u) de un código ya entendido, o FALSE si no se entendió
+function condicionCodigo(c) {
+  if (!c) return { sql: 'FALSE', params: [] }
+  if (c.origen === 'pago_cliente' || c.origen === 'egreso') return { sql: `u.origen = '${c.origen}' AND u.id = ?`, params: [c.id] }
+  if (c.origen === 'transaccion') return { sql: `u.origen = 'transaccion' AND u.tipo = ? AND u.numero = ?`, params: [c.tipo, c.numero] }
+  return { sql: `((u.origen IN ('pago_cliente', 'egreso') AND u.id = ?) OR (u.origen = 'transaccion' AND u.numero = ?))`, params: [c.cualquiera, c.cualquiera] }
+}
+
 // WHERE sobre la unión (alias u). `categoria` es el botón elegido; el resto, los filtros de
 // siempre. Remito e id son solo de cobros (transacciones): con ellos las demás fuentes quedan afuera.
-function filtro({ categoria, tipo, id, clienteId, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}, { sinCategoria = false } = {}) {
+function filtro({ categoria, tipo, id, codigo, clienteId, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}, { sinCategoria = false } = {}) {
   const w = []
   const p = []
   if (!sinCategoria && categoria && categoria !== 'todas' && CLAVES.includes(categoria)) { w.push('u.categoria = ?'); p.push(categoria) }
   // Tipo puntual de transacción (enlaces viejos: ?tipo=Venta Cantera)
   if (tipo && tipo !== 'todos') { w.push(`u.origen = 'transaccion' AND u.tipo = ?`); p.push(tipo) }
   if (id) { w.push(`u.origen = 'transaccion' AND u.id = ?`); p.push(Number(id) || 0) }
+  if (codigo && String(codigo).trim()) { const c = condicionCodigo(codigoDeTexto(codigo)); w.push(c.sql); p.push(...c.params) }
   if (clienteId) { w.push('u.cliente_id = ?'); p.push(clienteId) }
   const texto = String(cliente || '').trim()
-  if (texto) { w.push('u.persona ILIKE ?'); p.push(`%${texto}%`) }
+  // Si en la caja de nombres se escribe un código (PAG-001240), se busca ese código
+  const codigoEnNombre = texto ? codigoDeTexto(texto, { estricto: true }) : null
+  if (codigoEnNombre) { const c = condicionCodigo(codigoEnNombre); w.push(c.sql); p.push(...c.params) }
+  else if (texto) { w.push('u.persona ILIKE ?'); p.push(`%${texto}%`) }
   if (remito && String(remito).trim()) { w.push(`u.origen = 'transaccion' AND u.nro_remito = ?`); p.push(Number(remito) || 0) }
   const nro = nroOpDeTexto(nroOp)
   if (nro != null) { w.push('u.id_op_encabezado IN (SELECT id FROM op_encabezado WHERE nro_op = ?)'); p.push(nro) }
@@ -125,7 +157,7 @@ function totalesDe(filas) {
 
 const MovimientosDineroModel = {
   CATEGORIAS, CLAVES, SIN_COBRO,
-  codigo, totalesDe, _filtro: filtro, _orden: orden,
+  codigo, codigoDeTexto, totalesDe, _filtro: filtro, _orden: orden,
 
   async listar({ page = 1, limit = 20, sortBy = 'fecha', sortDir = 'DESC', ...filtros } = {}) {
     const { where, params } = filtro(filtros)
