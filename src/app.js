@@ -94,6 +94,7 @@ app.use('/circuitos',     require('./routes/circuitos.routes'))
 app.use('/zonas',         require('./routes/zonas.routes'))
 app.use('/facturacion',   require('./routes/facturacion.routes'))
 app.use('/liquidaciones', require('./routes/liquidaciones.routes'))
+app.use('/estado-pago',   require('./routes/estadoPago.routes'))
 app.use('/api/tercero',   require('./routes/tercero.routes'))
 
 // ── Placeholders (módulos futuros) ───────────────────────────────

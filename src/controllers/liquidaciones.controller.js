@@ -21,7 +21,7 @@ const LiquidacionesController = {
       res.render('pages/liquidaciones/index', {
         titulo: 'Liquidaciones', filtros, liquidacion, clienteSel, obras, TIPOS, ESTADOS,
         nro: nroLiquidacion(hoyISO(), filtros.clienteId),
-        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js', '/js/estadoPago.js'],
       })
     } catch (err) {
       console.error(err)

@@ -1,6 +1,8 @@
 <%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS y, opcional,
-    saldar ({ idCliente, nombre }): botón "Saldar" en las que deben algo en la cuenta corriente %>
+    saldar ({ idCliente, nombre }): botón "Marcar como pagada" en las que deben algo en la cuenta corriente.
+    Dueño y administración contable también pueden marcarla pendiente / pagada (public/js/estadoPago.js). %>
 <% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+<% const puedeCambiarPago = !!locals.user && ['dueno', 'admin_contable'].includes(user.rol) %>
 <% const nroTxt = o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0') %>
 <%# Lo que todavía no es deuda lo dice: un alquiler en curso, o algo sin entregar que no está en la cuenta %>
 <% const estadoTxt = o.estado === 'pendiente' && o.enCurso ? 'En curso'
@@ -49,10 +51,20 @@
       <span>Total <strong><%= $(o.total) %></strong><% if (o.estimado) { %> <small class="text-muted" title="Alquiler todavía sin cobrar: lo que se cobraría hoy">(estimado a hoy)</small><% } %></span>
       <span class="text-success">Pagado <strong><%= $(o.pagado) %></strong></span>
       <span class="<%= o.resta > 0.005 ? 'text-danger' : 'text-success' %>">Resta <strong><%= $(o.resta) %></strong></span>
-      <%# Saldar: lo que le falta exacto, aplicado a esta operación (las de un alquiler cobrado todo junto se saldan desde la cuenta) %>
+      <%# Marcar como pagada: lo que le falta exacto, aplicado a esta operación (las de un alquiler cobrado todo junto se saldan desde la cuenta) %>
       <% if (locals.saldar && o.enCuenta && !o.grupoTodoJunto && o.resta > 0.005) { %>
         <button type="button" class="btn btn-sm btn-outline-success btn-abonar" data-id="<%= saldar.idCliente %>" data-nombre="<%= saldar.nombre %>"
-                data-clave="op:<%= o.id %>" data-deuda="<%= o.resta %>" data-descripcion="<%= nroTxt %> · <%= o.tipoTexto %>">Saldar</button>
+                data-clave="op:<%= o.id %>" data-deuda="<%= o.resta %>" data-descripcion="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar como pagada</button>
+      <% } else if (puedeCambiarPago && !['cuenta_corriente', 'saldo_a_favor'].includes(o.metodo_pago) && !o.grupoTodoJunto && !o.enCurso && !o.estimado
+                    && !['pendiente', 'despachado'].includes(o.estadoOp) && o.resta > 0.005) { %>
+        <%# Venta de contado sin cobro registrado: se registra el cobro por lo que falta %>
+        <button type="button" class="btn btn-sm btn-outline-success btn-estado-pago" data-id="<%= o.id %>" data-accion="pagada"
+                data-nombre="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar como pagada</button>
+      <% } %>
+      <%# Marcar pendiente: quita los pagos aplicados (en cuenta corriente) o pasa el cobro de contado a cuenta corriente %>
+      <% if (puedeCambiarPago && (o.estado === 'pagada' || o.estado === 'parcial') && !o.estimado) { %>
+        <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= o.id %>" data-accion="pendiente"
+                data-nombre="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar pendiente</button>
       <% } %>
     <% } %>
   </div>

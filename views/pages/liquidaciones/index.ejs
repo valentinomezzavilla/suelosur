@@ -144,5 +144,7 @@
   </div>
 <% } %>
 
-<%# Pago de la cuenta corriente ("Saldar" en las operaciones del cliente) %>
+<%# Pago de la cuenta corriente ("Marcar como pagada" en las operaciones del cliente) %>
 <% if (conCliente) { %><%- include('../../partials/modal_pago_cuenta') %><% } %>
+<%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
+<%- include('../../partials/modal_estado_pago') %>

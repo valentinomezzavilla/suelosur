@@ -196,6 +196,7 @@
         </tr>
         <% } %>
         <% const saldarMostrado = new Set() %>
+        <% const pendienteMostrado = new Set() %>
         <% estado.movimientos.forEach(m => { %>
         <% const anulado = !!Number(m.anulado) %>
         <tr class="<%= anulado ? 'mov-anulado' : '' %>">
@@ -243,12 +244,17 @@
                 <button type="button" class="btn btn-sm btn-outline-success btn-abonar"
                         data-id="<%= cliente.id %>" data-nombre="<%= nombre %>" data-clave="<%= sd.clave %>"
                         data-deuda="<%= sd.resta %>" data-descripcion="<%= m.descripcion %>">
-                  Saldar<%= sd.resta < sd.total - 0.005 ? ' ' + money(sd.resta) : '' %>
+                  Marcar como pagada<%= sd.resta < sd.total - 0.005 ? ' ' + money(sd.resta) : '' %>
                 </button>
               <% } else if (sd) { %>
                 <small class="text-muted">Se salda con su operación</small>
               <% } else if (Math.abs(m.monto) > 0.005 && !((pendientes[m.id] || 0) > 0.005)) { %>
                 <span class="badge rounded-pill px-3 badge-activo">Saldado</span>
+              <% } %>
+              <%# Marcar pendiente: una vez por operación, si tiene algo pagado (quita los pagos aplicados y el saldo acompaña) %>
+              <% if (puedeAnular && m.id_op_encabezado && !pendienteMostrado.has(String(m.id_op_encabezado)) && (!sd || sd.resta < sd.total - 0.005)) { pendienteMostrado.add(String(m.id_op_encabezado)) %>
+                <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= m.id_op_encabezado %>" data-accion="pendiente"
+                        data-nombre="<%= m.descripcion %>">Marcar pendiente</button>
               <% } %>
             <% } %>
           </td>
@@ -271,6 +277,8 @@
 
 <!-- Modal de pago (elige a qué operaciones se aplica) -->
 <%- include('../../partials/modal_pago_cuenta') %>
+<!-- Marcar pendiente una operación (con vista previa de lo que cambia) -->
+<%- include('../../partials/modal_estado_pago') %>
 
 <script>
 // Anular pago: confirma y pide el motivo (queda registrado en el historial)

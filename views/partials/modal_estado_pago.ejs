@@ -1,0 +1,44 @@
+<%#
+  Modal "Marcar pendiente" / "Marcar como pagada" una operación (public/js/estadoPago.js).
+  Lo abre cualquier botón .btn-estado-pago con data-id (operación), data-accion
+  ('pendiente' | 'pagada') y data-nombre (OP-0001 · tipo). Antes de confirmar muestra qué va a
+  cambiar y cómo queda el saldo del cliente (GET /estado-pago/:id/vista-previa).
+%>
+<div id="modal-estado-pago" class="modal-overlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="estadoPagoTitulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="estadoPagoTitulo"><span id="estadoPagoAccion"></span> — <span id="estadoPagoNombre"></span></h2>
+      <button type="button" class="modal-close" id="estadoPagoCerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="estadoPagoCargando" class="text-muted">Calculando qué cambia…</p>
+      <div id="estadoPagoBloqueos" class="alert alert-warning" hidden></div>
+      <ul id="estadoPagoLineas" class="mb-3 ps-3" hidden></ul>
+      <p id="estadoPagoSaldo" class="fw-semibold" hidden></p>
+      <form id="estadoPagoForm" method="POST" hidden>
+        <div class="form-group" id="estadoPagoMotivoGrupo" hidden>
+          <label for="estadoPagoMotivo">Motivo</label>
+          <input type="text" name="motivo" id="estadoPagoMotivo" maxlength="300" placeholder="Ej: la transferencia nunca llegó" autocomplete="off">
+          <p class="form-hint">Queda registrado junto con tu usuario.</p>
+        </div>
+        <div id="estadoPagoCobroGrupo" hidden>
+          <div class="form-group">
+            <label for="estadoPagoMetodo">Método de pago</label>
+            <select name="metodo_pago" id="estadoPagoMetodo">
+              <option value="efectivo">Efectivo</option>
+              <option value="transferencia">Transferencia</option>
+            </select>
+          </div>
+          <%- include('fecha_pago', { nombre: 'fecha', idCampo: 'estadoPagoFecha', metodoSel: '' }) %>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline-secondary" id="estadoPagoCancelar">Cancelar</button>
+          <button type="submit" class="btn" id="estadoPagoConfirmar">Confirmar</button>
+        </div>
+      </form>
+      <div class="modal-actions" id="estadoPagoSoloCerrar" hidden>
+        <button type="button" class="btn btn-outline-secondary" id="estadoPagoCerrar2">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>

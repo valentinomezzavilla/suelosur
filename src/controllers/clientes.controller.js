@@ -136,7 +136,7 @@ const ClientesController = {
         cliente, estado, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.clave : null },
-        scripts: ['/js/modalAbonar.js'],
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')
