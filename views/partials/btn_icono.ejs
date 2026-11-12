@@ -1,0 +1,19 @@
+<%#
+  Botón de solo ícono para la columna de acciones de una fila (estilos: components/_buttons-icon.scss).
+  Va dentro de <div class="acciones-fila">. Recibe:
+    icono     nombre del ícono (src/config/icons.js)
+    etiqueta  qué hace: es el nombre accesible (aria-label) Y el tooltip (title). Obligatorio:
+              un botón sin texto visible no puede quedar sin nombre.
+    clase     tono y clases de enganche para los scripts: 'btn-outline-secondary', 'btn-outline-success btn-estado-pago'…
+    href      si viene, es un enlace (<a>); si no, un <button type="button">
+    target    '_blank' para abrir en otra pestaña (rel="noopener" va solo)
+    tipo      'submit' para un botón de formulario (por defecto 'button')
+    attrs     objeto con atributos extra, p. ej. { 'data-id': 5, 'data-accion': 'pagada' } (en ese orden)
+%>
+<%
+  const _tag = locals.href ? 'a' : 'button'
+  const _attrs = Object.entries(locals.attrs || {})
+%>
+<<%- _tag %><% if (locals.href) { %> href="<%= href %>"<% if (locals.target) { %> target="<%= target %>" rel="noopener"<% } %><% } else { %> type="<%= locals.tipo || 'button' %>"<% } %>
+  class="btn btn-sm btn-icon <%= locals.clase || 'btn-outline-secondary' %>" title="<%= etiqueta %>" aria-label="<%= etiqueta %>"
+  data-bs-toggle="tooltip" data-bs-placement="top"<% _attrs.forEach(([k, v]) => { %> <%- k %>="<%= v %>"<% }) %>><%- icon(icono, { size: 16 }) %></<%- _tag %>>

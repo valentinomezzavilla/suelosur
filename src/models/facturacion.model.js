@@ -250,6 +250,15 @@ module.exports = {
     await q(`UPDATE op_encabezado SET nro_factura = ? WHERE id = ? AND COALESCE(facturado, 0) = 0`, [nroFacturaDe(nroFactura), id])
   },
 
+  // Datos para el botón de N° de factura en las pantallas que listan movimientos y no
+  // operaciones (Cuenta corriente): { [id]: { id, nro_op, estado, facturado, nro_factura } }.
+  async datosNroFactura(ids) {
+    const lista = [...new Set((ids || []).filter(Boolean).map(Number))]
+    if (!lista.length) return {}
+    const rows = (await query(`SELECT id, nro_op, estado, facturado, nro_factura FROM op_encabezado WHERE id = ANY(?::bigint[])`, [lista])).rows
+    return Object.fromEntries(rows.map(r => [r.id, r]))
+  },
+
   // Marcar / quitar varias OP de una vez (desde Liquidaciones), todas en la misma
   // transacción: o se marcan todas o ninguna. Devuelve los id que cambiaron; las que ya
   // estaban así (o no se pueden: anuladas, facturadas) se saltean.

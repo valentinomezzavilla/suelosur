@@ -184,7 +184,7 @@
           <th class="text-end">Débito</th>
           <th class="text-end">Crédito</th>
           <th class="text-end">Saldo</th>
-          <th class="text-center">Acciones</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -197,6 +197,7 @@
         <% } %>
         <% const saldarMostrado = new Set() %>
         <% const pendienteMostrado = new Set() %>
+        <% const nroFacturaMostrado = new Set() %>
         <% estado.movimientos.forEach(m => { %>
         <% const anulado = !!Number(m.anulado) %>
         <tr class="<%= anulado ? 'mov-anulado' : '' %>">
@@ -229,11 +230,12 @@
           <td class="text-end text-success"><span class="<%= anulado ? 'text-decoration-line-through text-muted' : '' %>"><%= m.monto > 0 ? money(m.monto) : '—' %></span></td>
           <td class="text-end fw-semibold <%= anulado ? 'text-muted' : saldoCls(m.saldo) %>"><%= anulado ? '—' : money(m.saldo) %></td>
           <td class="text-center">
+            <div class="acciones-fila">
             <% if (m.tipo === 'pago' && !anulado && puedeAnular) { %>
               <form action="/clientes/<%= cliente.id %>/cuenta/movimiento/<%= m.id %>/anular" method="POST" class="d-inline form-anular-pago"
                     data-monto="<%= money(m.monto) %>">
                 <input type="hidden" name="motivo">
-                <button type="submit" class="btn btn-sm btn-outline-danger" title="Anular este pago">Anular</button>
+                <%- include('../../partials/btn_icono', { icono: 'ban', etiqueta: 'Anular este pago', clase: 'btn-outline-danger', tipo: 'submit' }) %>
               </form>
             <% } %>
             <% if (m.tipo === 'deuda') { %>
@@ -241,11 +243,9 @@
                   con el IVA) y el pago se aplica a ella. Una vez por operación. %>
               <% const sd = saldarPorCargo[m.id] %>
               <% if (sd && !saldarMostrado.has(sd.clave)) { saldarMostrado.add(sd.clave) %>
-                <button type="button" class="btn btn-sm btn-outline-success btn-abonar"
-                        data-id="<%= cliente.id %>" data-nombre="<%= nombre %>" data-clave="<%= sd.clave %>"
-                        data-deuda="<%= sd.resta %>" data-descripcion="<%= m.descripcion %>">
-                  Marcar como pagada<%= sd.resta < sd.total - 0.005 ? ' ' + money(sd.resta) : '' %>
-                </button>
+                <%- include('../../partials/btn_icono', { icono: 'checkCircle', clase: 'btn-outline-success btn-abonar',
+                      etiqueta: 'Marcar como pagada' + (sd.resta < sd.total - 0.005 ? ' ' + money(sd.resta) : ''),
+                      attrs: { 'data-id': cliente.id, 'data-nombre': nombre, 'data-clave': sd.clave, 'data-deuda': sd.resta, 'data-descripcion': m.descripcion } }) %>
               <% } else if (sd) { %>
                 <small class="text-muted">Se salda con su operación</small>
               <% } else if (Math.abs(m.monto) > 0.005 && !((pendientes[m.id] || 0) > 0.005)) { %>
@@ -253,10 +253,16 @@
               <% } %>
               <%# Marcar pendiente: una vez por operación, si tiene algo pagado (quita los pagos aplicados y el saldo acompaña) %>
               <% if (puedeAnular && m.id_op_encabezado && !pendienteMostrado.has(String(m.id_op_encabezado)) && (!sd || sd.resta < sd.total - 0.005)) { pendienteMostrado.add(String(m.id_op_encabezado)) %>
-                <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= m.id_op_encabezado %>" data-accion="pendiente"
-                        data-nombre="<%= m.descripcion %>">Marcar pendiente</button>
+                <%- include('../../partials/btn_icono', { icono: 'clock', etiqueta: 'Marcar pendiente', clase: 'btn-outline-danger btn-estado-pago',
+                      attrs: { 'data-id': m.id_op_encabezado, 'data-accion': 'pendiente', 'data-nombre': m.descripcion } }) %>
+              <% } %>
+              <%# Agregar / editar el N° de factura (public/js/nroFactura.js): una vez por operación; la facturada y la anulada no lo llevan %>
+              <% const opNro = m.id_op_encabezado ? (locals.opsNroFactura || {})[m.id_op_encabezado] : null %>
+              <% if (opNro && !nroFacturaMostrado.has(String(m.id_op_encabezado))) { nroFacturaMostrado.add(String(m.id_op_encabezado)) %>
+                <%- include('../../partials/boton_nro_factura', { op: opNro }) %>
               <% } %>
             <% } %>
+            </div>
           </td>
         </tr>
         <% }) %>
@@ -279,6 +285,8 @@
 <%- include('../../partials/modal_pago_cuenta') %>
 <!-- Marcar pendiente una operación (con vista previa de lo que cambia) -->
 <%- include('../../partials/modal_estado_pago') %>
+<!-- Agregar / editar el N° de factura de una operación -->
+<%- include('../../partials/modal_nro_factura') %>
 
 <script>
 // Anular pago: confirma y pide el motivo (queda registrado en el historial)

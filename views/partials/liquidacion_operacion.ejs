@@ -24,7 +24,11 @@
       <% if (o.facturado) { %><span class="badge badge-activo">Facturada</span><% } else if (o.paraFacturar) { %><span class="badge badge-pendiente">Para facturar</span><% } %>
       <span class="liq-estado liq-estado--<%= o.estado %>"><%= estadoTxt %></span>
       <% const href = o.tipo === 'contenedor' ? '/alquileres/contenedores/' + o.id : o.tipo === 'maquinaria' ? '/alquileres/maquinaria/' + o.id : '/ventas/' + o.id %>
-      <a href="<%= href %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+      <div class="acciones-fila">
+        <%- include('btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', clase: 'btn-outline-secondary', href: href }) %>
+        <%# Agregar / editar el N° de factura (public/js/nroFactura.js); la facturada y la anulada no lo llevan %>
+        <%- include('boton_nro_factura', { nombreOp: nroTxt, op: { id: o.id, nro_op: o.nro_op, nro_factura: o.nroFactura, facturado: o.facturado, estado: o.estadoOp } }) %>
+      </div>
     </div>
   </div>
   <div class="table-responsive">
@@ -53,18 +57,18 @@
       <span class="<%= o.resta > 0.005 ? 'text-danger' : 'text-success' %>">Resta <strong><%= $(o.resta) %></strong></span>
       <%# Marcar como pagada: lo que le falta exacto, aplicado a esta operación (las de un alquiler cobrado todo junto se saldan desde la cuenta) %>
       <% if (locals.saldar && o.enCuenta && !o.grupoTodoJunto && o.resta > 0.005) { %>
-        <button type="button" class="btn btn-sm btn-outline-success btn-abonar" data-id="<%= saldar.idCliente %>" data-nombre="<%= saldar.nombre %>"
-                data-clave="op:<%= o.id %>" data-deuda="<%= o.resta %>" data-descripcion="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar como pagada</button>
+        <%- include('btn_icono', { icono: 'checkCircle', etiqueta: 'Marcar como pagada', clase: 'btn-outline-success btn-abonar',
+              attrs: { 'data-id': saldar.idCliente, 'data-nombre': saldar.nombre, 'data-clave': 'op:' + o.id, 'data-deuda': o.resta, 'data-descripcion': nroTxt + ' · ' + o.tipoTexto } }) %>
       <% } else if (puedeCambiarPago && !['cuenta_corriente', 'saldo_a_favor'].includes(o.metodo_pago) && !o.grupoTodoJunto && !o.enCurso && !o.estimado
                     && !['pendiente', 'despachado'].includes(o.estadoOp) && o.resta > 0.005) { %>
         <%# Venta de contado sin cobro registrado: se registra el cobro por lo que falta %>
-        <button type="button" class="btn btn-sm btn-outline-success btn-estado-pago" data-id="<%= o.id %>" data-accion="pagada"
-                data-nombre="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar como pagada</button>
+        <%- include('btn_icono', { icono: 'checkCircle', etiqueta: 'Marcar como pagada', clase: 'btn-outline-success btn-estado-pago',
+              attrs: { 'data-id': o.id, 'data-accion': 'pagada', 'data-nombre': nroTxt + ' · ' + o.tipoTexto } }) %>
       <% } %>
       <%# Marcar pendiente: quita los pagos aplicados (en cuenta corriente) o pasa el cobro de contado a cuenta corriente %>
       <% if (puedeCambiarPago && (o.estado === 'pagada' || o.estado === 'parcial') && !o.estimado) { %>
-        <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= o.id %>" data-accion="pendiente"
-                data-nombre="<%= nroTxt %> · <%= o.tipoTexto %>">Marcar pendiente</button>
+        <%- include('btn_icono', { icono: 'clock', etiqueta: 'Marcar pendiente', clase: 'btn-outline-danger btn-estado-pago',
+              attrs: { 'data-id': o.id, 'data-accion': 'pendiente', 'data-nombre': nroTxt + ' · ' + o.tipoTexto } }) %>
       <% } %>
     <% } %>
   </div>

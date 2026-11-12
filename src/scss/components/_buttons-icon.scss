@@ -1,0 +1,78 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Acciones por renglón: botones de solo ícono
+//
+//   <div class="acciones-fila">
+//     <%- include('partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', clase: 'btn-outline-secondary', href: '…' }) %>
+//   </div>
+//
+// El texto largo no entra en una columna de acciones: cada acción es un cuadrado con su ícono
+// y el nombre sale en el tooltip. El nombre es OBLIGATORIO (aria-label + title): sin él, un
+// lector de pantalla leería "botón" a secas. El tono sigue el significado, no la decoración:
+//   .btn-outline-secondary  neutro (ver, editar, imprimir)
+//   .btn-outline-primary    la operación ya tiene el dato cargado (N° de factura)
+//   .btn-outline-success    confirmar (marcar como pagada)
+//   .btn-outline-danger     deshacer / anular (marcar pendiente, anular un pago)
+// El color nunca va solo: cada acción tiene además su propio ícono y su nombre.
+// ═══════════════════════════════════════════════════════════════
+
+$icon-btn: 32px;   // objetivo de clic ≥ 24px (WCAG 2.5.8) con aire entre botones; en mobile 38px (base/_mobile.scss)
+
+// Fila de acciones. Alineada al inicio: la primera acción cae siempre en el mismo lugar de la
+// columna (si cada fila se centrara, el "ver" saltaría según cuántos botones tenga). Fuera de las
+// tablas, si no entran, bajan juntos (nunca se cortan); dentro de una tabla van en una sola línea
+// (la tabla ya se desliza sola en pantallas angostas) y el resto de las columnas cede el lugar.
+.acciones-fila {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.375rem;
+
+  form { margin: 0; display: inline-flex; }
+
+  // Columna pegada al borde derecho (Transacciones)
+  &--fin { justify-content: flex-end; }
+}
+
+:is(td, th) .acciones-fila { flex-wrap: nowrap; }
+
+.btn.btn-icon {
+  --bs-btn-padding-x: 0;
+  --bs-btn-padding-y: 0;
+  width: $icon-btn;
+  height: $icon-btn;
+  min-width: $icon-btn;
+  min-height: $icon-btn;
+  padding: 0;
+  gap: 0;
+  flex: none;
+  line-height: 1;
+
+  .ic {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;   // el clic lo recibe el botón, no el trazo del SVG
+  }
+}
+
+// Tooltip con el nombre de la acción (Bootstrap lo crea en <body>: la tabla no lo recorta)
+.tooltip {
+  --bs-tooltip-bg: #{$gray-900};
+  --bs-tooltip-color: #fff;
+  --bs-tooltip-opacity: 1;
+  --bs-tooltip-font-size: #{$fs-sm};
+  --bs-tooltip-padding-x: 0.6rem;
+  --bs-tooltip-padding-y: 0.3rem;
+  --bs-tooltip-border-radius: #{$radius-sm};
+  --bs-tooltip-max-width: 280px;
+
+  font-weight: 500;
+  letter-spacing: -0.003em;
+
+  @media (prefers-reduced-motion: reduce) {
+    &.fade { transition: none; }
+  }
+}

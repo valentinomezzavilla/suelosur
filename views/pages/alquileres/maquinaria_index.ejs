@@ -33,10 +33,10 @@
         <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
         <td>
-          <div class="d-flex flex-wrap gap-1">
-            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+          <div class="acciones-fila">
+            <%- include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', href: '/alquileres/maquinaria/' + a.id }) %>
             <%- include('../../partials/boton_nro_factura', { op: a }) %>
-            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id], compacto: true }) %>
           </div>
         </td>
       </tr>
@@ -66,10 +66,10 @@
         <td><small><%= a.dias_restantes != null ? a.dias_restantes + 'd' : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
         <td>
-          <div class="d-flex flex-wrap gap-1">
-            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+          <div class="acciones-fila">
+            <%- include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', href: '/alquileres/maquinaria/' + a.id }) %>
             <%- include('../../partials/boton_nro_factura', { op: a }) %>
-            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id], compacto: true }) %>
           </div>
         </td>
       </tr>
@@ -98,10 +98,10 @@
         <td><small><%= a.fecha_entrega_planificada ? formatFecha(a.fecha_entrega_planificada) : '—' %></small></td>
         <td><span class="badge rounded-pill px-3 <%= est.badge %>"><%= est.label %></span></td>
         <td>
-          <div class="d-flex flex-wrap gap-1">
-            <a href="/alquileres/maquinaria/<%= a.id %>" class="btn btn-sm btn-outline-secondary">Ver</a>
+          <div class="acciones-fila">
+            <%- include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', href: '/alquileres/maquinaria/' + a.id }) %>
             <%- include('../../partials/boton_nro_factura', { op: a }) %>
-            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] }) %>
+            <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id], compacto: true }) %>
           </div>
         </td>
       </tr>

@@ -1,7 +1,10 @@
 <%#
-  Botones "Marcar como pagada" / "Marcar pendiente" de una operación, para la columna de
-  acciones de Ventas, Transacciones y Alquileres. Recibe `e` (de LiquidacionesModel.estadosPago:
-  { id, nombre, acciones: { pendiente, pagada } }) o nada. Solo dueño y administración contable.
+  Botones "Marcar como pagada" / "Marcar pendiente" de una operación. Recibe `e` (de
+  LiquidacionesModel.estadosPago: { id, nombre, acciones: { pendiente, pagada } }) o nada. Solo
+  dueño y administración contable.
+    compacto: true  → solo ícono (columna de acciones de Ventas, Transacciones y Alquileres, dentro
+                       de .acciones-fila): ✓ marcar pagada (verde) · reloj marcar pendiente (rojo)
+    sin compacto    → con texto (encabezado del detalle de la operación, donde hay lugar)
   Los abre public/js/estadoPago.js con el modal views/partials/modal_estado_pago.ejs, que cada
   pantalla incluye una vez.
 %>
@@ -12,11 +15,21 @@
 <% } %>
 <% if (locals.e && locals.user && ['dueno', 'admin_contable'].includes(user.rol) && e.acciones) { %>
   <% if (e.acciones.pagada) { %>
-    <button type="button" class="btn btn-sm btn-outline-success btn-estado-pago" data-id="<%= e.id %>" data-accion="pagada"
-            data-nombre="<%= e.nombre %>">Marcar como pagada</button>
+    <% if (locals.compacto) { %>
+      <%- include('btn_icono', { icono: 'checkCircle', etiqueta: 'Marcar como pagada', clase: 'btn-outline-success btn-estado-pago',
+                                 attrs: { 'data-id': e.id, 'data-accion': 'pagada', 'data-nombre': e.nombre } }) %>
+    <% } else { %>
+      <button type="button" class="btn btn-sm btn-outline-success btn-estado-pago" data-id="<%= e.id %>" data-accion="pagada"
+              data-nombre="<%= e.nombre %>">Marcar como pagada</button>
+    <% } %>
   <% } %>
   <% if (e.acciones.pendiente) { %>
-    <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= e.id %>" data-accion="pendiente"
-            data-nombre="<%= e.nombre %>">Marcar pendiente</button>
+    <% if (locals.compacto) { %>
+      <%- include('btn_icono', { icono: 'clock', etiqueta: 'Marcar pendiente', clase: 'btn-outline-danger btn-estado-pago',
+                                 attrs: { 'data-id': e.id, 'data-accion': 'pendiente', 'data-nombre': e.nombre } }) %>
+    <% } else { %>
+      <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= e.id %>" data-accion="pendiente"
+              data-nombre="<%= e.nombre %>">Marcar pendiente</button>
+    <% } %>
   <% } %>
 <% } %>
