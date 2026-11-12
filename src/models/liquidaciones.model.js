@@ -279,6 +279,21 @@ const LiquidacionesModel = {
     return ops[0] || null
   },
 
+  // Estado de pago y botones que corresponden a cada operación de una pantalla (Ventas,
+  // Transacciones, Alquileres…): { [id]: { id, estado, resta, nombre, acciones: { pendiente, pagada } } }.
+  // Es el MISMO cálculo de Liquidaciones, así todos los módulos dicen lo mismo.
+  async estadosPago(ids) {
+    const lista = [...new Set((ids || []).filter(Boolean).map(Number))]
+    if (!lista.length) return {}
+    const { ops } = await calcularOperaciones({ tipos: Object.keys(L.TIPOS), opIds: lista })
+    const { accionesDe } = require('../utils/estadoPagoAcciones')
+    return Object.fromEntries(ops.map(o => [o.id, {
+      id: o.id, estado: o.estado, resta: o.resta,
+      nombre: `${o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0')} · ${o.tipoTexto}`,
+      acciones: accionesDe(o),
+    }]))
+  },
+
   // filtros: salida de normalizarFiltros (utils/liquidaciones)
   async liquidacion({ clienteId, obra, desde, hasta, tipos, estadoPago }) {
     if (clienteId) {

@@ -14,7 +14,9 @@ const AlquileresMaquinariaController = {
   async index(req, res) {
     try {
       const grupos = await AlquileresMaquinariaModel.listarPorEstado()
-      res.render('pages/alquileres/maquinaria_index', { titulo: 'Alquileres — Maquinaria', grupos })
+      const estadosPago = await require('../models/liquidaciones.model').estadosPago(
+        Object.values(grupos).flatMap(g => Array.isArray(g) ? g.map(a => a.id) : []))
+      res.render('pages/alquileres/maquinaria_index', { titulo: 'Alquileres — Maquinaria', grupos, estadosPago, scripts: ['/js/estadoPago.js'] })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los alquileres de maquinaria.')
@@ -99,6 +101,8 @@ const AlquileresMaquinariaController = {
       if (solapamiento) delete req.session.solapamiento
       res.render('pages/alquileres/maquinaria_detalle', {
         titulo: `Alquiler Maq. OP-${String(alquiler.nro_op).padStart(4,'0')}`,
+        estadoPago: (await require('../models/liquidaciones.model').estadosPago([alquiler.id]))[alquiler.id] || null,
+        scripts: ['/js/estadoPago.js'],
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
         facturacion: await require('../models/facturacion.model').estadoOp(alquiler.id),
         camionesDisp: await OperacionesModel.camionesDisponibles('maquinas'),

@@ -1,0 +1,22 @@
+<%#
+  Botones "Marcar como pagada" / "Marcar pendiente" de una operación, para la columna de
+  acciones de Ventas, Transacciones y Alquileres. Recibe `e` (de LiquidacionesModel.estadosPago:
+  { id, nombre, acciones: { pendiente, pagada } }) o nada. Solo dueño y administración contable.
+  Los abre public/js/estadoPago.js con el modal views/partials/modal_estado_pago.ejs, que cada
+  pantalla incluye una vez.
+%>
+<%# mostrarEstado: en el detalle de una operación, además dice cómo está el pago %>
+<% if (locals.mostrarEstado && locals.e) { %>
+  <span class="badge rounded-pill px-3 py-2 <%= { pagada: 'badge-activo', parcial: 'badge-en-transito', pendiente: 'badge-pendiente' }[e.estado] || 'badge-pendiente' %>"
+        title="Estado de pago de la operación">Pago: <%= { pagada: 'Pagada', parcial: 'Parcial', pendiente: 'Pendiente' }[e.estado] || '—' %></span>
+<% } %>
+<% if (locals.e && locals.user && ['dueno', 'admin_contable'].includes(user.rol) && e.acciones) { %>
+  <% if (e.acciones.pagada) { %>
+    <button type="button" class="btn btn-sm btn-outline-success btn-estado-pago" data-id="<%= e.id %>" data-accion="pagada"
+            data-nombre="<%= e.nombre %>">Marcar como pagada</button>
+  <% } %>
+  <% if (e.acciones.pendiente) { %>
+    <button type="button" class="btn btn-sm btn-outline-danger btn-estado-pago" data-id="<%= e.id %>" data-accion="pendiente"
+            data-nombre="<%= e.nombre %>">Marcar pendiente</button>
+  <% } %>
+<% } %>

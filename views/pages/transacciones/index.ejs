@@ -177,6 +177,7 @@
                                             data-remito-firmado="<%= t.tiene_remito_firmado ? '1' : '' %>">
                                             Ver
                                         </button>
+                                        <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[t.id_op_encabezado] }) %>
                                         <% if (puedeCorregir) { %>
                                             <button type="button" class="btn-secondary btn-sm btn-borrar-transaccion"
                                                 data-id="<%= t.id %>" data-codigo="<%= codigoMov(t) %>"
@@ -354,3 +355,5 @@
           remito: icon('receipt', { size: 15 }),
           firmado: icon('checkCircle', { size: 15 }),
         }) %></script>
+<%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
+<%- include('../../partials/modal_estado_pago') %>

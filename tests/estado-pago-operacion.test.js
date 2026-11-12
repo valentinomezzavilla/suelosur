@@ -225,7 +225,7 @@ describe('marcar pendiente / pagada en la base', () => {
     await assert.rejects(() => EstadoPago.marcarPagada(v1, { usuario: admin, metodo_pago: 'efectivo' }), /ya está pagada/)
   })
 
-  it('no se marca pagada una venta que todavía no se entregó, ni una de cuenta corriente', async () => {
+  it('no se marca pagada una venta que todavía no se entregó, ni con cheque', async () => {
     const cli = await datos.crearCliente({ cuentaCorriente: true })
     const v1 = await venta(cli, '2026-10-10', 100000, 'efectivo')
     const v2 = await venta(cli, '2026-10-10', 100000)
@@ -233,9 +233,11 @@ describe('marcar pendiente / pagada en la base', () => {
     const a = await EstadoPago.vistaPreviaPagada(v1)
     assert.equal(a.puede, false)
     assert.match(a.bloqueos[0], /entreg/)
-    const b = await EstadoPago.vistaPreviaPagada(v2)
+    // En cuenta corriente sí se puede (registra el pago), pero no con cheque
+    const b = await EstadoPago.vistaPreviaPagada(v2, { metodo_pago: 'cheque' })
     assert.equal(b.puede, false)
-    assert.match(b.bloqueos[0], /cuenta corriente/)
+    assert.match(b.bloqueos[0], /efectivo o transferencia/)
+    assert.equal((await EstadoPago.vistaPreviaPagada(v2)).puede, true)
   })
 
   it('una auditoría deja registro de quién y por qué', async () => {
@@ -371,6 +373,169 @@ describe('controlador y pantallas de marcar pendiente / pagada', () => {
       await prueba.q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ?`, [sinCobro])
       assert.deepEqual((await Reporte.ventasSinCargo(c)).map(o => o.id), [sinCargo])
       assert.deepEqual((await Reporte.contadoSinCobro(c)).map(o => o.id), [sinCobro])
+    })
+  })
+
+  describe('marcar como pagada en cuenta corriente y botones en los demás módulos', () => {
+    const { accionesDe } = require('../src/utils/estadoPagoAcciones')
+    const VentasController = require('../src/controllers/ventas.controller')
+    const TransaccionesController = require('../src/controllers/transacciones.controller')
+
+    function llamarCtl(controlador, accion, { body = {}, params = {}, query = {} } = {}) {
+      return new Promise((resolve, reject) => {
+        const flashes = []
+        const req = { body, params, query, baseUrl: '', session: { user }, flash: (tipo, msg) => flashes.push({ tipo, msg }), get: () => null }
+        const res = {
+          redirect: (url) => resolve({ url, flashes }), render: (vista, data) => resolve({ vista, data, flashes }),
+          json: (data) => resolve({ json: data, flashes }), status() { return this },
+        }
+        Promise.resolve(controlador[accion](req, res)).catch(reject)
+      })
+    }
+
+    it('accionesDe: cada estado ofrece lo que corresponde', () => {
+      const base = { resta: 100, metodo_pago: 'efectivo', estadoOp: 'entregado' }
+      assert.deepEqual(accionesDe({ ...base, estado: 'pagada', resta: 0 }), { pendiente: true, pagada: false })
+      assert.deepEqual(accionesDe({ ...base, estado: 'parcial' }), { pendiente: true, pagada: true })
+      assert.deepEqual(accionesDe({ ...base, estado: 'pendiente' }), { pendiente: false, pagada: true })
+      // en cuenta: se puede marcar pagada solo si ya tiene su cargo
+      assert.equal(accionesDe({ ...base, metodo_pago: 'cuenta_corriente', estado: 'pendiente', enCuenta: false }).pagada, false)
+      assert.equal(accionesDe({ ...base, metodo_pago: 'cuenta_corriente', estado: 'pendiente', enCuenta: true }).pagada, true)
+      // de contado sin entregar, en curso, estimado, a convenir, grupo todo junto o anulada: nada
+      for (const x of [{ estadoOp: 'pendiente' }, { enCurso: true }, { estimado: true }, { aConvenir: true }, { grupoTodoJunto: true }, { estadoOp: 'anulado' }]) {
+        assert.deepEqual(accionesDe({ ...base, estado: 'pendiente', ...x }), { pendiente: false, pagada: false }, JSON.stringify(x))
+      }
+      assert.deepEqual(accionesDe(null), { pendiente: false, pagada: false })
+    })
+
+    it('venta en cuenta corriente: "marcar como pagada" registra el pago de esa operación y no toca las más viejas', async () => {
+      const cli = await datos.crearCliente({ cuentaCorriente: true })
+      const v1 = await venta(cli, '2026-09-10', 300000)
+      const v2 = await venta(cli, '2026-10-10', 450000)
+      assert.deepEqual(await estados(cli), { [v1]: 'pendiente', [v2]: 'pendiente' })
+      const previa = await EstadoPago.vistaPreviaPagada(v2, { metodo_pago: 'transferencia' })
+      assert.equal(previa.puede, true)
+      assert.equal(previa.monto, 450000)
+      assert.equal(previa.saldoDespues, -300000)
+      await EstadoPago.marcarPagada(v2, { usuario: admin, metodo_pago: 'transferencia', fechaDia: '2026-10-15' })
+      assert.deepEqual(await estados(cli), { [v1]: 'pendiente', [v2]: 'pagada' })
+      assert.equal(await saldo(cli), -300000)
+      const p = (await prueba.q(`SELECT monto, metodo_pago, created_at FROM movimientos_cuenta WHERE cliente_id = ? AND tipo = 'pago'`, [cli])).rows
+      assert.equal(p.length, 1)
+      assert.equal(Number(p[0].monto), 450000)
+      assert.match(String(p[0].created_at), /^2026-10-15/)
+      await assert.rejects(() => EstadoPago.marcarPagada(v2, { usuario: admin }), /ya está pagada/)
+      // y se puede volver atrás: queda pendiente otra vez
+      await EstadoPago.marcarPendiente(v2, { usuario: admin, motivo: 'Me equivoqué' })
+      assert.deepEqual(await estados(cli), { [v1]: 'pendiente', [v2]: 'pendiente' })
+      assert.equal(await saldo(cli), -750000)
+    })
+
+    it('Ventas: el listado y el detalle ofrecen los botones según el estado de cada venta', async () => {
+      const cli = await datos.crearCliente({ cuentaCorriente: true })
+      const vPaga = await venta(cli, '2026-10-05', 100000)
+      await pagar(cli, 100000, [{ clave: 'op:' + vPaga, monto: 100000 }])
+      const vDebe = await venta(cli, '2026-10-06', 90000)
+      const lista = await llamarCtl(VentasController, 'index', { query: { id_cliente: String(cli), fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', preset: 'rango' } })
+      assert.equal(lista.vista, 'pages/ventas/index', JSON.stringify(lista.flashes))
+      const html = await renderVista('pages/ventas/index', { ...lista.data, user })
+      assert.match(html, new RegExp(`data-id="${vPaga}" data-accion="pendiente"`))
+      assert.doesNotMatch(html, new RegExp(`data-id="${vPaga}" data-accion="pagada"`))
+      assert.match(html, new RegExp(`data-id="${vDebe}" data-accion="pagada"`))
+      assert.match(html, /id="modal-estado-pago"/)
+      assert.doesNotMatch(await renderVista('pages/ventas/index', { ...lista.data, user: { rol: 'admin_ventas' } }), /btn-estado-pago/)
+
+      const det = await llamarCtl(VentasController, 'detalle', { params: { id: vDebe } })
+      assert.equal(det.vista, 'pages/ventas/detalle', JSON.stringify(det.flashes))
+      const htmlDet = await renderVista('pages/ventas/detalle', { ...det.data, user })
+      assert.match(htmlDet, new RegExp(`data-id="${vDebe}" data-accion="pagada"`))
+      assert.match(htmlDet, /Pago: Pendiente/)
+      assert.match(htmlDet, /id="modal-estado-pago"/)
+    })
+
+    it('Transacciones: las filas de cobros ofrecen los botones de su operación', async () => {
+      const cli = await datos.crearCliente({ cuentaCorriente: true })
+      const v1 = await venta(cli, '2026-10-10', 200000, 'efectivo')
+      await prueba.q(`UPDATE op_encabezado SET estado = 'entregado' WHERE id = ?`, [v1])
+      await TransaccionesModel.crear({ tipo: 'Venta Cantera', id_op_encabezado: v1, cliente_id: cli, monto: 200000, metodo_pago: 'efectivo', fecha: '2026-10-10 12:00:00' })
+      const r = await llamarCtl(TransaccionesController, 'index', { query: { idCliente: String(cli), fechaDesde: '2026-10-01', fechaHasta: '2026-10-31', preset: 'rango' } })
+      assert.equal(r.vista, 'pages/transacciones/index', JSON.stringify(r.flashes))
+      const html = await renderVista('pages/transacciones/index', { ...r.data, user })
+      assert.match(html, new RegExp(`data-id="${v1}" data-accion="pendiente"`))
+      assert.match(html, /id="modal-estado-pago"/)
+    })
+  })
+
+  describe('botones en Alquileres (contenedores y maquinaria)', () => {
+    const AlquileresModel = require('../src/models/alquileres.model')
+    const AlquileresMaquinariaModel = require('../src/models/alquileres_maquinaria.model')
+    const AlquileresController = require('../src/controllers/alquileres.controller')
+    const AlquileresMaquinariaController = require('../src/controllers/alquileres_maquinaria.controller')
+    const { sumarDiasHabiles } = require('../src/utils/diasHabiles')
+
+    function llamarCtl(controlador, accion, { params = {}, query = {} } = {}) {
+      return new Promise((resolve, reject) => {
+        const flashes = []
+        const req = { body: {}, params, query, baseUrl: '', session: { user }, flash: (tipo, msg) => flashes.push({ tipo, msg }), get: () => null }
+        const res = {
+          redirect: (url) => resolve({ url, flashes }), render: (vista, data) => resolve({ vista, data, flashes }),
+          json: (data) => resolve({ json: data, flashes }), status() { return this },
+        }
+        Promise.resolve(controlador[accion](req, res)).catch(reject)
+      })
+    }
+
+    it('contenedor cobrado: el listado y el detalle ofrecen "Marcar pendiente"', async () => {
+      AlquileresModel.ubicar = async () => null   // sin llamadas a Nominatim en las pruebas
+      const cli = await datos.crearCliente({ cuentaCorriente: true })
+      const [cont] = await datos.crearContenedores(1)
+      const hace2 = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+      const a = await AlquileresModel.crearEnCurso({
+        ...datos.datosComunes({ id_cliente: cli, id_administrativo: admin, metodo_pago: 'efectivo', fecha_inicio: hace2 }),
+        id_contenedor: cont, plazo_alquiler: 20, precio_alquiler: 90000,
+      })
+      await TransaccionesModel.crear({ tipo: 'Alquiler', id_op_encabezado: a.id, cliente_id: cli, monto: 90000, metodo_pago: 'efectivo' })
+      // Otro que vence pronto: se ve en las tarjetas de "Por finalizar"
+      const [cont2] = await datos.crearContenedores(1)
+      const b = await AlquileresModel.crearEnCurso({
+        ...datos.datosComunes({ id_cliente: cli, id_administrativo: admin, metodo_pago: 'efectivo', fecha_inicio: hace2 }),
+        id_contenedor: cont2, plazo_alquiler: 2, precio_alquiler: 50000,
+      })
+      await TransaccionesModel.crear({ tipo: 'Alquiler', id_op_encabezado: b.id, cliente_id: cli, monto: 50000, metodo_pago: 'efectivo' })
+      const lista = await llamarCtl(AlquileresController, 'index')
+      assert.equal(lista.vista, 'pages/alquileres/index', JSON.stringify(lista.flashes))
+      const html = await renderVista('pages/alquileres/index', { ...lista.data, user })
+      assert.match(html, new RegExp(`data-id="${a.id}" data-accion="pendiente"`))
+      assert.match(html, new RegExp(`data-id="${b.id}" data-accion="pendiente"`))
+      assert.match(html, /id="modal-estado-pago"/)
+      const det = await llamarCtl(AlquileresController, 'detalle', { params: { id: a.id } })
+      assert.equal(det.vista, 'pages/alquileres/detalle', JSON.stringify(det.flashes))
+      const htmlDet = await renderVista('pages/alquileres/detalle', { ...det.data, user })
+      assert.match(htmlDet, new RegExp(`data-id="${a.id}" data-accion="pendiente"`))
+      assert.match(htmlDet, /Pago: Pagada/)
+      assert.doesNotMatch(await renderVista('pages/alquileres/detalle', { ...det.data, user: { rol: 'admin_ventas' } }), /btn-estado-pago/)
+    })
+
+    it('maquinaria cobrada: el listado y el detalle ofrecen "Marcar pendiente"', async () => {
+      const cli = await datos.crearCliente({ cuentaCorriente: true })
+      const maq = (await prueba.q(`INSERT INTO maquinaria (nombre, tipo) VALUES ('Bobcat prueba', 'bobcat') RETURNING id`)).rows[0].id
+      const futuro = sumarDiasHabiles(new Date().toISOString().slice(0, 10), 3)
+      const a = await AlquileresMaquinariaModel.crear({
+        id_cliente: cli, id_administrativo: admin, domicilio_entrega: 'San Lorenzo 501', domicilio_calle: 'San Lorenzo', domicilio_numero: '501',
+        zona_entrega: '', plazo_alquiler: 3, precio_por_hora: 100, horas_pactadas: 8, precio_total: 800, id_maquinaria: maq,
+        metodo_pago: 'efectivo', observaciones: 'PRUEBA', fecha_entrega_planificada: futuro,
+      })
+      const id = a.id || a
+      await TransaccionesModel.crear({ tipo: 'Maquinaria', id_op_encabezado: id, cliente_id: cli, monto: 800, metodo_pago: 'efectivo' })
+      const lista = await llamarCtl(AlquileresMaquinariaController, 'index')
+      assert.equal(lista.vista, 'pages/alquileres/maquinaria_index', JSON.stringify(lista.flashes))
+      const html = await renderVista('pages/alquileres/maquinaria_index', { ...lista.data, user })
+      assert.match(html, new RegExp(`data-id="${id}" data-accion="pendiente"`))
+      assert.match(html, /id="modal-estado-pago"/)
+      const det = await llamarCtl(AlquileresMaquinariaController, 'detalle', { params: { id } })
+      assert.equal(det.vista, 'pages/alquileres/maquinaria_detalle', JSON.stringify(det.flashes))
+      const htmlDet = await renderVista('pages/alquileres/maquinaria_detalle', { ...det.data, user })
+      assert.match(htmlDet, new RegExp(`data-id="${id}" data-accion="pendiente"`))
     })
   })
 })

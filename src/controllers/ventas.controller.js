@@ -90,6 +90,8 @@ const VentasController = {
       res.render('pages/ventas/index', {
         titulo: 'Ventas',
         ...paginacion,
+        estadosPago: await require('../models/liquidaciones.model').estadosPago(paginacion.ops.map(o => o.id)),
+        scripts: ['/js/estadoPago.js'],
         clientes,
         resumen,
         metricas,
@@ -446,6 +448,8 @@ const VentasController = {
       if (solapamiento) delete req.session.solapamiento
       res.render('pages/ventas/detalle', {
         titulo: `OP-${String(op.nro_op).padStart(4,'0')}`, op,
+        estadoPago: (await require('../models/liquidaciones.model').estadosPago([op.id]))[op.id] || null,
+        scripts: ['/js/estadoPago.js'],
         facturacion: await require('../models/facturacion.model').estadoOp(op.id),
         recursos, choferesDisp, solapamiento,
         camionesDisp: await OperacionesModel.camionesDisponibles('ventas'),

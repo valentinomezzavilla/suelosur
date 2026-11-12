@@ -326,20 +326,19 @@ async function verificarCuenta(op, antes, plan, q) {
   if (Math.abs(saldo - plan.saldoDespues) > 0.01) throw new Error(`Verificación: el saldo quedó en ${pesos(saldo)} y se esperaba ${pesos(plan.saldoDespues)}. No se guardó nada.`)
 }
 
-// ── Marcar PAGADA (venta de contado sin cobro) ────────────────────────
+// ── Marcar PAGADA ─────────────────────────────────────────────────────
+//  · En cuenta corriente: se registra un pago por lo que falta de la operación, aplicado a ella.
+//  · De contado (venta entregada sin cobro): se registra el cobro por lo que falta.
 
-async function planPagada(idOp, { metodo_pago = 'efectivo' } = {}) {
-  const op = await cargarOp(idOp)
+async function planPagada(idOp, { metodo_pago = 'efectivo' } = {}, q = query) {
+  const op = await cargarOp(idOp, q)
   const plan = { accion: 'pagada', idOp: Number(idOp), nroOp: op ? nroOp(op.nro_op) : null, camino: null, puede: false, bloqueos: [], lineas: [], saldoAntes: null, saldoDespues: null, monto: 0 }
   const no = (msg) => { plan.bloqueos.push(msg); return plan }
   if (!op) return no('La operación no existe.')
   if (!op.id_cliente) return no('La operación no tiene cliente.')
   if (op.estado === 'anulado') return no('La operación está anulada.')
   plan.idCliente = op.id_cliente
-  if (EN_CUENTA.includes(op.metodo_pago)) {
-    plan.camino = 'cuenta'
-    return no('Está en la cuenta corriente: el pago se registra con "Marcar como pagada" desde la cuenta (elige método y fecha).')
-  }
+  if (EN_CUENTA.includes(op.metodo_pago)) return planPagadaCuenta(op, plan, metodo_pago, q)
   plan.camino = 'contado'
   if (!COBRO_CONTADO.includes(metodo_pago)) return no('Elegí efectivo o transferencia. Los cheques se registran desde Cheques.')
   if (op.grupo_todo_junto) return no('Es un alquiler de varios contenedores cobrado todo junto: se cobra desde su grupo.')
@@ -359,14 +358,36 @@ async function planPagada(idOp, { metodo_pago = 'efectivo' } = {}) {
   return plan
 }
 
+// Operación en cuenta corriente: un pago por lo que le falta, aplicado a ella
+async function planPagadaCuenta(op, plan, metodo_pago, q) {
+  plan.camino = 'cuenta'
+  const no = (msg) => { plan.bloqueos.push(msg); return plan }
+  if (!COBRO_CONTADO.includes(metodo_pago)) return no('Elegí efectivo o transferencia. Los cheques se registran desde Cheques.')
+  if (op.grupo_todo_junto) return no('Es un alquiler de varios contenedores cobrado todo junto: el pago es uno solo para el grupo. Registralo desde la cuenta corriente del cliente.')
+  const imp = await ClientesModel.imputacionDe(op.id_cliente, q)
+  const cargos = Object.values(imp.cargos).filter(c => c.idOp && String(c.idOp) === String(op.id))
+  if (!cargos.length) return no(`${plan.nroOp} todavía no tiene cargo en la cuenta corriente (se carga al entregarla o cobrarla): todavía no hay nada que pagar.`)
+  const item = (await ClientesModel.pendientesDeCobro(op.id_cliente, q, imp)).find(it => it.clave === `op:${op.id}`)
+  if (!item) return no(`${plan.nroOp} ya está pagada.`)
+  plan.monto = r2(item.resta)
+  plan.saldoAntes = await saldoDe(op.id_cliente, q)
+  plan.saldoDespues = r2(plan.saldoAntes + plan.monto)
+  plan.lineas.push(`Se registra un pago de ${pesos(plan.monto)} en ${METODO_TXT[metodo_pago]}, aplicado a esta operación (lo que le falta).`)
+  plan.puede = plan.monto > EPS
+  if (!plan.puede) plan.bloqueos.push('No hay importe pendiente.')
+  return plan
+}
+
 async function vistaPreviaPagada(idOp, opts) { return publico(await planPagada(idOp, opts)) }
 
 async function marcarPagada(idOp, { usuario = null, metodo_pago = 'efectivo', fechaDia = null } = {}) {
+  const { fechaHoraDePago } = require('../utils/fechaPago')
+  const op0 = await cargarOp(idOp)
+  if (op0 && EN_CUENTA.includes(op0.metodo_pago)) return marcarPagadaCuenta(op0, { usuario, metodo_pago, fechaDia })
   const plan = await planPagada(idOp, { metodo_pago })
   if (!plan.puede) throw new Error(plan.bloqueos[0] || 'No se puede marcar como pagada.')
   const op = plan._op
   const TransaccionesModel = require('./transacciones.model')
-  const { fechaHoraDePago } = require('../utils/fechaPago')
   const tipo = op.tipo_op === 'M' ? (op.modalidad === 'flete' ? 'Venta Viaje' : 'Venta Cantera') : op.tipo_op === 'C' ? 'Alquiler' : 'Maquinaria'
   await transaction(async (q) => {
     await TransaccionesModel.crear({
@@ -383,6 +404,34 @@ async function marcarPagada(idOp, { usuario = null, metodo_pago = 'efectivo', fe
     if (Number(cobrado) < Number(plan.monto) - 0.01) throw new Error('Verificación: el cobro no quedó registrado. No se guardó nada.')
   })
   await auditar('marcar_pagada', op, usuario, { camino: 'contado', monto: plan.monto, metodo_pago, fecha: fechaDia })
+  return publico(plan)
+}
+
+async function marcarPagadaCuenta(op, { usuario, metodo_pago, fechaDia }) {
+  const { fechaHoraDePago } = require('../utils/fechaPago')
+  const plan = await transaction(async (q) => {
+    await q(`SELECT id FROM clientes WHERE id = ? FOR UPDATE`, [op.id_cliente])
+    const plan = await planPagada(op.id, { metodo_pago }, q)
+    if (!plan.puede) throw new Error(plan.bloqueos[0] || 'No se puede marcar como pagada.')
+    const antes = imputacionActual(await ClientesModel.imputacionDe(op.id_cliente, q))
+    const elegidas = await ClientesModel.validarImputaciones(op.id_cliente, [{ clave: `op:${op.id}`, monto: plan.monto }], plan.monto, q)
+    const mov = await ClientesModel.agregarMovimiento(op.id_cliente, {
+      tipo: 'pago', descripcion: `Pago — ${plan.nroOp} (marcada como pagada)`, monto: plan.monto, metodo_pago, fecha: fechaHoraDePago(fechaDia),
+    }, q)
+    await ClientesModel.guardarImputaciones(mov, elegidas, q)
+    // Verificación: la operación quedó pagada, ninguna otra cambió y el saldo subió lo que se pagó
+    const ahora = imputacionActual(await ClientesModel.imputacionDe(op.id_cliente, q))
+    const x = ahora.ops[String(op.id)]
+    if (!x || x.total - x.pagado > 0.01) throw new Error('Verificación: la operación no quedó pagada. No se guardó nada.')
+    for (const id of new Set([...Object.keys(antes.ops), ...Object.keys(ahora.ops)])) {
+      if (id === String(op.id)) continue
+      if (Math.abs((antes.ops[id] ? antes.ops[id].pagado : 0) - (ahora.ops[id] ? ahora.ops[id].pagado : 0)) > 0.01) throw new Error('Verificación: el pago alteraba otra operación del cliente. No se guardó nada.')
+    }
+    const saldo = await saldoDe(op.id_cliente, q)
+    if (Math.abs(saldo - plan.saldoDespues) > 0.01) throw new Error(`Verificación: el saldo quedó en ${pesos(saldo)} y se esperaba ${pesos(plan.saldoDespues)}. No se guardó nada.`)
+    return plan
+  })
+  await auditar('marcar_pagada', op, usuario, { camino: 'cuenta', monto: plan.monto, metodo_pago, fecha: fechaDia, saldoAntes: plan.saldoAntes, saldoDespues: plan.saldoDespues })
   return publico(plan)
 }
 
