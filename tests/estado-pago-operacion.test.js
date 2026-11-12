@@ -394,6 +394,17 @@ describe('controlador y pantallas de marcar pendiente / pagada', () => {
       assert.ok(opNueva.pagado < opNueva.total, 'la operación nueva sigue sin pagar del todo')
       assert.equal(await Reporte.detalleCliente(999999999), null)
     })
+
+    it('busca clientes por nombre o por N° de cliente (el id interno no es el N°)', async () => {
+      const c = await datos.crearCliente({ cuentaCorriente: true })
+      const numero = 987654   // el N° de cliente lo asigna el modelo al crear: acá se fija a mano
+      await prueba.q(`UPDATE clientes SET nombre = 'CO.C', apellido = 'STUDIO ZZ', numero = ? WHERE id = ?`, [numero, c])
+      assert.deepEqual((await Reporte.buscarClientes('co.c studio zz')).map(x => x.id), [c])
+      assert.deepEqual((await Reporte.buscarClientes('STUDIO ZZ')).map(x => x.id), [c])
+      assert.ok((await Reporte.buscarClientes(String(numero))).some(x => x.id === c))
+      assert.deepEqual(await Reporte.buscarClientes('   '), [])
+      assert.deepEqual(await Reporte.buscarClientes('nadie-se-llama-asi-xyz'), [])
+    })
   })
 
   describe('marcar como pagada en cuenta corriente y botones en los demás módulos', () => {
