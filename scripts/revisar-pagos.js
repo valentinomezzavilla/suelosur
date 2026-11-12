@@ -9,6 +9,8 @@
 //     (a lo más viejo, sin que nadie lo eligiera): suele ser un pago de otra cosa.
 //  3. Operaciones cubiertas por un AJUSTE a favor cargado a mano (sin operación): no es un
 //     pago, pero la cuenta lo aplica a las deudas más viejas.
+//  5. Pagos REPETIDOS: mismo cliente, importe, método y descripción cargados con pocos minutos de
+//     diferencia (un doble envío, o repetir "Saldar" porque la operación seguía pendiente).
 //  4. Operaciones de contado ya entregadas sin ningún cobro registrado (pendientes de verdad,
 //     pero fuera de la cuenta corriente: no suman al saldo del cliente).
 //
@@ -94,6 +96,35 @@ async function contadoSinCobro(clienteId = null) {
     ORDER BY op.id`, clienteId ? [clienteId] : [])).rows
 }
 
+// 5) Pagos repetidos: mismo cliente, importe, método y descripción, cargados con pocos minutos de
+// diferencia (un doble envío, o repetir "Saldar" porque la operación seguía figurando pendiente).
+// Un pago igual cargado otro día no cuenta: puede ser una cuota. Devuelve grupos de 2 o más.
+const MINUTOS_REPETIDO = 30
+async function pagosRepetidos(clienteId = null) {
+  const filas = (await query(`
+    SELECT m.id, m.cliente_id, m.monto, m.metodo_pago, COALESCE(m.descripcion, '') AS descripcion, m.created_at, m.registrado_en,
+           TRIM(COALESCE(c.nombre, '') || ' ' || COALESCE(c.apellido, '')) AS cliente
+    FROM movimientos_cuenta m JOIN clientes c ON c.id = m.cliente_id
+    WHERE m.tipo = 'pago' AND COALESCE(m.anulado, 0) = 0 AND m.registrado_en IS NOT NULL
+      ${clienteId ? 'AND m.cliente_id = ?' : ''}
+    ORDER BY m.cliente_id, m.monto, m.metodo_pago, m.descripcion, m.registrado_en, m.id`, clienteId ? [clienteId] : [])).rows
+  const instante = (t) => new Date(String(t).replace(' ', 'T')).getTime()
+  const misma = (a, b) => a.cliente_id === b.cliente_id && Number(a.monto) === Number(b.monto)
+    && (a.metodo_pago || '') === (b.metodo_pago || '') && a.descripcion === b.descripcion
+  const grupos = []
+  let actual = []
+  for (const fila of filas) {
+    const ultima = actual[actual.length - 1]
+    if (ultima && misma(ultima, fila) && Math.abs(instante(fila.registrado_en) - instante(ultima.registrado_en)) <= MINUTOS_REPETIDO * 60000) actual.push(fila)
+    else { if (actual.length > 1) grupos.push(actual); actual = [fila] }
+  }
+  if (actual.length > 1) grupos.push(actual)
+  return grupos.map(g => ({
+    cliente_id: g[0].cliente_id, cliente: g[0].cliente, monto: Number(g[0].monto), metodo: g[0].metodo_pago, descripcion: g[0].descripcion,
+    pagos: g.map(p => ({ id: Number(p.id), fecha: String(p.created_at || '').slice(0, 10), cargado: String(p.registrado_en) })),
+  }))
+}
+
 // Detalle de la cuenta de UN cliente: cada pago vigente y a qué operaciones se aplicó (elegidas al
 // registrarlo o aplicado solo a lo más viejo), lo que quedó a favor, y cada operación con lo que
 // debe y lo que se le aplicó. Sirve para ver por qué una operación sigue pendiente aunque se
@@ -107,9 +138,10 @@ async function detalleCliente(clienteId) {
   const ops = idsOp.length ? Object.fromEntries((await query(
     `SELECT id, nro_op, tipo_op, fecha_emision, fecha_entrega_planificada FROM op_encabezado WHERE id = ANY(?::bigint[])`, [idsOp])).rows.map(r => [String(r.id), r])) : {}
   const sobrante = Object.fromEntries(imp.creditos.map(c => [String(c.id), c.sobrante]))
+  const cargado = Object.fromEntries((await query(`SELECT id, registrado_en FROM movimientos_cuenta WHERE cliente_id = ?`, [cli.id])).rows.map(r => [String(r.id), r.registrado_en]))
   const pagos = imp.movs.filter(m => Number(m.monto) > 0).map(m => ({
     id: m.id, fecha: String(m.created_at || '').slice(0, 10), tipo: m.tipo, metodo: m.metodo_pago, monto: Number(m.monto),
-    descripcion: m.descripcion || '', aplicado: aplicadoA[m.id] || [], aFavor: sobrante[String(m.id)] || 0,
+    descripcion: m.descripcion || '', aplicado: aplicadoA[m.id] || [], aFavor: sobrante[String(m.id)] || 0, cargado: cargado[String(m.id)] || null,
   }))
   const porOp = porOperacion(imp.cargos)
   const operaciones = idsOp.map(id => ({
@@ -123,7 +155,7 @@ function imprimirDetalle(d) {
   console.log(`\n=== Cuenta de #${d.cliente.numero} ${d.cliente.nombre} — saldo guardado ${pesos(d.cliente.saldo)} ===`)
   console.log(`\nPagos vigentes (${d.pagos.length}) y a qué se aplicó cada uno:`)
   d.pagos.forEach(p => {
-    console.log(`  mov ${p.id} · ${fechaCorta(p.fecha)} · ${pesos(p.monto)}${p.metodo ? ' (' + (METODO[p.metodo] || p.metodo) + ')' : ''} · ${p.tipo}${p.descripcion ? ' · ' + p.descripcion : ''}`)
+    console.log(`  mov ${p.id} (PAG-${String(p.id).padStart(6, '0')}) · pago del ${fechaCorta(p.fecha)}${p.cargado ? ', cargado el ' + fechaCorta(p.cargado) + ' a las ' + String(p.cargado).slice(11, 19) : ''} · ${pesos(p.monto)}${p.metodo ? ' (' + (METODO[p.metodo] || p.metodo) + ')' : ''} · ${p.tipo}${p.descripcion ? ' · ' + p.descripcion : ''}`)
     if (!p.aplicado.length && !(p.aFavor > 0.005)) console.log('      (no se aplicó a nada)')
     p.aplicado.forEach(a => console.log(`      → ${a.etiqueta} ${pesos(a.monto)} ${a.elegida ? '(elegido al registrar el pago)' : '(aplicado solo, a lo más viejo)'}`))
     if (p.aFavor > 0.005) console.log(`      → quedó a favor ${pesos(p.aFavor)}`)
@@ -144,6 +176,15 @@ async function buscarClientes(texto) {
     ORDER BY id LIMIT 20`, ['%' + t + '%', t])).rows
 }
 
+function imprimirRepetidos(repetidos) {
+  console.log(`\n=== 5. Pagos REPETIDOS: mismo cliente, importe, método y descripción, cargados con menos de ${MINUTOS_REPETIDO} minutos de diferencia (${repetidos.length}) ===`)
+  console.log('    Si la plata no entró varias veces, anular los de más desde la Cuenta corriente (Anular).')
+  repetidos.forEach(g => {
+    console.log(`  ${g.cliente} · ${g.pagos.length} pagos de ${pesos(g.monto)}${g.metodo ? ' (' + (METODO[g.metodo] || g.metodo) + ')' : ''}${g.descripcion ? ' — ' + g.descripcion : ''}`)
+    g.pagos.forEach(p => console.log(`      PAG-${String(p.id).padStart(6, '0')} · pago del ${fechaCorta(p.fecha)} · cargado el ${fechaCorta(p.cargado)} a las ${p.cargado.slice(11, 19)}`))
+  })
+}
+
 async function main(args = process.argv.slice(2)) {
   const buscar = args.find(a => a.startsWith('--buscar='))
   if (buscar) {
@@ -152,7 +193,12 @@ async function main(args = process.argv.slice(2)) {
     encontrados.forEach(c => console.log(`  id ${c.id} · N° ${c.numero} · ${c.nombre} · saldo ${pesos(c.saldo)}`))
     if (!encontrados.length) console.log('  (ninguno)')
     else if (encontrados.length > 3) console.log('\nSon muchos: repetí con --cliente=ID (el id de la lista) para ver el detalle de uno.')
-    else for (const c of encontrados) imprimirDetalle(await detalleCliente(c.id))
+    else {
+      for (const c of encontrados) {
+        imprimirDetalle(await detalleCliente(c.id))
+        imprimirRepetidos(await pagosRepetidos(c.id))
+      }
+    }
     return { encontrados }
   }
   const arg = args.find(a => a.startsWith('--cliente='))
@@ -179,16 +225,18 @@ async function main(args = process.argv.slice(2)) {
   console.log('    Están pendientes de verdad pero fuera de la cuenta corriente: no suman al saldo.')
   sinCobro.forEach(o => console.log(`  ${nroOp(o.nro_op)} · ${o.cliente} · ${fechaCorta(o.fecha_emision)} · ${o.metodo_pago || 'efectivo'}`))
 
+  const repetidos = await pagosRepetidos(clienteId)
+  imprimirRepetidos(repetidos)
   if (clienteId) {
     const detalle = await detalleCliente(clienteId)
     if (detalle) imprimirDetalle(detalle)
     else console.log(`\nNo existe el cliente con id ${clienteId}. --cliente toma el id interno (el de la URL /clientes/cuentas/ID), no el N° de cliente: para buscar por nombre o N° usá --buscar=texto`)
   }
   console.log('\nPara cambiar el estado de una: Liquidaciones o Cuenta corriente → "Marcar pendiente" / "Marcar como pagada".')
-  return { sinCargo, dudosas, sinCobro }
+  return { sinCargo, dudosas, sinCobro, repetidos }
 }
 
-module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, detalleCliente, buscarClientes, main }
+module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, pagosRepetidos, detalleCliente, buscarClientes, main }
 
 if (require.main === module) {
   main()
