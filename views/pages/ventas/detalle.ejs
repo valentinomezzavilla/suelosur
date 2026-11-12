@@ -15,6 +15,7 @@
   </div>
   <div class="d-flex gap-2 align-items-center">
     <span class="badge rounded-pill px-3 py-2 <%= badge %>"><%= op.estado %></span>
+    <%- include('../../partials/botones_estado_pago', { e: locals.estadoPago, mostrarEstado: true }) %>
     <% if (op.estado !== 'anulado') { %>
       <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('printer', { size: 15 }) %> Remito</a>
       <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 15 }) %> PDF</a>
@@ -242,3 +243,5 @@
   <% } %>
 
 </div>
+<%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
+<%- include('../../partials/modal_estado_pago') %>

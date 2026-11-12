@@ -49,7 +49,9 @@ const AlquileresController = {
       const q = req.query.q || ''
       const grupos = await AlquileresModel.listarPorEstado({ q })
       const sinPrecio = await AlquileresModel.cantidadSinPrecio()
-      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q }, sinPrecio })
+      const estadosPago = await require('../models/liquidaciones.model').estadosPago(
+        Object.values(grupos).flatMap(g => Array.isArray(g) ? g.map(a => a.id) : []))
+      res.render('pages/alquileres/index', { titulo: 'Alquileres — Contenedores', grupos, filtros: { q }, sinPrecio, estadosPago, scripts: ['/js/estadoPago.js'] })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al cargar los alquileres.')
@@ -328,6 +330,8 @@ const AlquileresController = {
       }
       res.render('pages/alquileres/detalle', {
         titulo: `Alquiler OP-${String(alquiler.nro_op).padStart(4,'0')}`,
+        estadoPago: (await require('../models/liquidaciones.model').estadosPago([alquiler.id]))[alquiler.id] || null,
+        scripts: ['/js/estadoPago.js'],
         alquiler, disponibles, recursos, choferesDisp, solapamiento,
         facturacion: await require('../models/facturacion.model').estadoOp(alquiler.id),
         camionesDisp: await OperacionesModel.camionesDisponibles('contenedores'),

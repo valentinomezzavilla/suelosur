@@ -51,6 +51,7 @@
           <span class="finalizar-card__dr ${semaforoDias(dr)}">${drTxt}</span>
         </div>
         <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-naranja w-100 mt-2">Ver / gestionar retiro</a>
+        <div class="d-flex flex-wrap gap-1 mt-2">${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] })}</div>
       </div>`
     }).join('') + `</div>`
   }
@@ -101,6 +102,7 @@
               <a href="/alquileres/contenedores/${a.id}" class="btn btn-sm btn-outline-secondary" title="Ver">${icon('eye', { size: 15 })}</a>
               ${a.estado !== 'anulado' ? `<a href="/alquileres/contenedores/${a.id}/editar" class="btn btn-sm btn-outline-secondary" title="Editar">${icon('edit', { size: 15 })}</a>` : ''}
               <a href="/remitos/${a.id}/pdf" target="_blank" class="btn btn-sm btn-outline-secondary" title="Imprimir remito PDF">${icon('printer', { size: 15 })}</a>
+              ${include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[a.id] })}
             </td>
           </tr>`
         }).join('')}
@@ -168,3 +170,5 @@
     <%- tabla(grupos.programados, { empty: 'No hay alquileres programados.', colDias: 'Inicio planificado', mostrarDias: 'planificada' }) %>
   </div>
 </div>
+<%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
+<%- include('../../partials/modal_estado_pago') %>

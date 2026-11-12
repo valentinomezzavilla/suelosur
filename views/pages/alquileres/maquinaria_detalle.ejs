@@ -12,7 +12,8 @@
     </h4>
     <small class="text-muted">Emitido: <%= formatFecha(alquiler.fecha_emision) %> · <%= alquiler.administrativo_nombre %></small>
   </div>
-  <div class="d-flex gap-2">
+  <div class="d-flex gap-2 align-items-center">
+    <%- include('../../partials/botones_estado_pago', { e: locals.estadoPago, mostrarEstado: true }) %>
     <% if (!estaAnulado) { %>
       <a href="/alquileres/maquinaria/<%= alquiler.id %>/editar" class="btn btn-sm btn-outline-secondary"><%- icon('edit', { size: 14 }) %> Editar</a>
       <a href="/remitos/<%= alquiler.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 14 }) %> Remito PDF</a>
@@ -132,3 +133,5 @@
   <%- include('../../partials/remito_firmado', { opId: alquiler.id, estado: alquiler.estado, archivo: alquiler.archivo_remito }) %>
 </div>
 <% } %>
+<%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
+<%- include('../../partials/modal_estado_pago') %>
