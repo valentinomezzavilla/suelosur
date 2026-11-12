@@ -374,6 +374,26 @@ describe('controlador y pantallas de marcar pendiente / pagada', () => {
       assert.deepEqual((await Reporte.ventasSinCargo(c)).map(o => o.id), [sinCargo])
       assert.deepEqual((await Reporte.contadoSinCobro(c)).map(o => o.id), [sinCobro])
     })
+
+    it('detalle de un cliente: pagos "para una operación" que en realidad se aplicaron a las más viejas', async () => {
+      // Caso de la captura: se "salda" varias veces la misma operación y el pago se aplica solo a
+      // lo más viejo, así que la operación sigue debiendo lo mismo y se vuelve a pagar
+      const c = await datos.crearCliente({ cuentaCorriente: true })
+      const vieja = await venta(c, '2026-09-10', 600000)
+      const nueva = await venta(c, '2026-10-20', 336000)
+      for (let i = 0; i < 2; i++) {
+        await ClientesModel.agregarMovimiento(c, { tipo: 'pago', descripcion: 'Pago — Venta Viaje (la nueva)', monto: 336000, metodo_pago: 'efectivo', fecha: '2026-11-06 12:00:00' })
+      }
+      const d = await Reporte.detalleCliente(c)
+      assert.equal(d.pagos.length, 2)
+      // los dos pagos fueron a la operación VIEJA (a lo más viejo), ninguno a la que se quiso saldar
+      const etiquetas = d.pagos.flatMap(p => p.aplicado.map(a => [a.etiqueta, a.elegida]))
+      const nro = (id) => 'OP-' + String(d.operaciones.find(o => o.idOp === id).nro_op).padStart(4, '0')
+      assert.ok(etiquetas.some(([e, el]) => e === nro(vieja) && el === false))
+      const opNueva = d.operaciones.find(o => o.idOp === nueva)
+      assert.ok(opNueva.pagado < opNueva.total, 'la operación nueva sigue sin pagar del todo')
+      assert.equal(await Reporte.detalleCliente(999999999), null)
+    })
   })
 
   describe('marcar como pagada en cuenta corriente y botones en los demás módulos', () => {

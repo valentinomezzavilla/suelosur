@@ -14,7 +14,8 @@
 //
 // Uso:
 //   npm run revisar:pagos                    → todo
-//   npm run revisar:pagos -- --cliente=123   → un cliente
+//   npm run revisar:pagos -- --cliente=123   → un cliente, con el detalle de su cuenta: cada pago y
+//                                              a qué operaciones se aplicó, y cada operación
 
 const path = require('path')
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') })
@@ -92,6 +93,45 @@ async function contadoSinCobro(clienteId = null) {
     ORDER BY op.id`, clienteId ? [clienteId] : [])).rows
 }
 
+// Detalle de la cuenta de UN cliente: cada pago vigente y a qué operaciones se aplicó (elegidas al
+// registrarlo o aplicado solo a lo más viejo), lo que quedó a favor, y cada operación con lo que
+// debe y lo que se le aplicó. Sirve para ver por qué una operación sigue pendiente aunque se
+// hayan hecho pagos "para ella", o por qué figura pagada.
+async function detalleCliente(clienteId) {
+  const cli = (await query(`SELECT id, numero, saldo, TRIM(COALESCE(nombre, '') || ' ' || COALESCE(apellido, '')) AS nombre FROM clientes WHERE id = ?`, [clienteId])).rows[0]
+  if (!cli) return null
+  const imp = await ClientesModel.imputacionDe(cli.id)
+  const aplicadoA = await ClientesModel.aplicacionesPorPago(imp)
+  const idsOp = [...new Set(Object.values(imp.cargos).map(c => c.idOp).filter(Boolean).map(Number))]
+  const ops = idsOp.length ? Object.fromEntries((await query(
+    `SELECT id, nro_op, tipo_op, fecha_emision, fecha_entrega_planificada FROM op_encabezado WHERE id = ANY(?::bigint[])`, [idsOp])).rows.map(r => [String(r.id), r])) : {}
+  const sobrante = Object.fromEntries(imp.creditos.map(c => [String(c.id), c.sobrante]))
+  const pagos = imp.movs.filter(m => Number(m.monto) > 0).map(m => ({
+    id: m.id, fecha: String(m.created_at || '').slice(0, 10), tipo: m.tipo, metodo: m.metodo_pago, monto: Number(m.monto),
+    descripcion: m.descripcion || '', aplicado: aplicadoA[m.id] || [], aFavor: sobrante[String(m.id)] || 0,
+  }))
+  const porOp = porOperacion(imp.cargos)
+  const operaciones = idsOp.map(id => ({
+    idOp: id, nro_op: ops[String(id)] ? ops[String(id)].nro_op : null, fecha: ops[String(id)] ? fechaDeOperacion(ops[String(id)]) : null,
+    total: porOp[id] ? porOp[id].total : 0, pagado: porOp[id] ? porOp[id].pagado : 0,
+  })).sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)) || a.idOp - b.idOp)
+  return { cliente: cli, pagos, operaciones, aFavor: imp.aFavor }
+}
+
+function imprimirDetalle(d) {
+  console.log(`\n=== Cuenta de #${d.cliente.numero} ${d.cliente.nombre} — saldo guardado ${pesos(d.cliente.saldo)} ===`)
+  console.log(`\nPagos vigentes (${d.pagos.length}) y a qué se aplicó cada uno:`)
+  d.pagos.forEach(p => {
+    console.log(`  mov ${p.id} · ${fechaCorta(p.fecha)} · ${pesos(p.monto)}${p.metodo ? ' (' + (METODO[p.metodo] || p.metodo) + ')' : ''} · ${p.tipo}${p.descripcion ? ' · ' + p.descripcion : ''}`)
+    if (!p.aplicado.length && !(p.aFavor > 0.005)) console.log('      (no se aplicó a nada)')
+    p.aplicado.forEach(a => console.log(`      → ${a.etiqueta} ${pesos(a.monto)} ${a.elegida ? '(elegido al registrar el pago)' : '(aplicado solo, a lo más viejo)'}`))
+    if (p.aFavor > 0.005) console.log(`      → quedó a favor ${pesos(p.aFavor)}`)
+  })
+  console.log(`\nOperaciones en la cuenta (de la más vieja a la más nueva):`)
+  d.operaciones.forEach(o => console.log(`  ${o.nro_op != null ? nroOp(o.nro_op) : 'op ' + o.idOp} · ${fechaCorta(o.fecha)} · total ${pesos(o.total)} · pagado ${pesos(o.pagado)} · resta ${pesos(o.total - o.pagado)}`))
+  if (d.aFavor > 0.005) console.log(`\nSaldo a favor sin aplicar: ${pesos(d.aFavor)}`)
+}
+
 async function main(args = process.argv.slice(2)) {
   const arg = args.find(a => a.startsWith('--cliente='))
   const clienteId = arg ? arg.split('=')[1] : null
@@ -117,11 +157,16 @@ async function main(args = process.argv.slice(2)) {
   console.log('    Están pendientes de verdad pero fuera de la cuenta corriente: no suman al saldo.')
   sinCobro.forEach(o => console.log(`  ${nroOp(o.nro_op)} · ${o.cliente} · ${fechaCorta(o.fecha_emision)} · ${o.metodo_pago || 'efectivo'}`))
 
+  if (clienteId) {
+    const detalle = await detalleCliente(clienteId)
+    if (detalle) imprimirDetalle(detalle)
+    else console.log('\nNo existe el cliente', clienteId)
+  }
   console.log('\nPara cambiar el estado de una: Liquidaciones o Cuenta corriente → "Marcar pendiente" / "Marcar como pagada".')
   return { sinCargo, dudosas, sinCobro }
 }
 
-module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, main }
+module.exports = { ventasSinCargo, cubiertasDudosas, contadoSinCobro, detalleCliente, main }
 
 if (require.main === module) {
   main()
