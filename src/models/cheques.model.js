@@ -71,7 +71,8 @@ const ChequesModel = {
     return (await query(`SELECT * FROM cheques WHERE id = ?`, [id])).rows[0]
   },
 
-  async listar({ tipo_cartera, estado, tipo, q } = {}) {
+  // WHERE compartido por la lista y las tarjetas (alias c = cheques)
+  _filtro({ tipo_cartera, estado, tipo, q } = {}) {
     const wheres = []
     const params = []
     if (tipo_cartera) { wheres.push('c.tipo_cartera = ?'); params.push(tipo_cartera) }
@@ -82,7 +83,11 @@ const ChequesModel = {
       wheres.push(`(COALESCE(c.numero,'') ILIKE ? OR COALESCE(c.a_nombre_de,'') ILIKE ? OR COALESCE(c.banco,'') ILIKE ?)`)
       params.push(like, like, like)
     }
-    const where = wheres.length ? 'WHERE ' + wheres.join(' AND ') : ''
+    return { where: wheres.length ? 'WHERE ' + wheres.join(' AND ') : '', params }
+  },
+
+  async listar(filtros = {}) {
+    const { where, params } = this._filtro(filtros)
     return (await query(`
       SELECT c.*,
              ${nombreClienteSQL('cli')} AS cliente_nombre,
@@ -98,8 +103,10 @@ const ChequesModel = {
   },
 
   // Totales por tipo de cartera y estado (para las tarjetas de la cartera).
-  async resumen() {
-    const rows = (await query(`SELECT tipo_cartera, estado, COUNT(*) AS c, COALESCE(SUM(monto),0) AS s FROM cheques GROUP BY tipo_cartera, estado`)).rows
+  // Con filtros, solo lo que coincide (la lista y las tarjetas muestran lo mismo)
+  async resumen(filtros = {}) {
+    const { where, params } = this._filtro(filtros)
+    const rows = (await query(`SELECT c.tipo_cartera, c.estado, COUNT(*) AS n, COALESCE(SUM(c.monto),0) AS s FROM cheques c ${where} GROUP BY c.tipo_cartera, c.estado`, params)).rows
     const r = {
       recibido: { total: 0, en_espera: 0, habilitado: 0, deshabilitado: 0 },
       emitido:  { total: 0, en_espera: 0, habilitado: 0, deshabilitado: 0 },

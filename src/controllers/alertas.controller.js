@@ -13,7 +13,7 @@ const AlertasController = {
       res.render('pages/alertas/index', {
         titulo: 'Centro de Alertas',
         alertas,
-        resumen: await AlertasModel.resumen(),
+        resumen: await AlertasModel.resumen({ modulo, tipo, severidad }),
         config: await Notif.getConfig(),
         filtros: { modulo: modulo || '', tipo: tipo || '', severidad: severidad || '' },
       })

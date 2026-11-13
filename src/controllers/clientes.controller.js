@@ -115,6 +115,8 @@ const ClientesController = {
       const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
       const obra = await ClientesModel.obraPorClave(cli.id, filtros.obra)
       const estado = await ClientesModel.estadoCuenta(cli.id, { desde: filtros.desde, hasta: filtros.hasta, obra })
+      // Tarjetas de operaciones: con TODOS los filtros (obra, estado de pago, tipos y fechas), como el PDF
+      const resumenOps = (await require('../models/liquidaciones.model').liquidacion(filtros)).resumen
       const obras = await ClientesModel.obras(cli.id)
       const cliente = { ...cli, telefono: cli.telefono || cli.tel_whatsapp, saldo: cli.saldo ?? 0 }
       // Imputación de la cuenta: cuánto falta de cada cargo, "Saldar" por operación (todos sus
@@ -135,7 +137,7 @@ const ClientesController = {
       const opsNroFactura = await require('../models/facturacion.model').datosNroFactura(estado.movimientos.map(m => m.id_op_encabezado))
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
+        cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.clave : null },
         scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js'],

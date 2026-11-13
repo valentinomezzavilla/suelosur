@@ -41,7 +41,7 @@ const FlotaController = {
       const opciones = await FlotaModel.opcionesFiltro()
       res.render('pages/flota/index', {
         titulo: 'Flota Camiones', vehiculos, estados: FlotaModel.ESTADOS,
-        resumen: await FlotaModel.resumenFlota(), opciones,
+        resumen: await FlotaModel.resumenFlota({ q, estado, tipo, marca, chofer }), opciones,
         choferes: await EmpleadosModel.listarChoferes({ soloActivos: true }),
         filtros: { q: q || '', estado: estado || '', tipo: tipo || '', marca: marca || '', chofer: chofer || '' },
       })

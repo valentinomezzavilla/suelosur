@@ -44,7 +44,7 @@ const ChequesController = {
       res.render('pages/cheques/index', {
         titulo: 'Cheques',
         cheques: await ChequesModel.listar({ tipo_cartera, estado, tipo, q }),
-        resumen: await ChequesModel.resumen(),
+        resumen: await ChequesModel.resumen({ tipo_cartera, estado, tipo, q }),
         estados: ChequesModel.ESTADOS,
         filtros: { tipo_cartera: tipo_cartera || '', estado: estado || '', tipo: tipo || '', q: q || '' },
       })

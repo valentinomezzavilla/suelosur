@@ -62,7 +62,8 @@ const FlotaModel = {
   ESTADOS,
   DEDICACIONES,
 
-  async listar({ q, estado, tipo, marca, chofer } = {}) {
+  // Condiciones compartidas por la lista y las tarjetas (alias v = flota_vehiculos)
+  _filtro({ q, estado, tipo, marca, chofer } = {}) {
     const wheres = ['1=1']
     const params = []
     if (estado) { wheres.push('v.estado_operativo = ?'); params.push(estado) }
@@ -74,6 +75,11 @@ const FlotaModel = {
       wheres.push('(v.nombre ILIKE ? OR v.patente ILIKE ? OR v.marca ILIKE ? OR v.modelo ILIKE ? OR CAST(v.numero_interno AS TEXT) ILIKE ?)')
       params.push(term, term, term, term, term)
     }
+    return { wheres, params }
+  },
+
+  async listar(filtros = {}) {
+    const { wheres, params } = this._filtro(filtros)
     return (await query(`
       SELECT v.*,
         (SELECT (e.nombre || ' ' || COALESCE(e.apellido,'')) FROM asignaciones_recurso a JOIN empleados e ON e.id=a.id_empleado
@@ -234,12 +240,17 @@ const FlotaModel = {
     `, [id])).rows
   },
 
-  // Métricas de disponibilidad de flota (para dashboard/reportes)
-  async resumenFlota() {
-    const rows = (await query(`SELECT estado_operativo AS estado, COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1 GROUP BY estado_operativo`)).rows
+  // Métricas de disponibilidad de flota (dashboard / reportes). Sin filtros: toda la flota
+  // activa; con los de la pantalla de Flota: solo los camiones activos que coinciden.
+  async resumenFlota(filtros = {}) {
+    const { wheres, params } = this._filtro(filtros)
+    const rows = (await query(`
+      SELECT v.estado_operativo AS estado, COUNT(*) AS n FROM flota_vehiculos v
+      WHERE ${wheres.join(' AND ')} AND v.activo = 1 GROUP BY v.estado_operativo
+    `, params)).rows
     const porEstado = {}
-    rows.forEach(r => { porEstado[r.estado] = r.n })
-    const total = (await query(`SELECT COUNT(*) AS n FROM flota_vehiculos WHERE activo = 1`)).rows[0]?.n || 0
+    let total = 0
+    rows.forEach(r => { porEstado[r.estado] = r.n; total += r.n })
     return { total, porEstado }
   },
 

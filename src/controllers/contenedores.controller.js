@@ -10,8 +10,9 @@ const ContenedoresController = {
       await AlquileresModel.autoVencerAlquileres().catch(e => console.error('autoVencer:', e.message))
       const { estado_paso, estado_general, q, registro, page } = req.query
       const todos   = await ContenedoresModel.listar({ estado_paso, estado_general, q, registro })
-      const resumen = await ContenedoresModel.resumenPorEstado()
-      // Las tarjetas de resumen siguen contando el total, no solo la página actual.
+      // Las tarjetas cuentan todo lo que coincide con los filtros (no solo la página actual),
+      // salvo el filtro de estado: cada tarjeta es ese filtro.
+      const resumen = await ContenedoresModel.resumenPorEstado({ estado_general, q, registro })
       const { items: contenedores, total, page: pag, limit, totalPaginas } = paginar(todos, page, 15)
       res.render('pages/contenedores/index', {
         titulo: 'Contenedores', contenedores, resumen,

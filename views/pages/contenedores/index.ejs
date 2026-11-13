@@ -18,6 +18,12 @@
     en_alquiler:       'Entregado',
     pendiente_retiro:  'Pendiente Retiro',
   }
+  // Las tarjetas cuentan con los filtros actuales: al hacer clic se agrega el estado y se conserva el resto
+  const hrefEstado = (estado) => {
+    const o = { estado_paso: estado }
+    ;['q', 'estado_general', 'registro'].forEach(k => { if (filtros[k]) o[k] = filtros[k] })
+    return '/contenedores?' + new URLSearchParams(o).toString()
+  }
   function semaforoDias(dias, plazo) {
     if (!plazo || plazo <= 0) return ''
     if (dias >= plazo)         return 'dias-rojo'
@@ -47,7 +53,7 @@
     { key:'en_alquiler',       label:'Entregado',         icono:'clock' },
     { key:'pendiente_retiro',  label:'Pendiente Retiro',  icono:'alert' },
   ].forEach(s => { %>
-    <a href="/contenedores?estado_paso=<%= s.key %>" class="text-decoration-none">
+    <a href="<%= hrefEstado(s.key) %>" class="text-decoration-none" title="Ver <%= s.label.toLowerCase() %> con los filtros actuales">
       <div class="card shadow-sm h-100 text-center py-2">
         <div class="mb-1"><%- icon(s.icono, { size: 20 }) %></div>
         <div class="fw-bold fs-5"><%= conteo[s.key] %></div>

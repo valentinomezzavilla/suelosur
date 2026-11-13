@@ -84,7 +84,7 @@ const VentasController = {
       const filtrosBase = { estado, id_cliente, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
       const paginacion = await VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 20 })
       const clientes   = await VentasModel.listarClientes()
-      const resumen    = await VentasModel.contarPorEstado()
+      const resumen    = await VentasModel.contarPorEstado(filtrosBase)
       const metricas   = await VentasModel.resumen(filtrosBase)
 
       res.render('pages/ventas/index', {

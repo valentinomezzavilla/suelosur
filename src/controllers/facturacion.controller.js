@@ -127,7 +127,12 @@ module.exports = {
       const cfg     = await ConfigFacturacion.obtener()
       const { clienteSel, obras, opIds } = await filtroCliente(filtros)
       const rows    = await FacturacionModel.todos()
-      const resumen = FacturacionModel.resumen(rows)
+      // Los KPIs y el gráfico mezclan pendientes y facturadas: cada grupo se filtra con su regla
+      // (las pendientes por fecha de emisión, las facturadas por fecha de factura)
+      const resumen = FacturacionModel.resumen([
+        ...FacturacionModel.filtrar(rows, { estado: 'pendiente', ...filtros, opIds }),
+        ...FacturacionModel.filtrar(rows, { estado: 'facturado', ...filtros, opIds }),
+      ])
       const lista   = FacturacionModel.filtrar(rows, { estado: tab, ...filtros, opIds })
       res.render('pages/facturacion/index', {
         titulo: 'Facturación',
