@@ -11,7 +11,9 @@
     const $ = (id) => document.getElementById(id);
     const form = $('estadoPagoForm');
     const bloqueos = $('estadoPagoBloqueos');
+    const resumen = $('estadoPagoResumen');
     const lineas = $('estadoPagoLineas');
+    const nota = $('estadoPagoNota');
     const saldo = $('estadoPagoSaldo');
     const cargando = $('estadoPagoCargando');
     const motivoGrupo = $('estadoPagoMotivoGrupo');
@@ -30,7 +32,9 @@
 
     function limpiar() {
         bloqueos.hidden = true; bloqueos.textContent = '';
+        resumen.hidden = true; resumen.textContent = '';
         lineas.hidden = true; lineas.innerHTML = '';
+        nota.hidden = true; nota.textContent = '';
         saldo.hidden = true; saldo.textContent = '';
         form.hidden = true; soloCerrar.hidden = true;
         motivoGrupo.hidden = true; cobroGrupo.hidden = true;
@@ -42,7 +46,7 @@
     async function cargarVistaPrevia() {
         const mia = ++pedido;
         cargando.hidden = false;
-        bloqueos.hidden = true; lineas.hidden = true; saldo.hidden = true; form.hidden = true; soloCerrar.hidden = true;
+        bloqueos.hidden = true; resumen.hidden = true; lineas.hidden = true; nota.hidden = true; saldo.hidden = true; form.hidden = true; soloCerrar.hidden = true;
         let r;
         try {
             const url = '/estado-pago/' + encodeURIComponent(actual.id) + '/vista-previa?accion=' + actual.accion +
@@ -65,8 +69,22 @@
             r.bloqueos.forEach((t) => { const p = document.createElement('div'); p.textContent = t; bloqueos.appendChild(p); });
         }
         if (r.puede) {
-            (r.lineas || []).forEach((t) => { const li = document.createElement('li'); li.textContent = t; lineas.appendChild(li); });
-            lineas.hidden = !(r.lineas || []).length;
+            // Con resumen (marcar pendiente): una frase clara, solo los pagos que cambian y una nota
+            // para los que no; sin resumen, el detalle completo de siempre
+            const x = r.resumen;
+            const conResumen = !!(x && x.quitado > 0.005);
+            const detalle = conResumen ? (x.pagosQueCambian || []) : (r.lineas || []);
+            if (conResumen) {
+                resumen.hidden = false;
+                resumen.textContent = 'Se le quitan ' + pesos(x.quitado) + ' de pagos a esta operación y el cliente vuelve a deberlos.';
+                if (x.pagosSinCambio > 0) {
+                    nota.hidden = false;
+                    nota.textContent = (x.pagosSinCambio === 1 ? 'Otro pago del cliente no cambia' : 'Otros ' + x.pagosSinCambio + ' pagos del cliente no cambian') +
+                        ' de monto: solo se deja escrito a qué operaciones va cada uno, para que no se corran a esta operación al quedar pendiente.';
+                }
+            }
+            detalle.forEach((t) => { const li = document.createElement('li'); li.textContent = t; lineas.appendChild(li); });
+            lineas.hidden = !detalle.length;
             if (r.saldoAntes != null && r.saldoDespues != null && Math.abs(r.saldoAntes - r.saldoDespues) > 0.005) {
                 saldo.hidden = false;
                 saldo.textContent = 'Saldo del cliente: ' + textoSaldo(r.saldoAntes) + ' → ' + textoSaldo(r.saldoDespues);
