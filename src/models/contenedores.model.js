@@ -237,13 +237,13 @@ const ContenedoresModel = {
     `)).rows
   },
 
-  async resumenPorEstado() {
-    return (await query(`
-      SELECT ${SQL_ESTADO_PASO} AS estado_paso, COUNT(*) AS total FROM contenedores c
-      JOIN (${SQL_ULTIMO_MOV}) um ON um.id_contenedor = c.id
-      LEFT JOIN LATERAL (${SQL_PROXIMA_OP}) prox ON TRUE
-      WHERE c.activo = 1 GROUP BY 1
-    `)).rows
+  // Cantidad por estado actual, con los filtros de la lista menos el de estado (cada tarjeta
+  // es un filtro de estado y cuenta lo que mostraría al hacer clic). Sin filtros: los activos.
+  async resumenPorEstado({ estado_general, q, registro } = {}) {
+    const filas = await this.listar({ estado_general, q, registro })
+    const conteo = {}
+    filas.forEach(c => { if (c.estado_paso) conteo[c.estado_paso] = (conteo[c.estado_paso] || 0) + 1 })
+    return Object.entries(conteo).map(([estado_paso, total]) => ({ estado_paso, total }))
   },
 
   async circuitoDiario() {

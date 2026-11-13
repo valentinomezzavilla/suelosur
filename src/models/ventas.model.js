@@ -51,8 +51,15 @@ const VentasModel = {
     `)).rows
   },
 
-  async contarPorEstado() {
-    return (await query(`SELECT estado, COUNT(*) AS total FROM op_encabezado WHERE tipo_op IN ('M') GROUP BY estado`)).rows
+  // Cantidad de ventas por estado, con los mismos filtros que el listado salvo el de estado:
+  // cada tarjeta es una pestaña y cuenta lo que mostraría al hacer clic.
+  async contarPorEstado({ id_cliente, q, fechaDesde, fechaHasta } = {}) {
+    const { where, params } = this._filtroVentas({ id_cliente, q, fechaDesde, fechaHasta })
+    return (await query(`
+      SELECT op.estado, COUNT(*) AS total FROM op_encabezado op
+      LEFT JOIN clientes c ON c.id = op.id_cliente
+      ${where} GROUP BY op.estado
+    `, params)).rows
   },
 
   // Construye WHERE + params compartido por listar/resumen

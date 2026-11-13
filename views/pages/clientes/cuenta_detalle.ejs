@@ -112,12 +112,20 @@
           <a href="/clientes/cuentas/<%= cliente.id %>" class="btn btn-outline-secondary">Limpiar</a>
         </div>
       </div>
-      <p class="form-text mb-0 mt-2">Los movimientos de abajo se filtran por fechas y obra<% if (obra) { %> (con obra <strong><%= obra.nombre %></strong> se ven sus cargos y todos los pagos del cliente, que no están atados a una obra)<% } %>. Estado de pago y operaciones se aplican al PDF.</p>
+      <p class="form-text mb-0 mt-2">Los movimientos de abajo se filtran por fechas y obra<% if (obra) { %> (con obra <strong><%= obra.nombre %></strong> se ven sus cargos y todos los pagos del cliente, que no están atados a una obra)<% } %>. Las tarjetas de operaciones y el PDF usan todos los filtros.</p>
     </form>
   </div>
 </div>
 
-<!-- Resumen del período -->
+<!-- Operaciones según todos los filtros (obra, estado de pago, tipos y fechas): lo mismo que el PDF -->
+<div class="liq-resumen mb-3">
+  <div class="liq-resumen__caja"><span>Consumido en el período</span><strong><%= money(resumenOps.consumido) %></strong></div>
+  <div class="liq-resumen__caja"><span>Pagado</span><strong class="text-success"><%= money(resumenOps.pagado) %></strong></div>
+  <div class="liq-resumen__caja"><span>Pendiente de estas operaciones</span><strong class="<%= resumenOps.saldo > 0.005 ? 'text-danger' : 'text-success' %>"><%= money(resumenOps.saldo) %></strong></div>
+  <div class="liq-resumen__caja"><span>Operaciones</span><strong><%= resumenOps.cantidad %></strong></div>
+</div>
+
+<!-- Movimientos de la cuenta del período (fechas y obra) -->
 <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
   <div class="stat-card stat-card--neutral">
     <div class="stat-card__body"><span class="stat-card__value <%= saldoCls(estado.saldoInicial) %>"><%= saldoTxt(estado.saldoInicial) %></span><span class="stat-card__label">Saldo inicial</span></div>
