@@ -12,8 +12,12 @@
     const form = $('estadoPagoForm');
     const bloqueos = $('estadoPagoBloqueos');
     const resumen = $('estadoPagoResumen');
+    const ops = $('estadoPagoOps');
     const lineas = $('estadoPagoLineas');
     const nota = $('estadoPagoNota');
+    const otras = $('estadoPagoOtras');
+    const soloEstaBtn = $('estadoPagoSoloEsta');
+    const soloEstaCampo = $('estadoPagoSoloEstaCampo');
     const saldo = $('estadoPagoSaldo');
     const cargando = $('estadoPagoCargando');
     const motivoGrupo = $('estadoPagoMotivoGrupo');
@@ -33,8 +37,12 @@
     function limpiar() {
         bloqueos.hidden = true; bloqueos.textContent = '';
         resumen.hidden = true; resumen.textContent = '';
+        ops.hidden = true; ops.innerHTML = '';
         lineas.hidden = true; lineas.innerHTML = '';
         nota.hidden = true; nota.textContent = '';
+        otras.hidden = true; otras.textContent = '';
+        soloEstaBtn.hidden = true;
+        soloEstaCampo.value = actual && actual.soloEsta ? '1' : '';
         saldo.hidden = true; saldo.textContent = '';
         form.hidden = true; soloCerrar.hidden = true;
         motivoGrupo.hidden = true; cobroGrupo.hidden = true;
@@ -46,11 +54,13 @@
     async function cargarVistaPrevia() {
         const mia = ++pedido;
         cargando.hidden = false;
-        bloqueos.hidden = true; resumen.hidden = true; lineas.hidden = true; nota.hidden = true; saldo.hidden = true; form.hidden = true; soloCerrar.hidden = true;
+        bloqueos.hidden = true; resumen.hidden = true; ops.hidden = true; lineas.hidden = true; nota.hidden = true; otras.hidden = true; saldo.hidden = true; form.hidden = true; soloCerrar.hidden = true;
+        soloEstaBtn.hidden = true; soloEstaCampo.value = actual.soloEsta ? '1' : '';
         let r;
         try {
             const url = '/estado-pago/' + encodeURIComponent(actual.id) + '/vista-previa?accion=' + actual.accion +
-                (actual.accion === 'pagada' ? '&metodo_pago=' + encodeURIComponent(metodo.value) : '');
+                (actual.accion === 'pagada' ? '&metodo_pago=' + encodeURIComponent(metodo.value) : '') +
+                (actual.soloEsta ? '&soloEsta=1' : '');
             const resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
             r = await resp.json();
             if (!resp.ok) throw new Error(r.error || 'Error');
@@ -75,8 +85,20 @@
             const conResumen = !!(x && x.quitado > 0.005);
             const detalle = conResumen ? (x.pagosQueCambian || []) : (r.lineas || []);
             if (conResumen) {
+                const varias = (x.operaciones || []).length > 1;
                 resumen.hidden = false;
-                resumen.textContent = 'Se le quitan ' + pesos(x.quitado) + ' de pagos a esta operación y el cliente vuelve a deberlos.';
+                resumen.textContent = varias
+                    ? 'Se dejan pendientes las ' + x.operaciones.length + ' operaciones de este remito y se le quitan ' + pesos(x.quitado) + ' de pagos: el cliente vuelve a deberlos.'
+                    : 'Se le quitan ' + pesos(x.quitado) + ' de pagos a esta operación y el cliente vuelve a deberlos.';
+                if (varias) {
+                    x.operaciones.forEach((o) => { const li = document.createElement('li'); li.textContent = o.nroOp + (o.tipo ? ' · ' + o.tipo : '') + ': ' + pesos(o.quitado); ops.appendChild(li); });
+                    ops.hidden = false;
+                }
+                if (x.otrasOperaciones > 0) {
+                    otras.hidden = false;
+                    otras.textContent = (x.otrasOperaciones === 1 ? 'La otra operación del cliente no cambia: sigue con el mismo estado y el mismo saldo.'
+                        : 'Las otras ' + x.otrasOperaciones + ' operaciones del cliente no cambian: siguen con el mismo estado y el mismo saldo.');
+                }
                 if (x.pagosSinCambio > 0) {
                     nota.hidden = false;
                     nota.textContent = (x.pagosSinCambio === 1 ? 'Otro pago del cliente no cambia' : 'Otros ' + x.pagosSinCambio + ' pagos del cliente no cambian') +
@@ -92,6 +114,8 @@
             form.hidden = false;
         } else {
             soloCerrar.hidden = false;
+            // Remito con varias operaciones y algo que lo impide: se puede marcar solo la elegida
+            soloEstaBtn.hidden = !(r.opsDelRemito > 1 && !actual.soloEsta);
         }
     }
 
@@ -116,6 +140,7 @@
         if (boton) { e.preventDefault(); abrir(boton); }
     });
     ['estadoPagoCerrar', 'estadoPagoCancelar', 'estadoPagoCerrar2'].forEach((id) => $(id).addEventListener('click', cerrar));
+    soloEstaBtn.addEventListener('click', () => { if (actual) { actual.soloEsta = true; cargarVistaPrevia(); } });
     modal.addEventListener('click', (e) => { if (e.target === modal) cerrar(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && actual) cerrar(); });
     metodo.addEventListener('change', () => { if (actual && actual.accion === 'pagada') cargarVistaPrevia(); });

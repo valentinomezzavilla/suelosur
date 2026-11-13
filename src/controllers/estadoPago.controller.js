@@ -13,7 +13,7 @@ const EstadoPagoController = {
   async vistaPrevia(req, res) {
     try {
       const { accion, metodo_pago } = req.query
-      if (accion === 'pendiente') return res.json(await EstadoPago.vistaPreviaPendiente(req.params.id))
+      if (accion === 'pendiente') return res.json(await EstadoPago.vistaPreviaPendiente(req.params.id, { soloEsta: req.query.soloEsta === '1' }))
       if (accion === 'pagada') return res.json(await EstadoPago.vistaPreviaPagada(req.params.id, { metodo_pago: metodo_pago || 'efectivo' }))
       res.status(400).json({ error: 'Acción inválida.' })
     } catch (err) {
@@ -23,8 +23,12 @@ const EstadoPagoController = {
 
   async marcarPendiente(req, res) {
     try {
-      const r = await EstadoPago.marcarPendiente(req.params.id, { usuario: usuario(req), motivo: req.body.motivo })
-      req.flash('success', `${r.nroOp} quedó pendiente de pago.${r.saldoDespues != null ? ' Saldo del cliente: ' + saldoTxt(r.saldoDespues) + '.' : ''}`)
+      const r = await EstadoPago.marcarPendiente(req.params.id, { usuario: usuario(req), motivo: req.body.motivo, soloEsta: req.body.soloEsta === '1' })
+      const ops = r.operaciones || []
+      const quien = ops.length > 1
+        ? `El remito ${r.remito}: ${ops.length} operaciones (${ops.map(o => o.nroOp).join(', ')}) quedaron pendientes de pago.`
+        : `${r.nroOp} quedó pendiente de pago.`
+      req.flash('success', `${quien}${r.saldoDespues != null ? ' Saldo del cliente: ' + saldoTxt(r.saldoDespues) + '.' : ''}`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'No se pudo marcar como pendiente.')
     }
