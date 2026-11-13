@@ -24,6 +24,7 @@
 const { query, transaction } = require('../config/db')
 const ClientesModel = require('./clientes.model')
 const { imputar, porOperacion } = require('../utils/imputacion')
+const L = require('../utils/liquidaciones')
 
 const EPS = 0.005
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
@@ -42,7 +43,7 @@ const METODO_TXT = { efectivo: 'efectivo', transferencia: 'transferencia', chequ
 function aplicadoSinX(imp, idPago, X) {
   const m = new Map()
   for (const a of imp.aplicaciones[idPago] || []) {
-    if (a.idOp && String(a.idOp) === X) continue
+    if (a.idOp && X.has(String(a.idOp))) continue
     const clave = a.idOp ? `o:${a.idOp}` : `c:${a.idCargo}`
     const prev = m.get(clave)
     if (prev) prev.monto = r2(prev.monto + a.monto)
@@ -51,21 +52,21 @@ function aplicadoSinX(imp, idPago, X) {
   return m
 }
 const aplicadoAX = (imp, idPago, X) =>
-  r2((imp.aplicaciones[idPago] || []).filter(a => a.idOp && String(a.idOp) === X).reduce((s, a) => s + a.monto, 0))
+  r2((imp.aplicaciones[idPago] || []).filter(a => a.idOp && X.has(String(a.idOp))).reduce((s, a) => s + a.monto, 0))
 const mismoAplicado = (a, b) => {
   if (a.size !== b.size) return false
   for (const [k, v] of a) { const w = b.get(k); if (!w || Math.abs(w.monto - v.monto) > EPS) return false }
   return true
 }
-const pagadoDe = (imp, X) => { const d = porOperacion(imp.cargos)[X]; return d ? d.pagado : 0 }
+const pagadoDe = (imp, X) => { const po = porOperacion(imp.cargos); let t = 0; for (const id of X) t += po[id] ? po[id].pagado : 0; return t }
 
-// Qué hay que cambiar de los pagos para que la operación `idOp` quede pendiente sin tocar el
-// resto. movs: movimientos vigentes del cliente (en el orden de la cuenta); asignaciones: las
+// Qué hay que cambiar de los pagos para que la operación `idOp` (o varias: un array, las de un
+// remito) quede pendiente sin tocar el resto. movs: movimientos vigentes del cliente (en el orden de la cuenta); asignaciones: las
 // operaciones elegidas de cada pago.
 // → { pagadoAntes, cambios: [{ idPago, montoOriginal, montoNuevo, imputaciones, tocaMonto }], sinCambios }
 // Tira un Error si no se puede dejar pendiente sin alterar otras operaciones.
-function calcularReversion(movs, asignaciones, idOp) {
-  const X = String(idOp)
+function calcularReversion(movs, asignaciones, idOps) {
+  const X = new Set([].concat(idOps).map(String))
   const base = imputar(movs, asignaciones)
   const pagadoAntes = pagadoDe(base, X)
   if (pagadoAntes <= EPS) return { pagadoAntes: 0, cambios: [] }
@@ -130,7 +131,7 @@ function calcularReversion(movs, asignaciones, idOp) {
 function diferenciasConBase(a, b, X) {
   const pa = porOperacion(a.cargos), pb = porOperacion(b.cargos)
   for (const id of new Set([...Object.keys(pa), ...Object.keys(pb)])) {
-    if (id === X) continue
+    if (X.has(id)) continue
     if (Math.abs((pa[id] ? pa[id].pagado : 0) - (pb[id] ? pb[id].pagado : 0)) > 0.01) return 'otra operación del cliente'
   }
   for (const [id, c] of Object.entries(a.cargos)) {
@@ -163,11 +164,29 @@ async function cobrosDeContado(idOp, q = query) {
 const saldoDe = async (idCliente, q = query) => r2(((await q(`SELECT saldo FROM clientes WHERE id = ?`, [idCliente])).rows[0] || {}).saldo)
 
 // ── Marcar PENDIENTE ──────────────────────────────────────────────────
+// Un remito puede tener varias operaciones (mismo cliente y mismo N° de remito). "Marcar
+// pendiente" las deja pendientes a TODAS juntas y no toca a ninguna otra del cliente: el cálculo
+// se hace de una vez para todo el conjunto y, antes de guardar, se verifica que las demás
+// operaciones sigan con el mismo estado y el mismo saldo. Con `soloEsta` se deja pendiente
+// únicamente la operación elegida.
+
+// Las operaciones que comparten el remito de `op` (mismo cliente, sin anuladas); `op` va siempre.
+async function opsDelRemito(op, q) {
+  if (!op.nro_remito) return [op]
+  const ids = (await q(`SELECT id FROM op_encabezado WHERE id_cliente = ? AND nro_remito = ? AND estado <> 'anulado' ORDER BY id`,
+    [op.id_cliente, op.nro_remito])).rows.map(r => r.id)
+  const ops = []
+  for (const id of ids) ops.push(String(id) === String(op.id) ? op : await cargarOp(id, q))
+  return ops.filter(Boolean)
+}
+
+const tipoTexto = (op) => L.TIPOS[L.tipoDeOperacion({ tipo_op: op.tipo_op, modalidad: op.modalidad })] || ''
 
 // Calcula (sin escribir) qué pasaría. Devuelve el plan para mostrar y, con `aplicar`, ejecutarlo.
-async function planPendiente(idOp, q = query) {
+async function planPendiente(idOp, q = query, { soloEsta = false } = {}) {
   const op = await cargarOp(idOp, q)
-  const plan = { accion: 'pendiente', idOp: Number(idOp), nroOp: op ? nroOp(op.nro_op) : null, camino: null, puede: false, bloqueos: [], lineas: [], saldoAntes: null, saldoDespues: null }
+  const plan = { accion: 'pendiente', idOp: Number(idOp), nroOp: op ? nroOp(op.nro_op) : null, camino: null, puede: false, bloqueos: [], lineas: [],
+    saldoAntes: null, saldoDespues: null, remito: op ? op.nro_remito || null : null, opsDelRemito: 1, operaciones: [] }
   const no = (msg) => { plan.bloqueos.push(msg); return plan }
   if (!op) return no('La operación no existe.')
   if (!op.id_cliente) return no('La operación no tiene cliente: no hay cuenta donde volver a cargar la deuda.')
@@ -175,110 +194,182 @@ async function planPendiente(idOp, q = query) {
   plan.idCliente = op.id_cliente
   plan.saldoAntes = await saldoDe(op.id_cliente, q)
 
-  if (EN_CUENTA.includes(op.metodo_pago)) return planPendienteCuenta(op, plan, q)
-  return planPendienteContado(op, plan, q)
+  const grupo = soloEsta ? [op] : await opsDelRemito(op, q)
+  plan.opsDelRemito = grupo.length
+  const cuenta = grupo.filter(g => EN_CUENTA.includes(g.metodo_pago))
+  const contado = grupo.filter(g => !EN_CUENTA.includes(g.metodo_pago))
+  const ec = cuenta.length ? await evaluarCuenta(cuenta, op.id_cliente, q) : null
+  const eo = contado.length ? await evaluarContado(contado, q) : null
+
+  plan.bloqueos.push(...(ec ? ec.bloqueos : []), ...(eo ? eo.bloqueos : []))
+  if (ec && ec.cambia && eo && eo.cambia) plan.bloqueos.push('Este remito tiene operaciones cobradas de distinta forma (cuenta corriente y contado): marcalas de a una.')
+  const cambia = ec && ec.cambia ? ec : (eo && eo.cambia ? eo : null)
+  if (!plan.bloqueos.length && !cambia) plan.bloqueos.push((ec && ec.msgYa) || (eo && eo.msgYa) || `${plan.nroOp} ya está pendiente.`)
+  plan.camino = cambia === ec && ec ? 'cuenta' : (cambia ? 'contado' : (ec ? 'cuenta' : 'contado'))
+
+  if (cambia) {
+    plan.lineas.push(...cambia.lineas)
+    if (cambia === ec) {
+      if (ec.cambios.some(c => c.tocaMonto && c.montoOriginal - c.montoNuevo > EPS) && Math.abs(ec.delta) > EPS) {
+        plan.lineas.push(`El cliente pasa a deber ${pesos(ec.delta)} más en su cuenta corriente.`)
+      }
+    } else {
+      plan.lineas.push(`El cliente pasa a deber ${pesos(eo.delta)} en su cuenta corriente.`)
+    }
+    plan.saldoDespues = r2(plan.saldoAntes - cambia.delta)
+    const afectadas = grupo.filter(g => cambia.quitadoPorOp[g.id] > EPS)
+    plan.operaciones = afectadas.map(g => ({ id: Number(g.id), nroOp: nroOp(g.nro_op), tipo: tipoTexto(g), quitado: cambia.quitadoPorOp[g.id] }))
+    plan.resumen = {
+      quitado: r2(cambia.delta),
+      pagosQueCambian: cambia === ec ? ec.cambian : eo.lineas.slice(),
+      pagosSinCambio: cambia === ec ? ec.sinCambio : 0,
+      operaciones: plan.operaciones,
+      otrasOperaciones: cambia === ec ? ec.otras : 0,
+    }
+    plan._ops = afectadas
+    plan._ids = afectadas.map(g => String(g.id))
+    plan._cambios = ec && cambia === ec ? ec.cambios : []
+    plan._cobros = eo && cambia === eo ? eo.cobros : []
+    plan._delta = r2(cambia.delta)
+  }
+  plan.puede = plan.bloqueos.length === 0 && !!cambia
+  return plan
 }
 
-async function planPendienteCuenta(op, plan, q) {
-  plan.camino = 'cuenta'
-  const no = (msg) => { plan.bloqueos.push(msg); return plan }
-  if (op.grupo_todo_junto) return no('Es un alquiler de varios contenedores cobrado todo junto: el pago es uno solo para el grupo. Anulá el pago desde la cuenta corriente del cliente.')
-  const imp = await ClientesModel.imputacionDe(op.id_cliente, q)
-  const cargos = Object.values(imp.cargos).filter(c => c.idOp && String(c.idOp) === String(op.id))
-  if (!cargos.length) return no(`${plan.nroOp} todavía no tiene cargo en la cuenta corriente: ya está pendiente.`)
-  const asignaciones = await ClientesModel.asignacionesDe([op.id_cliente], q)
+// Operaciones del grupo que están en cuenta corriente: qué hay que quitarle a cada pago
+async function evaluarCuenta(ops, idCliente, q) {
+  const ev = { cambia: false, bloqueos: [], msgYa: null, lineas: [], cambian: [], sinCambio: 0, delta: 0, cambios: [], quitadoPorOp: {}, otras: 0 }
+  const unica = ops.length === 1
+  if (ops.some(o => o.grupo_todo_junto)) {
+    ev.bloqueos.push('Es un alquiler de varios contenedores cobrado todo junto: el pago es uno solo para el grupo. Anulá el pago desde la cuenta corriente del cliente.')
+    return ev
+  }
+  const imp = await ClientesModel.imputacionDe(idCliente, q)
+  const conCargo = ops.filter(o => Object.values(imp.cargos).some(c => c.idOp && String(c.idOp) === String(o.id)))
+  if (!conCargo.length) {
+    ev.msgYa = unica ? `${nroOp(ops[0].nro_op)} todavía no tiene cargo en la cuenta corriente: ya está pendiente.`
+      : 'Las operaciones de este remito todavía no tienen cargo en la cuenta corriente: ya están pendientes.'
+    return ev
+  }
+  const asignaciones = await ClientesModel.asignacionesDe([idCliente], q)
   let r
-  try { r = calcularReversion(imp.movs, asignaciones, op.id) } catch (e) { return no(e.message) }
-  if (!r.cambios.length && r.pagadoAntes <= EPS) return no(`${plan.nroOp} ya está pendiente: no tiene pagos aplicados.`)
+  try { r = calcularReversion(imp.movs, asignaciones, conCargo.map(o => o.id)) } catch (e) { ev.bloqueos.push(e.message); return ev }
+  if (!r.cambios.length && r.pagadoAntes <= EPS) {
+    ev.msgYa = unica ? `${nroOp(ops[0].nro_op)} ya está pendiente: no tiene pagos aplicados.`
+      : 'Las operaciones de este remito ya están pendientes: no tienen pagos aplicados.'
+    return ev
+  }
+
+  const ids = new Set(conCargo.map(o => String(o.id)))
+  const pagadoPorOp = porOperacion(imp.cargos)
+  conCargo.forEach(o => { ev.quitadoPorOp[o.id] = r2(pagadoPorOp[String(o.id)] ? pagadoPorOp[String(o.id)].pagado : 0) })
+  ev.otras = new Set(Object.values(imp.cargos).filter(c => c.idOp && !ids.has(String(c.idOp))).map(c => String(c.idOp))).size
 
   const movs = new Map(imp.movs.map(m => [String(m.id), m]))
-  let delta = 0
-  // Para la ventana: solo los pagos que cambian de monto, y cuántos más no cambian
-  const cambian = []
-  let sinCambio = 0
   for (const c of r.cambios) {
     const m = movs.get(String(c.idPago))
     const cheque = (await q(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [c.idPago])).rows[0]
     const tercero = (await q(`SELECT 1 FROM egresos WHERE id_movimiento_cuenta = ? LIMIT 1`, [c.idPago])).rows[0]
     const desc = `el pago del ${fechaCorta(m.created_at)} por ${pesos(m.monto)}${m.metodo_pago ? ` (${METODO_TXT[m.metodo_pago] || m.metodo_pago})` : ''}`
-    if (cheque) plan.bloqueos.push(`Parte de lo pagado viene de ${desc}, que es un cheque: deshabilitá el cheque desde Cheques y volvé a intentar.`)
-    else if (tercero && c.tocaMonto && c.montoNuevo > EPS) plan.bloqueos.push(`Parte de lo pagado viene de ${desc}, una transferencia a un tercero que también paga otras operaciones: anulalo entero desde la cuenta corriente (Anular) y volvé a registrar lo que corresponda.`)
-    else if (c.montoNuevo <= EPS) { const t = `Se anula ${desc}: era todo de esta operación.`; plan.lineas.push(t); cambian.push(t) }
+    const esta = unica ? 'esta operación' : 'estas operaciones'
+    if (cheque) ev.bloqueos.push(`Parte de lo pagado viene de ${desc}, que es un cheque: deshabilitá el cheque desde Cheques y volvé a intentar.`)
+    else if (tercero && c.tocaMonto && c.montoNuevo > EPS) ev.bloqueos.push(`Parte de lo pagado viene de ${desc}, una transferencia a un tercero que también paga otras operaciones: anulalo entero desde la cuenta corriente (Anular) y volvé a registrar lo que corresponda.`)
+    else if (c.montoNuevo <= EPS) { const t = `Se anula ${desc}: era todo de ${esta}.`; ev.lineas.push(t); ev.cambian.push(t) }
     else if (c.tocaMonto) {
-      const t = `Del ${desc.replace(/^el /, '')}, ${pesos(c.montoOriginal - c.montoNuevo)} eran de esta operación: se anula y se vuelve a registrar por los ${pesos(c.montoNuevo)} que corresponden a las demás.`
-      plan.lineas.push(t); cambian.push(t)
-    } else { plan.lineas.push(`${desc[0].toUpperCase()}${desc.slice(1)} se mantiene, pero se deja escrito a qué operaciones va.`); sinCambio++ }
-    delta += c.montoOriginal - c.montoNuevo
+      const t = `Del ${desc.replace(/^el /, '')}, ${pesos(c.montoOriginal - c.montoNuevo)} eran de ${esta}: se anula y se vuelve a registrar por los ${pesos(c.montoNuevo)} que corresponden a las demás.`
+      ev.lineas.push(t); ev.cambian.push(t)
+    } else { ev.lineas.push(`${desc[0].toUpperCase()}${desc.slice(1)} se mantiene, pero se deja escrito a qué operaciones va.`); ev.sinCambio++ }
+    ev.delta += c.montoOriginal - c.montoNuevo
   }
-  if (r.cambios.some(c => c.tocaMonto && c.montoOriginal - c.montoNuevo > EPS) && Math.abs(delta) > EPS) {
-    plan.lineas.push(`El cliente pasa a deber ${pesos(delta)} más en su cuenta corriente.`)
-  }
-  plan.saldoDespues = r2(plan.saldoAntes - delta)
-  plan.puede = plan.bloqueos.length === 0
-  plan.resumen = { quitado: r2(delta), pagosQueCambian: cambian, pagosSinCambio: sinCambio }
-  plan._cambios = r.cambios
-  plan._delta = r2(delta)
-  return plan
+  ev.delta = r2(ev.delta)
+  ev.cambios = r.cambios
+  ev.cambia = true
+  return ev
 }
 
-async function planPendienteContado(op, plan, q) {
-  plan.camino = 'contado'
-  const no = (msg) => { plan.bloqueos.push(msg); return plan }
-  const cobros = await cobrosDeContado(op.id, q)
-  if (!cobros.length) return no(`${plan.nroOp} no tiene ningún cobro registrado: ya está pendiente.`)
-  if (cobros.length > 1) return no('Tiene más de un cobro registrado: pasá cada uno a cuenta corriente desde Transacciones (Cambiar método de pago).')
-  const c = cobros[0]
-  if (!COBRO_CONTADO.includes(c.metodo_pago || 'efectivo')) return no(`El cobro es con ${c.metodo_pago}: anulalo desde Cheques.`)
-  if (op.grupo_todo_junto) return no('Es un alquiler de varios contenedores cobrado todo junto: el método de pago no se puede cambiar por separado.')
-  const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
-  if (errCC) return no(`Para dejarla pendiente el cobro pasa a la cuenta corriente del cliente, y no se puede: ${errCC}`)
-  plan.lineas.push(`El cobro de ${pesos(c.monto)} (${METODO_TXT[c.metodo_pago || 'efectivo']}, ${fechaCorta(c.fecha)}) pasa a cuenta corriente.`)
-  plan.lineas.push(`El cliente pasa a deber ${pesos(c.monto)} en su cuenta corriente.`)
-  plan.saldoDespues = r2(plan.saldoAntes - Number(c.monto))
-  plan.puede = true
-  plan.resumen = { quitado: r2(c.monto), pagosQueCambian: [plan.lineas[0]], pagosSinCambio: 0 }
-  plan._cobro = c
-  return plan
+// Operaciones del grupo cobradas de contado: el cobro pasa a cuenta corriente
+async function evaluarContado(ops, q) {
+  const ev = { cambia: false, bloqueos: [], msgYa: null, lineas: [], delta: 0, cobros: [], quitadoPorOp: {} }
+  const unica = ops.length === 1
+  const de = (o, texto) => (unica ? texto : `${nroOp(o.nro_op)}: ${texto}`)
+  let sinCobro = 0
+  for (const o of ops) {
+    const cobros = await cobrosDeContado(o.id, q)
+    if (!cobros.length) { sinCobro++; continue }
+    if (cobros.length > 1) { ev.bloqueos.push(de(o, 'Tiene más de un cobro registrado: pasá cada uno a cuenta corriente desde Transacciones (Cambiar método de pago).')); continue }
+    const c = cobros[0]
+    if (!COBRO_CONTADO.includes(c.metodo_pago || 'efectivo')) { ev.bloqueos.push(de(o, `El cobro es con ${c.metodo_pago}: anulalo desde Cheques.`)); continue }
+    if (o.grupo_todo_junto) { ev.bloqueos.push(de(o, 'Es un alquiler de varios contenedores cobrado todo junto: el método de pago no se puede cambiar por separado.')); continue }
+    const errCC = await ClientesModel.errorCuentaCorriente(o.id_cliente)
+    if (errCC) { ev.bloqueos.push(de(o, `Para dejarla pendiente el cobro pasa a la cuenta corriente del cliente, y no se puede: ${errCC}`)); continue }
+    ev.lineas.push(`El cobro de ${pesos(c.monto)} (${METODO_TXT[c.metodo_pago || 'efectivo']}, ${fechaCorta(c.fecha)}) pasa a cuenta corriente.`)
+    ev.cobros.push({ op: o, cobro: c })
+    ev.quitadoPorOp[o.id] = r2(c.monto)
+    ev.delta += Number(c.monto)
+  }
+  ev.delta = r2(ev.delta)
+  ev.cambia = ev.cobros.length > 0
+  if (!ev.cambia && sinCobro === ops.length) {
+    ev.msgYa = unica ? `${nroOp(ops[0].nro_op)} no tiene ningún cobro registrado: ya está pendiente.`
+      : 'Las operaciones de este remito no tienen ningún cobro registrado: ya están pendientes.'
+  }
+  return ev
 }
 
-const publico = (plan) => { const { _cambios, _delta, _cobro, ...p } = plan; return p }
+// Lo que se le quita a una operación y sus datos para mostrar (sin las claves internas "_")
+const publico = (plan) => Object.fromEntries(Object.entries(plan).filter(([k]) => !k.startsWith('_')))
 
-async function vistaPreviaPendiente(idOp) { return publico(await planPendiente(idOp)) }
+async function vistaPreviaPendiente(idOp, opciones = {}) { return publico(await planPendiente(idOp, query, opciones)) }
 
-async function marcarPendiente(idOp, { usuario = null, motivo = '' } = {}) {
+async function marcarPendiente(idOp, { usuario = null, motivo = '', soloEsta = false } = {}) {
   const texto = String(motivo || '').trim().slice(0, 300)
   if (texto.length < 3) throw new Error('Indicá el motivo.')
   const op = await cargarOp(idOp)
   if (!op) throw new Error('La operación no existe.')
 
-  if (EN_CUENTA.includes(op.metodo_pago)) {
+  const previo = await planPendiente(idOp, query, { soloEsta })
+  if (!previo.puede) throw new Error(previo.bloqueos[0] || 'No se puede dejar pendiente.')
+
+  if (previo.camino === 'cuenta') {
     const resultado = await transaction(async (q) => {
       await q(`SELECT id FROM clientes WHERE id = ? FOR UPDATE`, [op.id_cliente])
-      const plan = await planPendiente(idOp, q)
+      const plan = await planPendiente(idOp, q, { soloEsta })
       if (!plan.puede) throw new Error(plan.bloqueos[0] || 'No se puede dejar pendiente.')
       const antes = imputacionActual(await ClientesModel.imputacionDe(op.id_cliente, q))
-      for (const c of plan._cambios) await aplicarCambio(c, op, { usuario, motivo: texto }, q)
-      await verificarCuenta(op, antes, plan, q)
+      const rotulo = plan._ops.map(o => nroOp(o.nro_op)).join(', ')
+      for (const c of plan._cambios) await aplicarCambio(c, { idCliente: op.id_cliente, rotulo }, { usuario, motivo: texto }, q)
+      await verificarCuenta(op.id_cliente, plan, antes, q)
       return plan
     })
-    await auditar('marcar_pendiente', op, usuario, { camino: 'cuenta', motivo: texto, cambios: resultado._cambios, saldoAntes: resultado.saldoAntes, saldoDespues: resultado.saldoDespues })
+    for (const o of resultado._ops) {
+      await auditar('marcar_pendiente', o, usuario, { camino: 'cuenta', motivo: texto, remito: resultado.remito, operaciones: resultado.operaciones.map(x => x.nroOp),
+        cambios: resultado._cambios, saldoAntes: resultado.saldoAntes, saldoDespues: resultado.saldoDespues })
+    }
     return publico(resultado)
   }
 
-  const plan = await planPendiente(idOp)
-  if (!plan.puede) throw new Error(plan.bloqueos[0] || 'No se puede dejar pendiente.')
-  const c = plan._cobro
+  // De contado: cada cobro pasa a cuenta corriente; si algo no cierra, se vuelve todo atrás
+  const plan = previo
   const TransaccionesModel = require('./transacciones.model')
-  await TransaccionesModel.cambiarMetodoPago(c.id, 'cuenta_corriente')
+  const hechos = []
   try {
-    const d = (await ClientesModel.pagadoPorOperacion([op.id]))[op.id]
+    for (const { cobro } of plan._cobros) {
+      await TransaccionesModel.cambiarMetodoPago(cobro.id, 'cuenta_corriente')
+      hechos.push(cobro)
+    }
+    const pagado = await ClientesModel.pagadoPorOperacion(plan._ids)
     const saldo = await saldoDe(op.id_cliente)
-    if (!d || d.pagado > EPS || Math.abs(saldo - plan.saldoDespues) > 0.01) throw new Error('El cambio no dejó la operación pendiente como se esperaba.')
+    if (plan._ids.some(id => !pagado[id] || pagado[id].pagado > EPS) || Math.abs(saldo - plan.saldoDespues) > 0.01) {
+      throw new Error('El cambio no dejó la operación pendiente como se esperaba.')
+    }
   } catch (e) {
-    await TransaccionesModel.cambiarMetodoPago(c.id, c.metodo_pago || 'efectivo').catch(() => {})
+    for (const c of hechos.reverse()) await TransaccionesModel.cambiarMetodoPago(c.id, c.metodo_pago || 'efectivo').catch(() => {})
     throw new Error(`${e.message} Se volvió al estado anterior.`)
   }
-  await auditar('marcar_pendiente', op, usuario, { camino: 'contado', motivo: texto, transaccion: c.id, monto: Number(c.monto), metodoAnterior: c.metodo_pago || 'efectivo', saldoAntes: plan.saldoAntes, saldoDespues: plan.saldoDespues })
+  for (const { op: o, cobro } of plan._cobros) {
+    await auditar('marcar_pendiente', o, usuario, { camino: 'contado', motivo: texto, remito: plan.remito, operaciones: plan.operaciones.map(x => x.nroOp),
+      transaccion: cobro.id, monto: Number(cobro.monto), metodoAnterior: cobro.metodo_pago || 'efectivo', saldoAntes: plan.saldoAntes, saldoDespues: plan.saldoDespues })
+  }
   return publico(plan)
 }
 
@@ -292,8 +383,8 @@ function imputacionActual(imp) {
 
 // Anula el pago afectado (queda en el historial) y, si sobra plata para otras operaciones, lo
 // registra de nuevo por esa parte (misma fecha, método y descripción) con sus operaciones escritas
-async function aplicarCambio(c, op, { usuario, motivo }, q) {
-  const m = (await q(`SELECT * FROM movimientos_cuenta WHERE id = ? AND cliente_id = ? FOR UPDATE`, [c.idPago, op.id_cliente])).rows[0]
+async function aplicarCambio(c, { idCliente, rotulo }, { usuario, motivo }, q) {
+  const m = (await q(`SELECT * FROM movimientos_cuenta WHERE id = ? AND cliente_id = ? FOR UPDATE`, [c.idPago, idCliente])).rows[0]
   if (!m || Number(m.anulado)) throw new Error('Un pago cambió mientras se calculaba. Volvé a intentar.')
   if (Math.abs(Number(m.monto) - c.montoOriginal) > 0.005) throw new Error('Un pago cambió mientras se calculaba. Volvé a intentar.')
   if (!c.tocaMonto) {
@@ -302,26 +393,31 @@ async function aplicarCambio(c, op, { usuario, motivo }, q) {
     await ClientesModel.guardarImputaciones(c.idPago, c.imputaciones, q)
     return
   }
-  const razon = `Marcada pendiente ${nroOp(op.nro_op)}: ${motivo}`
+  const razon = `Marcada pendiente ${rotulo}: ${motivo}`
   await q(`UPDATE movimientos_cuenta SET anulado = 1, anulado_en = ahora_local(), anulado_por = ?, anulado_motivo = ? WHERE id = ?`,
     [usuario || null, razon.slice(0, 300), c.idPago])
   await require('../services/tercero.service').borrarDeMovimiento(c.idPago, q)
   if (c.montoNuevo > EPS) {
-    const nuevo = await ClientesModel.agregarMovimiento(op.id_cliente, {
-      tipo: m.tipo, descripcion: `${m.descripcion || 'Pago'} (resto tras marcar pendiente ${nroOp(op.nro_op)})`.slice(0, 300),
+    const nuevo = await ClientesModel.agregarMovimiento(idCliente, {
+      tipo: m.tipo, descripcion: `${m.descripcion || 'Pago'} (resto tras marcar pendiente ${rotulo})`.slice(0, 300),
       monto: c.montoNuevo, metodo_pago: m.metodo_pago, fecha: m.created_at,
     }, q)
     await ClientesModel.guardarImputaciones(nuevo, c.imputaciones, q)
   }
 }
 
-async function verificarCuenta(op, antes, plan, q) {
-  const imp = await ClientesModel.imputacionDe(op.id_cliente, q)
+// Antes de confirmar: las operaciones marcadas quedaron sin pagos, NINGUNA otra operación ni cargo
+// a mano del cliente cambió y el saldo se movió exactamente lo esperado. Si no, no se guarda nada.
+async function verificarCuenta(idCliente, plan, antes, q) {
+  const imp = await ClientesModel.imputacionDe(idCliente, q)
   const ahora = imputacionActual(imp)
-  const x = ahora.ops[String(op.id)]
-  if (x && x.pagado > EPS) throw new Error('Verificación: la operación seguía con pagos aplicados. No se guardó nada.')
+  const marcadas = new Set(plan._ids.map(String))
+  for (const id of marcadas) {
+    const x = ahora.ops[id]
+    if (x && x.pagado > EPS) throw new Error('Verificación: la operación seguía con pagos aplicados. No se guardó nada.')
+  }
   for (const id of new Set([...Object.keys(antes.ops), ...Object.keys(ahora.ops)])) {
-    if (id === String(op.id)) continue
+    if (marcadas.has(id)) continue
     if (Math.abs((antes.ops[id] ? antes.ops[id].pagado : 0) - (ahora.ops[id] ? ahora.ops[id].pagado : 0)) > 0.01) {
       throw new Error('Verificación: el cambio alteraba el pago de otra operación del cliente. No se guardó nada.')
     }
@@ -329,7 +425,7 @@ async function verificarCuenta(op, antes, plan, q) {
   for (const id of Object.keys(antes.sueltos)) {
     if (Math.abs(antes.sueltos[id] - (ahora.sueltos[id] ?? antes.sueltos[id])) > 0.01) throw new Error('Verificación: el cambio alteraba un cargo a mano del cliente. No se guardó nada.')
   }
-  const saldo = await saldoDe(op.id_cliente, q)
+  const saldo = await saldoDe(idCliente, q)
   if (Math.abs(saldo - plan.saldoDespues) > 0.01) throw new Error(`Verificación: el saldo quedó en ${pesos(saldo)} y se esperaba ${pesos(plan.saldoDespues)}. No se guardó nada.`)
 }
 

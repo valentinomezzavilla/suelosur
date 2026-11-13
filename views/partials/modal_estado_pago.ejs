@@ -14,10 +14,13 @@
       <p id="estadoPagoCargando" class="text-muted">Calculando qué cambia…</p>
       <div id="estadoPagoBloqueos" class="alert alert-warning" hidden></div>
       <p id="estadoPagoResumen" class="fw-semibold mb-2" hidden></p>
+      <ul id="estadoPagoOps" class="mb-2 ps-3" hidden></ul>
       <ul id="estadoPagoLineas" class="mb-2 ps-3" hidden></ul>
-      <p id="estadoPagoNota" class="small text-muted mb-3" hidden></p>
+      <p id="estadoPagoNota" class="small text-muted mb-2" hidden></p>
+      <p id="estadoPagoOtras" class="small text-success mb-3" hidden></p>
       <p id="estadoPagoSaldo" class="fw-semibold" hidden></p>
       <form id="estadoPagoForm" method="POST" hidden>
+        <input type="hidden" name="soloEsta" id="estadoPagoSoloEstaCampo" value="">
         <div class="form-group" id="estadoPagoMotivoGrupo" hidden>
           <label for="estadoPagoMotivo">Motivo</label>
           <input type="text" name="motivo" id="estadoPagoMotivo" maxlength="300" placeholder="Ej: la transferencia nunca llegó" autocomplete="off">
@@ -39,6 +42,7 @@
         </div>
       </form>
       <div class="modal-actions" id="estadoPagoSoloCerrar" hidden>
+        <button type="button" class="btn btn-outline-secondary" id="estadoPagoSoloEsta" hidden title="Deja pendiente únicamente esta operación, no las demás del remito">Marcar solo esta operación</button>
         <button type="button" class="btn btn-outline-secondary" id="estadoPagoCerrar2">Cerrar</button>
       </div>
     </div>
