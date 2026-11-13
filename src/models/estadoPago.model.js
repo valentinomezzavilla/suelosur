@@ -193,6 +193,9 @@ async function planPendienteCuenta(op, plan, q) {
 
   const movs = new Map(imp.movs.map(m => [String(m.id), m]))
   let delta = 0
+  // Para la ventana: solo los pagos que cambian de monto, y cuántos más no cambian
+  const cambian = []
+  let sinCambio = 0
   for (const c of r.cambios) {
     const m = movs.get(String(c.idPago))
     const cheque = (await q(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [c.idPago])).rows[0]
@@ -200,9 +203,11 @@ async function planPendienteCuenta(op, plan, q) {
     const desc = `el pago del ${fechaCorta(m.created_at)} por ${pesos(m.monto)}${m.metodo_pago ? ` (${METODO_TXT[m.metodo_pago] || m.metodo_pago})` : ''}`
     if (cheque) plan.bloqueos.push(`Parte de lo pagado viene de ${desc}, que es un cheque: deshabilitá el cheque desde Cheques y volvé a intentar.`)
     else if (tercero && c.tocaMonto && c.montoNuevo > EPS) plan.bloqueos.push(`Parte de lo pagado viene de ${desc}, una transferencia a un tercero que también paga otras operaciones: anulalo entero desde la cuenta corriente (Anular) y volvé a registrar lo que corresponda.`)
-    else if (c.montoNuevo <= EPS) plan.lineas.push(`Se anula ${desc}.`)
-    else if (c.tocaMonto) plan.lineas.push(`${desc[0].toUpperCase()}${desc.slice(1)} se anula y se vuelve a registrar por ${pesos(c.montoNuevo)} (lo que corresponde a las demás operaciones).`)
-    else plan.lineas.push(`${desc[0].toUpperCase()}${desc.slice(1)} se mantiene, pero se deja escrito a qué operaciones va.`)
+    else if (c.montoNuevo <= EPS) { const t = `Se anula ${desc}: era todo de esta operación.`; plan.lineas.push(t); cambian.push(t) }
+    else if (c.tocaMonto) {
+      const t = `Del ${desc.replace(/^el /, '')}, ${pesos(c.montoOriginal - c.montoNuevo)} eran de esta operación: se anula y se vuelve a registrar por los ${pesos(c.montoNuevo)} que corresponden a las demás.`
+      plan.lineas.push(t); cambian.push(t)
+    } else { plan.lineas.push(`${desc[0].toUpperCase()}${desc.slice(1)} se mantiene, pero se deja escrito a qué operaciones va.`); sinCambio++ }
     delta += c.montoOriginal - c.montoNuevo
   }
   if (r.cambios.some(c => c.tocaMonto && c.montoOriginal - c.montoNuevo > EPS) && Math.abs(delta) > EPS) {
@@ -210,6 +215,7 @@ async function planPendienteCuenta(op, plan, q) {
   }
   plan.saldoDespues = r2(plan.saldoAntes - delta)
   plan.puede = plan.bloqueos.length === 0
+  plan.resumen = { quitado: r2(delta), pagosQueCambian: cambian, pagosSinCambio: sinCambio }
   plan._cambios = r.cambios
   plan._delta = r2(delta)
   return plan
@@ -230,6 +236,7 @@ async function planPendienteContado(op, plan, q) {
   plan.lineas.push(`El cliente pasa a deber ${pesos(c.monto)} en su cuenta corriente.`)
   plan.saldoDespues = r2(plan.saldoAntes - Number(c.monto))
   plan.puede = true
+  plan.resumen = { quitado: r2(c.monto), pagosQueCambian: [plan.lineas[0]], pagosSinCambio: 0 }
   plan._cobro = c
   return plan
 }
