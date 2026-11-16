@@ -1,0 +1,167 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Filtro por obra con varias obras (partials/filtro_obras + js/filtroObra.js):
+// botón con aspecto de select que abre una lista de obras con casillas.
+// Los estilos no dependen del contexto: se ve igual en filtros Bootstrap, en la barra de
+// filtros (.filtro-group) y en formularios propios (.form-group).
+// ═══════════════════════════════════════════════════════════════
+
+$caret: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23667085' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.6' d='m4 6 4 4 4-4'/%3e%3c/svg%3e");
+
+.filtro-obras {
+  position: relative;
+  min-width: 0;
+}
+
+.filtro-obras .filtro-obras__boton {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: $control-h;
+  margin: 0;
+  padding: 0 2.1rem 0 0.75rem;
+  border: 1px solid $border-input;
+  border-radius: $radius-md;
+  background: #fff $caret no-repeat right 0.6rem center / 16px 16px;
+  color: $ink;
+  font: inherit;
+  font-size: $fs-base;
+  text-align: left;
+  box-shadow: $shadow-xs;
+  cursor: pointer;
+  transition: border-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  &:hover:not(:disabled) { border-color: $border-input-hover; }
+  &:focus-visible,
+  &[aria-expanded="true"] {
+    outline: none;
+    border-color: $accent;
+    box-shadow: $focus-ring;
+  }
+  &:disabled {
+    background-color: $gray-100;
+    color: $muted;
+    border-color: $gray-200;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+.filtro-obras__texto {
+  min-width: 0;   // si no, en el flex del botón el texto largo no se recorta y ensancha la página
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.filtro-obras__panel {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: min(260px, calc(100vw - 32px));
+  padding: 0.4rem;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: 10px;
+  box-shadow: $shadow-lg;
+  animation: filtro-obras-in 0.14s $ease-out;
+}
+
+@keyframes filtro-obras-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.filtro-obras .filtro-obras__buscar {
+  margin-bottom: 0.35rem;
+}
+
+.filtro-obras__lista {
+  max-height: 260px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+// (doble clase: gana a los estilos de label/input de .filtro-group y .form-group)
+.filtro-obras .filtro-obras__opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: $radius-sm;
+  font-size: $fs-base;
+  font-weight: 400;
+  line-height: 1.35;
+  color: $ink;
+  cursor: pointer;
+  transition: background-color 0.08s $ease;
+
+  &:hover { background: $gray-100; }
+  &:has(input:checked) { background: $accent-soft; color: $accent-darker; }
+
+  input[type="checkbox"] {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    min-width: 0;
+    min-height: 0;
+    margin: 0.1rem 0 0;
+    padding: 0;
+    box-shadow: none;
+    accent-color: $accent;
+    cursor: pointer;
+  }
+
+  span { min-width: 0; overflow-wrap: anywhere; }
+}
+
+.filtro-obras__vacio {
+  margin: 0;
+  padding: 0.7rem 0.55rem;
+  font-size: $fs-sm;
+  color: $muted;
+  text-align: center;
+}
+
+.filtro-obras__pie {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  padding: 0.4rem 0.3rem 0.1rem;
+  border-top: 1px solid $border-soft;
+}
+
+.filtro-obras__cuenta {
+  font-size: $fs-xs;
+  color: $muted;
+}
+
+.filtro-obras .filtro-obras__limpiar {
+  flex: none;
+  padding: 0.2rem 0.35rem;
+  border: 0;
+  border-radius: $radius-xs;
+  background: transparent;
+  color: $accent;
+  font-size: $fs-sm;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 2px; }
+  &:disabled { color: $muted-light; cursor: default; }
+}
+
+// Mobile: controles más altos (táctiles) y a 16px, como el resto de los campos
+@include md-down {
+  .filtro-obras .filtro-obras__boton { min-height: $control-h-lg; font-size: 16px; }
+  .filtro-obras .filtro-obras__opcion { padding-block: 0.6rem; }
+}

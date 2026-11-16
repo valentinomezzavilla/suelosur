@@ -5,6 +5,7 @@ const ClientesModel     = require('../models/clientes.model')
 const Afip              = require('../services/afip.service')
 const { registrarAuditoria } = require('../utils/auditoria')
 const { fmtFecha } = require('../utils/fecha')
+const { clavesObra } = require('../utils/obras')
 const { generarFacturacionPDF } = require('../utils/pdfFacturacion')
 
 const ENTIDAD = 'operacion'
@@ -54,7 +55,7 @@ const leerFiltros = (q) => {
   return {
     q:     q.q || '',
     clienteId,
-    obra:  clienteId && String(q.obra || '').trim() ? String(q.obra).trim() : '',
+    obra:  clienteId ? clavesObra(q.obra) : [],   // una o varias obras del cliente
     tipo:  FacturacionModel.TIPOS[q.tipo] ? q.tipo : '',
     desde: q.desde || '',
     hasta: q.hasta || '',
@@ -62,17 +63,18 @@ const leerFiltros = (q) => {
   }
 }
 
-// Cliente y obra elegidos en el filtro (mismo filtro que Liquidaciones). La obra se traduce
-// a sus operaciones con obraPorClave. Un cliente que no existe se ignora.
+// Cliente y obras elegidos en el filtro (mismo filtro que Liquidaciones). Las obras se
+// traducen a sus operaciones con obrasElegidas. Un cliente que no existe se ignora.
 async function filtroCliente(filtros) {
-  if (!filtros.clienteId) return { clienteSel: null, obras: [], opIds: null }
+  if (!filtros.clienteId) return { clienteSel: null, obras: [], opIds: null, obra: null }
   const c = await ClientesModel.obtener(filtros.clienteId)
-  if (!c) { filtros.clienteId = ''; filtros.obra = ''; return { clienteSel: null, obras: [], opIds: null } }
-  const obra = filtros.obra ? await ClientesModel.obraPorClave(c.id, filtros.obra) : null
+  if (!c) { filtros.clienteId = ''; filtros.obra = []; return { clienteSel: null, obras: [], opIds: null, obra: null } }
+  const obra = await ClientesModel.obrasElegidas(c.id, filtros.obra)
   return {
     clienteSel: { id: c.id, numero: c.numero, nombreCompleto: ClientesModel.nombreCompleto(c) },
     obras: await ClientesModel.obras(c.id, { incluirAnuladas: true }),
     opIds: obra ? obra.opIds : null,
+    obra,
   }
 }
 
@@ -341,11 +343,11 @@ module.exports = {
       const formato = req.params.formato === 'pdf' ? 'pdf' : 'excel'
       const tab = req.query.tab === 'facturado' ? 'facturado' : 'pendiente'
       const filtros = leerFiltros(req.query)
-      const { clienteSel, opIds } = await filtroCliente(filtros)
+      const { clienteSel, opIds, obra } = await filtroCliente(filtros)
       const lista = FacturacionModel.filtrar(await FacturacionModel.todos(), { estado: tab, ...filtros, opIds })
       const esFact = tab === 'facturado'
       const titulo = (esFact ? 'Operaciones facturadas' : 'Operaciones pendientes de facturar')
-        + (clienteSel ? ` — ${clienteSel.nombreCompleto}${filtros.obra ? ' · ' + filtros.obra : ''}` : '')
+        + (clienteSel ? ` — ${clienteSel.nombreCompleto}${obra ? ' · ' + obra.nombre : ''}` : '')
       const estadoFact = (r) => r.requiereNC ? 'Anulada — requiere NC' : (r.nc_numero ? `Anulada — NC ${r.nc_numero}` : 'Vigente')
 
       const columnas = esFact

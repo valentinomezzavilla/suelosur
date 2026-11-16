@@ -1,6 +1,7 @@
 'use strict'
 // Liquidaciones: lógica pura (sin base). Estado de pago de cada operación, totales,
 // agrupados y filtros. Ver docs/superpowers/specs/2026-10-06-liquidaciones-design.md
+const { clavesObra } = require('./obras')
 
 const TIPOS = {
   cantera:    'Venta en cantera',
@@ -36,7 +37,8 @@ function rangoMes(hoy) {
 function normalizarFiltros(q = {}, hoy) {
   const mes = rangoMes(hoy)
   const clienteId = /^\d+$/.test(String(q.clienteId || '').trim()) ? String(q.clienteId).trim() : null
-  const obra = clienteId && String(q.obra || '').trim() ? String(q.obra).trim() : null
+  // Obras: una o varias (claves); solo valen con cliente, porque las obras son del cliente
+  const obra = clienteId ? clavesObra(q.obra) : []
   const pedidos = (Array.isArray(q.tipos) ? q.tipos : [q.tipos]).filter(t => Object.hasOwn(TIPOS, t))
   return {
     clienteId,

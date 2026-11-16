@@ -1,0 +1,48 @@
+<%#
+  Filtro por obra, con una o varias obras (js/filtroObra.js): un botón con el resumen de lo
+  elegido abre la lista de obras del cliente con casillas. Envía "obra" una vez por cada obra
+  marcada; ninguna marcada = todas las obras. Con muchas obras aparece un buscador.
+  Locals:
+    obras      → [{ clave, nombre }] del cliente (vacío: sin cliente o sin obras)
+    elegidas   → claves marcadas (texto o lista)
+    textoVacio → lo que dice el botón deshabilitado cuando no hay obras para elegir
+                 (por defecto "El cliente no tiene obras cargadas")
+    dinamico   → true: al elegir otro cliente en el buscador (js/buscarCliente.js) carga sus obras
+    clase / claseLabel → clases del contenedor y de la etiqueta
+%>
+<%
+  const _BUSCADOR_DESDE = 7
+  const _eleg = [].concat(typeof elegidas !== 'undefined' && elegidas ? elegidas : []).map(String)
+  const _base = typeof obras !== 'undefined' && obras ? obras : []
+  // Una obra elegida que ya no está en el listado (p. ej. solo con operaciones anuladas) se
+  // muestra igual, marcada: si no, el botón diría "Todas las obras" y la lista vendría filtrada
+  const _obras = [..._base, ..._eleg.filter(c => !_base.some(o => o.clave === c)).map(c => ({ clave: c, nombre: c }))]
+  const _vacio = typeof textoVacio !== 'undefined' && textoVacio ? textoVacio : 'El cliente no tiene obras cargadas'
+  const _marcadas = _obras.filter(o => _eleg.includes(o.clave))
+  const _texto = !_obras.length ? _vacio
+    : !_marcadas.length ? 'Todas las obras'
+    : _marcadas.length === 1 ? _marcadas[0].nombre
+    : `${_marcadas.length} obras: ${_marcadas.map(o => o.nombre).join(', ')}`
+%>
+<div class="<%= typeof clase !== 'undefined' ? clase : '' %>">
+  <label class="<%= typeof claseLabel !== 'undefined' ? claseLabel : 'form-label' %>" for="filtroObra">Obra</label>
+  <div class="filtro-obras" data-filtro-obras<%= typeof dinamico !== 'undefined' && dinamico ? ' data-dinamico' : '' %> data-buscador-desde="<%= _BUSCADOR_DESDE %>">
+    <button type="button" id="filtroObra" class="filtro-obras__boton" aria-expanded="false" aria-controls="filtroObraPanel"
+            <%= _obras.length ? '' : 'disabled' %> <% if (_marcadas.length > 1) { %>title="<%= _marcadas.map(o => o.nombre).join(' · ') %>"<% } %>>
+      <span class="filtro-obras__texto"><%= _texto %></span>
+    </button>
+    <div class="filtro-obras__panel" id="filtroObraPanel" hidden>
+      <input type="search" class="form-control form-control-sm filtro-obras__buscar" placeholder="Buscar obra..." aria-label="Buscar obra" autocomplete="off" <%= _obras.length >= _BUSCADOR_DESDE ? '' : 'hidden' %>>
+      <div class="filtro-obras__lista" role="group" aria-label="Obras del cliente">
+        <% _obras.forEach(o => { %>
+        <label class="filtro-obras__opcion"><input type="checkbox" name="obra" value="<%= o.clave %>" <%= _eleg.includes(o.clave) ? 'checked' : '' %>><span><%= o.nombre %></span></label>
+        <% }) %>
+      </div>
+      <p class="filtro-obras__vacio" hidden>Ninguna obra coincide con la búsqueda.</p>
+      <div class="filtro-obras__pie">
+        <span class="filtro-obras__cuenta" aria-live="polite"><%= _marcadas.length ? `${_marcadas.length} de ${_obras.length} marcada${_marcadas.length === 1 ? '' : 's'}` : 'Ninguna marcada: se ven todas' %></span>
+        <button type="button" class="filtro-obras__limpiar" <%= _marcadas.length ? '' : 'disabled' %>>Desmarcar todas</button>
+      </div>
+    </div>
+  </div>
+</div>

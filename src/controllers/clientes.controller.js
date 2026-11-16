@@ -15,6 +15,14 @@ const { normalizarFiltrosCuentas, filtrarCuentas, coincideCliente, TIPOS_CLIENTE
 const fechaISO = (v) => /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')) && !Number.isNaN(new Date(v + 'T00:00:00').getTime())
   && new Date(v + 'T00:00:00Z').toISOString().slice(0, 10) === v ? v : null
 
+// "Cheque N° 1234" / "Echeq N° 1234" para la descripción de un pago con cheque, o '' si el
+// método no es cheque o no se cargó el número.
+function textoCheque(metodo, nro) {
+  const n = String(nro == null ? '' : nro).replace(/\s+/g, ' ').trim().slice(0, 40)
+  if (!n || !['cheque', 'echeq'].includes(metodo)) return ''
+  return `${metodo === 'echeq' ? 'Echeq' : 'Cheque'} N° ${n}`
+}
+
 // Movimiento de cuenta corriente. Si es un pago por transferencia a un tercero (ej. una
 // estación de servicio), el pago del cliente y el egreso al tercero son UN solo movimiento:
 // se guardan juntos en la misma transacción (o ninguno), y el pago dice a quién se le transfirió.
@@ -113,7 +121,7 @@ const ClientesController = {
       // Mismos filtros que Liquidaciones (el cliente es este): los movimientos de la
       // pantalla usan fechas y obra; el PDF es la liquidación del cliente con todos.
       const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
-      const obra = await ClientesModel.obraPorClave(cli.id, filtros.obra)
+      const obra = await ClientesModel.obrasElegidas(cli.id, filtros.obra)
       const estado = await ClientesModel.estadoCuenta(cli.id, { desde: filtros.desde, hasta: filtros.hasta, obra })
       // Tarjetas de operaciones: con TODOS los filtros (obra, estado de pago, tipos y fechas), como el PDF
       const resumenOps = (await require('../models/liquidaciones.model').liquidacion(filtros)).resumen
@@ -139,8 +147,8 @@ const ClientesController = {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
         cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
-        filtros: { ...filtros, obra: obra ? obra.clave : null },
-        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js'],
+        filtros: { ...filtros, obra: obra ? obra.claves : [] },
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/filtroObra.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')
@@ -331,11 +339,14 @@ const ClientesController = {
       // Si viene de "Saldar" en una operación puntual, la descripción hace referencia a ella;
       // si no, queda el genérico de siempre.
       const concepto = (req.body.descripcion || '').trim()
-      const descripcion = concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda'
+      const metodo = req.body.metodo_pago || null
+      // Cheque / Echeq: el N° de cheque queda en la descripción (como los pagos del módulo Cheques)
+      const cheque = textoCheque(metodo, req.body.nro_cheque)
+      const descripcion = (concepto ? `Pago — ${concepto}` : 'Pago / abono de deuda') + (cheque ? ` — ${cheque}` : '')
       const fechaLeida = leerFechaPago(req.body.fecha)
       if (fechaLeida.error) { req.flash('error', fechaLeida.error); return res.redirect('back') }
-      const tercero = await Tercero.leer(req.body, req.body.metodo_pago)
-      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: req.body.metodo_pago || null, fechaDia: fechaLeida.fecha, imputaciones }, tercero)
+      const tercero = await Tercero.leer(req.body, metodo)
+      await registrarMovimientoCC(req, { descripcion, monto, metodo_pago: metodo, fechaDia: fechaLeida.fecha, imputaciones }, tercero)
       req.flash('success', `Pago de $${monto.toLocaleString('es-AR')} registrado.`)
     } catch (err) {
       console.error(err); req.flash('error', err.message || 'Error.')
@@ -422,6 +433,7 @@ const ClientesController = {
         cliente,
         obras: await ClientesModel.obras(cliente.id),
         filtros: { fechaDesde: '', fechaHasta: '', tipo: 'todos', incluir: ['transacciones','movimientos'] },
+        scripts: ['/js/filtroObra.js'],
       })
     } catch (err) { console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes') }
   },

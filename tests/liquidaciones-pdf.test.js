@@ -44,6 +44,27 @@ describe('generarLiquidacionPDF', () => {
     assert.ok((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length >= 2)
   })
 
+  it('con varias obras de nombre largo: la línea "Obras:" se recorta y el PDF sale igual', async () => {
+    const obras = ['Quebradas de Manantiales M78 L6', 'Prados de Manantiales M26 L19', 'Abras de Manantiales M18 L9', 'Colón 100']
+    const liquidacion = { clientes: [{ cliente, operaciones: [op(1)], resumen: { consumido: 1200, pagado: 1200, saldo: 0, cantidad: 1 }, pagos: null, porObra: [] }],
+      resumen: { consumido: 1200, pagado: 1200, saldo: 0, cantidad: 1 }, obra: obras.join(', '), obraEtiqueta: 'Obras' }
+    const res = resFalso()
+    generarLiquidacionPDF(res, { liquidacion, filtros: { ...filtros, obra: ['a', 'b', 'c', 'd'] }, general: false })
+    assert.equal((await res.terminado).subarray(0, 5).toString(), '%PDF-')
+  })
+
+  it('recortar: deja el texto en el ancho pedido con "…"', () => {
+    const PDFDocument = require('pdfkit')
+    const { recortar } = require('../src/utils/pdfBrand')
+    const doc = new PDFDocument()
+    doc.font('Helvetica').fontSize(8)
+    const largo = 'Obras: ' + 'Quebradas de Manantiales M78 L6, '.repeat(10)
+    const r = recortar(doc, largo, 200)
+    assert.ok(r.endsWith('…'))
+    assert.ok(doc.widthOfString(r) <= 200)
+    assert.equal(recortar(doc, 'Obra: Colón 100', 200), 'Obra: Colón 100')
+  })
+
   it('sin operaciones: igual genera el PDF', async () => {
     const liquidacion = { clientes: [{ cliente, operaciones: [], resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 }, pagos: [], porObra: [] }],
       resumen: { consumido: 0, pagado: 0, saldo: 0, cantidad: 0 }, obra: null }

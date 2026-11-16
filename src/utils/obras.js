@@ -38,6 +38,29 @@ function agruparObras(ops = []) {
   return [...grupos.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
 }
 
+// Obras elegidas en un filtro (parámetro "obra" de la URL, se puede repetir para elegir
+// varias) → lista de claves sin vacíos ni repetidos. Acepta un texto, una lista o el objeto
+// que arma el parser de la URL con muchos valores ({ 0: 'a', 1: 'b', ... }).
+function clavesObra(valor) {
+  const lista = Array.isArray(valor) ? valor
+    : (valor && typeof valor === 'object' ? Object.values(valor) : [valor])
+  return [...new Set(lista.filter(v => typeof v === 'string' || typeof v === 'number').map(limpiar).filter(Boolean))]
+}
+
+// Varias obras elegidas como una sola: [{ clave, nombre, opIds }] → { claves, nombres,
+// nombre ('A, B'), etiqueta ('Obra' / 'Obras'), opIds (las de todas, sin repetir) }.
+function unirObras(obras = []) {
+  if (!obras.length) return null
+  const nombres = obras.map(o => o.nombre)
+  return {
+    claves: obras.map(o => o.clave),
+    nombres,
+    nombre: nombres.join(', '),
+    etiqueta: nombres.length > 1 ? 'Obras' : 'Obra',
+    opIds: [...new Set(obras.flatMap(o => o.opIds.map(String)))],
+  }
+}
+
 // Movimientos de cuenta corriente que entran en el estado de cuenta de una obra: los
 // cargos de sus operaciones y todos los pagos del cliente (los pagos no están atados a
 // una obra). También los créditos sueltos (ajustes a favor sin operación).
@@ -47,4 +70,4 @@ function movimientoDeObra(m, opIds) {
   return m.id_op_encabezado == null && Number(m.monto) > 0
 }
 
-module.exports = { nombreObra, claveObra, agruparObras, movimientoDeObra }
+module.exports = { nombreObra, claveObra, agruparObras, clavesObra, unirObras, movimientoDeObra }

@@ -346,7 +346,7 @@ module.exports = {
   },
 
   // clienteId: solo ese cliente; opIds: solo esas operaciones (las de una obra, ver
-  // ClientesModel.obraPorClave)
+  // ClientesModel.obrasElegidas)
   filtrar(rows, { estado, q, tipo, desde, hasta, nc, clienteId, opIds }) {
     const facturado = estado === 'facturado'
     const texto = String(q || '').trim().toLowerCase()

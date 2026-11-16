@@ -1,7 +1,7 @@
 'use strict'
 const crypto = require('crypto')
 const { query, transaction } = require('../config/db')
-const { agruparObras, movimientoDeObra } = require('../utils/obras')
+const { agruparObras, clavesObra, unirObras, movimientoDeObra } = require('../utils/obras')
 const { hoyISO } = require('../utils/fecha')
 const { fechaDeOperacion } = require('../utils/fechaOperacion')
 const { imputar, porOperacion } = require('../utils/imputacion')
@@ -480,17 +480,19 @@ const ClientesModel = {
     return agruparObras(rows)
   },
 
-  // Obra elegida en un filtro (por su clave) → { clave, nombre, opIds }, o null si no hay
-  // filtro. Una clave que ya no existe devuelve una obra sin operaciones.
-  async obraPorClave(clienteId, clave) {
-    if (!clave) return null
-    const obra = (await this.obras(clienteId, { incluirAnuladas: true })).find(o => o.clave === clave)
-    return obra || { clave, nombre: clave, opIds: [] }
+  // Obras elegidas en un filtro (una o varias claves; ver utils/obras.clavesObra) →
+  // { claves, nombres, nombre, etiqueta, opIds } con las operaciones de todas, o null si no
+  // se eligió ninguna. Una clave que ya no existe cuenta como una obra sin operaciones.
+  async obrasElegidas(clienteId, claves) {
+    const lista = clavesObra(claves)
+    if (!lista.length) return null
+    const todas = await this.obras(clienteId, { incluirAnuladas: true })
+    return unirObras(lista.map(clave => todas.find(o => o.clave === clave) || { clave, nombre: clave, opIds: [] }))
   },
 
   // Estado de cuenta de un período: movimientos + saldo inicial/final + totales.
   // Convención de signo: monto < 0 = débito (deuda), monto > 0 = crédito (pago/ajuste a favor).
-  // obra (de obraPorClave): solo los cargos de esa obra y todos los pagos del cliente.
+  // obra (de obrasElegidas): solo los cargos de esas obras y todos los pagos del cliente.
   async estadoCuenta(clienteId, { desde, hasta, obra } = {}) {
     const opIds = obra ? new Set(obra.opIds.map(String)) : null
     const wheres = ['cliente_id = ?']

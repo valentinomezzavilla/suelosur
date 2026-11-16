@@ -13,7 +13,7 @@ const LiquidacionesController = {
       if (liquidacion.clienteInexistente) {
         req.flash('error', 'Cliente no encontrado.')
         filtros.clienteId = null
-        filtros.obra = null
+        filtros.obra = []
         liquidacion = await LiquidacionesModel.liquidacion(filtros)
       }
       const clienteSel = filtros.clienteId ? liquidacion.clientes[0].cliente : null

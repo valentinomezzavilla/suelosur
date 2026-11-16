@@ -39,6 +39,11 @@
               <option value="cheque">Cheque</option><option value="echeq">Echeq</option>
             </select>
           </div>
+          <%# Solo con Cheque / Echeq (js/modalAbonar.js): el número queda en la descripción del pago %>
+          <div class="form-group" id="grupoNroChequeAbonar" hidden>
+            <label for="inputNroChequeAbonar">N° de cheque</label>
+            <input type="text" name="nro_cheque" id="inputNroChequeAbonar" maxlength="40" autocomplete="off" inputmode="numeric" placeholder="Ej: 00012345" disabled>
+          </div>
           <%- include('fecha_pago', { nombre: 'fecha', idCampo: 'inputFechaAbonar', metodoSel: '' }) %>
         </div>
 
