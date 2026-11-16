@@ -76,9 +76,11 @@ function drawHeader(doc, { titulo = '', derecha = [], conRubro = true } = {}) {
       doc.fillColor(GRIS).fontSize(8.5).font('Helvetica').text(d, left, yd, { width, align: 'right' })
       yd += 12
     } else {
-      const txt = `${d.label ? d.label + ': ' : ''}${d.valor ?? ''}`
       doc.fillColor(d.color || GRIS).fontSize(d.size || 9).font(d.bold ? 'Helvetica-Bold' : 'Helvetica')
-         .text(txt, left, yd, { width, align: 'right' })
+      // maxAncho (fracción del ancho): un texto largo (p. ej. varias obras) se recorta en una línea
+      let txt = `${d.label ? d.label + ': ' : ''}${d.valor ?? ''}`
+      if (d.maxAncho) txt = recortar(doc, txt, width * d.maxAncho)
+      doc.text(txt, left, yd, { width, align: 'right' })
       yd += (d.size || 9) + 4
     }
   })
@@ -121,8 +123,16 @@ function drawDesarrolladoPor(doc) {
   }
 }
 
+// Recorta el texto (con "…") para que entre en el ancho dado, con la fuente actual del doc
+function recortar(doc, texto, ancho) {
+  if (doc.widthOfString(texto) <= ancho) return texto
+  let t = texto
+  while (t.length > 1 && doc.widthOfString(t + '…') > ancho) t = t.slice(0, -1)
+  return t + '…'
+}
+
 module.exports = {
   AZUL, NARANJA, GRIS, TINTA, ROJO, VERDE, LINEA, FONDO,
   LOGO_PATH, HAY_LOGO, EMPRESA, money,
-  drawHeader, drawFooter, drawDesarrolladoPor,
+  drawHeader, drawFooter, drawDesarrolladoPor, recortar,
 }

@@ -1,7 +1,7 @@
 'use strict'
 const { describe, it } = require('node:test')
 const assert = require('node:assert/strict')
-const { nombreObra, claveObra, agruparObras, movimientoDeObra } = require('../src/utils/obras')
+const { nombreObra, claveObra, agruparObras, clavesObra, unirObras, movimientoDeObra } = require('../src/utils/obras')
 
 describe('nombreObra', () => {
   it('si tiene obra, manda la obra aunque también tenga dirección', () => {
@@ -38,6 +38,29 @@ describe('agruparObras', () => {
       ['Quebradas de Manantiales M78 L6', ['3', '2']],
     ])
     assert.equal(claveObra('Colón 1200'), 'colon 1200')
+  })
+})
+
+describe('clavesObra (obras elegidas en la URL)', () => {
+  it('una, varias o ninguna', () => {
+    assert.deepEqual(clavesObra('colon 1200'), ['colon 1200'])
+    assert.deepEqual(clavesObra(['colon 1200', 'velez 10']), ['colon 1200', 'velez 10'])
+    assert.deepEqual(clavesObra(undefined), [])
+    assert.deepEqual(clavesObra(''), [])
+  })
+  it('sin vacíos ni repetidas, y con el objeto que arma el parser con muchos valores', () => {
+    assert.deepEqual(clavesObra([' colon 1200 ', '', 'colon 1200', 'velez  10']), ['colon 1200', 'velez 10'])
+    assert.deepEqual(clavesObra({ 0: 'a', 1: 'b' }), ['a', 'b'])
+    assert.deepEqual(clavesObra([{ x: 1 }, 'a']), ['a'])
+  })
+})
+
+describe('unirObras', () => {
+  it('varias obras como una: nombres, etiqueta y operaciones de todas sin repetir', () => {
+    const u = unirObras([{ clave: 'a', nombre: 'Obra A', opIds: ['1', '2'] }, { clave: 'b', nombre: 'Obra B', opIds: [2, '3'] }])
+    assert.deepEqual(u, { claves: ['a', 'b'], nombres: ['Obra A', 'Obra B'], nombre: 'Obra A, Obra B', etiqueta: 'Obras', opIds: ['1', '2', '3'] })
+    assert.equal(unirObras([{ clave: 'a', nombre: 'Obra A', opIds: [] }]).etiqueta, 'Obra')
+    assert.equal(unirObras([]), null)
   })
 })
 

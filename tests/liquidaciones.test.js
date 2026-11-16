@@ -10,24 +10,29 @@ describe('rangoMes / normalizarFiltros', () => {
   })
   it('sin parámetros: todo por defecto', () => {
     assert.deepEqual(L.normalizarFiltros({}, '2026-10-06'), {
-      clienteId: null, obra: null, desde: '2026-10-01', hasta: '2026-10-31',
+      clienteId: null, obra: [], desde: '2026-10-01', hasta: '2026-10-31',
       tipos: ['cantera', 'viaje', 'contenedor', 'maquinaria'], estadoPago: 'todas',
     })
   })
   it('respeta valores válidos (tipos como string o array)', () => {
     const f = L.normalizarFiltros({ clienteId: '42', obra: 'colon 100', desde: '2026-01-01', hasta: '2026-03-31', tipos: 'viaje', estadoPago: 'pendientes' }, '2026-10-06')
-    assert.deepEqual(f, { clienteId: '42', obra: 'colon 100', desde: '2026-01-01', hasta: '2026-03-31', tipos: ['viaje'], estadoPago: 'pendientes' })
+    assert.deepEqual(f, { clienteId: '42', obra: ['colon 100'], desde: '2026-01-01', hasta: '2026-03-31', tipos: ['viaje'], estadoPago: 'pendientes' })
     assert.deepEqual(L.normalizarFiltros({ tipos: ['cantera', 'maquinaria'] }, '2026-10-06').tipos, ['cantera', 'maquinaria'])
   })
   it('ignora valores manipulados y usa los defaults', () => {
     const f = L.normalizarFiltros({ clienteId: 'abc', desde: 'hola', hasta: '2026-13-45', tipos: ['xxx'], estadoPago: 'raro' }, '2026-10-06')
     assert.deepEqual(f, {
-      clienteId: null, obra: null, desde: '2026-10-01', hasta: '2026-10-31',
+      clienteId: null, obra: [], desde: '2026-10-01', hasta: '2026-10-31',
       tipos: ['cantera', 'viaje', 'contenedor', 'maquinaria'], estadoPago: 'todas',
     })
   })
   it('la obra solo vale con cliente', () => {
-    assert.equal(L.normalizarFiltros({ obra: 'colon 100' }, '2026-10-06').obra, null)
+    assert.deepEqual(L.normalizarFiltros({ obra: 'colon 100' }, '2026-10-06').obra, [])
+    assert.deepEqual(L.normalizarFiltros({ obra: ['colon 100', 'velez 10'] }, '2026-10-06').obra, [])
+  })
+  it('varias obras: todas las elegidas, sin vacíos ni repetidas', () => {
+    const f = L.normalizarFiltros({ clienteId: '42', obra: ['colon 100', '', 'velez 10', 'colon 100'] }, '2026-10-06')
+    assert.deepEqual(f.obra, ['colon 100', 'velez 10'])
   })
 })
 

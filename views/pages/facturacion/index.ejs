@@ -11,9 +11,15 @@
   const maxTipo = Math.max(0, ...r.porTipo.map(t => t.total))
   const esFact = tab === 'facturado'
   const suma = (k) => lista.reduce((a, o) => a + (Number(o[k]) || 0), 0)
-  const qsExport = new URLSearchParams(Object.entries({ tab, ...filtros }).filter(([, v]) => v)).toString()
-  // Las pestañas conservan el cliente y la obra elegidos
-  const qsCliente = new URLSearchParams(Object.entries({ clienteId: filtros.clienteId, obra: filtros.obra }).filter(([, v]) => v)).toString()
+  // Parámetros de la URL; las listas (varias obras) van una vez por valor
+  const qsDe = (obj) => {
+    const p = new URLSearchParams()
+    Object.entries(obj).forEach(([k, v]) => [].concat(v || []).filter(Boolean).forEach(x => p.append(k, x)))
+    return p.toString()
+  }
+  const qsExport = qsDe({ tab, ...filtros })
+  // Las pestañas conservan el cliente y las obras elegidas
+  const qsCliente = qsDe({ clienteId: filtros.clienteId, obra: filtros.obra })
   const urlTab = (t) => `/facturacion?tab=${t}${qsCliente ? '&' + qsCliente : ''}`
 %>
 
@@ -163,7 +169,7 @@
   <input type="hidden" name="tab" value="<%= tab %>">
   <%- include('../../partials/filtro_cliente_obra', { clienteSel, obras, obraSel: filtros.obra,
         claseCliente: 'filtro-group fact-filtro-cliente', claseObra: 'filtro-group fact-filtro-obra',
-        claseInput: '', claseSelect: '', claseLabel: '' }) %>
+        claseInput: '', claseLabel: '' }) %>
   <div class="filtro-group fact-filtro-q">
     <label for="fq">Buscar</label>
     <input id="fq" type="text" name="q" value="<%= filtros.q %>" placeholder="N° de OP, CUIT, N° de factura<%= esFact ? ' o CAE' : '' %>">

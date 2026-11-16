@@ -12,14 +12,8 @@ const GRIS = B.GRIS
 const TINTA = B.TINTA
 
 const money = B.money
-
 // Recorta el texto al ancho de la celda: sin esto un texto largo se pisa con la columna siguiente
-function recortar(doc, texto, ancho) {
-  if (doc.widthOfString(texto) <= ancho) return texto
-  let t = texto
-  while (t.length > 1 && doc.widthOfString(t + '…') > ancho) t = t.slice(0, -1)
-  return t + '…'
-}
+const recortar = B.recortar
 
 // registros: cantidad a mostrar en el pie cuando hay filas que no son registros (totales, subtotales)
 function generarTablaPDF(res, { titulo = 'Reporte', subtitulo = '', columnas = [], filas = [], nombreArchivo, registros } = {}) {

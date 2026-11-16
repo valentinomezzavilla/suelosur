@@ -5,7 +5,7 @@
     const p = new URLSearchParams()
     const f = { ...filtros, ...extra }
     if (f.clienteId) p.set('clienteId', f.clienteId)
-    if (f.obra) p.set('obra', f.obra)
+    for (const o of [].concat(f.obra || [])) p.append('obra', o)
     p.set('desde', f.desde); p.set('hasta', f.hasta)
     f.tipos.forEach(t => p.append('tipos', t))
     p.set('estadoPago', f.estadoPago)

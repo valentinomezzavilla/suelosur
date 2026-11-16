@@ -300,7 +300,8 @@ const LiquidacionesModel = {
       const existe = (await query(`SELECT 1 FROM clientes WHERE id = ?`, [clienteId])).rowCount
       if (!existe) return { clientes: [], resumen: L.resumir([]), clienteInexistente: true }
     }
-    const obraElegida = clienteId && obra ? await ClientesModel.obraPorClave(clienteId, obra) : null
+    // Una o varias obras: las operaciones de todas (null = todas las obras)
+    const obraElegida = clienteId ? await ClientesModel.obrasElegidas(clienteId, obra) : null
 
     let { ops } = await calcularOperaciones({ clienteId, desde, hasta, tipos, opIds: obraElegida ? obraElegida.opIds : null })
     ops = L.filtrarPorEstado(ops, estadoPago)
@@ -319,13 +320,15 @@ const LiquidacionesModel = {
         operaciones: g.operaciones,
         pagos: clienteId && !obraElegida ? await pagosDelCliente(clienteId, { desde, hasta }) : null,
         resumen: L.resumir(g.operaciones),
-        porObra: !obraElegida && porObra.length > 1 ? porObra.map(o => ({ nombre: o.nombre, resumen: o.resumen })) : [],
+        // Resumen por obra: con todas las obras o con varias elegidas
+        porObra: porObra.length > 1 ? porObra.map(o => ({ nombre: o.nombre, resumen: o.resumen })) : [],
       })
     }
     // Con un cliente: su saldo (el mismo que muestra la Cuenta corriente), con el detalle de
     // cuánto es de este período, de otros, sin cobrar y en curso
     const saldo = clienteId ? await LiquidacionesModel.saldoCliente(clienteId, { desde, hasta }) : null
-    return { clientes, resumen: L.resumir(ops), obra: obraElegida ? obraElegida.nombre : null, saldo }
+    return { clientes, resumen: L.resumir(ops), obra: obraElegida ? obraElegida.nombre : null,
+      obraEtiqueta: obraElegida ? obraElegida.etiqueta : null, saldo }
   },
 
   // Saldo del cliente (utils/liquidaciones.saldoDelCliente): la cuenta corriente (igual a

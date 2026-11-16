@@ -15,7 +15,7 @@
   // Mismos parámetros que /liquidaciones (el PDF es la liquidación del cliente)
   const qsPdf = (() => {
     const p = new URLSearchParams()
-    if (filtros.obra) p.set('obra', filtros.obra)
+    for (const o of [].concat(filtros.obra || [])) p.append('obra', o)
     p.set('desde', filtros.desde); p.set('hasta', filtros.hasta)
     filtros.tipos.forEach(t => p.append('tipos', t))
     p.set('estadoPago', filtros.estadoPago)
@@ -70,17 +70,7 @@
   <div class="card-body">
     <form method="GET" action="/clientes/cuentas/<%= cliente.id %>">
       <div class="row g-2 align-items-end mb-2">
-        <div class="col-12 col-md-5">
-          <label class="form-label" for="filtroObra">Obra</label>
-          <select name="obra" id="filtroObra" class="form-select" <%= obras.length ? '' : 'disabled' %>>
-            <% if (!obras.length) { %>
-              <option value="">El cliente no tiene obras cargadas</option>
-            <% } else { %>
-              <option value="">Todas las obras</option>
-              <% obras.forEach(o => { %><option value="<%= o.clave %>" <%= filtros.obra === o.clave ? 'selected' : '' %>><%= o.nombre %></option><% }) %>
-            <% } %>
-          </select>
-        </div>
+        <%- include('../../partials/filtro_obras', { obras, elegidas: filtros.obra, clase: 'col-12 col-md-5' }) %>
         <div class="col-6 col-md-3">
           <label class="form-label">Estado de pago</label>
           <select name="estadoPago" class="form-select">
@@ -112,7 +102,7 @@
           <a href="/clientes/cuentas/<%= cliente.id %>" class="btn btn-outline-secondary">Limpiar</a>
         </div>
       </div>
-      <p class="form-text mb-0 mt-2">Los movimientos de abajo se filtran por fechas y obra<% if (obra) { %> (con obra <strong><%= obra.nombre %></strong> se ven sus cargos y todos los pagos del cliente, que no están atados a una obra)<% } %>. Las tarjetas de operaciones y el PDF usan todos los filtros.</p>
+      <p class="form-text mb-0 mt-2">Los movimientos de abajo se filtran por fechas y obra<% if (obra) { %> (con <%= obra.nombres.length > 1 ? 'las obras' : 'la obra' %> <strong><%= obra.nombre %></strong> se ven sus cargos y todos los pagos del cliente, que no están atados a una obra)<% } %>. Las tarjetas de operaciones y el PDF usan todos los filtros.</p>
     </form>
   </div>
 </div>

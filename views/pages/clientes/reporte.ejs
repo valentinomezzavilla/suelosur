@@ -35,16 +35,8 @@
 
     <div class="form-section">
       <h3 class="form-section__title">Obra</h3>
-      <p class="form-hint">La obra es la que se cargó en la operación; si no tiene, la dirección (calle y número) de la entrega.</p>
-      <div class="form-group">
-        <label for="obra">Obra</label>
-        <select name="obra" id="obra" <%= obras.length ? '' : 'disabled' %>>
-          <option value=""><%= obras.length ? 'Todas las obras' : 'El cliente no tiene obras cargadas' %></option>
-          <% obras.forEach(o => { %>
-          <option value="<%= o.clave %>"><%= o.nombre %></option>
-          <% }) %>
-        </select>
-      </div>
+      <p class="form-hint">La obra es la que se cargó en la operación; si no tiene, la dirección (calle y número) de la entrega. Podés marcar varias; sin marcar ninguna se incluyen todas.</p>
+      <%- include('../../partials/filtro_obras', { obras, clase: 'form-group', claseLabel: '' }) %>
     </div>
 
     <div class="config-actions">

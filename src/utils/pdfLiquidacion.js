@@ -63,7 +63,11 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
       `Período: ${periodo}`,
       `Fecha de emisión: ${fmtFecha(hoy)}`,
     ]
-    if (liquidacion.obra) lineas.push(`Obra: ${liquidacion.obra}`)
+    // Una o varias obras, en una línea (recortada si no entra)
+    if (liquidacion.obra) {
+      doc.font('Helvetica').fontSize(8)
+      lineas.push(B.recortar(doc, `${liquidacion.obraEtiqueta || 'Obra'}: ${liquidacion.obra}`, width * 0.7))
+    }
     let yd = top + 22
     lineas.forEach((t, i) => {
       doc.fillColor(i === 0 ? NEGRO : GRIS).font(i === 0 ? 'Helvetica-Bold' : 'Helvetica').fontSize(8)

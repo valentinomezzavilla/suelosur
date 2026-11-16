@@ -7,7 +7,7 @@
   <div class="card-body">
     <p class="text-muted mb-3">Reporte detallado, un renglón por venta: fecha, remito, cantidad, material, cliente, obra, precio unitario e importe. Elegí el período y descargalo en PDF o Excel.</p>
     <form method="GET">
-      <%# Cliente (opcional): al elegirlo se habilita el filtro por obra (js/filtroObra.js) %>
+      <%# Cliente (opcional): al elegirlo se habilita el filtro por obras (js/filtroObra.js) %>
       <div class="row g-2 align-items-end mb-2">
         <div class="col-12 col-md-6 position-relative">
           <label class="form-label" for="buscarClienteInput">Cliente (opcional)</label>
@@ -20,12 +20,8 @@
           <input type="hidden" name="clienteId" id="inputClienteId">
           <input type="hidden" id="inputClienteNombre">
         </div>
-        <div class="col-12 col-md-6">
-          <label class="form-label" for="filtroObra">Obra</label>
-          <select name="obra" id="filtroObra" class="form-select" disabled>
-            <option value="">Elegí un cliente para ver sus obras</option>
-          </select>
-        </div>
+        <%- include('../../partials/filtro_obras', { obras: [], dinamico: true,
+              textoVacio: 'Elegí un cliente para ver sus obras', clase: 'col-12 col-md-6' }) %>
       </div>
       <div class="row g-2 align-items-end">
         <div class="col-6 col-md-3">

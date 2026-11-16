@@ -17,7 +17,7 @@ const { SQL_FECHA_OPERACION: FECHA } = require('../utils/fechaOperacion')
 
 const ReportesModel = {
 
-  // opIds: solo esas operaciones (filtro por obra, ver ClientesModel.obraPorClave)
+  // opIds: solo esas operaciones (filtro por obras, ver ClientesModel.obrasElegidas)
   async libroVentas({ desde, hasta, clienteId, opIds } = {}) {
     const cond = [`op.estado <> 'anulado'`]
     const params = []

@@ -121,7 +121,7 @@ const ClientesController = {
       // Mismos filtros que Liquidaciones (el cliente es este): los movimientos de la
       // pantalla usan fechas y obra; el PDF es la liquidación del cliente con todos.
       const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
-      const obra = await ClientesModel.obraPorClave(cli.id, filtros.obra)
+      const obra = await ClientesModel.obrasElegidas(cli.id, filtros.obra)
       const estado = await ClientesModel.estadoCuenta(cli.id, { desde: filtros.desde, hasta: filtros.hasta, obra })
       // Tarjetas de operaciones: con TODOS los filtros (obra, estado de pago, tipos y fechas), como el PDF
       const resumenOps = (await require('../models/liquidaciones.model').liquidacion(filtros)).resumen
@@ -147,8 +147,8 @@ const ClientesController = {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
         cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
-        filtros: { ...filtros, obra: obra ? obra.clave : null },
-        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js'],
+        filtros: { ...filtros, obra: obra ? obra.claves : [] },
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/filtroObra.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')
@@ -433,6 +433,7 @@ const ClientesController = {
         cliente,
         obras: await ClientesModel.obras(cliente.id),
         filtros: { fechaDesde: '', fechaHasta: '', tipo: 'todos', incluir: ['transacciones','movimientos'] },
+        scripts: ['/js/filtroObra.js'],
       })
     } catch (err) { console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes') }
   },
