@@ -22,6 +22,19 @@
     const resumen = $('pagoResumen');
     const sinDeuda = $('pagoSinDeuda');
     const btnConfirmar = $('confirmarPago');
+    const selMetodo = $('inputMetodoAbonar');
+    const grupoCheque = $('grupoNroChequeAbonar');
+    const inputCheque = $('inputNroChequeAbonar');
+
+    // N° de cheque: solo con Cheque / Echeq (oculto y deshabilitado no viaja en el form)
+    const METODOS_CON_NRO = ['cheque', 'echeq'];
+    function mostrarNroCheque() {
+        if (!selMetodo || !grupoCheque || !inputCheque) return;
+        const ver = METODOS_CON_NRO.includes(selMetodo.value);
+        grupoCheque.hidden = !ver;
+        inputCheque.disabled = !ver;
+    }
+    selMetodo?.addEventListener('change', mostrarNroCheque);
 
     const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
     const pesos = (n) => '$' + r2(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -217,6 +230,9 @@
         form.action = `/clientes/${btn.dataset.id}/abonar`;
         // Transferencia a tercero: no arrastrar lo elegido en un pago anterior
         $('inputMetodoAbonar')?.dispatchEvent(new Event('tercero:reset'));
+        // N° de cheque: no arrastrar el del pago anterior
+        if (inputCheque) inputCheque.value = '';
+        mostrarNroCheque();
         // Fecha de pago: cada pago arranca en hoy (el máximo permitido)
         const inputFecha = $('inputFechaAbonar');
         if (inputFecha && inputFecha.max) inputFecha.value = inputFecha.max;
