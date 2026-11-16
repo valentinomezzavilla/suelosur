@@ -1,0 +1,31 @@
+<%#
+  Modal "¿Agregar observación?" antes de generar el PDF de una liquidación o de una cuenta
+  corriente (public/js/observacionPdf.js). Lo abre cualquier link a[data-pdf-observacion]:
+  "No" abre el PDF tal cual; "Sí" muestra una caja de texto y la observación se imprime en el
+  PDF (parámetro obs). Cada pantalla lo incluye una vez.
+%>
+<div id="modal-observacion-pdf" class="modal-overlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="obsPdfTitulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="obsPdfTitulo">¿Agregar observación?</h2>
+      <button type="button" class="modal-close" id="obsPdfCerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="form-hint mb-3">La observación se imprime en el PDF.</p>
+      <div class="modal-actions" id="obsPdfOpciones">
+        <button type="button" class="btn btn-outline-secondary" id="obsPdfNo">No</button>
+        <button type="button" class="btn btn-naranja" id="obsPdfSi">Sí</button>
+      </div>
+      <form id="obsPdfForm" style="display:none">
+        <div class="form-group">
+          <label for="obsPdfTexto">Observación</label>
+          <textarea id="obsPdfTexto" class="form-control" rows="4" maxlength="1000" placeholder="Escribí la observación que va a salir en el PDF"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline-secondary" id="obsPdfCancelar">Cancelar</button>
+          <button type="submit" class="btn btn-naranja" id="obsPdfGenerar">Generar PDF</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

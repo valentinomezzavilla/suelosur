@@ -21,7 +21,7 @@ const LiquidacionesController = {
       res.render('pages/liquidaciones/index', {
         titulo: 'Liquidaciones', filtros, liquidacion, clienteSel, obras, TIPOS, ESTADOS,
         nro: nroLiquidacion(hoyISO(), filtros.clienteId),
-        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js'],
       })
     } catch (err) {
       console.error(err)
@@ -38,7 +38,7 @@ const LiquidacionesController = {
         req.flash('error', 'Cliente no encontrado.')
         return res.redirect('/liquidaciones')
       }
-      return generarLiquidacionPDF(res, { liquidacion, filtros, general: !filtros.clienteId })
+      return generarLiquidacionPDF(res, { liquidacion, filtros, general: !filtros.clienteId, observacion: req.query.obs })
     } catch (err) {
       console.error(err)
       req.flash('error', 'Error al generar la liquidación.')

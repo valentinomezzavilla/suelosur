@@ -27,7 +27,19 @@ function nombreArchivoLiquidacion(liquidacion, filtros) {
   return `liquidacion-${quien}-${filtros.desde}-${filtros.hasta}`
 }
 
-function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
+// Observación opcional que se carga al generar el PDF (parámetro obs): texto plano, hasta
+// 1000 caracteres y 30 renglones (así siempre entra en una página)
+const OBS_MAX = 1000
+const OBS_RENGLONES = 30
+function leerObservacion(v) {
+  const t = String(Array.isArray(v) ? v[0] : (v ?? '')).replace(/\r\n?/g, '\n').trim().slice(0, OBS_MAX)
+  const renglones = t.split('\n')
+  return (renglones.length > OBS_RENGLONES
+    ? [...renglones.slice(0, OBS_RENGLONES - 1), renglones.slice(OBS_RENGLONES - 1).join(' ')]
+    : renglones).join('\n').trim()
+}
+
+function generarLiquidacionPDF(res, { liquidacion, filtros, general, observacion = '' }) {
   const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true })
   res.setHeader('Content-Type', 'application/pdf')
   res.setHeader('Content-Disposition', `inline; filename="${nombreArchivoLiquidacion(liquidacion, filtros)}.pdf"`)
@@ -273,6 +285,19 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     ], tituloPagina)
   }
 
+  // Observación cargada al generar el PDF: recuadro con el texto, entero en una página
+  function bloqueObservacion(tituloPagina) {
+    const texto = leerObservacion(observacion)
+    if (!texto) return
+    const anchoTexto = width - 20
+    const alto = doc.fillColor(NEGRO).fontSize(9).font('Helvetica').heightOfString(texto, { width: anchoTexto }) + 16
+    asegurar(alto + 22, tituloPagina)
+    seccion('Observaciones')
+    doc.rect(left, y, width, alto).lineWidth(0.5).strokeColor(LINEA).stroke()
+    doc.fillColor(NEGRO).fontSize(9).font('Helvetica').text(texto, left + 10, y + 8, { width: anchoTexto })
+    y += alto + 16
+  }
+
   function operaciones(c, tituloPagina) {
     if (!c.operaciones.length) {
       doc.fillColor(GRIS).fontSize(10).font('Helvetica').text('Sin operaciones en el período.', left, y, { width, align: 'center' })
@@ -292,7 +317,9 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
       liquidacion.clientes.map(c => ({ nombre: c.cliente.nombreCompleto, resumen: c.resumen })), titulo)
     if (!liquidacion.clientes.length) {
       doc.fillColor(GRIS).fontSize(10).font('Helvetica').text('Sin operaciones en el período.', left, y, { width, align: 'center' })
+      y += 26
     }
+    bloqueObservacion(titulo)
     liquidacion.clientes.forEach(c => {
       nuevaPagina(titulo)
       ficha(c.cliente)
@@ -337,6 +364,7 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
     operaciones(c, titulo)
     resumenPorObra(c.porObra, titulo)
     pendiente(c.operaciones, titulo)
+    bloqueObservacion(titulo)
   }
 
   // ── Pie en todas las páginas: leyenda, página X de Y ─────────
@@ -354,4 +382,4 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general }) {
   doc.end()
 }
 
-module.exports = { generarLiquidacionPDF, nombreArchivoLiquidacion }
+module.exports = { generarLiquidacionPDF, nombreArchivoLiquidacion, leerObservacion }

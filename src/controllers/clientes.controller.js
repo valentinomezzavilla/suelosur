@@ -148,7 +148,7 @@ const ClientesController = {
         cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.claves : [] },
-        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/filtroObra.js'],
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js', '/js/filtroObra.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')
@@ -163,7 +163,7 @@ const ClientesController = {
       const filtros = normalizarFiltros({ ...req.query, clienteId: String(cli.id) }, hoyISO())
       const liquidacion = await require('../models/liquidaciones.model').liquidacion(filtros)
       const { generarLiquidacionPDF } = require('../utils/pdfLiquidacion')
-      generarLiquidacionPDF(res, { liquidacion, filtros, general: false })
+      generarLiquidacionPDF(res, { liquidacion, filtros, general: false, observacion: req.query.obs })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al generar el PDF.'); res.redirect('back')
     }

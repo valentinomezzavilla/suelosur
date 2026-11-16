@@ -16,7 +16,7 @@
 %>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h4 class="fw-bold mb-0 text-dark-title"><%- icon('fileText', { size: 18 }) %> Liquidaciones</h4>
-  <a href="/liquidaciones/pdf?<%= qs() %>" target="_blank" class="btn btn-naranja"><%- icon('download', { size: 15 }) %> Descargar PDF</a>
+  <a href="/liquidaciones/pdf?<%= qs() %>" target="_blank" data-pdf-observacion class="btn btn-naranja"><%- icon('download', { size: 15 }) %> Descargar PDF</a>
 </div>
 
 <div class="card shadow-sm mb-3">
@@ -150,3 +150,5 @@
 <%- include('../../partials/modal_estado_pago') %>
 <%# Agregar / editar el N° de factura de una operación %>
 <%- include('../../partials/modal_nro_factura') %>
+<%# ¿Agregar observación? antes de generar el PDF %>
+<%- include('../../partials/modal_observacion_pdf') %>

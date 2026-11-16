@@ -31,7 +31,7 @@
     </h4>
   </div>
   <div class="d-flex gap-2">
-    <a href="/clientes/cuentas/<%= cliente.id %>/pdf?<%= qsPdf %>" target="_blank" class="btn btn-sm btn-outline-secondary">
+    <a href="/clientes/cuentas/<%= cliente.id %>/pdf?<%= qsPdf %>" target="_blank" data-pdf-observacion class="btn btn-sm btn-outline-secondary">
       <%- icon('printer', { size: 15 }) %> Descargar PDF
     </a>
     <a href="/liquidaciones?<%= new URLSearchParams(Object.assign({ clienteId: String(cliente.id) }, filtros.desde ? { desde: filtros.desde } : {}, filtros.hasta ? { hasta: filtros.hasta } : {})).toString() %>"
@@ -285,6 +285,8 @@
 <%- include('../../partials/modal_estado_pago') %>
 <!-- Agregar / editar el N° de factura de una operación -->
 <%- include('../../partials/modal_nro_factura') %>
+<!-- ¿Agregar observación? antes de generar el PDF -->
+<%- include('../../partials/modal_observacion_pdf') %>
 
 <script>
 // Anular pago: confirma y pide el motivo (queda registrado en el historial)
