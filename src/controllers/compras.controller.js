@@ -48,11 +48,25 @@ function faltantesCarga(d) {
   return faltan.length ? faltan.join(', ').replace(/, ([^,]*)$/, ' y $1') : null
 }
 
+// "Otro" en el camión o el chofer de un pago de combustible: la carga es a un tercero, ajeno a
+// la empresa. Con el campo 'carga' de la categoría, "Otro" en CUALQUIERA de los dos marca toda
+// la carga como a tercero (sin camión ni chofer de la flota). Sin ese campo, "otro" se ignora.
+// Devuelve { tercero, id_vehiculo, id_chofer } con los ids ya listos para guardar (null si no hay).
+const OTRO = 'otro'
+function camionYChofer(body, conCarga) {
+  if (conCarga && (body.id_vehiculo === OTRO || body.id_chofer === OTRO)) {
+    return { tercero: true, id_vehiculo: null, id_chofer: null }
+  }
+  const id = (v) => (v && v !== OTRO ? v : null)
+  return { tercero: false, id_vehiculo: id(body.id_vehiculo), id_chofer: id(body.id_chofer) }
+}
+const MSG_OTRO_CON_IMPACTA = 'Con "Otro" la carga no va a ningún camión de la flota: destildá "Impacta en autonomía del camión".'
+
 // Qué había antes de la corrección (queda en la auditoría; el detalle muestra la última edición)
 async function auditarEdicion(id, antes, usuario) {
   const campos = ['fecha', 'categoria', 'descripcion', 'monto', 'metodo_pago', 'id_proveedor', 'id_producto', 'cantidad',
     'subtotal_material', 'costo_final_flete', 'fletero', 'id_empleado', 'id_vehiculo', 'periodo', 'hora', 'nro_factura',
-    'nro_remito', 'litros', 'id_chofer', 'id_combustible']
+    'nro_remito', 'litros', 'id_chofer', 'id_combustible', 'carga_tercero']
   const resumen = {}
   campos.forEach(c => { if (antes[c] != null && antes[c] !== '') resumen[c] = antes[c] })
   await registrarAuditoria({ entidad_tipo: 'egreso', entidad_id: id, accion: 'editar', usuario, detalle: { antes: resumen } })
@@ -104,7 +118,7 @@ const ComprasController = {
   async crear(req, res) {
     try {
       const { categoria, fecha, monto, metodo_pago, descripcion,
-              id_proveedor, id_empleado, id_vehiculo,
+              id_proveedor, id_empleado,
               id_producto, cantidad, costo_unitario, costo_flete, fletero,
               subtotal_material, costo_final_flete,
               periodo, descuentos, adiciones } = req.body
@@ -174,6 +188,7 @@ const ComprasController = {
       const montoNum = parseFloat(monto) || 0
       if (montoNum <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect('/compras/nueva') }
 
+      const cc = camionYChofer(req.body, cat.campos.includes('carga'))
       const datosExtra = {}
       cat.camposCustom.forEach(cf => {
         const v = (req.body[cf.clave] || '').toString().trim()
@@ -188,7 +203,7 @@ const ComprasController = {
         id_proveedor: (cat.campos.includes('proveedor') || cat.campos.includes('estacion')) ? (id_proveedor || null) : null,
         id_producto:  cat.campos.includes('producto')  ? (id_producto || null) : null,
         id_empleado:  cat.campos.includes('empleado')  ? (id_empleado || null) : null,
-        id_vehiculo:  cat.campos.includes('vehiculo')  ? (id_vehiculo || null) : null,
+        id_vehiculo:  cat.campos.includes('vehiculo')  ? cc.id_vehiculo : null,
         datos_extra: datosExtra,
         origen: 'manual', id_usuario: req.session.user?.id,
       }
@@ -197,12 +212,14 @@ const ComprasController = {
       // autonomía del camión" el pago crea además la carga en Flota → camión → Combustible:
       // la carga suma a la deuda con la estación y este mismo pago la cancela.
       // El chofer es obligatorio siempre: aunque el pago lo cargue administración, queda
-      // registrado quién hizo la carga.
+      // registrado quién hizo la carga. "Otro" (carga a un tercero) lo cumple, sin chofer ni
+      // camión de la flota, y no puede impactar en un camión.
       const conCarga = cat.campos.includes('carga')
       if (conCarga) {
-        const { hora, nro_factura, nro_remito, litros, id_chofer } = req.body
-        if (!id_chofer) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect('/compras/nueva') }
-        Object.assign(egreso, { hora, nro_factura, nro_remito, litros, id_chofer })
+        const { hora, nro_factura, nro_remito, litros } = req.body
+        if (!cc.id_chofer && !cc.tercero) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect('/compras/nueva') }
+        if (cc.tercero && req.body.impacta_flota === '1') { req.flash('error', MSG_OTRO_CON_IMPACTA); return res.redirect('/compras/nueva') }
+        Object.assign(egreso, { hora, nro_factura, nro_remito, litros, id_chofer: cc.id_chofer, carga_tercero: cc.tercero ? 1 : 0 })
       }
       if (conCarga && req.body.impacta_flota === '1') {
         const faltan = faltantesCarga(egreso)
@@ -300,6 +317,7 @@ const ComprasController = {
         ? { campos: ['empleado', 'periodo'], camposCustom: [] }
         : ((await CategoriasEgresoModel.obtenerPorClave(e.categoria)) || { campos: [], camposCustom: [] })
       const usa = (c) => cat.campos.includes(c)
+      const cc = camionYChofer(b, usa('carga'))
       const monto = parseFloat(b.monto) || 0
       if (monto <= 0) { req.flash('error', 'Ingresá un monto mayor a cero.'); return res.redirect(volver) }
       const extra = datosExtraDe(e)
@@ -314,14 +332,16 @@ const ComprasController = {
         id_proveedor: (usa('proveedor') || usa('estacion')) ? (b.id_proveedor || null) : e.id_proveedor,
         id_producto:  usa('producto') ? (b.id_producto || null) : e.id_producto,
         id_empleado:  usa('empleado') ? (b.id_empleado || null) : e.id_empleado,
-        id_vehiculo:  usa('vehiculo') ? (b.id_vehiculo || null) : e.id_vehiculo,
+        id_vehiculo:  usa('vehiculo') ? cc.id_vehiculo : e.id_vehiculo,
         // Datos de la carga: si la categoría ya no los usa, quedan como estaban
         hora: e.hora, nro_factura: e.nro_factura, nro_remito: e.nro_remito, litros: e.litros, id_chofer: e.id_chofer,
+        carga_tercero: e.carga_tercero,
       }
       let carga = null
       if (usa('carga')) {
-        if (!b.id_chofer) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect(volver) }
-        Object.assign(datos, { hora: b.hora, nro_factura: b.nro_factura, nro_remito: b.nro_remito, litros: b.litros, id_chofer: b.id_chofer })
+        if (!cc.id_chofer && !cc.tercero) { req.flash('error', 'Elegí el chofer que hizo la carga de combustible.'); return res.redirect(volver) }
+        if (cc.tercero && b.impacta_flota === '1') { req.flash('error', MSG_OTRO_CON_IMPACTA); return res.redirect(volver) }
+        Object.assign(datos, { hora: b.hora, nro_factura: b.nro_factura, nro_remito: b.nro_remito, litros: b.litros, id_chofer: cc.id_chofer, carga_tercero: cc.tercero ? 1 : 0 })
         const impacta = b.impacta_flota === '1'
         if (impacta) {
           const faltan = faltantesCarga(datos)

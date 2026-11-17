@@ -58,10 +58,11 @@ const EgresosModel = {
   // compras de material: guardan el detalle de lo que se compró (ver migrarDetalleCompras).
   // `hora`, `nro_factura`, `nro_remito`, `litros`, `id_chofer` e `id_combustible` son de los
   // pagos de combustible (categorías con el campo 'carga'); id_combustible es la carga que el
-  // pago creó en Flota. `q`: la transacción de quien llama (para crear pago y carga juntos).
+  // pago creó en Flota. carga_tercero (1) marca la carga a un tercero ("Otro"): sin camión
+  // ni chofer de la flota. `q`: la transacción de quien llama (para crear pago y carga juntos).
   async crear({ fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
                 cantidad, subtotal_material, costo_final_flete, id_stock_ingreso,
-                hora, nro_factura, nro_remito, litros, id_chofer, id_combustible }, q = null) {
+                hora, nro_factura, nro_remito, litros, id_chofer, id_combustible, carga_tercero }, q = null) {
     if (!categoria) throw new Error('Elegí una categoría válida.')
     // El fletero escrito queda dado de alta en Fleteros (o toma el nombre como está guardado)
     fletero = await FleterosModel.asegurar(fletero, q || query)
@@ -69,8 +70,8 @@ const EgresosModel = {
     const { rows } = await (q || query)(`
       INSERT INTO egresos (fecha, categoria, descripcion, monto, metodo_pago, fletero, periodo, id_proveedor, id_producto, id_empleado, id_vehiculo, datos_extra, origen, id_usuario,
                            cantidad, subtotal_material, costo_final_flete, id_stock_ingreso,
-                           hora, nro_factura, nro_remito, litros, id_chofer, id_combustible)
-      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           hora, nro_factura, nro_remito, litros, id_chofer, id_combustible, carga_tercero)
+      VALUES (COALESCE(?, to_char(CURRENT_DATE, 'YYYY-MM-DD')), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       RETURNING id
     `, [fecha || null, categoria, descripcion || '', parseFloat(monto) || 0, metodo_pago || null, fletero,
         (periodo || '').trim() || null, id_proveedor || null, id_producto || null, id_empleado || null, id_vehiculo || null,
@@ -78,7 +79,7 @@ const EgresosModel = {
         cantidad == null ? null : cantidad, subtotal_material == null ? null : subtotal_material,
         costo_final_flete == null ? null : costo_final_flete, id_stock_ingreso || null,
         CombustibleModel.horaHHMM(hora), CombustibleModel.texto(nro_factura), CombustibleModel.texto(nro_remito),
-        litrosNum > 0 ? litrosNum : null, id_chofer || null, id_combustible || null])
+        litrosNum > 0 ? litrosNum : null, id_chofer || null, id_combustible || null, carga_tercero ? 1 : 0])
     return rows[0].id
   },
 
@@ -244,7 +245,7 @@ const EgresosModel = {
         UPDATE egresos SET fecha = COALESCE(?, fecha), descripcion = ?, monto = ?, metodo_pago = ?, fletero = ?, periodo = ?,
                            id_proveedor = ?, id_producto = ?, id_empleado = ?, id_vehiculo = ?, datos_extra = ?,
                            cantidad = ?, subtotal_material = ?, costo_final_flete = ?,
-                           hora = ?, nro_factura = ?, nro_remito = ?, litros = ?, id_chofer = ?, id_combustible = ?
+                           hora = ?, nro_factura = ?, nro_remito = ?, litros = ?, id_chofer = ?, id_combustible = ?, carga_tercero = ?
         WHERE id = ?
       `, [datos.fecha || null, datos.descripcion || '', parseFloat(datos.monto) || 0, datos.metodo_pago || null, fletero,
           (datos.periodo || '').trim() || null, datos.id_proveedor || null, datos.id_producto || null,
@@ -253,7 +254,7 @@ const EgresosModel = {
           datos.subtotal_material == null ? null : datos.subtotal_material,
           datos.costo_final_flete == null ? null : datos.costo_final_flete,
           CombustibleModel.horaHHMM(datos.hora), CombustibleModel.texto(datos.nro_factura), CombustibleModel.texto(datos.nro_remito),
-          litros > 0 ? litros : null, datos.id_chofer || null, id_combustible || null, id])
+          litros > 0 ? litros : null, datos.id_chofer || null, id_combustible || null, datos.carga_tercero ? 1 : 0, id])
       return { antes: e, stockMovido }
     })
   },
