@@ -52,7 +52,7 @@
         ['Producto', e.producto_nombre],
         ['Empleado', e.empleado_nombre],
         ['Período', e.periodo],
-        ['Vehículo', e.vehiculo_nombre],
+        ['Vehículo', e.vehiculo_nombre || (Number(e.carga_tercero) ? 'Otro' : null)],
         ['Fletero', e.fletero],
       )
     }
@@ -71,7 +71,7 @@
       ['N° Factura', e.nro_factura],
       ['N° Remito', e.nro_remito],
       ['Litros', e.litros ? num(e.litros) + ' l' : null],
-      ['Chofer', e.chofer_nombre],
+      ['Chofer', e.chofer_nombre || (Number(e.carga_tercero) ? 'Otro' : null)],
       ['Carga en el camión', e.id_combustible ? ('Sí' + (e.carga_km ? ` · ${num(e.carga_km)} km` : '')) : null],
     )
     datosExtraDe(e).forEach(t => { const i = t.indexOf(': '); filas.push([t.slice(0, i), t.slice(i + 2)]) })
@@ -288,7 +288,8 @@
           <td><%= e.descripcion || '—' %>
             <% const extras = datosExtraDe(e); if (extras.length) { %><small class="text-muted d-block"><%= extras.join(' · ') %></small><% } %>
             <% const carga = [e.hora, e.nro_factura && 'Fact. ' + e.nro_factura, e.nro_remito && 'Rem. ' + e.nro_remito,
-                              e.litros && num(e.litros) + ' l', e.chofer_nombre && 'Chofer: ' + e.chofer_nombre].filter(Boolean)
+                              e.litros && num(e.litros) + ' l', Number(e.carga_tercero) ? 'Camión y chofer: Otro' : null,
+                              e.chofer_nombre && 'Chofer: ' + e.chofer_nombre].filter(Boolean)
                if (carga.length || e.id_combustible) { %><small class="text-muted d-block"><%= carga.join(' · ') %>
               <% if (e.id_combustible) { %><span class="badge rounded-pill badge-en-transito ms-1" title="También quedó como carga de combustible del camión (Flota)">Carga en camión</span><% } %></small><% } %>
           </td>

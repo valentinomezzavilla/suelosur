@@ -169,6 +169,7 @@
           <option value="">— Sin vehículo —</option>
           <% if (falta(catsCon('vehiculo'), vehiculos, ed && ed.id_vehiculo)) { %><option value="<%= ed.id_vehiculo %>" selected><%= ed.vehiculo_nombre || 'Vehículo #' + ed.id_vehiculo %></option><% } %>
           <% vehiculos.forEach(v => { %><option value="<%= v.id %>" <%= sel(val('id_vehiculo'), v.id) %>><%= [v.numero_interno ? '#' + v.numero_interno : null, v.patente, v.nombre].filter(Boolean).join(' · ') %></option><% }) %>
+          <% if (catsCon('carga')) { %><option value="otro" data-solo-carga="<%= catsCon('carga') %>" <%= ed && Number(ed.carga_tercero) ? 'selected' : '' %>>Otro</option><% } %>
         </select>
       </div>
       <% } %>
@@ -189,8 +190,13 @@
               <option value="">Seleccionar…</option>
               <% if (falta(catsCon('carga'), choferes, ed && ed.id_chofer)) { %><option value="<%= ed.id_chofer %>" selected><%= ed.chofer_nombre || 'Chofer #' + ed.id_chofer %></option><% } %>
               <% choferes.forEach(c => { %><option value="<%= c.id %>" <%= sel(val('id_chofer'), c.id) %>><%= c.nombre %> <%= c.apellido || '' %></option><% }) %>
+              <option value="otro" data-solo-carga="<%= catsCon('carga') %>" <%= ed && Number(ed.carga_tercero) ? 'selected' : '' %>>Otro</option>
             </select>
           </div>
+        </div>
+        <%# Sin .d-block: su !important pisaría el display:none de acá y del script %>
+        <div id="avisoOtro" class="small text-muted mb-3" style="display:none">
+          Carga a un tercero: el pago se registra sin camión ni chofer de la flota<%= ed && ed.id_combustible ? ' y se quita la carga del camión' : '' %>.
         </div>
         <label class="toggle-row">
           <input type="checkbox" name="impacta_flota" value="1" id="impactaFlota" <%= ed && ed.id_combustible ? 'checked' : '' %>>
@@ -340,8 +346,29 @@
     const bloqueImpacta = document.getElementById('bloqueImpacta')
     const obligatoriosImpacta = ['selVehiculo', 'selEstacion', 'litros']
       .map(id => document.getElementById(id)).filter(Boolean)
+    // "Otro": carga a un tercero, sin camión ni chofer de la flota. Es una sola cosa: elegirlo
+    // en el camión o en el chofer lo deja en los dos, y con "Otro" no se puede impactar en un camión.
+    const selVehiculo = document.getElementById('selVehiculo')
+    const selChofer = document.getElementById('selChofer')
+    const avisoOtro = document.getElementById('avisoOtro')
+    const esOtro = (s) => !!s && !s.disabled && s.value === 'otro'
+    function vincularOtro(uno, otro) {
+      if (!uno || !otro) return
+      uno.addEventListener('change', () => {
+        if (uno.value === 'otro') otro.value = 'otro'
+        else if (otro.value === 'otro') otro.value = ''
+        aplicarImpacta()
+      })
+    }
+    vincularOtro(selVehiculo, selChofer)
+    vincularOtro(selChofer, selVehiculo)
     function aplicarImpacta() {
       if (!impacta) return
+      const bloqueVisible = impacta.closest('.cond').style.display !== 'none'
+      const tercero = bloqueVisible && (esOtro(selVehiculo) || esOtro(selChofer))
+      if (tercero) impacta.checked = false
+      impacta.disabled = !bloqueVisible || tercero
+      if (avisoOtro) avisoOtro.style.display = tercero ? '' : 'none'
       const activo = impacta.checked && !impacta.disabled
       bloqueImpacta.style.display = activo ? '' : 'none'
       obligatoriosImpacta.forEach(f => { f.required = activo })
@@ -359,6 +386,13 @@
         const visible = !!v && cats.includes(v)
         el.style.display = visible ? '' : 'none'
         el.querySelectorAll('input, select, textarea').forEach(f => { f.disabled = !visible })
+      })
+      // "Otro" (carga a un tercero) solo se ofrece en las categorías con el campo de la carga
+      document.querySelectorAll('option[data-solo-carga]').forEach(o => {
+        const ok = !!v && o.dataset.soloCarga.split(' ').includes(v)
+        o.hidden = !ok
+        o.disabled = !ok
+        if (!ok && o.selected) o.parentElement.value = ''
       })
       aplicarBloqueoMonto()
       aplicarImpacta()

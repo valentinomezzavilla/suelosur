@@ -1515,6 +1515,9 @@ async function initDB() {
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
   await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_combustible ON egresos(id_combustible)`)
+  // 1 = carga a un tercero, ajeno a la empresa ("Otro" en camión y chofer): el pago no va a
+  // ningún camión ni chofer de la flota (id_vehiculo e id_chofer quedan en NULL)
+  await pool.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS carga_tercero INTEGER NOT NULL DEFAULT 0`)
   await pool.query(`ALTER TABLE cc_proveedores ADD COLUMN IF NOT EXISTS id_usuario BIGINT`)
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_egresos_proveedor ON egresos(id_proveedor)`)
   // Una sola vez: la categoría Combustible pasa a pedir la estación de servicio (en lugar

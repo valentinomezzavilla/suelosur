@@ -74,6 +74,8 @@ async function abrir() {
   await cliente.query(`ALTER TABLE movimientos_cuenta ALTER COLUMN registrado_en SET DEFAULT ahora_local()`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_chofer BIGINT REFERENCES empleados(id)`)
   await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS id_combustible BIGINT REFERENCES combustible(id) ON DELETE SET NULL`)
+  // Marca de carga a un tercero ("Otro" en camión y chofer): lo mismo
+  await cliente.query(`ALTER TABLE egresos ADD COLUMN IF NOT EXISTS carga_tercero INTEGER NOT NULL DEFAULT 0`)
   // Importes en DOUBLE PRECISION y el saldo de los clientes mantenido por la base (trigger):
   // sin desplegar, se aplican dentro de la prueba (y se deshacen con el ROLLBACK)
   if (typeof db.migrarImportesADoble === 'function') await db.migrarImportesADoble(cliente)
