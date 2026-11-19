@@ -441,7 +441,13 @@ const TIPOS_CARGO = Object.values(TIPO_CARGO_POR_METODO)
 // cargo como corresponde (lo crea, ajusta el importe/cliente/tipo, o lo borra); el saldo del
 // cliente lo recalcula la base. `q` permite correrlo dentro de una transacción abierta.
 // moverFecha: también lleva el cargo a la fecha de compra (al corregirla en la edición).
-VentasModel.sincronizarCargoCC = async function (idOp, q = query, { moverFecha = false } = {}) {
+// El ajuste de un descuento sigue al cargo (models/descuentos.sincronizarAjustes)
+VentasModel.sincronizarCargoCC = async function (idOp, q = query, opciones = {}) {
+  const cambio = await sincronizarCargoVenta(idOp, q, opciones)
+  await require('./descuentos.model').sincronizarAjustes(idOp, q)
+  return cambio
+}
+async function sincronizarCargoVenta(idOp, q = query, { moverFecha = false } = {}) {
   const op = (await q(`
     SELECT op.id, op.nro_op, op.tipo_op, op.estado, op.metodo_pago, op.id_cliente, op.modalidad,
            op.obra, op.domicilio_calle, op.domicilio_altura, op.fecha_emision, op.observaciones,

@@ -1403,7 +1403,13 @@ const TIPOS_EN_CUENTA = ['deuda', 'uso_saldo_favor', 'ajuste']
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100
 const nroOp = (n) => `OP-${String(n).padStart(4, '0')}`
 
-AlquileresModel.sincronizarCargoCC = async function (idOp, q = query, { conservador = false } = {}) {
+// El ajuste de un descuento sigue al cargo (models/descuentos.sincronizarAjustes)
+AlquileresModel.sincronizarCargoCC = async function (idOp, q = query, opciones = {}) {
+  const cambio = await sincronizarCargoAlquiler(idOp, q, opciones)
+  await require('./descuentos.model').sincronizarAjustes(idOp, q)
+  return cambio
+}
+async function sincronizarCargoAlquiler(idOp, q = query, { conservador = false } = {}) {
   const op = (await q(`
     SELECT op.id, op.tipo_op, op.id_grupo, ag.cobro_modo
     FROM op_encabezado op LEFT JOIN alquiler_grupos ag ON ag.id = op.id_grupo WHERE op.id = ?
@@ -1429,6 +1435,7 @@ AlquileresModel.sincronizarCargoCC = async function (idOp, q = query, { conserva
                         WHERE id_op_encabezado = ANY(?::bigint[]) AND tipo <> 'Ajuste'`, [ids])).rows
   const movs = (await q(`SELECT id, cliente_id, tipo, monto, id_op_encabezado, descripcion FROM movimientos_cuenta
                          WHERE id_op_encabezado = ANY(?::bigint[]) AND tipo = ANY(?) AND COALESCE(anulado, 0) = 0
+                           AND id NOT IN (SELECT id_movimiento FROM descuento_operaciones WHERE id_movimiento IS NOT NULL)
                          ORDER BY id`, [ids, TIPOS_EN_CUENTA])).rows
 
   const metodosTx = [...new Set(txs.map(t => t.metodo_pago || 'efectivo'))]
