@@ -349,6 +349,11 @@ function generarLiquidacionPDF(res, { liquidacion, filtros, general, observacion
       ].filter(Boolean)
       const lineas = []
       if (partes.length > 1 || d.anteriores > 0.005 || d.posteriores > 0.005 || d.manuales > 0.005) lineas.push(`Se compone de: ${partes.join(' · ')}.`)
+      // Descuentos sobre el saldo total (no atados a una operación): ya están en el saldo
+      const dSaldo = liquidacion.descuentosSaldo || []
+      if (dSaldo.length) {
+        lineas.push(`Incluye ${dSaldo.length === 1 ? 'un descuento' : 'descuentos'} sobre el saldo: ${dSaldo.map(d => `${d.etiqueta} del ${fmtFecha(d.fecha)} −${B.money(d.monto)}`).join(' · ')}.`)
+      }
       if (s.sinCobrar.total > 0.005) {
         const t = s.total
         lineas.push(`Además, operaciones sin cobrar fuera de la cuenta corriente: ${B.money(s.sinCobrar.total)}. Total: ${t > 0.005 ? 'debe ' + B.money(t) : (t < -0.005 ? 'a favor ' + B.money(-t) : 'al día')}.`)

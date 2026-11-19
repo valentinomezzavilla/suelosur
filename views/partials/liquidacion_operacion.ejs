@@ -36,7 +36,7 @@
       <thead><tr><th>Detalle</th><th class="text-end">Cant.</th><th>Unid.</th><th class="text-end">P. unit.</th><th class="text-end">Importe</th></tr></thead>
       <tbody>
         <% o.renglones.forEach(r => { %>
-          <tr>
+          <tr<%- r.esDescuento ? ' class="is-descuento"' : '' %>>
             <td><%= r.descripcion %></td>
             <td class="text-end"><%= Number(r.cantidad).toLocaleString('es-AR') %></td>
             <td><%= r.unidad %></td>

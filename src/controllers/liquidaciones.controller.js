@@ -18,10 +18,11 @@ const LiquidacionesController = {
       }
       const clienteSel = filtros.clienteId ? liquidacion.clientes[0].cliente : null
       const obras = clienteSel ? await ClientesModel.obras(clienteSel.id) : []
+      const descuentosVigentes = clienteSel ? await require('../models/descuentos.model').cantidadVigentes(clienteSel.id) : 0
       res.render('pages/liquidaciones/index', {
-        titulo: 'Liquidaciones', filtros, liquidacion, clienteSel, obras, TIPOS, ESTADOS,
+        titulo: 'Liquidaciones', filtros, liquidacion, clienteSel, obras, TIPOS, ESTADOS, descuentosVigentes,
         nro: nroLiquidacion(hoyISO(), filtros.clienteId),
-        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/liquidacionesFacturar.js', '/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js', '/js/descuentos.js'],
       })
     } catch (err) {
       console.error(err)
