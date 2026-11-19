@@ -15,7 +15,7 @@
   const volver = barra.dataset.descVolver || location.pathname + location.search;
 
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-  const pesos = (n) => '$ ' + r2(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const pesos = (n) => '$' + r2(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fecha = (f) => (f ? String(f).slice(0, 10).split('-').reverse().join('/') : '');
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ICONO_AVISO = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
@@ -24,12 +24,12 @@
   // ── Abrir / cerrar ───────────────────────────────────────────
   let abierto = null;
   let anteriorFoco = null;
-  function abrir(modal) {
+  function abrir(modal, foco) {
     anteriorFoco = document.activeElement;
     modal.style.display = 'flex';
     abierto = modal;
     document.body.classList.add('modal-abierto');
-    setTimeout(() => { const f = modal.querySelector('input:not([type=hidden]):not([disabled]), button'); if (f) f.focus(); }, 30);
+    setTimeout(() => { const f = foco || modal.querySelector('.modal-body button, .modal-body input:not([type=hidden])'); if (f) f.focus(); }, 30);
   }
   function cerrar() {
     if (!abierto) return;
@@ -78,16 +78,16 @@
     const o = opciones;
     const deuda = r2(o.enPantalla.reduce((s, x) => s + x.resta, 0));
     $('descInfoTodas').textContent = o.enPantalla.length
-      ? `${o.enPantalla.length} ${o.enPantalla.length === 1 ? 'operación debe' : 'operaciones deben'} ${pesos(deuda)}.`
+      ? `${o.enPantalla.length} en pantalla · deben ${pesos(deuda)}.`
       : 'No hay operaciones con saldo pendiente en pantalla.';
     llenar(selectDe('operacion'), o.enPantalla.map(x => ({ ...x, valor: x.id })),
-      (x) => `${x.nombre} · ${fecha(x.fecha)} · debe ${pesos(x.resta)}${x.facturada ? ' · facturada' : ''}`, 'Sin operaciones para descontar');
+      (x) => `${x.nombre} · ${fecha(x.fecha)} — debe ${pesos(x.resta)}${x.facturada ? ' (facturada)' : ''}`, 'Sin operaciones para descontar');
     llenar(selectDe('remito'), o.remitos.map(x => ({ ...x, valor: x.numero })),
-      (x) => `Remito ${x.numero} · ${x.cantidad} ${x.cantidad === 1 ? 'operación' : 'operaciones'} · debe ${pesos(x.resta)}`, 'Sin remitos con saldo pendiente');
+      (x) => `Remito ${x.numero} — ${x.cantidad} ${x.cantidad === 1 ? 'operación' : 'operaciones'}, deben ${pesos(x.resta)}`, 'Sin remitos con saldo pendiente');
     llenar(selectDe('factura'), o.facturas.map(x => ({ ...x, valor: x.numero })),
-      (x) => `Factura ${x.numero} · ${x.cantidad} ${x.cantidad === 1 ? 'operación' : 'operaciones'} · debe ${pesos(x.resta)}`, 'Sin facturas con saldo pendiente');
+      (x) => `Factura ${x.numero} — ${x.cantidad} ${x.cantidad === 1 ? 'operación' : 'operaciones'}, deben ${pesos(x.resta)}`, 'Sin facturas con saldo pendiente');
     $('descInfoSaldo').textContent = o.saldoTotal > 0
-      ? `Debe ${pesos(o.saldoTotal)} en total. Un crédito que se aplica a lo más viejo.`
+      ? `Debe ${pesos(o.saldoTotal)} en total. Se aplica como crédito a lo más viejo.`
       : 'El cliente no debe nada.';
     habilitarAlcance('todas', o.enPantalla.length > 0);
     habilitarAlcance('operacion', o.enPantalla.length > 0);
@@ -112,6 +112,8 @@
 
   function marcarAlcance() {
     form.querySelectorAll('.desc-alcance').forEach(el => el.classList.toggle('is-activo', el.querySelector('input').checked));
+    // Solo el desplegable del alcance elegido
+    form.querySelectorAll('.desc-ref').forEach(el => { el.hidden = el.dataset.alcance !== alcance(); });
     const sel = selectDe(alcance());
     inputRef.value = sel && !sel.disabled ? sel.value : '';
   }
@@ -124,9 +126,11 @@
     inputValor.placeholder = pct ? 'Ej: 10' : 'Ej: 250.000';
   }
 
-  function estadoPrevia(html, ok) {
+  const pieTotal = $('descPieTotal');
+  function estadoPrevia(html, ok, total) {
     previa.innerHTML = html;
     btnAplicar.disabled = !ok;
+    if (pieTotal) pieTotal.innerHTML = ok ? `Se descuentan <strong>${pesos(total)}</strong>` : '';
   }
 
   function pedirPrevia() {
@@ -149,7 +153,7 @@
       if (n !== pedidoActual) return;
       if (!r.ok) { estadoPrevia(`<p class="desc-previa__error" role="alert">${esc(d.error || 'No se pudo calcular.')}</p>`, false); return; }
       inputEsperado.value = d.total;
-      estadoPrevia(dibujarPrevia(d), d.total > 0);
+      estadoPrevia(dibujarPrevia(d), d.total > 0, d.total);
     } catch (e) {
       if (n === pedidoActual) estadoPrevia('<p class="desc-previa__error" role="alert">No se pudo calcular la vista previa. Revisá la conexión.</p>', false);
     } finally {
@@ -160,18 +164,17 @@
   function dibujarPrevia(d) {
     const resumen = `<div class="desc-previa__resumen">
         <div><span>Debe</span><strong>${pesos(d.debe)}</strong></div>
-        <div class="is-descuento"><span>Descuento ${esc(d.etiqueta)}</span><strong>− ${pesos(d.total)}</strong></div>
+        <div class="is-descuento"><span>Descuento ${esc(d.etiqueta)}</span><strong>−${pesos(d.total)}</strong></div>
         <div class="is-queda"><span>Queda debiendo</span><strong>${pesos(d.queda)}</strong></div>
       </div>`;
     if (!d.lineas.length) return `<h3 class="desc-previa__titulo">Vista previa · ${esc(d.alcanceTexto)}</h3>${resumen}`;
     const filas = d.lineas.map(l => `
-      <tr>
-        <td><strong>${esc(l.nombre)}</strong><small>${esc(fecha(l.fecha))}${l.tipoTexto ? ' · ' + esc(l.tipoTexto) : ''}</small>
-          ${l.aviso ? aviso(l.aviso) : ''}</td>
-        <td class="text-end">${pesos(l.resta)}</td>
-        <td class="text-end desc-previa__menos">− ${pesos(l.monto)}</td>
-        <td class="text-end"><strong>${pesos(l.queda)}</strong></td>
-      </tr>`).join('');
+      <tr${l.aviso ? ' class="con-aviso"' : ''}>
+        <td><strong>${esc(l.nombre)}</strong><small>${esc(fecha(l.fecha))}${l.tipoTexto ? ' · ' + esc(l.tipoTexto) : ''}</small></td>
+        <td class="text-end" data-label="Debe">${pesos(l.resta)}</td>
+        <td class="text-end desc-previa__menos" data-label="Descuento">−${pesos(l.monto)}</td>
+        <td class="text-end" data-label="Queda"><strong>${pesos(l.queda)}</strong></td>
+      </tr>${l.aviso ? `<tr class="desc-previa__fila-aviso"><td colspan="4">${aviso(l.aviso)}</td></tr>` : ''}`).join('');
     return `<h3 class="desc-previa__titulo">Vista previa · ${esc(d.alcanceTexto)}</h3>${resumen}
       <div class="table-responsive"><table class="table table-sm desc-previa__tabla mb-0">
         <thead><tr><th>Operación</th><th class="text-end">Debe</th><th class="text-end">Descuento</th><th class="text-end">Queda</th></tr></thead>
@@ -183,7 +186,7 @@
     form.reset();
     cambiarTipo();
     estadoPrevia('<p class="desc-previa__vacio">Ingresá el valor para ver cuánto se descuenta.</p>', false);
-    abrir(modal);
+    abrir(modal, inputValor);
     if (!opciones) {
       $('descInfoTodas').textContent = 'Cargando…';
       try {
@@ -203,11 +206,7 @@
     barra.querySelector('.js-desc-agregar').addEventListener('click', abrirAgregar);
     form.querySelectorAll('input[name=tipo]').forEach(r => r.addEventListener('change', () => { cambiarTipo(); pedirPrevia(); }));
     form.querySelectorAll('input[name=alcance]').forEach(r => r.addEventListener('change', () => { marcarAlcance(); pedirPrevia(); }));
-    form.querySelectorAll('.js-desc-ref').forEach(sel => sel.addEventListener('change', () => {
-      const r = form.querySelector(`input[name=alcance][value="${sel.dataset.alcance}"]`);
-      if (r && !r.disabled) r.checked = true;
-      marcarAlcance(); pedirPrevia();
-    }));
+    form.querySelectorAll('.js-desc-ref').forEach(sel => sel.addEventListener('change', () => { marcarAlcance(); pedirPrevia(); }));
     inputValor.addEventListener('input', pedirPrevia);
     form.addEventListener('submit', (e) => {
       if (btnAplicar.disabled || !inputEsperado.value) { e.preventDefault(); return; }
@@ -224,7 +223,7 @@
 
   function tarjeta(d) {
     const ops = d.operaciones.length
-      ? `<ul class="desc-item__ops">${d.operaciones.map(o => `<li><span>${esc(o.nombre)}${o.facturada ? ' <em class="desc-chip">facturada</em>' : ''}</span><strong>− ${pesos(o.monto)}</strong></li>`).join('')}</ul>`
+      ? `<ul class="desc-item__ops">${d.operaciones.map(o => `<li><span>${esc(o.nombre)}${o.facturada ? ' <em class="desc-chip">facturada</em>' : ''}</span><strong>−${pesos(o.monto)}</strong></li>`).join('')}</ul>`
       : '';
     const meta = [fecha(d.fecha), d.usuario && `cargado por ${esc(d.usuario)}`].filter(Boolean).join(' · ');
     const revertido = d.revertido
@@ -247,7 +246,7 @@
         <header class="desc-item__cabecera">
           <span class="desc-item__valor">${esc(d.etiqueta)}</span>
           <div class="desc-item__datos"><strong>${esc(d.alcanceTexto)}</strong><small>${meta}</small></div>
-          <span class="desc-item__total">− ${pesos(d.total)}</span>
+          <span class="desc-item__total">−${pesos(d.total)}</span>
         </header>
         ${d.motivo ? `<p class="desc-item__motivo">Motivo: ${esc(d.motivo)}</p>` : ''}
         ${ops}

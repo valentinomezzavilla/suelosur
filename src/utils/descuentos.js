@@ -85,7 +85,7 @@ function montoSobre(base, { tipo, valor }) {
   return r2(Math.min(valor, b))
 }
 
-const pesos = (n) => '$ ' + r2(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+const pesos = (n) => '$' + r2(n).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 function etiqueta({ tipo, valor }) {
   return tipo === 'porcentaje' ? `${Number(valor).toLocaleString('es-AR', { maximumFractionDigits: 2 })}%` : pesos(valor)
 }

@@ -48,7 +48,7 @@ describe('PDF: descuentos', () => {
     const fin = new Promise((ok) => s.on('end', () => ok(Buffer.concat(partes))))
     const saldo = { cuenta: { saldo: -800, deuda: 800, aFavor: 0, desglose: { periodo: 800, anteriores: 0, posteriores: 0, manuales: 0 }, creditos: [] },
       sinCobrar: { ops: [], total: 0, enPeriodo: 0 }, enCurso: { ops: [], total: 0 }, programadas: { ops: [], total: 0 }, total: 800 }
-    generarLiquidacionPDF(s, { liquidacion: { ...liquidacion([op]), saldo, descuentosSaldo: [{ fecha: '2026-11-19', etiqueta: '$ 100', monto: 100 }] }, filtros, general: false })
+    generarLiquidacionPDF(s, { liquidacion: { ...liquidacion([op]), saldo, descuentosSaldo: [{ fecha: '2026-11-19', etiqueta: '$100', monto: 100 }] }, filtros, general: false })
     const pdf = await fin
     assert.equal(pdf.subarray(0, 5).toString(), '%PDF-')
   })

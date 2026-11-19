@@ -77,7 +77,7 @@ describe('descuentos: reparto', () => {
 describe('descuentos: textos', () => {
   it('etiqueta y aviso de factura', () => {
     assert.equal(D.etiqueta({ tipo: 'porcentaje', valor: 12.5 }), '12,5%')
-    assert.equal(D.etiqueta({ tipo: 'monto', valor: 50000 }), '$ 50.000')
+    assert.equal(D.etiqueta({ tipo: 'monto', valor: 50000 }), '$50.000')
     assert.equal(D.avisoFactura('A-0001-00001234'), 'Tiene factura emitida (N° A-0001-00001234): el descuento requiere una nota de crédito por fuera del sistema.')
     assert.equal(D.avisoFactura(null), 'Tiene factura emitida: el descuento requiere una nota de crédito por fuera del sistema.')
     assert.equal(D.facturaEmitida({ facturado: true }), true)

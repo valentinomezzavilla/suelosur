@@ -14,8 +14,8 @@
 
 - Textos en español rioplatense. Roles: `dueno`, `admin_contable`.
 - Aviso exacto: `Tiene factura emitida (N° X): el descuento requiere una nota de crédito por fuera del sistema.` (sin N°: `Tiene factura emitida: …`).
-- Descripción del ajuste: `Descuento 10% — OP-0123` / `Descuento $ 50.000 — OP-0123` / `Descuento 10% sobre el saldo`.
-- Renglón: `Descuento 10% (19/11/2026)` / `Descuento $ 50.000 (19/11/2026)`.
+- Descripción del ajuste: `Descuento 10% — OP-0123` / `Descuento $50.000 — OP-0123` / `Descuento 10% sobre el saldo`.
+- Renglón: `Descuento 10% (19/11/2026)` / `Descuento $50.000 (19/11/2026)`.
 - Tablas en `initDB` con `CREATE TABLE IF NOT EXISTS` (aditivas). Nunca con nodemon corriendo.
 - Porcentaje: 0 < v ≤ 100. Monto: > 0 y ≤ lo que deben las alcanzadas (o el saldo total).
 
@@ -33,7 +33,7 @@
 
 **Produce:** `validar({ tipo, valor, alcance, referencia })` → `{ error } | { tipo, valor, alcance, referencia }`;
 `esDescontable(op)` → bool; `repartir(ops, { tipo, valor })` → `[{ id, resta, monto, queda }]` (monto ≤ resta,
-proporcional, redondeo al último); `montoSobre(base, { tipo, valor })`; `etiqueta({ tipo, valor })` → `10%` / `$ 50.000`;
+proporcional, redondeo al último); `montoSobre(base, { tipo, valor })`; `etiqueta({ tipo, valor })` → `10%` / `$50.000`;
 `AVISO_FACTURA(nro)`.
 
 - [ ] Pruebas `tests/descuentos.test.js`: 10% de [1000, 500] → [100, 50]; monto 100 sobre [200, 100] → [66.67, 33.33]; monto > Σ resta → error de `validar`/`repartir`; % 0 o 101 → error; excluye `estimado`, `enCurso`, `grupoTodoJunto`, sin entregar, a convenir, resta 0.
