@@ -1,7 +1,8 @@
 <%# Tarjeta de una operación de la liquidación. Recibe: o (operación), ESTADOS y, opcional,
     saldar ({ idCliente, nombre }): botón "Marcar como pagada" en las que deben algo en la cuenta corriente.
     Dueño y administración contable también pueden marcarla pendiente / pagada (public/js/estadoPago.js). %>
-<% const $ = (n) => '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+<%# Negativos (descuentos, ajustes a la baja) como −$70.000,00, no $-70.000,00 %>
+<% const $ = (n) => (Number(n) < 0 ? '−$' : '$') + Math.abs(Number(n || 0)).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
 <% const puedeCambiarPago = !!locals.user && ['dueno', 'admin_contable'].includes(user.rol) %>
 <% const nroTxt = o.nro_remito ? 'Remito ' + o.nro_remito : 'OP-' + String(o.nro_op).padStart(4, '0') %>
 <%# Lo que todavía no es deuda lo dice: un alquiler en curso, o algo sin entregar que no está en la cuenta %>
@@ -36,11 +37,12 @@
       <thead><tr><th>Detalle</th><th class="text-end">Cant.</th><th>Unid.</th><th class="text-end">P. unit.</th><th class="text-end">Importe</th></tr></thead>
       <tbody>
         <% o.renglones.forEach(r => { %>
-          <tr>
+          <tr<%- r.esDescuento ? ' class="is-descuento"' : '' %>>
             <td><%= r.descripcion %></td>
-            <td class="text-end"><%= Number(r.cantidad).toLocaleString('es-AR') %></td>
+            <%# El descuento es un importe: sin cantidad ni precio unitario %>
+            <td class="text-end"><%= r.esDescuento ? '' : Number(r.cantidad).toLocaleString('es-AR') %></td>
             <td><%= r.unidad %></td>
-            <td class="text-end"><%= $(r.precio_unit) %></td>
+            <td class="text-end"><%= r.esDescuento ? '' : $(r.precio_unit) %></td>
             <td class="text-end"><%= $(r.importe) %></td>
           </tr>
         <% }) %>

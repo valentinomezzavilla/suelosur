@@ -1,0 +1,396 @@
+@use '../abstracts/variables' as *;
+@use '../abstracts/mixins'    as *;
+
+// ═══════════════════════════════════════════════════════════════
+// Descuentos del cliente (views/partials/descuentos.ejs + public/js/descuentos.js)
+// ═══════════════════════════════════════════════════════════════
+
+// Barra arriba de las operaciones
+.desc-barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  flex-wrap: wrap;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  background: $bg-card;
+  border: 1px solid $border;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-xs;
+
+  &__texto {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    min-width: 0;
+    strong { font-size: $fs-base; color: $ink; font-weight: 600; }
+    span { font-size: $fs-sm; color: $muted; }
+  }
+
+  &__acciones {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    .btn { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+  }
+
+  &__cuenta {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.25rem;
+    height: 1.25rem;
+    padding: 0 0.35rem;
+    border-radius: 999px;
+    background: $accent-soft;
+    color: $accent-dark;
+    font-size: $fs-xxs;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  @include sm-down {
+    &__acciones { width: 100%; .btn { flex: 1 1 auto; justify-content: center; min-height: $control-h-lg; } }
+  }
+}
+
+// ── Modal "Agregar descuento" ───────────────────────────────────
+.desc-modal {
+  .modal-body { padding: 1.25rem 1.25rem 0; }
+  // Nada del modal empuja el ancho (textos largos en desplegables y números)
+  .form-select, .form-control { min-width: 0; max-width: 100%; }
+}
+
+.desc-form { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+
+.desc-paso {
+  min-width: 0;
+
+  &__titulo {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: $fs-sm;
+    font-weight: 600;
+    color: $ink-soft;
+  }
+
+  // Tipo y valor en la misma fila (en el celular, uno debajo del otro)
+  &--fila {
+    display: grid;
+    grid-template-columns: auto minmax(0, 260px);
+    align-items: end;
+    gap: 0.5rem 1.25rem;
+    @include sm-down { grid-template-columns: minmax(0, 1fr); }
+  }
+  &__ayuda { grid-column: 1 / -1; margin: 0; }
+}
+
+// Porcentaje / Monto fijo como control segmentado
+.desc-segmento {
+  display: inline-flex;
+  padding: 3px;
+  background: $gray-100;
+  border-radius: $radius-md;
+  gap: 2px;
+
+  &__op {
+    position: relative;
+    margin: 0;
+    cursor: pointer;
+
+    input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-height: $control-h-sm;
+      padding: 0.3rem 0.9rem;
+      border-radius: $radius-sm;
+      font-size: $fs-sm;
+      font-weight: 500;
+      color: $ink-soft;
+      transition: background-color $dur-fast $ease, color $dur-fast $ease, box-shadow $dur-fast $ease;
+    }
+    &:hover span { color: $ink; }
+    input:checked + span { background: $bg-card; color: $accent-dark; box-shadow: $shadow-sm; font-weight: 600; }
+    input:focus-visible + span { box-shadow: $focus-ring; }
+  }
+}
+
+// Valor con su % o $
+.desc-valor {
+  position: relative;
+  display: flex;
+  align-items: center;
+  max-width: 260px;
+
+  width: 100%;
+
+  .form-control {
+    width: 100%;
+    height: $control-h-lg;
+    font-size: 1.125rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    padding-right: 2.25rem;
+  }
+  &__prefijo, &__sufijo {
+    position: absolute;
+    color: $muted;
+    font-weight: 600;
+    pointer-events: none;
+  }
+  &__sufijo { right: 0.85rem; }
+  &__prefijo { left: 0.85rem; }
+  &__prefijo:not([hidden]) ~ .form-control { padding-left: 1.75rem; }
+}
+
+// Alcance: tarjetas seleccionables
+.desc-alcances {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  @include sm-down { grid-template-columns: 1fr; }
+}
+
+.desc-alcance {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  background: $bg-card;
+  cursor: pointer;
+  transition: border-color $dur-fast $ease, background-color $dur-fast $ease, box-shadow $dur-fast $ease;
+
+  > input { margin-top: 0.2rem; accent-color: $accent; width: 16px; height: 16px; flex: 0 0 auto; }
+  &:hover { border-color: $border-input-hover; }
+  &.is-activo { border-color: $accent; background: $accent-soft; box-shadow: 0 0 0 1px $accent inset; }
+  &:focus-within { box-shadow: $focus-ring; }
+  &.is-disabled { opacity: 0.55; cursor: not-allowed; &:hover { border-color: $border; } }
+  &--ancho { grid-column: 1 / -1; }
+
+  &__cuerpo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 0;
+    flex: 1;
+    strong { font-size: $fs-sm; color: $ink; font-weight: 600; }
+    small { font-size: $fs-xs; color: $muted; line-height: 1.35; }
+    .form-select { margin-top: 0.15rem; }
+  }
+}
+
+.desc-ref {
+  margin-top: 0.75rem;
+  .form-label { font-size: $fs-sm; font-weight: 600; color: $ink-soft; margin-bottom: 0.35rem; }
+  .form-select { width: 100%; text-overflow: ellipsis; }
+}
+
+.desc-excluidas {
+  margin: 0.6rem 0 0;
+  font-size: $fs-xs;
+  color: $muted;
+  line-height: 1.45;
+  strong { color: $ink-soft; font-weight: 600; }
+}
+
+// Vista previa
+.desc-previa {
+  border: 1px dashed $border-input;
+  border-radius: $radius-md;
+  padding: 0.9rem 1rem;
+  background: $bg-card-alt;
+  transition: opacity $dur $ease;
+
+  &.is-cargando { opacity: 0.55; }
+
+  &__vacio { margin: 0; font-size: $fs-sm; color: $muted; text-align: center; }
+  &__error { margin: 0; font-size: $fs-sm; color: $danger-text; font-weight: 500; }
+  &__titulo { margin: 0 0 0.6rem; font-size: $fs-sm; font-weight: 600; color: $ink-soft; }
+
+  &__resumen {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    // En el celular: renglones compactos (etiqueta a la izquierda, importe a la derecha)
+    @include sm-down {
+      grid-template-columns: 1fr;
+      gap: 0.35rem;
+      > div:is(div) { flex-direction: row; align-items: baseline; justify-content: space-between; padding: 0.45rem 0.65rem; }
+    }
+
+    > div {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+      padding: 0.55rem 0.7rem;
+      background: $bg-card;
+      border: 1px solid $border-soft;
+      border-radius: $radius-sm;
+    }
+    span { font-size: $fs-xs; color: $muted; }
+    strong { font-size: 1rem; color: $ink; font-variant-numeric: tabular-nums; }
+    .is-descuento strong { color: $success-text; }
+    .is-queda { border-color: $accent-border; background: $accent-soft; strong { color: $accent-darker; } }
+  }
+
+  &__tabla {
+    background: $bg-card;
+    font-size: $fs-sm;
+    th { font-size: $fs-xs; color: $muted; font-weight: 600; white-space: nowrap; }
+    td { vertical-align: top; font-variant-numeric: tabular-nums; }
+    td.text-end { white-space: nowrap; }
+    td small { display: block; color: $muted; font-size: $fs-xs; }
+    tr.con-aviso td { border-bottom: 0; }
+  }
+  &__fila-aviso td { padding-top: 0; }
+
+  // En el celular cada operación es una tarjeta: nombre arriba, Debe / Descuento / Queda abajo
+  @include sm-down {
+    .table-responsive { overflow: visible; }
+    &__tabla {
+      &, tbody { display: block; width: 100%; }
+      thead { display: none; }
+      tr { display: block; padding: 0.6rem 0.1rem; border-bottom: 1px solid $border-line; }
+      tr.con-aviso { border-bottom: 0; padding-bottom: 0.2rem; }
+      td { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; padding: 0.1rem 0 !important; border: 0; }
+      td:first-child { display: block; margin-bottom: 0.3rem; }
+      td[data-label]::before { content: attr(data-label); font-size: $fs-xs; color: $muted; font-weight: 500; }
+    }
+    &__fila-aviso { padding-top: 0 !important; }
+  }
+  &__menos { color: $success-text; white-space: nowrap; }
+}
+
+// Cartel de factura emitida
+.desc-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0;
+  padding: 0.4rem 0.55rem;
+  border-radius: $radius-sm;
+  background: $warning-soft;
+  border: 1px solid $warning-border;
+  color: $warning-text;
+  font-size: $fs-xs;
+  font-weight: 500;
+  line-height: 1.35;
+  svg { flex: 0 0 auto; margin-top: 1px; }
+}
+
+// Acciones fijas al pie del modal (siempre a la vista, con lo que se va a descontar)
+.desc-pie {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 -1.25rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid $border-soft;
+  background: rgba(255, 255, 255, 0.95);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+
+  &__total {
+    margin: 0;
+    font-size: $fs-sm;
+    color: $muted;
+    strong { color: $success-text; font-size: 1rem; font-variant-numeric: tabular-nums; }
+  }
+  &__botones { display: flex; gap: 0.5rem; margin-left: auto; }
+
+  @include sm-down {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    &__botones { margin-left: 0; .btn { flex: 1 1 0; min-height: $control-h-lg; } }
+  }
+}
+
+// ── Modal "Descuentos aplicados" ────────────────────────────────
+.desc-lista { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.desc-item {
+  border: 1px solid $border;
+  border-radius: $radius-md;
+  padding: 0.85rem 1rem;
+  background: $bg-card;
+
+  &.is-revertido { background: $bg-card-alt; opacity: 0.75; .desc-item__total { text-decoration: line-through; color: $muted; } }
+
+  &__cabecera { display: flex; align-items: center; gap: 0.75rem; }
+  &__valor {
+    flex: 0 0 auto;
+    min-width: 3.25rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: $radius-sm;
+    background: $success-soft;
+    border: 1px solid $success-border;
+    color: $success-text;
+    font-weight: 700;
+    font-size: $fs-sm;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  &__datos {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    flex: 1;
+    strong { color: $ink; font-size: $fs-base; }
+    small { color: $muted; font-size: $fs-xs; }
+  }
+  &__total { font-weight: 700; color: $success-text; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  &__motivo { margin: 0.5rem 0 0; font-size: $fs-sm; color: $ink-soft; }
+
+  &__ops {
+    list-style: none;
+    margin: 0.6rem 0 0;
+    padding: 0.5rem 0 0;
+    border-top: 1px solid $border-line;
+    li { display: flex; justify-content: space-between; gap: 1rem; font-size: $fs-sm; padding: 0.15rem 0; color: $ink-soft; }
+    strong { font-variant-numeric: tabular-nums; color: $ink; font-weight: 600; }
+  }
+  &__acciones { display: flex; justify-content: flex-end; margin-top: 0.6rem; }
+  &__revertido { margin: 0.5rem 0 0; font-size: $fs-xs; color: $muted; }
+
+  @include sm-down {
+    &__cabecera { flex-wrap: wrap; }
+    &__total { width: 100%; text-align: right; }
+  }
+}
+
+.desc-chip {
+  font-style: normal;
+  font-size: $fs-xxs;
+  font-weight: 600;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: $warning-soft;
+  color: $warning-text;
+  border: 1px solid $warning-border;
+}
+
+.desc-revertir {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border-radius: $radius-sm;
+  background: $danger-soft;
+  border: 1px solid $danger-border;
+  .form-label { font-size: $fs-sm; font-weight: 600; color: $danger-text; }
+  .form-hint { margin: 0.35rem 0 0.6rem; font-size: $fs-xs; color: $danger-text; }
+  &__botones { display: flex; justify-content: flex-end; gap: 0.5rem; }
+}
+
+// Renglón "Descuento …" en el detalle de la operación (partials/liquidacion_operacion)
+.liq-op__tabla tr.is-descuento td { color: $success-text; font-weight: 500; }

@@ -1,0 +1,146 @@
+<%#
+  Descuentos del cliente (public/js/descuentos.js): botones "Agregar descuento" y "Ver descuentos
+  aplicados" (solo si tiene alguno vigente) y sus dos modales. Lo usan Liquidaciones (con
+  cliente) y la Cuenta corriente. Solo dueño y administración contable.
+  Recibe:
+    idCliente, nombre   el cliente
+    filtros             la query string de la pantalla (las operaciones "en pantalla")
+    volver              la URL a la que vuelve después de aplicar / revertir
+    vigentes            cantidad de descuentos vigentes del cliente
+  Ver docs/superpowers/specs/2026-11-19-descuentos-design.md
+%>
+<% if (locals.user && ['dueno', 'admin_contable'].includes(user.rol)) { %>
+<div class="desc-barra" data-desc-cliente="<%= idCliente %>" data-desc-nombre="<%= nombre %>"
+     data-desc-filtros="<%= filtros %>" data-desc-volver="<%= volver %>">
+  <div class="desc-barra__texto">
+    <strong>Descuentos</strong>
+    <span><%= vigentes ? (vigentes === 1 ? 'Tiene 1 descuento vigente.' : `Tiene ${vigentes} descuentos vigentes.`) : 'Bajan lo que debe el cliente: por porcentaje o monto fijo.' %></span>
+  </div>
+  <div class="desc-barra__acciones">
+    <% if (vigentes) { %>
+      <button type="button" class="btn btn-sm btn-outline-secondary js-desc-ver">
+        <%- icon('eye', { size: 15 }) %> Ver descuentos aplicados <span class="desc-barra__cuenta"><%= vigentes %></span>
+      </button>
+    <% } %>
+    <button type="button" class="btn btn-sm btn-primary js-desc-agregar">
+      <%- icon('tag', { size: 15 }) %> Agregar descuento
+    </button>
+  </div>
+</div>
+
+<%# ── Modal: agregar descuento ─────────────────────────────── %>
+<div id="modal-descuento" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-box--lg desc-modal" role="dialog" aria-modal="true" aria-labelledby="modal-descuento-titulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-descuento-titulo">Agregar descuento — <span><%= nombre %></span></h2>
+      <button type="button" class="modal-close js-desc-cerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <form id="formDescuento" method="POST" action="/descuentos" class="modal-body desc-form" novalidate>
+      <input type="hidden" name="clienteId" value="<%= idCliente %>">
+      <input type="hidden" name="filtros" value="<%= filtros %>">
+      <input type="hidden" name="volver" value="<%= volver %>">
+      <input type="hidden" name="referencia" id="descReferencia">
+      <input type="hidden" name="totalEsperado" id="descTotalEsperado">
+
+      <div class="desc-paso desc-paso--fila">
+        <div>
+          <span class="desc-paso__titulo" id="descTipoLabel">Tipo de descuento</span>
+          <div class="desc-segmento" role="radiogroup" aria-labelledby="descTipoLabel">
+            <label class="desc-segmento__op">
+              <input type="radio" name="tipo" value="porcentaje" checked>
+              <span><%- icon('percent', { size: 15 }) %> Porcentaje</span>
+            </label>
+            <label class="desc-segmento__op">
+              <input type="radio" name="tipo" value="monto">
+              <span><%- icon('dollar', { size: 15 }) %> Monto fijo</span>
+            </label>
+          </div>
+        </div>
+        <div class="desc-paso__valor">
+          <label class="desc-paso__titulo" for="descValor" id="descValorLabel">Porcentaje a descontar</label>
+          <div class="desc-valor">
+            <span class="desc-valor__prefijo" id="descPrefijo" hidden>$</span>
+            <input type="text" name="valor" id="descValor" class="form-control" inputmode="decimal" autocomplete="off" required placeholder="Ej: 10" aria-describedby="descValorAyuda">
+            <span class="desc-valor__sufijo" id="descSufijo">%</span>
+          </div>
+        </div>
+        <p class="form-hint desc-paso__ayuda" id="descValorAyuda">Se calcula sobre lo que falta pagar de cada operación: no toca lo que ya está pagado.</p>
+      </div>
+
+      <div class="desc-paso">
+        <span class="desc-paso__titulo" id="descAlcanceLabel">¿A qué se aplica?</span>
+        <div class="desc-alcances" role="radiogroup" aria-labelledby="descAlcanceLabel" id="descAlcances">
+          <label class="desc-alcance">
+            <input type="radio" name="alcance" value="todas" checked>
+            <span class="desc-alcance__cuerpo"><strong>Todas las operaciones</strong><small id="descInfoTodas">Cargando…</small></span>
+          </label>
+          <label class="desc-alcance">
+            <input type="radio" name="alcance" value="operacion">
+            <span class="desc-alcance__cuerpo"><strong>Una operación</strong><small>De las que se ven en pantalla.</small></span>
+          </label>
+          <label class="desc-alcance">
+            <input type="radio" name="alcance" value="remito">
+            <span class="desc-alcance__cuerpo"><strong>Un N° de remito</strong><small>Se reparte entre sus operaciones.</small></span>
+          </label>
+          <label class="desc-alcance">
+            <input type="radio" name="alcance" value="factura">
+            <span class="desc-alcance__cuerpo"><strong>Un N° de factura</strong><small>Se reparte entre sus operaciones.</small></span>
+          </label>
+          <label class="desc-alcance desc-alcance--ancho">
+            <input type="radio" name="alcance" value="saldo">
+            <span class="desc-alcance__cuerpo"><strong>Sobre el saldo total</strong><small id="descInfoSaldo">Un crédito que se aplica a lo más viejo.</small></span>
+          </label>
+        </div>
+        <%# Solo el del alcance elegido (public/js/descuentos.js) %>
+        <div class="desc-ref" data-alcance="operacion" hidden>
+          <label class="form-label" for="descRefOperacion">Operación</label>
+          <select class="form-select js-desc-ref" id="descRefOperacion" data-alcance="operacion"></select>
+        </div>
+        <div class="desc-ref" data-alcance="remito" hidden>
+          <label class="form-label" for="descRefRemito">N° de remito</label>
+          <select class="form-select js-desc-ref" id="descRefRemito" data-alcance="remito"></select>
+        </div>
+        <div class="desc-ref" data-alcance="factura" hidden>
+          <label class="form-label" for="descRefFactura">N° de factura</label>
+          <select class="form-select js-desc-ref" id="descRefFactura" data-alcance="factura"></select>
+        </div>
+        <p class="desc-excluidas" id="descExcluidas" hidden></p>
+      </div>
+
+      <div class="desc-paso">
+        <label class="form-label" for="descMotivo">Motivo <span class="text-muted fw-normal">(opcional)</span></label>
+        <input type="text" name="motivo" id="descMotivo" class="form-control" maxlength="300" placeholder="Ej: pago anticipado, cliente frecuente">
+      </div>
+
+      <div class="desc-previa" id="descPrevia" aria-live="polite">
+        <p class="desc-previa__vacio">Ingresá el valor para ver cuánto se descuenta.</p>
+      </div>
+
+      <div class="desc-pie">
+        <p class="desc-pie__total" id="descPieTotal" aria-live="polite"></p>
+        <div class="desc-pie__botones">
+          <button type="button" class="btn btn-outline-secondary js-desc-cerrar">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="descAplicar" disabled>Aplicar descuento</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%# ── Modal: descuentos aplicados ──────────────────────────── %>
+<div id="modal-descuentos" class="modal-overlay" style="display:none">
+  <div class="modal-box modal-box--lg desc-modal" role="dialog" aria-modal="true" aria-labelledby="modal-descuentos-titulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-descuentos-titulo">Descuentos aplicados — <span><%= nombre %></span></h2>
+      <button type="button" class="modal-close js-desc-cerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="desc-lista" id="descLista" aria-live="polite"><p class="text-muted mb-0">Cargando…</p></div>
+      <label class="form-check mt-3 mb-0" id="descVerRevertidosCaja" hidden>
+        <input type="checkbox" class="form-check-input" id="descVerRevertidos">
+        <span class="form-check-label">Mostrar los revertidos</span>
+      </label>
+    </div>
+  </div>
+</div>
+<% } %>

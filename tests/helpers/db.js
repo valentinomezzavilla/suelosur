@@ -80,6 +80,7 @@ async function abrir() {
   // sin desplegar, se aplican dentro de la prueba (y se deshacen con el ROLLBACK)
   if (typeof db.migrarImportesADoble === 'function') await db.migrarImportesADoble(cliente)
   if (typeof db.migrarImputacionesPago === 'function') await db.migrarImputacionesPago(cliente)
+  if (typeof db.migrarDescuentos === 'function') await db.migrarDescuentos(cliente)
   const haySaldoCalculado = (await cliente.query(`SELECT 1 FROM pg_trigger WHERE tgname = 'movimientos_cuenta_saldo'`)).rowCount
   if (!haySaldoCalculado && typeof db.instalarSaldoCalculado === 'function') await db.instalarSaldoCalculado(cliente)
 }

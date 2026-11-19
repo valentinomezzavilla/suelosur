@@ -1684,6 +1684,9 @@ async function initDB() {
   // A qué operaciones se aplica cada pago (lo que se eligió al registrarlo)
   await migrarImputacionesPago()
 
+  // Descuentos a clientes (Liquidaciones / Cuenta corriente) y cuánto le tocó a cada operación
+  await migrarDescuentos()
+
   // Saldo de la cuenta corriente = suma de sus movimientos, mantenido por la base
   const corregidos = await instalarSaldoCalculado()
   if (corregidos.length) {
@@ -1778,6 +1781,47 @@ async function migrarImputacionesPago(cliente = null) {
       CHECK (id_op_encabezado IS NOT NULL OR id_cargo IS NOT NULL)
     )`)
   await ejecutar(`CREATE INDEX IF NOT EXISTS idx_imputaciones_pago_pago ON imputaciones_pago(id_pago)`)
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Descuentos a clientes: cada descuento (tipo, valor, a qué se aplicó, quién) y cuánto le tocó a
+// cada operación. En las operaciones a cuenta corriente (y en "sobre el saldo") el descuento es
+// además un ajuste a favor en movimientos_cuenta (id_movimiento). Revertir lo marca revertido y
+// anula esos ajustes. Ver docs/superpowers/specs/2026-11-19-descuentos-design.md
+// `cliente` (opcional): conexión con una transacción abierta (el arnés de pruebas).
+// ─────────────────────────────────────────────────────────────────
+async function migrarDescuentos(cliente = null) {
+  const ejecutar = (sql) => (cliente ? cliente.query(sql) : pool.query(sql))
+  await ejecutar(`
+    CREATE TABLE IF NOT EXISTS descuentos (
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      cliente_id       BIGINT NOT NULL REFERENCES clientes(id),
+      tipo             TEXT NOT NULL CHECK (tipo IN ('porcentaje','monto')),
+      valor            DOUBLE PRECISION NOT NULL CHECK (valor > 0),
+      alcance          TEXT NOT NULL CHECK (alcance IN ('todas','operacion','remito','factura','saldo')),
+      referencia       TEXT,
+      total            DOUBLE PRECISION NOT NULL,
+      motivo           TEXT,
+      id_usuario       BIGINT,
+      created_at       TEXT DEFAULT ahora_local(),
+      revertido        INTEGER NOT NULL DEFAULT 0,
+      revertido_en     TEXT,
+      revertido_por    BIGINT,
+      revertido_motivo TEXT
+    )`)
+  await ejecutar(`CREATE INDEX IF NOT EXISTS idx_descuentos_cliente ON descuentos(cliente_id)`)
+  await ejecutar(`
+    CREATE TABLE IF NOT EXISTS descuento_operaciones (
+      id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+      id_descuento     BIGINT NOT NULL REFERENCES descuentos(id) ON DELETE CASCADE,
+      id_op_encabezado BIGINT REFERENCES op_encabezado(id) ON DELETE CASCADE,
+      monto            DOUBLE PRECISION NOT NULL CHECK (monto > 0),
+      id_movimiento    BIGINT REFERENCES movimientos_cuenta(id) ON DELETE SET NULL,
+      factura_emitida  INTEGER NOT NULL DEFAULT 0,
+      nro_factura      TEXT
+    )`)
+  await ejecutar(`CREATE INDEX IF NOT EXISTS idx_descuento_operaciones_op ON descuento_operaciones(id_op_encabezado)`)
+  await ejecutar(`CREATE INDEX IF NOT EXISTS idx_descuento_operaciones_desc ON descuento_operaciones(id_descuento)`)
 }
 
 // `cliente` (opcional): una conexión con una transacción ya abierta (el arnés de pruebas);
@@ -2013,4 +2057,4 @@ async function limpiarRastreoViejo(dias = 7) {
   }
 }
 
-module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock, migrarImportesADoble, instalarSaldoCalculado, migrarImputacionesPago }
+module.exports = { pool, query, transaction, initDB, limpiarRastreoViejo, migrarHorasALocal, migrarGruposAlquiler, migrarAsignacionPrecio, migrarDetalleCompras, vincularComprasConStock, migrarImportesADoble, instalarSaldoCalculado, migrarImputacionesPago, migrarDescuentos }

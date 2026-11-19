@@ -109,14 +109,33 @@ function renglonContenedor(r, neto, diasReales = null) {
   return { base, dias, renglon: { descripcion: base, unidad: 'días', cantidad: dias, precio_unit: Math.round(neto / dias * 100) / 100, importe: neto } }
 }
 
-// Agrega el IVA (para facturar) al neto de la operación: un renglón más del total
+// Agrega el IVA (para facturar) al neto de la operación: un renglón más del total. Los
+// descuentos (renglones esDescuento, al final) son sobre lo que paga el cliente: se restan
+// después del IVA.
 function cerrarTotales(op, alicuota) {
-  op.renglones = op.renglones.filter(x => !x.esIva)
+  const descuentos = op.renglones.filter(x => x.esDescuento)
+  op.renglones = op.renglones.filter(x => !x.esIva && !x.esDescuento)
   op.neto = op.total = redondear(op.renglones.reduce((s, x) => s + x.importe, 0))
   op.iva = op.aConvenir ? 0 : ivaDe(op.neto, alicuota)
   if (op.iva) {
     op.renglones.push({ descripcion: etiquetaIva(alicuota), unidad: '', cantidad: 1, precio_unit: op.iva, importe: op.iva, esIva: true })
     op.total = redondear(op.neto + op.iva)
+  }
+  op.descuento = redondear(descuentos.reduce((s, x) => s - x.importe, 0))
+  if (descuentos.length) {
+    op.renglones.push(...descuentos)
+    op.total = redondear(op.total - op.descuento)
+  }
+}
+
+// Descuentos vigentes (models/descuentos): un renglón negativo por cada uno
+async function aplicarDescuentos(ops) {
+  const porOp = await require('./descuentos.model').vigentesPorOperacion(ops.filter(o => !o.aConvenir).map(o => o.id))
+  for (const op of ops) {
+    const lista = porOp[op.id]
+    if (!lista || op.aConvenir) continue
+    lista.forEach(d => op.renglones.push({ descripcion: d.descripcion, unidad: '', cantidad: 1, precio_unit: -d.monto, importe: -d.monto, esDescuento: true }))
+    cerrarTotales(op, op._alicuota)
   }
 }
 
@@ -208,6 +227,7 @@ async function calcularOperaciones({ clienteId, desde, hasta, tipos, opIds }) {
 
   const ops = pedidas.map(r => armar(r, materiales, cobros[r.id]))
   await estimarSinCobrar(ops, pedidas)
+  await aplicarDescuentos(ops)
   for (const op of ops) {
     const enCuentaMetodo = L.METODOS_EN_CUENTA.includes(op.metodo_pago)
     const ccOp = enCuentaMetodo ? cc[op.id] : null
@@ -261,6 +281,11 @@ async function datosClientes(ids) {
 }
 
 const LiquidacionesModel = {
+  // Todas las operaciones del cliente (sin filtro de fecha) con su estado de pago
+  async operacionesCliente(clienteId) {
+    return (await calcularOperaciones({ clienteId, tipos: Object.keys(L.TIPOS) })).ops
+  },
+
   // Operaciones armadas (detalle, neto, IVA y total) por id, sin filtro de fecha ni de
   // estado de pago. Lo usa el PDF de Facturación. Devuelve { [id]: op }.
   async operacionesPorIds(ids) {
@@ -327,8 +352,10 @@ const LiquidacionesModel = {
     // Con un cliente: su saldo (el mismo que muestra la Cuenta corriente), con el detalle de
     // cuánto es de este período, de otros, sin cobrar y en curso
     const saldo = clienteId ? await LiquidacionesModel.saldoCliente(clienteId, { desde, hasta }) : null
+    // Descuentos sobre el saldo total (no atados a una operación), para el PDF
+    const descuentosSaldo = clienteId ? await require('./descuentos.model').sobreElSaldo(clienteId) : []
     return { clientes, resumen: L.resumir(ops), obra: obraElegida ? obraElegida.nombre : null,
-      obraEtiqueta: obraElegida ? obraElegida.etiqueta : null, saldo }
+      obraEtiqueta: obraElegida ? obraElegida.etiqueta : null, saldo, descuentosSaldo }
   },
 
   // Saldo del cliente (utils/liquidaciones.saldoDelCliente): la cuenta corriente (igual a

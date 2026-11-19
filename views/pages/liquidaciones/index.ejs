@@ -73,6 +73,12 @@
   <%- include('../../partials/saldo_cliente', { saldo: liquidacion.saldo, idCliente: idCli, linkCuenta: true, pendientePeriodo: r.saldo }) %>
 <% } %>
 
+<%# Descuentos del cliente: agregar (por %, monto, operación, remito, factura o sobre el saldo) y ver / revertir %>
+<% if (conCliente && liquidacion.clientes[0].cliente) { %>
+  <%- include('../../partials/descuentos', { idCliente: liquidacion.clientes[0].cliente.id, nombre: liquidacion.clientes[0].cliente.nombreCompleto,
+        filtros: qs(), volver: '/liquidaciones?' + qs(), vigentes: locals.descuentosVigentes || 0 }) %>
+<% } %>
+
 <% if (!r.cantidad) { %>
   <div class="card shadow-sm"><div class="card-body text-center text-muted py-5">Sin operaciones en el período.</div></div>
 <% } else if (conCliente) { %>

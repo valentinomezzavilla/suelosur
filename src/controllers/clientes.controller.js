@@ -143,12 +143,13 @@ const ClientesController = {
       const saldo = await require('../models/liquidaciones.model').saldoCliente(cli.id, { desde: filtros.desde, hasta: filtros.hasta })
       // N° de factura de las operaciones de la cuenta (botón "Agregar / Editar N°Factura")
       const opsNroFactura = await require('../models/facturacion.model').datosNroFactura(estado.movimientos.map(m => m.id_op_encabezado))
+      const descuentosVigentes = await require('../models/descuentos.model').cantidadVigentes(cli.id)
       res.render('pages/clientes/cuenta_detalle', {
         titulo: `Cuenta corriente — ${ClientesModel.nombreCompleto(cliente)}`,
-        cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura,
+        cliente, estado, resumenOps, pendientes, saldarPorCargo, aplicadoA, aFavorPorPago, saldo, obras, obra, TIPOS, opsNroFactura, descuentosVigentes,
         periodoLabel: etiquetaPeriodo({ preset: 'rango', desde: filtros.desde, hasta: filtros.hasta }),
         filtros: { ...filtros, obra: obra ? obra.claves : [] },
-        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js', '/js/filtroObra.js'],
+        scripts: ['/js/modalAbonar.js', '/js/estadoPago.js', '/js/nroFactura.js', '/js/observacionPdf.js', '/js/filtroObra.js', '/js/descuentos.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error.'); res.redirect('/clientes/cuentas')

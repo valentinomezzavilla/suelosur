@@ -115,6 +115,10 @@
   <div class="liq-resumen__caja"><span>Operaciones</span><strong><%= resumenOps.cantidad %></strong></div>
 </div>
 
+<%# Descuentos del cliente: agregar y ver / revertir (los mismos de Liquidaciones) %>
+<%- include('../../partials/descuentos', { idCliente: cliente.id, nombre, filtros: qsPdf,
+      volver: '/clientes/cuentas/' + cliente.id + '?' + qsPdf, vigentes: locals.descuentosVigentes || 0 }) %>
+
 <!-- Movimientos de la cuenta del período (fechas y obra) -->
 <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr))">
   <div class="stat-card stat-card--neutral">
