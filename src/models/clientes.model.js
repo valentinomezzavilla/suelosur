@@ -500,7 +500,8 @@ const ClientesModel = {
   // Las obras son del cliente: sin cliente válido, nada de esto se aplica.
   async seleccionFiltro(clienteId, claves) {
     const vacio = { clienteSel: null, obras: [], obra: null, opIds: null, claves: [] }
-    if (!/^\d+$/.test(String(clienteId ?? '').trim())) return vacio
+    // Hasta 18 dígitos: más largo no entra en un BIGINT y Postgres lo rechazaría con "out of range"
+    if (!/^\d{1,18}$/.test(String(clienteId ?? '').trim())) return vacio
     const c = await this.obtener(String(clienteId).trim())
     if (!c) return vacio
     const obra = await this.obrasElegidas(c.id, claves)

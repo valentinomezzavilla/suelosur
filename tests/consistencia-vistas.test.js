@@ -35,6 +35,13 @@ describe('vista Transacciones', () => {
     assert.match(html, /class="mov-chip is-active"[^>]*>\s*<span>Todas<\/span>\s*<span class="mov-chip__n">4<\/span>/)
     assert.match(html, /href="\/transacciones\?[^"]*categoria=sueldos/)
   })
+  it('las tarjetas de entró y salió muestran su ícono (no un cuadrado vacío)', async () => {
+    const html = await renderVista('pages/transacciones/index', locals)
+    for (const tono of ['success', 'danger']) {
+      const svg = html.match(new RegExp(`stat-card--${tono}">\\s*<div class="stat-card__icon">(<svg[\\s\\S]*?</svg>)`))[1]
+      assert.match(svg, /<(line|polyline|path)/, `tarjeta ${tono} sin dibujo`)
+    }
+  })
   it('entró / salió / neto / a cuenta corriente', async () => {
     const html = await renderVista('pages/transacciones/index', locals)
     assert.match(html, /Entró · Noviembre 2026/)

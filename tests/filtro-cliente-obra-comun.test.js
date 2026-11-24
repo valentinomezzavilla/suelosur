@@ -76,7 +76,8 @@ describe('ClientesModel.seleccionFiltro', () => {
   })
 
   it('cliente inexistente o con formato inválido: todo vacío', async () => {
-    for (const id of ['999999999', 'abc', '', undefined, '1; DROP TABLE x']) {
+    // (un número fuera del rango de BIGINT también: Postgres lo rechazaría con "out of range")
+    for (const id of ['999999999', 'abc', '', undefined, '1; DROP TABLE x', '99999999999999999999999']) {
       assert.deepEqual(await ClientesModel.seleccionFiltro(id, [A]),
         { clienteSel: null, obras: [], obra: null, opIds: null, claves: [] }, `clienteId ${JSON.stringify(id)}`)
     }

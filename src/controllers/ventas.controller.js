@@ -79,10 +79,10 @@ const VentasController = {
   async index(req, res) {
     try {
       // id_cliente (enlaces viejos) se lee como clienteId; ver filtro_cliente_obra
-      const { id_cliente: _idViejo, ...resto } = req.query
+      const { id_cliente, ...resto } = req.query
       const { estado, q, sort, dir, page, preset, fechaDesde, fechaHasta, mes } = req.query
       const periodo = resolverPeriodo({ preset, desde: fechaDesde, hasta: fechaHasta, mes })
-      const sel = await ClientesModel.seleccionFiltro(req.query.clienteId || req.query.id_cliente, req.query.obra)
+      const sel = await ClientesModel.seleccionFiltro(req.query.clienteId || id_cliente, req.query.obra)
 
       const filtrosBase = { estado, id_cliente: sel.clienteSel ? sel.clienteSel.id : null, opIds: sel.opIds, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
       const paginacion = await VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 20 })
