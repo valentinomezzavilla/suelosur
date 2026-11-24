@@ -490,6 +490,29 @@ const ClientesModel = {
     return unirObras(lista.map(clave => todas.find(o => o.clave === clave) || { clave, nombre: clave, opIds: [] }))
   },
 
+  // Cliente y obras que se eligieron en un filtro (componente filtro_cliente_obra), listos
+  // para la pantalla y para filtrar: { clienteSel, obras, obra, opIds, claves }.
+  //   clienteSel → { id, numero, nombreCompleto } (null si no hay cliente o no existe)
+  //   obras      → todas las obras del cliente, anuladas incluidas, para armar el desplegable
+  //   obra       → ver obrasElegidas (null si no se eligió ninguna)
+  //   opIds      → operaciones de las obras elegidas (null = sin filtro de obra; [] = ninguna)
+  //   claves     → claves de obra elegidas, normalizadas (vacío sin cliente)
+  // Las obras son del cliente: sin cliente válido, nada de esto se aplica.
+  async seleccionFiltro(clienteId, claves) {
+    const vacio = { clienteSel: null, obras: [], obra: null, opIds: null, claves: [] }
+    if (!/^\d+$/.test(String(clienteId ?? '').trim())) return vacio
+    const c = await this.obtener(String(clienteId).trim())
+    if (!c) return vacio
+    const obra = await this.obrasElegidas(c.id, claves)
+    return {
+      clienteSel: { id: c.id, numero: c.numero, nombreCompleto: this.nombreCompleto(c) },
+      obras: await this.obras(c.id, { incluirAnuladas: true }),
+      obra,
+      opIds: obra ? obra.opIds : null,
+      claves: clavesObra(claves),
+    }
+  },
+
   // Estado de cuenta de un período: movimientos + saldo inicial/final + totales.
   // Convención de signo: monto < 0 = débito (deuda), monto > 0 = crédito (pago/ajuste a favor).
   // obra (de obrasElegidas): solo los cargos de esas obras y todos los pagos del cliente.

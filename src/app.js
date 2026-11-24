@@ -53,6 +53,8 @@ app.use((req, res, next) => {
   res.locals.formatFechaHora = fmtFechaHora
   res.locals.hoyISO = hoyISO
   res.locals.sumarDiasHabiles = require('./utils/diasHabiles').sumarDiasHabiles
+  // Parámetros de URL de un objeto de filtros (varias obras = obra=a&obra=b)
+  res.locals.consulta = require('./utils/consulta').consulta
   res.locals.codigoTx = require('./models/transacciones.model').codigo
   // Notificaciones in-app: conteo de alertas para el badge del sidebar
   res.locals.alertasResumen = null
