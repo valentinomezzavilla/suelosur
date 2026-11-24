@@ -311,6 +311,14 @@
   text-align: center;
 }
 
+// Cliente y obras (filtro compartido con Liquidaciones) en la barra de filtros: más anchos que un campo común
+// (el cliente elegido se ve con su botón "Cambiar": necesita ~300px para no partirse en dos líneas)
+.filtro-group.tx-filtro-cliente  { flex: 1 1 300px; }
+.filtro-group.tx-filtro-obra     { flex: 1 1 220px; }
+.filtro-group.tx-filtro-empleado { flex: 1 1 180px; }
+// Corte de fila: arriba código, cliente, obra y empleado/proveedor; abajo remito, N° de OP, fechas y montos
+.tx-filtro-salto { flex-basis: 100%; height: 0; }
+
 // Monto con su sentido escrito (no solo por color)
 .mov-monto--entrada { color: $success-text; }
 .mov-monto--salida  { color: $danger-text; }

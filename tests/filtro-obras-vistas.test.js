@@ -70,6 +70,14 @@ describe('formularios con el filtro de obras', () => {
     assert.doesNotMatch(html, /<select name="obra"/)
   })
 
+  it('Libro de ventas: usa el componente compartido de cliente y obras (no una copia a mano)', async () => {
+    const html = await renderVista('pages/ventas/libro', { filtros: {} })
+    assert.match(html, /class="col-12 col-md-6 filtro-cliente position-relative"/)
+    assert.ok(html.includes('<input type="hidden" name="clienteId" id="inputClienteId" value="">'))
+    assert.match(html, /data-filtro-obras data-dinamico/)
+    assert.doesNotMatch(html, /Cliente \(opcional\)/)
+  })
+
   it('Reporte de cliente: casillas con las obras del cliente', async () => {
     const html = await renderVista('pages/clientes/reporte', { cliente: { id: 7, numero: 7, nombre: 'Ana', apellido: 'Paz' }, obras,
       filtros: { fechaDesde: '', fechaHasta: '' } })

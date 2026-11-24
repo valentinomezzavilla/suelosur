@@ -5,12 +5,13 @@ const ejs = require('ejs')
 const { icon } = require('../../src/config/icons')
 const { fmtFecha, fmtFechaHora, hoyISO } = require('../../src/utils/fecha')
 const { sumarDiasHabiles } = require('../../src/utils/diasHabiles')
+const { consulta } = require('../../src/utils/consulta')
 
 const VISTAS = path.join(__dirname, '..', '..', 'views')
 
 function renderVista(relativa, locals = {}) {
   return ejs.renderFile(path.join(VISTAS, relativa + '.ejs'), {
-    icon, formatFecha: fmtFecha, formatFechaHora: fmtFechaHora, hoyISO, sumarDiasHabiles,
+    icon, formatFecha: fmtFecha, formatFechaHora: fmtFechaHora, hoyISO, sumarDiasHabiles, consulta,
     user: { rol: 'dueno', nombre: 'Prueba' }, success: [], error: [], warning: [],
     ...locals,
   })

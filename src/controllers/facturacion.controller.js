@@ -66,16 +66,9 @@ const leerFiltros = (q) => {
 // Cliente y obras elegidos en el filtro (mismo filtro que Liquidaciones). Las obras se
 // traducen a sus operaciones con obrasElegidas. Un cliente que no existe se ignora.
 async function filtroCliente(filtros) {
-  if (!filtros.clienteId) return { clienteSel: null, obras: [], opIds: null, obra: null }
-  const c = await ClientesModel.obtener(filtros.clienteId)
-  if (!c) { filtros.clienteId = ''; filtros.obra = []; return { clienteSel: null, obras: [], opIds: null, obra: null } }
-  const obra = await ClientesModel.obrasElegidas(c.id, filtros.obra)
-  return {
-    clienteSel: { id: c.id, numero: c.numero, nombreCompleto: ClientesModel.nombreCompleto(c) },
-    obras: await ClientesModel.obras(c.id, { incluirAnuladas: true }),
-    opIds: obra ? obra.opIds : null,
-    obra,
-  }
+  const sel = await ClientesModel.seleccionFiltro(filtros.clienteId, filtros.obra)
+  if (!sel.clienteSel) { filtros.clienteId = ''; filtros.obra = [] }
+  return sel
 }
 
 const mensajeError = (err, porDefecto) => {

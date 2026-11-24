@@ -5,11 +5,15 @@
   const _total  = typeof total !== 'undefined' ? total : 0
   const _limit  = typeof limit !== 'undefined' ? limit : 15
   const _filtros = typeof filtros !== 'undefined' && filtros ? filtros : {}
+  // Una lista (varias obras) repite el parámetro: obra=a&obra=b
   const _qs = (p) => {
-    const base = Object.fromEntries(
-      Object.entries(_filtros).filter(([k, v]) => v !== '' && v != null && k !== 'page')
-    )
-    return new URLSearchParams({ ...base, page: p }).toString()
+    const sp = new URLSearchParams()
+    Object.entries(_filtros).forEach(([k, v]) => {
+      if (k === 'page') return
+      ;(Array.isArray(v) ? v : [v]).forEach(x => { if (x !== '' && x != null) sp.append(k, x) })
+    })
+    sp.append('page', p)
+    return sp.toString()
   }
 %>
 <% if (_tp > 1) { %>
