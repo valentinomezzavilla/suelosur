@@ -10,7 +10,7 @@ const { ESTADOS: ESTADOS_SUELDO } = require('../src/utils/sueldos')
 const { codigo: codigoTx } = require('../src/models/transacciones.model')
 
 describe('vista Transacciones', () => {
-  const filtros = { categoria: 'todas', id: '', tipo: '', idCliente: '', cliente: '', remito: '', nroOp: '', fechaDesde: '2026-11-01',
+  const filtros = { categoria: 'todas', id: '', tipo: '', clienteId: '', obra: [], cliente: '', remito: '', nroOp: '', fechaDesde: '2026-11-01',
     fechaHasta: '2026-11-30', montoMin: '', montoMax: '', mes: '', preset: 'mes', sortBy: 'fecha', sortDir: 'DESC' }
   const movimientos = [
     { origen: 'transaccion', id: 1, categoria: 'ventas', tipo: 'Venta Viaje', numero: 3, fecha: '2026-10-30 12:00:00', cargado_en: '2026-11-04 09:00:00',
@@ -24,7 +24,7 @@ describe('vista Transacciones', () => {
   ]
   const locals = {
     titulo: 'Transacciones', movimientos, filtros, categorias: M.CATEGORIAS, codigoMov: M.codigo, codigoTx,
-    clientesLista: [], periodoLabel: 'Noviembre 2026', pagina: 1, totalPaginas: 1, totalTransacciones: 4, scripts: [],
+    clienteSel: null, obras: [], periodoLabel: 'Noviembre 2026', pagina: 1, totalPaginas: 1, totalTransacciones: 4, scripts: [],
     metricas: { entradas: 1300, salidas: 800, neto: 500, aCuenta: 500, cantidad: 4,
       conteo: { todas: 4, ventas: 2, alquileres: 0, pagos_clientes: 1, sueldos: 1, compras: 0, ajustes: 0 } },
   }

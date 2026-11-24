@@ -6,15 +6,18 @@
                 const m = metricas || { entradas: 0, salidas: 0, neto: 0, aCuenta: 0, cantidad: 0, conteo: {} }
                 const money = (n) => '$' + Number(n||0).toLocaleString('es-AR')
                 const puedeCorregir = ['dueno','admin_contable'].includes(user?.rol)
+                // Los enlaces se arman con consulta(): omite los vacíos y repite el parámetro de las
+                // listas, así varias obras viajan como obra=a&obra=b
+                const sinOrden = (o) => { const { sortBy, sortDir, ...resto } = o; return resto }
                 // Enlace que conserva los filtros y cambia los que se pasan
                 const conFiltros = (cambios) => {
-                    const o = Object.assign({}, filtros, cambios)
-                    const limpio = Object.entries(o).filter(([k, v]) => v !== '' && v != null && k !== 'sortBy' && k !== 'sortDir' && !(k === 'categoria' && v === 'todas'))
-                    return '/transacciones?' + new URLSearchParams(limpio).toString()
+                    const o = sinOrden(Object.assign({}, filtros, cambios))
+                    if (o.categoria === 'todas') delete o.categoria
+                    return '/transacciones?' + consulta(o)
                 }
                 const presetHref = (p) => conFiltros({ preset: p, fechaDesde: '', fechaHasta: '', mes: '' })
                 // El reporte usa los mismos filtros que la tabla (sin la página ni el orden)
-                const qsReporte = new URLSearchParams(Object.entries(filtros).filter(([k, v]) => v !== '' && v != null && k !== 'sortBy' && k !== 'sortDir')).toString()
+                const qsReporte = consulta(sinOrden(filtros))
             %>
 
             <div class="page-header">
@@ -75,15 +78,13 @@
                     <input type="text" name="codigo" value="<%= filtros.codigo %>" maxlength="14"
                         placeholder="Ej: PAG-001240" autocomplete="off">
                 </div>
+                <%# Mismo filtro de cliente y obras que Liquidaciones (js/buscarCliente.js + js/filtroObra.js) %>
+                <%- include('../../partials/filtro_cliente_obra', { clienteSel, obras, obraSel: filtros.obra,
+                      claseCliente: 'filtro-group tx-filtro-cliente', claseObra: 'filtro-group tx-filtro-obra', claseInput: '', claseLabel: '' }) %>
                 <div class="filtro-group">
-                    <label>Cliente / persona</label>
-                    <input type="text" name="cliente" value="<%= filtros.cliente %>" list="listaClientesTx"
-                        placeholder="Nombre del cliente, empleado o proveedor..." autocomplete="off">
-                    <datalist id="listaClientesTx">
-                        <% (clientesLista || []).forEach(c => { %>
-                            <option value="<%= [c.nombre, c.apellido].filter(Boolean).join(' ') %>"><%= c.dni ? 'DNI ' + c.dni : '' %> <%= c.numero ? '· #' + c.numero : '' %></option>
-                        <% }) %>
-                    </datalist>
+                    <label>Empleado / proveedor</label>
+                    <input type="text" name="cliente" value="<%= filtros.cliente %>"
+                        placeholder="Nombre del empleado o proveedor..." autocomplete="off">
                 </div>
                 <div class="filtro-group">
                     <label>Remito</label>
@@ -209,7 +210,7 @@
 
             <% if (totalPaginas > 1) { %>
                 <%
-                    const qs = Object.entries(filtros).filter(([, v]) => v !== '' && v != null).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+                    const qs = consulta(filtros);
                     const base = '/transacciones?' + (qs ? qs + '&' : '');
                 %>
                 <nav class="pagination" style="display:flex;justify-content:center;align-items:center;gap:0.75rem;padding:1rem 0;margin-top:0.5rem">

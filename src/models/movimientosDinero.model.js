@@ -104,7 +104,9 @@ function condicionCodigo(c) {
 
 // WHERE sobre la unión (alias u). `categoria` es el botón elegido; el resto, los filtros de
 // siempre. Remito e id son solo de cobros (transacciones): con ellos las demás fuentes quedan afuera.
-function filtro({ categoria, tipo, id, codigo, clienteId, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}, { sinCategoria = false } = {}) {
+// opIds: operaciones de las obras elegidas en el filtro (null/ausente = sin filtro de obra; [] = ninguna).
+// Los pagos de cliente no tienen operación, así que con una obra elegida quedan afuera.
+function filtro({ categoria, tipo, id, codigo, clienteId, opIds, cliente, remito, nroOp, fechaDesde, fechaHasta, montoMin, montoMax } = {}, { sinCategoria = false } = {}) {
   const w = []
   const p = []
   if (!sinCategoria && categoria && categoria !== 'todas' && CLAVES.includes(categoria)) { w.push('u.categoria = ?'); p.push(categoria) }
@@ -113,6 +115,7 @@ function filtro({ categoria, tipo, id, codigo, clienteId, cliente, remito, nroOp
   if (id) { w.push(`u.origen = 'transaccion' AND u.id = ?`); p.push(Number(id) || 0) }
   if (codigo && String(codigo).trim()) { const c = condicionCodigo(codigoDeTexto(codigo)); w.push(c.sql); p.push(...c.params) }
   if (clienteId) { w.push('u.cliente_id = ?'); p.push(clienteId) }
+  if (opIds)     { w.push('u.id_op_encabezado = ANY(?::bigint[])'); p.push(opIds.map(String)) }
   const texto = String(cliente || '').trim()
   // Si en la caja de nombres se escribe un código (PAG-001240), se busca ese código
   const codigoEnNombre = texto ? codigoDeTexto(texto, { estricto: true }) : null

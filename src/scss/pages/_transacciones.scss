@@ -311,6 +311,10 @@
   text-align: center;
 }
 
+// Cliente y obras (filtro compartido con Liquidaciones) en la barra de filtros: más anchos que un campo común
+.filtro-group.tx-filtro-cliente { flex: 1 1 240px; }
+.filtro-group.tx-filtro-obra    { flex: 1 1 200px; }
+
 // Monto con su sentido escrito (no solo por color)
 .mov-monto--entrada { color: $success-text; }
 .mov-monto--salida  { color: $danger-text; }

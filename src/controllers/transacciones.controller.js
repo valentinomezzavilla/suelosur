@@ -16,14 +16,20 @@ const METODOS = {
 const SENTIDO = { entrada: 'Entrada', salida: 'Salida', a_cuenta: 'A cuenta corriente' }
 
 // Los mismos filtros para el listado y para el reporte: lo que se ve es lo que se exporta.
-function leerFiltros(q) {
+// Cliente y obras (componente filtro_cliente_obra): clienteId + una o varias obra. idCliente (enlaces
+// viejos) se lee igual. `cliente` es el texto libre (empleado / proveedor): filtra por nombre.
+// sel = { clienteSel, obras, obra, opIds, claves } de ClientesModel.seleccionFiltro.
+async function leerFiltros(q) {
   const periodo = resolverPeriodo({ preset: q.preset, desde: q.fechaDesde, hasta: q.fechaHasta, mes: q.mes })
   const categoria = MovimientosDineroModel.CLAVES.includes(q.categoria) ? q.categoria : 'todas'
+  const sel = await ClientesModel.seleccionFiltro(q.clienteId || q.idCliente, q.obra)
   return {
     periodo,
+    sel,
     filtros: {
       categoria,
-      id: q.id, codigo: q.codigo, tipo: q.tipo, clienteId: q.idCliente, cliente: q.cliente, remito: q.remito, nroOp: q.nroOp,
+      id: q.id, codigo: q.codigo, tipo: q.tipo, clienteId: sel.clienteSel ? sel.clienteSel.id : undefined, opIds: sel.opIds,
+      cliente: q.cliente, remito: q.remito, nroOp: q.nroOp,
       fechaDesde: periodo.desde, fechaHasta: periodo.hasta,
       montoMin: q.montoMin, montoMax: q.montoMax,
     },
@@ -33,9 +39,9 @@ function leerFiltros(q) {
 const TransaccionesController = {
   async index(req, res) {
     try {
-      const { id, codigo, tipo, idCliente, cliente, remito, nroOp, montoMin, montoMax, sortBy, sortDir } = req.query
+      const { id, codigo, tipo, cliente, remito, nroOp, montoMin, montoMax, sortBy, sortDir } = req.query
       // Período: presets (hoy/semana/mes/rango). Default = mes en curso.
-      const { periodo, filtros: baseFiltros } = leerFiltros(req.query)
+      const { periodo, filtros: baseFiltros, sel } = await leerFiltros(req.query)
 
       const pagina = Math.max(1, Number(req.query.page) || 1)
       const resultado = await MovimientosDineroModel.listar({
@@ -47,7 +53,8 @@ const TransaccionesController = {
 
       const filtros = {
         categoria: baseFiltros.categoria,
-        id: id||'', codigo: codigo||'', tipo: tipo||'', idCliente: idCliente||'', cliente: cliente||'', remito: remito||'', nroOp: nroOp||'',
+        id: id||'', codigo: codigo||'', tipo: tipo||'', clienteId: sel.clienteSel ? String(sel.clienteSel.id) : '', obra: sel.claves,
+        cliente: cliente||'', remito: remito||'', nroOp: nroOp||'',
         fechaDesde: periodo.desde||'', fechaHasta: periodo.hasta||'', montoMin: montoMin||'',
         montoMax: montoMax||'', mes: periodo.mes||'', preset: periodo.preset||'',
         sortBy: sortBy||'fecha', sortDir: sortDir||'DESC',
@@ -59,7 +66,8 @@ const TransaccionesController = {
         filtros,
         categorias: MovimientosDineroModel.CATEGORIAS,
         codigoMov: MovimientosDineroModel.codigo,
-        clientesLista: await ClientesModel.listar(),
+        clienteSel: sel.clienteSel,
+        obras: sel.obras,
         metricas,
         periodoLabel: etiquetaPeriodo(periodo),
         pagina: resultado.page,
@@ -67,7 +75,7 @@ const TransaccionesController = {
         totalTransacciones: resultado.total,
         estadosPago: await require('../models/liquidaciones.model').estadosPago(
           resultado.rows.filter(t => t.origen === 'transaccion').map(t => t.id_op_encabezado)),
-        scripts: ['/js/transacciones.js', '/js/estadoPago.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/transacciones.js', '/js/estadoPago.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al cargar transacciones.'); res.redirect('back')
@@ -79,7 +87,7 @@ const TransaccionesController = {
   async exportar(req, res) {
     try {
       const formato = req.params.formato === 'pdf' ? 'pdf' : 'excel'
-      const { periodo, filtros } = leerFiltros(req.query)
+      const { periodo, filtros, sel } = await leerFiltros(req.query)
       const lista = await MovimientosDineroModel.todos(filtros)
       const ops = await MovimientosDineroModel.detalleOperaciones(lista.filter(t => t.origen === 'transaccion').map(t => t.id_op_encabezado))
 
@@ -160,7 +168,9 @@ const TransaccionesController = {
         filtros.categoria !== 'todas' && cat ? `Mostrando: ${cat.etiqueta}` : null,
         filtros.tipo && filtros.tipo !== 'todos' ? `Tipo: ${filtros.tipo}` : null,
         filtros.codigo ? `Código: ${filtros.codigo}` : null,
-        filtros.cliente ? `Cliente / persona: ${filtros.cliente}` : null,
+        sel.clienteSel ? `Cliente: ${sel.clienteSel.nombreCompleto}` : null,
+        sel.obra ? `${sel.obra.etiqueta}: ${sel.obra.nombre}` : null,
+        filtros.cliente ? `Persona: ${filtros.cliente}` : null,
         filtros.montoMin ? `Monto desde $${Number(filtros.montoMin).toLocaleString('es-AR')}` : null,
         filtros.montoMax ? `Monto hasta $${Number(filtros.montoMax).toLocaleString('es-AR')}` : null,
         'Fecha = fecha de pago',
