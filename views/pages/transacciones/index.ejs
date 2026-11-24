@@ -81,11 +81,12 @@
                 <%# Mismo filtro de cliente y obras que Liquidaciones (js/buscarCliente.js + js/filtroObra.js) %>
                 <%- include('../../partials/filtro_cliente_obra', { clienteSel, obras, obraSel: filtros.obra,
                       claseCliente: 'filtro-group tx-filtro-cliente', claseObra: 'filtro-group tx-filtro-obra', claseInput: '', claseLabel: '' }) %>
-                <div class="filtro-group">
+                <div class="filtro-group tx-filtro-empleado">
                     <label>Empleado / proveedor</label>
                     <input type="text" name="cliente" value="<%= filtros.cliente %>"
                         placeholder="Nombre del empleado o proveedor..." autocomplete="off">
                 </div>
+                <div class="tx-filtro-salto" aria-hidden="true"></div>
                 <div class="filtro-group">
                     <label>Remito</label>
                     <input type="text" name="remito" value="<%= filtros.remito %>" inputmode="numeric"
