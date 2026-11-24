@@ -4,28 +4,16 @@
   const totalTodas  = Object.values(conteo).reduce((a, b) => a + b, 0)
   const estadoAct   = filtros.estado || ''
 
-  // Filtros vigentes (sin page) para preservarlos en links de tabs / orden
-  const baseFiltros = {}
-  ;['estado','id_cliente','q','sort','dir','preset','fechaDesde','fechaHasta','mes'].forEach(k => { if (filtros[k]) baseFiltros[k] = filtros[k] })
+  // Los enlaces se arman con consulta(): omite los vacíos y repite el parámetro de las listas,
+  // así varias obras viajan como obra=a&obra=b (la página se resetea al cambiar de pestaña/período/orden)
+  const f = filtros
 
-  // Helper: link de pestaña por estado (resetea page, preserva búsqueda/cliente/período)
-  const tabHref = (key) => {
-    const o = {}
-    if (key) o.estado = key
-    if (filtros.id_cliente) o.id_cliente = filtros.id_cliente
-    if (filtros.q) o.q = filtros.q
-    ;['preset','fechaDesde','fechaHasta','mes'].forEach(k => { if (filtros[k]) o[k] = filtros[k] })
-    return '/ventas?' + new URLSearchParams(o).toString()
-  }
+  // Helper: link de pestaña por estado (preserva búsqueda/cliente/obras/período)
+  const tabHref = (key) => '/ventas?' + consulta({ estado: key, clienteId: f.clienteId, obra: f.obra, q: f.q,
+    preset: f.preset, fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta, mes: f.mes })
 
-  // Helper: chips de período (preserva estado/cliente/q)
-  const presetHref = (p) => {
-    const o = { preset: p }
-    if (filtros.estado) o.estado = filtros.estado
-    if (filtros.id_cliente) o.id_cliente = filtros.id_cliente
-    if (filtros.q) o.q = filtros.q
-    return '/ventas?' + new URLSearchParams(o).toString()
-  }
+  // Helper: chips de período (preserva estado/cliente/obras/q)
+  const presetHref = (p) => '/ventas?' + consulta({ preset: p, estado: f.estado, clienteId: f.clienteId, obra: f.obra, q: f.q })
   const money = (n) => '$' + Number(n || 0).toLocaleString('es-AR')
   const tipoOperacion = (op) => op.modalidad === 'flete' ? 'Viaje' : 'Cantera'
   const met = metricas || { total: 0, count: 0 }
@@ -35,8 +23,8 @@
     const activo  = filtros.sort === col
     const nextDir = (activo && filtros.dir === 'asc') ? 'desc' : 'asc'
     const arrow   = activo ? (filtros.dir === 'asc' ? ' ▲' : ' ▼') : ''
-    const o = { ...baseFiltros, sort: col, dir: nextDir }
-    const href = '/ventas?' + new URLSearchParams(o).toString()
+    const href = '/ventas?' + consulta({ estado: f.estado, clienteId: f.clienteId, obra: f.obra, q: f.q, sort: col, dir: nextDir,
+      preset: f.preset, fechaDesde: f.fechaDesde, fechaHasta: f.fechaHasta, mes: f.mes })
     return `<a href="${href}" class="th-sort${activo ? ' is-active' : ''}">${label}${arrow}</a>`
   }
 
@@ -100,25 +88,21 @@
     <% if (filtros.sort)   { %><input type="hidden" name="sort"   value="<%= filtros.sort %>"><% } %>
     <% if (filtros.dir)    { %><input type="hidden" name="dir"    value="<%= filtros.dir %>"><% } %>
     <div class="row g-2 align-items-end">
-      <div class="col-md-3">
+      <div class="col-12 col-md-4">
         <label class="form-label">Buscar</label>
         <input type="text" name="q" value="<%= filtros.q || '' %>" class="form-control form-control-sm"
                placeholder="N° de OP, remito, cliente, N° de factura...">
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Cliente</label>
-        <select name="id_cliente" class="form-select form-select-sm" data-buscable>
-          <option value="">Todos los clientes</option>
-          <% clientes.forEach(c => { %>
-            <option value="<%= c.id %>" <%= filtros.id_cliente === c.id ? 'selected' : '' %>><%= [c.nombre, c.apellido].filter(Boolean).join(' ') %></option>
-          <% }) %>
-        </select>
-      </div>
-      <div class="col-md-2">
+      <%# Mismo filtro de cliente y obras que Liquidaciones (js/buscarCliente.js + js/filtroObra.js) %>
+      <%- include('../../partials/filtro_cliente_obra', { clienteSel, obras, obraSel: filtros.obra,
+            claseCliente: 'col-12 col-md-4', claseObra: 'col-12 col-md-4', claseInput: 'form-control form-control-sm' }) %>
+    </div>
+    <div class="row g-2 align-items-end mt-1">
+      <div class="col-6 col-md-2">
         <label class="form-label">Desde</label>
         <input type="date" name="fechaDesde" value="<%= filtros.fechaDesde || '' %>" class="form-control form-control-sm">
       </div>
-      <div class="col-md-2">
+      <div class="col-6 col-md-2">
         <label class="form-label">Hasta</label>
         <input type="date" name="fechaHasta" value="<%= filtros.fechaHasta || '' %>" class="form-control form-control-sm">
       </div>

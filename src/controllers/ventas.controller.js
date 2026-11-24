@@ -78,12 +78,14 @@ const VentasController = {
 
   async index(req, res) {
     try {
-      const { estado, id_cliente, q, sort, dir, page, preset, fechaDesde, fechaHasta, mes } = req.query
+      // id_cliente (enlaces viejos) se lee como clienteId; ver filtro_cliente_obra
+      const { id_cliente: _idViejo, ...resto } = req.query
+      const { estado, q, sort, dir, page, preset, fechaDesde, fechaHasta, mes } = req.query
       const periodo = resolverPeriodo({ preset, desde: fechaDesde, hasta: fechaHasta, mes })
+      const sel = await ClientesModel.seleccionFiltro(req.query.clienteId || req.query.id_cliente, req.query.obra)
 
-      const filtrosBase = { estado, id_cliente, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
+      const filtrosBase = { estado, id_cliente: sel.clienteSel ? sel.clienteSel.id : null, opIds: sel.opIds, q, fechaDesde: periodo.desde, fechaHasta: periodo.hasta }
       const paginacion = await VentasModel.listar({ ...filtrosBase, sort, dir, page: parseInt(page) || 1, limit: 20 })
-      const clientes   = await VentasModel.listarClientes()
       const resumen    = await VentasModel.contarPorEstado(filtrosBase)
       const metricas   = await VentasModel.resumen(filtrosBase)
 
@@ -91,12 +93,14 @@ const VentasController = {
         titulo: 'Ventas',
         ...paginacion,
         estadosPago: await require('../models/liquidaciones.model').estadosPago(paginacion.ops.map(o => o.id)),
-        scripts: ['/js/estadoPago.js', '/js/nroFactura.js'],
-        clientes,
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/estadoPago.js', '/js/nroFactura.js'],
+        clienteSel: sel.clienteSel,
+        obras: sel.obras,
         resumen,
         metricas,
         periodoLabel: etiquetaPeriodo(periodo),
-        filtros: { ...req.query, fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
+        filtros: { ...resto, clienteId: sel.clienteSel ? String(sel.clienteSel.id) : '', obra: sel.claves,
+          fechaDesde: periodo.desde || '', fechaHasta: periodo.hasta || '', preset: periodo.preset || '' },
       })
     } catch (err) {
       console.error(err)

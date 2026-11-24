@@ -37,10 +37,6 @@ function importesVenta(op, subtotal) {
 const VentasModel = {
 
   // ── Auxiliares ────────────────────────────────────────────────
-  async listarClientes() {
-    return (await query(`SELECT id, nombre, apellido, tel_whatsapp FROM clientes WHERE activo = 1 ORDER BY nombre`)).rows
-  },
-
   async listarProductos() {
     return (await query(`
       SELECT p.id, p.nombre, p.unidad_medida, p.precio_cantera, p.precio_viaje, p.es_contenedor,
@@ -53,8 +49,8 @@ const VentasModel = {
 
   // Cantidad de ventas por estado, con los mismos filtros que el listado salvo el de estado:
   // cada tarjeta es una pestaña y cuenta lo que mostraría al hacer clic.
-  async contarPorEstado({ id_cliente, q, fechaDesde, fechaHasta } = {}) {
-    const { where, params } = this._filtroVentas({ id_cliente, q, fechaDesde, fechaHasta })
+  async contarPorEstado({ id_cliente, opIds, q, fechaDesde, fechaHasta } = {}) {
+    const { where, params } = this._filtroVentas({ id_cliente, opIds, q, fechaDesde, fechaHasta })
     return (await query(`
       SELECT op.estado, COUNT(*) AS total FROM op_encabezado op
       LEFT JOIN clientes c ON c.id = op.id_cliente
@@ -62,12 +58,14 @@ const VentasModel = {
     `, params)).rows
   },
 
-  // Construye WHERE + params compartido por listar/resumen
-  _filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta } = {}) {
+  // Construye WHERE + params compartido por listar/resumen.
+  // opIds: operaciones de las obras elegidas en el filtro (null/ausente = sin filtro de obra; [] = ninguna)
+  _filtroVentas({ estado, id_cliente, opIds, q, fechaDesde, fechaHasta } = {}) {
     const wheres = [`op.tipo_op = 'M'`]
     const params = []
     if (estado)     { wheres.push('op.estado = ?');     params.push(estado) }
     if (id_cliente) { wheres.push('op.id_cliente = ?'); params.push(id_cliente) }
+    if (opIds)      { wheres.push('op.id = ANY(?::bigint[])'); params.push(opIds.map(String)) }
     if (fechaDesde) { wheres.push('op.fecha_emision >= ?'); params.push(fechaDesde) }
     if (fechaHasta) { wheres.push('op.fecha_emision <= ?'); params.push(fechaHasta) }
     if (q && String(q).trim()) {
@@ -80,8 +78,8 @@ const VentasModel = {
   },
 
   // ── Listado con paginación, búsqueda y ordenamiento ───────────
-  async listar({ estado, id_cliente, q, fechaDesde, fechaHasta, sort, dir, page = 1, limit = 20 } = {}) {
-    const { where, params } = this._filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta })
+  async listar({ estado, id_cliente, opIds, q, fechaDesde, fechaHasta, sort, dir, page = 1, limit = 20 } = {}) {
+    const { where, params } = this._filtroVentas({ estado, id_cliente, opIds, q, fechaDesde, fechaHasta })
 
     // Ordenamiento con whitelist (evita inyección por columna)
     const sortMap = {
@@ -120,8 +118,8 @@ const VentasModel = {
   },
 
   // Métricas del período/filtros (cantidad y monto total)
-  async resumen({ estado, id_cliente, q, fechaDesde, fechaHasta } = {}) {
-    const { where, params } = this._filtroVentas({ estado, id_cliente, q, fechaDesde, fechaHasta })
+  async resumen({ estado, id_cliente, opIds, q, fechaDesde, fechaHasta } = {}) {
+    const { where, params } = this._filtroVentas({ estado, id_cliente, opIds, q, fechaDesde, fechaHasta })
     const row = (await query(`
       SELECT COUNT(*) AS count,
              COALESCE(SUM(${SQL_TOTAL}), 0) AS total
