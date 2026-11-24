@@ -18,11 +18,15 @@
   const isActive = _curS === _key
   const nextDir  = isActive ? (_curD === 'ASC' ? 'DESC' : 'ASC') : 'ASC'
   // Construir querystring preservando filtros
-  const params = {}
-  Object.entries(_f).forEach(([k, v]) => { if (v !== '' && v != null && k !== 'page' && k !== 'sort' && k !== 'dir') params[k] = v })
-  params.sort = _key
-  params.dir  = nextDir
-  const qs = new URLSearchParams(params).toString()
+  // Una lista (varias obras) repite el parámetro: obra=a&obra=b
+  const sp = new URLSearchParams()
+  Object.entries(_f).forEach(([k, v]) => {
+    if (k === 'page' || k === 'sort' || k === 'dir') return
+    ;(Array.isArray(v) ? v : [v]).forEach(x => { if (x !== '' && x != null) sp.append(k, x) })
+  })
+  sp.append('sort', _key)
+  sp.append('dir', nextDir)
+  const qs = sp.toString()
   const arrow = !isActive ? '⇅' : (_curD === 'ASC' ? '↑' : '↓')
 %>
 <th class="th-sort text-<%= _align %><%= _thClass %>">

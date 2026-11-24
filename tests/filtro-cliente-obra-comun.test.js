@@ -10,6 +10,7 @@ const VentasModel = require('../src/models/ventas.model')
 const ClientesModel = require('../src/models/clientes.model')
 const Facturacion = require('../src/controllers/facturacion.controller')
 const { consulta } = require('../src/utils/consulta')
+const { renderVista } = require('./helpers/vistas')
 
 function llamar(Controller, accion, { query = {}, params = {} } = {}) {
   return new Promise((resolve, reject) => {
@@ -101,5 +102,30 @@ describe('Facturación: cliente y obras elegidos', () => {
     assert.equal(data.clienteSel, null)
     assert.equal(data.filtros.clienteId, '')
     assert.deepEqual(data.filtros.obra, [])
+  })
+})
+
+// Orden y paginación: varias obras viajan como un parámetro por obra (obra=a&obra=b), no como 'a,b'
+describe('enlaces de orden y paginación con varias obras', () => {
+  const filtros = { clienteId: '5', obra: ['barrio norte l1', 'centro, l3'], q: '' }
+
+  it('paginación: un parámetro obra por cada obra elegida', async () => {
+    const html = await renderVista('partials/paginacion', { page: 1, totalPaginas: 3, total: 50, limit: 20, filtros })
+    assert.ok(html.includes('href="?clienteId=5&amp;obra=barrio+norte+l1&amp;obra=centro%2C+l3&amp;page=2"'), html)
+    assert.ok(!html.includes('obra=barrio+norte+l1%2C'), 'no debe juntar las obras con coma')
+  })
+
+  it('encabezado de orden: un parámetro obra por cada obra elegida', async () => {
+    const html = await renderVista('partials/th_sort', { sortKey: 'fecha', sortLabel: 'Fecha', currentSort: '', currentDir: 'ASC', filtros })
+    assert.ok(html.includes('obra=barrio+norte+l1&amp;obra=centro%2C+l3&amp;sort=fecha&amp;dir=ASC'), html)
+    assert.ok(!html.includes('obra=barrio+norte+l1%2C'), 'no debe juntar las obras con coma')
+  })
+
+  it('siguen omitiendo vacíos y page (y sort/dir en el encabezado)', async () => {
+    const f = { clienteId: '5', obra: ['a', '', null], q: '', page: 4, sort: 'x', dir: 'DESC', nada: null }
+    const pag = await renderVista('partials/paginacion', { page: 1, totalPaginas: 2, total: 30, limit: 20, filtros: f })
+    assert.ok(pag.includes('href="?clienteId=5&amp;obra=a&amp;sort=x&amp;dir=DESC&amp;page=2"'), pag)
+    const th = await renderVista('partials/th_sort', { sortKey: 'fecha', sortLabel: 'Fecha', currentSort: 'x', currentDir: 'DESC', filtros: f })
+    assert.ok(th.includes('href="?clienteId=5&amp;obra=a&amp;sort=fecha&amp;dir=ASC"'), th)
   })
 })
