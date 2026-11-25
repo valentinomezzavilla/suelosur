@@ -213,26 +213,29 @@ const VentasModel = {
     })
   },
 
-  // Actualiza datos editables de un viaje (estado != entregado/anulado).
-  // Ajusta el stock pendiente si cambió la cantidad pedida.
-  async actualizarViaje(id, datos) {
-    const op = (await query(`SELECT estado, modalidad, precio_flete, id_cliente, metodo_pago, iva_alicuota FROM op_encabezado WHERE id = ?`, [id])).rows[0]
-    if (!op) throw new Error('Orden no encontrada.')
+  // Edita una venta (viaje o cantera). Pendiente/despachada: la cantidad ajusta el stock
+  // pendiente. Entregada: ajusta el stock real (cantidad_actual), porque la entrega ya lo
+  // descontó. Una venta facturada no deja cambiar cantidad, precios, flete ni total.
+  //  - datos.lineas: [{ id, cantidad, precio }] (ids de op_detalle_material). Sin ella, el
+  //    camino de siempre sobre la primera línea (datos.cantidad / datos.precioProducto).
+  //  - datos.tercero: undefined no lo toca; null o un objeto se guarda en la misma transacción.
+  // Devuelve { entregada, cobroCorregido }.
+  async actualizarVenta(id, datos, { usuario = null } = {}) {
+    const previa = (await query(`SELECT id_cliente FROM op_encabezado WHERE id = ?`, [id])).rows[0]
+    if (!previa) throw new Error('Orden no encontrada.')
     if (datos.metodoPago === 'cuenta_corriente') {
-      const errCC = await ClientesModel.errorCuentaCorriente(op.id_cliente)
+      const errCC = await ClientesModel.errorCuentaCorriente(previa.id_cliente)
       if (errCC) throw new Error(errCC)
     }
     if (datos.metodoPago === 'saldo_a_favor') {
-      const errSaldo = await ClientesModel.errorSaldoFavor(op.id_cliente)
+      const errSaldo = await ClientesModel.errorSaldoFavor(previa.id_cliente)
       if (errSaldo) throw new Error(errSaldo)
     }
-    if (op.estado === 'entregado') throw new Error('No se puede editar una venta ya entregada.')
-    if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
 
+    const vacio  = (v) => v == null || String(v).trim() === ''
     const calle  = (datos.calle || '').trim() || null
     const numero = alturaNum(datos.numero)
     const obra   = (datos.obra || '').trim() || null
-    if (!calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
     const fecha  = datos.fecha || null
     // Fecha de compra (define el mes de la venta). Si no vino, se conserva la actual.
     let fechaCompra = null
@@ -245,58 +248,119 @@ const VentasModel = {
     const hora   = datos.hora || null
     const zona   = datos.zona || null
     const metodoPago = datos.metodoPago || null
-    const observaciones = datos.descripcion || ''
-    const vacio  = (v) => v == null || String(v).trim() === ''
-    const flete  = vacio(datos.precioFlete) ? (Number(op.precio_flete) || 0) : Math.max(0, Number(datos.precioFlete) || 0)
 
+    let entregada = false
     await transaction(async (q) => {
+      // Se bloquea la venta: dos ediciones a la vez no pueden calcular el stock sobre datos viejos
+      const op = (await q(`
+        SELECT estado, modalidad, facturado, tercero, precio_flete, monto_total, id_cliente, metodo_pago, iva_alicuota, observaciones
+        FROM op_encabezado WHERE id = ? FOR UPDATE
+      `, [id])).rows[0]
+      if (!op) throw new Error('Orden no encontrada.')
+      if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
+      entregada = op.estado === 'entregado'
+      const esViaje = op.modalidad === 'flete'
+      if (esViaje && !calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
+      const flete = vacio(datos.precioFlete) ? (Number(op.precio_flete) || 0) : Math.max(0, Number(datos.precioFlete) || 0)
+
       // N° de factura (opcional): si el formulario no trae el campo, no se toca
       if (datos.nroFactura !== undefined) await require('./facturacion.model').guardarNroFactura(id, datos.nroFactura, q)
-      // Único detalle (cantidad/precio): si no vino un campo, se conserva el valor actual
-      const detalle = (await q(`
-        SELECT d.id, d.id_producto, d.cantidad_pedida, d.precio_unitario, d.dias,
+
+      // Líneas: si un campo no vino se conserva el valor actual
+      const detalles = (await q(`
+        SELECT d.id, d.id_producto, d.cantidad_pedida, d.precio_unitario, d.dias, p.nombre AS producto,
                COALESCE(p.depende_stock, 1) = 1 AND COALESCE(p.es_contenedor, 0) = 0 AS mueve_stock,
                COALESCE(p.es_contenedor, 0) = 1 AS es_contenedor
         FROM op_detalle_material d JOIN productos p ON p.id = d.id_producto
-        WHERE d.id_orden_pedido = ? LIMIT 1
-      `, [id])).rows[0]
-      let subtotal = 0
-      if (detalle) {
+        WHERE d.id_orden_pedido = ? ORDER BY d.id
+      `, [id])).rows
+      const pedidas = new Map()
+      if (datos.lineas) {
+        for (const l of datos.lineas) {
+          if (!detalles.some(d => String(d.id) === String(l.id))) throw new Error('Línea inválida.')
+          pedidas.set(String(l.id), { cantidad: l.cantidad, precio: l.precio })
+        }
+      } else if (detalles[0]) {
+        pedidas.set(String(detalles[0].id), { cantidad: datos.cantidad, precio: datos.precioProducto })
+      }
+      const nuevas = detalles.map((d) => {
+        const p = pedidas.get(String(d.id))
+        if (!p) return { ...d, cantidad: Number(d.cantidad_pedida), precio: Number(d.precio_unitario), editada: false }
         // Un renglón viejo de contenedor por días (cantidad 1, precio = total de los días)
         // pasa a unidad al editarlo: 1 contenedor a ese precio, salvo que se cambie.
-        const nuevaCant = Number(datos.cantidad) > 0 ? Number(datos.cantidad) : detalle.cantidad_pedida
-        if (detalle.es_contenedor && !Number.isInteger(nuevaCant)) throw new Error('La cantidad de contenedores tiene que ser un número entero.')
-        const nuevoPrecio = vacio(datos.precioProducto) ? detalle.precio_unitario : Math.max(0, Number(datos.precioProducto) || 0)
-        const delta = nuevaCant - detalle.cantidad_pedida
-        await q(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ?, dias = NULL, precio_dia = NULL WHERE id = ?`,
-          [nuevaCant, nuevoPrecio, detalle.id])
-        if (delta !== 0 && detalle.mueve_stock && detalle.dias == null) {
-          await q(`UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar + ?) WHERE id_producto = ?`,
-            [delta, detalle.id_producto])
-        }
-        subtotal = nuevaCant * nuevoPrecio
-      }
+        const cantidad = Number(p.cantidad) > 0 ? Number(p.cantidad) : Number(d.cantidad_pedida)
+        if (d.es_contenedor && !Number.isInteger(cantidad)) throw new Error('La cantidad de contenedores tiene que ser un número entero.')
+        const precio = vacio(p.precio) ? Number(d.precio_unitario) : Math.max(0, Number(p.precio) || 0)
+        return { ...d, cantidad, precio, editada: true }
+      })
+      const subtotal = nuevas.reduce((s, n) => s + n.cantidad * n.precio, 0)
       // Total: el editado a mano si se tildó, si no productos + flete
       const totalManual = String(datos.editarTotal) === '1' && !vacio(datos.precioTotal)
       const total = totalManual ? Math.max(0, Number(datos.precioTotal) || 0) : subtotal + flete
+
+      // Facturada: el monto es el de la factura, no se cambia
+      if (Number(op.facturado) === 1) {
+        const subtotalViejo = detalles.reduce((s, d) => s + Number(d.cantidad_pedida) * Number(d.precio_unitario), 0)
+        const fleteViejo = Number(op.precio_flete) || 0
+        const netoViejo = op.monto_total != null ? Number(op.monto_total) : subtotalViejo + fleteViejo
+        const cambia = Math.abs(total - netoViejo) > 0.005 || Math.abs(flete - fleteViejo) > 0.005
+          || nuevas.some(n => Math.abs(n.cantidad - Number(n.cantidad_pedida)) > 1e-6 || Math.abs(n.precio - Number(n.precio_unitario)) > 0.005)
+        if (cambia) throw new Error('Ya está facturada: no se puede cambiar el monto, la cantidad ni los precios.')
+      }
+
       // Pagada con saldo a favor: el crédito (más lo que ya usó esta venta) tiene que alcanzar
       if ((metodoPago || op.metodo_pago) === 'saldo_a_favor') {
         const errSaldo = await ClientesModel.errorSaldoFavor(op.id_cliente, { monto: conIva(total, op.iva_alicuota), opId: id }, q)
         if (errSaldo) throw new Error(errSaldo)
       }
 
-      await q(`
-        UPDATE op_encabezado
-        SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
-            domicilio_calle = ?, domicilio_altura = ?, obra = ?,
-            domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
-            observaciones = ?, precio_flete = ?, monto_total = ?,
-            fecha_emision = COALESCE(?, fecha_emision)
-        WHERE id = ?
-      `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, fechaCompra, id])
+      // Descripción: sin el campo se conserva. En cantera la parte automática ("Producto xN, …")
+      // se rehace con las cantidades nuevas, salvo que el texto se haya escrito a mano.
+      let observaciones = datos.descripcion === undefined ? (op.observaciones || '') : String(datos.descripcion || '')
+      if (!esViaje) {
+        const viejo = detalles.map(d => `${d.producto} x${d.cantidad_pedida}`).join(', ')
+        const nuevo = nuevas.map(n => `${n.producto} x${n.cantidad}`).join(', ')
+        const resto = observaciones.slice(viejo.length)
+        if (viejo !== nuevo && observaciones.startsWith(viejo) && (resto === '' || /^\s/.test(resto))) observaciones = nuevo + resto
+      }
+
+      for (const n of nuevas) {
+        if (!n.editada) continue
+        await q(`UPDATE op_detalle_material SET cantidad_pedida = ?, precio_unitario = ?, dias = NULL, precio_dia = NULL WHERE id = ?`,
+          [n.cantidad, n.precio, n.id])
+        const delta = n.cantidad - Number(n.cantidad_pedida)
+        if (Math.abs(delta) < 1e-6 || !n.mueve_stock || n.dias != null) continue
+        await q(entregada
+          // La entrega ya descontó el stock real: la diferencia sale (o vuelve) de ahí
+          ? `UPDATE stock SET cantidad_actual = GREATEST(0, cantidad_actual - ?) WHERE id_producto = ?`
+          : `UPDATE stock SET cant_pendiente_entregar = GREATEST(0, cant_pendiente_entregar + ?) WHERE id_producto = ?`,
+          [delta, n.id_producto])
+      }
+
+      if (esViaje) {
+        await q(`
+          UPDATE op_encabezado
+          SET fecha_entrega_planificada = ?, hora_planificada = ?, zona = ?,
+              domicilio_calle = ?, domicilio_altura = ?, obra = ?,
+              domicilio_sin_numero = ?, metodo_pago = COALESCE(?, metodo_pago),
+              observaciones = ?, precio_flete = ?, monto_total = ?,
+              fecha_emision = COALESCE(?, fecha_emision)
+          WHERE id = ?
+        `, [fecha, hora, zona, calle, numero, obra, numero ? 0 : 1, metodoPago, observaciones, flete, total, fechaCompra, id])
+      } else {
+        // Cantera: no tiene envío ni dirección
+        await q(`
+          UPDATE op_encabezado
+          SET metodo_pago = COALESCE(?, metodo_pago), observaciones = ?, precio_flete = ?, monto_total = ?,
+              fecha_emision = COALESCE(?, fecha_emision)
+          WHERE id = ?
+        `, [metodoPago, observaciones, flete, total, fechaCompra, id])
+      }
+      if (datos.tercero !== undefined) await require('../services/tercero.service').guardarEnOp(id, datos.tercero, {}, q)
       // Cambió el total, el método o la fecha de compra: el cargo en cuenta corriente acompaña
       await VentasModel.sincronizarCargoCC(id, q, { moverFecha: fechaCompra != null })
     })
+    return { entregada, cobroCorregido: false }
   },
 
   // Adapta una OP a la forma que esperan las vistas viaje/edit/detalle
@@ -535,5 +599,8 @@ VentasModel.sincronizarTodosLosCargosCC = async function () {
 }
 
 VentasModel.importesVenta = importesVenta
+
+// Nombre de siempre: el viaje es el caso de una sola línea de actualizarVenta
+VentasModel.actualizarViaje = (...args) => VentasModel.actualizarVenta(...args)
 
 module.exports = VentasModel
