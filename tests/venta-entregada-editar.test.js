@@ -502,4 +502,88 @@ describe('modelo: editar una venta entregada', () => {
       compila(htmlCantera)
     })
   })
+
+  // ── revisión final: saldo a favor, método vacío y casos de borde ──
+  describe('saldo a favor y casos de borde', () => {
+    const { renderVista } = require('./helpers/vistas')
+    const cargosDe = async (id) => (await prueba.q(`SELECT tipo, monto FROM movimientos_cuenta WHERE id_op_encabezado = ? AND tipo IN ('deuda', 'uso_saldo_favor') ORDER BY id`, [id])).rows
+    const saldoDe = async (cli) => Number((await prueba.q(`SELECT saldo FROM clientes WHERE id = ?`, [cli])).rows[0].saldo)
+    const txsDe = async (id) => (await prueba.q(`SELECT * FROM transacciones WHERE id_op_encabezado = ? ORDER BY id`, [id])).rows
+    const auditorias = async (id) => (await prueba.q(`SELECT id FROM auditoria WHERE entidad_tipo = 'operacion' AND entidad_id = ?`, [id])).rows
+    // Cliente con $2000 a favor que paga con ese saldo un viaje entregado de $2000 (queda en 0)
+    const ventaConSaldo = async () => {
+      const cli = await datos.crearCliente({ saldo: 2000 })
+      const prod = await producto()
+      const id = await viajeEntregado({ prod, cantidad: 2, precio: 1000, metodo: 'saldo_a_favor', cli })
+      assert.equal(await saldoDe(cli), 0, 'el saldo se usó entero')
+      return { cli, prod, id }
+    }
+    const conSaldo = { ...base, metodoPago: 'saldo_a_favor' }
+
+    it('guardar una venta pagada con saldo a favor, sin cambiar el método, no toca el cargo ni el saldo', async () => {
+      const { cli, id } = await ventaConSaldo()
+      const r = await VentasModel.actualizarVenta(id, { ...conSaldo, cantidad: 2, precioProducto: 1000, descripcion: 'Nota' })
+      assert.equal(r.cobroCorregido, false)
+      assert.equal((await txsDe(id))[0].metodo_pago, 'saldo_a_favor')
+      assert.deepEqual((await cargosDe(id)).map(c => [c.tipo, Number(c.monto)]), [['uso_saldo_favor', -2000]])
+      assert.equal(await saldoDe(cli), 0)
+    })
+
+    it('bajar el monto de una venta pagada con saldo a favor devuelve la diferencia al saldo', async () => {
+      const { cli, id } = await ventaConSaldo()
+      await VentasModel.actualizarVenta(id, { ...conSaldo, cantidad: 1, precioProducto: 1000 })
+      assert.equal(Number((await txsDe(id))[0].monto), 1000)
+      assert.deepEqual((await cargosDe(id)).map(c => [c.tipo, Number(c.monto)]), [['uso_saldo_favor', -1000]])
+      assert.equal(await saldoDe(cli), 1000)
+    })
+
+    it('subir el monto más allá del saldo a favor rechaza y no cambia nada', async () => {
+      const { cli, prod, id } = await ventaConSaldo()
+      await assert.rejects(() => VentasModel.actualizarVenta(id, { ...conSaldo, cantidad: 5, precioProducto: 1000 }), /saldo/i)
+      assert.deepEqual(await stockDe(prod), { actual: 98, pendiente: 0 })
+      assert.equal(Number((await fila(id)).monto_total), 2000)
+      assert.equal(Number((await txsDe(id))[0].monto), 2000)
+      assert.equal(await saldoDe(cli), 0)
+    })
+
+    it('el formulario de una venta pagada con saldo a favor la muestra elegida aunque el saldo sea 0', async () => {
+      const { id } = await ventaConSaldo()
+      const r = await llamar(VentasController, 'editarViaje', { user, params: { id } })
+      const html = await renderVista(r.vista, { ...r.data, user })
+      assert.match(html, /<option value="saldo_a_favor"\s+selected/)
+    })
+
+    it('venta vieja sin método de pago: guardar sin cambios no reescribe el método de la transacción', async () => {
+      const prod = await producto()
+      const id = await viajeEntregado({ prod, cantidad: 2, precio: 1000, metodo: 'transferencia' })
+      await prueba.q(`UPDATE op_encabezado SET metodo_pago = NULL WHERE id = ?`, [id])
+      const r = await VentasModel.actualizarVenta(id, { ...base, metodoPago: 'efectivo', cantidad: 2, precioProducto: 1000 }, { usuario: admin })
+      assert.equal(r.cobroCorregido, false)
+      assert.equal((await txsDe(id))[0].metodo_pago, 'transferencia')
+      assert.equal((await auditorias(id)).length, 0)
+    })
+
+    it('una línea de otra venta se rechaza y no se guarda nada', async () => {
+      const arena = await producto()
+      const a = await canteraEntregada({ items: [{ id: arena, cantidad: 2 }] })
+      const b = await canteraEntregada({ items: [{ id: arena, cantidad: 3 }] })
+      const [lineaB] = await lineasDe(b)
+      await assert.rejects(() => VentasModel.actualizarVenta(a, { metodoPago: 'efectivo', lineas: [{ id: lineaB.id, cantidad: 9, precio: 1000 }] }), /Línea inválida/)
+      assert.deepEqual(await stockDe(arena), { actual: 95, pendiente: 0 })
+      assert.equal(Number((await lineasDe(b))[0].cantidad_pedida), 3)
+    })
+
+    it('cantidad en blanco o cero y precio en blanco conservan lo guardado', async () => {
+      const arena = await producto()
+      const id = await canteraEntregada({ items: [{ id: arena, cantidad: 2 }] })
+      const [l] = await lineasDe(id)
+      for (const cantidad of ['', 0]) {
+        await VentasModel.actualizarVenta(id, { metodoPago: 'efectivo', lineas: [{ id: l.id, cantidad, precio: '' }] })
+        const [despues] = await lineasDe(id)
+        assert.equal(Number(despues.cantidad_pedida), 2)
+        assert.equal(Number(despues.precio_unitario), 1000)
+      }
+      assert.deepEqual(await stockDe(arena), { actual: 98, pendiente: 0 })
+    })
+  })
 })

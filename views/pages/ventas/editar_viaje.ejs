@@ -185,8 +185,9 @@
                             <option value="cheque"           <%= viaje.metodoPago === 'cheque' ? 'selected' : '' %>>Cheque</option>
                             <option value="echeq"           <%= viaje.metodoPago === 'echeq' ? 'selected' : '' %>>Echeq</option>
                             <option value="cuenta_corriente" <%= viaje.metodoPago === 'cuenta_corriente' ? 'selected' : '' %>>Cuenta corriente</option>
-                            <% if (saldoFavorCliente > 0) { %>
-                              <option value="saldo_a_favor" <%= viaje.metodoPago === 'saldo_a_favor' ? 'selected' : '' %>>Usar saldo a favor del cliente ($<%= Math.round(saldoFavorCliente).toLocaleString('es-AR') %>)</option>
+                            <%# También si la venta YA está pagada con saldo a favor (aunque hoy el saldo sea 0): si no, el navegador mandaría "efectivo" %>
+                            <% if (saldoFavorCliente > 0 || viaje.metodoPago === 'saldo_a_favor') { %>
+                              <option value="saldo_a_favor" <%= viaje.metodoPago === 'saldo_a_favor' ? 'selected' : '' %>>Usar saldo a favor del cliente<%= saldoFavorCliente > 0 ? ` ($${Math.round(saldoFavorCliente).toLocaleString('es-AR')})` : '' %></option>
                             <% } %>
                         </select>
                     </div>

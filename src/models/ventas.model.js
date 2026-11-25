@@ -228,10 +228,6 @@ const VentasModel = {
       const errCC = await ClientesModel.errorCuentaCorriente(previa.id_cliente)
       if (errCC) throw new Error(errCC)
     }
-    if (datos.metodoPago === 'saldo_a_favor') {
-      const errSaldo = await ClientesModel.errorSaldoFavor(previa.id_cliente)
-      if (errSaldo) throw new Error(errSaldo)
-    }
 
     const vacio  = (v) => v == null || String(v).trim() === ''
     const calle  = (datos.calle || '').trim() || null
@@ -421,6 +417,7 @@ const VentasModel = {
       nroFactura: op.nro_factura || '',
       facturado: Number(op.facturado) === 1,
       // Cantera (sin envío) y ventas ya entregadas también se editan; una línea por producto
+      id_cliente: op.id_cliente,
       esCantera: op.modalidad !== 'flete',
       entregada: op.estado === 'entregado',
       lineas: (op.detalles || []).map(d => ({
@@ -622,7 +619,7 @@ VentasModel.estadoDeCobro = async function (idOp, q = query) {
     FROM op_encabezado op WHERE op.id = ?
   `, [idOp])).rows[0]
   if (!op) return null
-  return { estado: op.estado, tipo_op: op.tipo_op, total: Number(op.total), metodo: op.metodo_pago || null,
+  return { estado: op.estado, tipo_op: op.tipo_op, total: Number(op.total), metodo: op.metodo_pago || 'efectivo',
            tercero: op.tercero || null, descripcion: VentasModel.descripcionDeCobro(op) }
 }
 
@@ -641,7 +638,7 @@ VentasModel.corregirCobro = async function (idOp, antes, q = query) {
   if (!txs.length) return false
   const diferencia = redondear(despues.total - antes.total)
   const cambiaMonto = Math.abs(diferencia) > 0.005
-  const cambiaMetodo = !!despues.metodo && despues.metodo !== antes.metodo
+  const cambiaMetodo = despues.metodo !== antes.metodo
   const cambiaTercero = (despues.tercero || null) !== (antes.tercero || null)
   const cambiaDescripcion = txs.length === 1 && despues.descripcion !== antes.descripcion
   if (!cambiaMonto && !cambiaMetodo && !cambiaTercero && !cambiaDescripcion) return false
