@@ -335,4 +335,77 @@ describe('modelo: editar una venta entregada', () => {
       assert.equal(det.antes.metodo_pago, 'efectivo')
     })
   })
+
+  // ── controlador y detalle ───────────────────────────────────
+  describe("controlador y detalle", () => {
+    const { renderVista } = require("./helpers/vistas")
+
+    it("editarViaje abre un viaje entregado", async () => {
+      const id = await viajeEntregado({ prod: await producto() })
+      const r = await llamar(VentasController, "editarViaje", { user, params: { id } })
+      assert.equal(r.vista, "pages/ventas/editar_viaje")
+      assert.equal(r.data.viaje.entregada, true)
+      assert.equal(r.data.viaje.esCantera, false)
+    })
+
+    it("editarViaje abre una cantera con una línea por producto", async () => {
+      const arena = await producto()
+      const piedra = await producto({ nombre: "Piedra prueba entregada", precioCantera: 3000 })
+      const id = await canteraEntregada({ items: [{ id: arena, cantidad: 2 }, { id: piedra, cantidad: 1 }] })
+      const r = await llamar(VentasController, "editarViaje", { user, params: { id } })
+      assert.equal(r.vista, "pages/ventas/editar_viaje")
+      assert.equal(r.data.viaje.esCantera, true)
+      assert.equal(r.data.viaje.entregada, true)
+      assert.deepEqual(r.data.viaje.lineas.map(l => [l.producto, l.cantidad, l.precio]),
+        [["Arena prueba entregada", 2, 1000], ["Piedra prueba entregada", 1, 3000]])
+    })
+
+    it("editarViaje rechaza una venta anulada", async () => {
+      const id = await crearViaje({ prod: await producto() })
+      await VentasModel.anular(id)
+      const r = await llamar(VentasController, "editarViaje", { user, params: { id } })
+      assert.equal(r.url, `/ventas/${id}`)
+      assert.equal(r.flashes[0].tipo, "error")
+    })
+
+    it("actualizarViaje guarda una cantera entregada y avisa que se corrigió el cobro", async () => {
+      const arena = await producto()
+      const piedra = await producto({ nombre: "Piedra prueba entregada", precioCantera: 3000 })
+      const id = await canteraEntregada({ items: [{ id: arena, cantidad: 2 }, { id: piedra, cantidad: 1 }] })
+      const [l1, l2] = await lineasDe(id)
+      const r = await llamar(VentasController, "actualizarViaje", { user, params: { id }, body: {
+        metodoPago: "efectivo", fechaCompra: "2026-11-10",
+        ["cantidad_" + l1.id]: "3", ["precio_" + l1.id]: "1000", ["cantidad_" + l2.id]: "1", ["precio_" + l2.id]: "2500",
+      } })
+      assert.equal(r.url, `/ventas/${id}`)
+      assert.equal(r.flashes[0].tipo, "success", JSON.stringify(r.flashes))
+      assert.match(r.flashes[0].msg, /^Venta actualizada/)
+      assert.match(r.flashes[0].msg, /cobro/)
+      assert.deepEqual(await stockDe(arena), { actual: 97, pendiente: 0 })
+      assert.equal(Number((await fila(id)).monto_total), 5500)
+    })
+
+    it("actualizarViaje de un viaje sin entregar sigue diciendo Viaje actualizado.", async () => {
+      const id = await crearViaje({ prod: await producto() })
+      const r = await llamar(VentasController, "actualizarViaje", { user, params: { id }, body: {
+        calle: "Colón", numero: "100", fecha: "2026-11-20", metodoPago: "efectivo", cantidad: "3", precioProducto: "1000" } })
+      assert.equal(r.url, `/ventas/${id}`)
+      assert.equal(r.flashes[0].msg, "Viaje actualizado.")
+    })
+
+    it("el detalle ofrece Editar en viajes y cantera, entregados o no, y no en una anulada", async () => {
+      const prod = await producto()
+      const viaje = await viajeEntregado({ prod })
+      const cantera = await canteraEntregada({ items: [{ id: prod, cantidad: 1 }] })
+      const anulada = await crearViaje({ prod })
+      await VentasModel.anular(anulada)
+      const html = async (id) => {
+        const r = await llamar(VentasController, "detalle", { user, params: { id } })
+        return renderVista(r.vista, { ...r.data, user })
+      }
+      assert.match(await html(viaje), new RegExp(`href="/ventas/${viaje}/editar"`))
+      assert.match(await html(cantera), new RegExp(`href="/ventas/${cantera}/editar"`))
+      assert.doesNotMatch(await html(anulada), new RegExp(`href="/ventas/${anulada}/editar"`))
+    })
+  })
 })

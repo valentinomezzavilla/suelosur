@@ -418,6 +418,13 @@ const VentasModel = {
       // N° de factura cargado con la operación; ya facturada (su número es el del comprobante) no se edita
       nroFactura: op.nro_factura || '',
       facturado: Number(op.facturado) === 1,
+      // Cantera (sin envío) y ventas ya entregadas también se editan; una línea por producto
+      esCantera: op.modalidad !== 'flete',
+      entregada: op.estado === 'entregado',
+      lineas: (op.detalles || []).map(d => ({
+        id: d.id, producto: d.producto, esContenedor: !!d.es_contenedor,
+        cantidad: Number(d.cantidad_pedida), precio: Number(d.precio_unitario),
+      })),
     }
   },
 
