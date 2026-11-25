@@ -157,6 +157,16 @@ describe('modelo: editar una venta entregada', () => {
     assert.equal((await fila(id)).domicilio_calle, 'Otra')
   })
 
+  it('facturada con total pactado a mano: guardar sin tocar el monto no lo cambia', async () => {
+    const prod = await producto()
+    const id = await viajeEntregado({ prod, cantidad: 2, precio: 1000 })
+    await prueba.q(`UPDATE op_encabezado SET facturado = 1, monto_total = 1800 WHERE id = ?`, [id])
+    await VentasModel.actualizarVenta(id, { ...base, calle: 'Otra' })
+    const op = await fila(id)
+    assert.equal(op.domicilio_calle, 'Otra')
+    assert.equal(Number(op.monto_total), 1800)
+  })
+
   it('anulada: sigue sin poder editarse', async () => {
     const prod = await producto()
     const id = await crearViaje({ prod })
@@ -406,6 +416,77 @@ describe('modelo: editar una venta entregada', () => {
       assert.match(await html(viaje), new RegExp(`href="/ventas/${viaje}/editar"`))
       assert.match(await html(cantera), new RegExp(`href="/ventas/${cantera}/editar"`))
       assert.doesNotMatch(await html(anulada), new RegExp(`href="/ventas/${anulada}/editar"`))
+    })
+  })
+
+  // ── formulario de edición ───────────────────────────────────
+  describe('formulario de edición', () => {
+    const { renderVista } = require('./helpers/vistas')
+    const vm = require('node:vm')
+    const pagina = async (id) => {
+      const r = await llamar(VentasController, 'editarViaje', { user, params: { id } })
+      return renderVista(r.vista, { ...r.data, user })
+    }
+    const compila = (html) => {
+      const m = html.match(/<script>([\s\S]*?)<\/script>/)
+      assert.ok(m, 'la página tiene su script')
+      assert.doesNotThrow(() => new vm.Script(m[1]))
+    }
+    const deshabilitado = (campo) => new RegExp(`name="${campo}"[^>]*\\bdisabled`)
+    const canteraDos = async () => {
+      const arena = await producto()
+      const piedra = await producto({ nombre: 'Piedra prueba entregada', precioCantera: 3000 })
+      const id = await canteraEntregada({ items: [{ id: arena, cantidad: 2 }, { id: piedra, cantidad: 1 }] })
+      return { id, lineas: await lineasDe(id) }
+    }
+
+    it('una entregada avisa que se corrigen el stock, el cobro y la cuenta; una pendiente no', async () => {
+      const prod = await producto()
+      assert.match(await pagina(await viajeEntregado({ prod })), /ya fue entregada/)
+      assert.doesNotMatch(await pagina(await crearViaje({ prod })), /ya fue entregada/)
+    })
+
+    it('un viaje sin entregar mantiene su formulario de siempre', async () => {
+      const html = await pagina(await crearViaje({ prod: await producto() }))
+      for (const campo of ['calle', 'numero', 'fecha', 'hora', 'zona', 'cantidad', 'precioProducto', 'precioFlete', 'precioTotal', 'metodoPago']) {
+        assert.match(html, new RegExp(`name="${campo}"`), campo)
+      }
+      assert.doesNotMatch(html, /name="cantidad_\d+"/)
+      compila(html)
+    })
+
+    it('cantera: sin campos de envío ni flete, y una fila por producto', async () => {
+      const { id, lineas } = await canteraDos()
+      const html = await pagina(id)
+      for (const campo of ['calle', 'numero', 'obra', 'fecha', 'hora', 'zona', 'precioFlete', 'cantidad', 'precioProducto']) {
+        assert.doesNotMatch(html, new RegExp(`name="${campo}"`), campo)
+      }
+      for (const campo of ['fechaCompra', 'metodoPago', 'descripcion', 'precioTotal']) assert.match(html, new RegExp(`name="${campo}"`), campo)
+      for (const l of lineas) {
+        assert.match(html, new RegExp(`name="cantidad_${l.id}"[^>]*value="${Number(l.cantidad_pedida)}"`))
+        assert.match(html, new RegExp(`name="precio_${l.id}"[^>]*value="${Number(l.precio_unitario)}"`))
+      }
+      compila(html)
+    })
+
+    it('facturada: los campos de monto quedan deshabilitados con su aviso y el resto sigue editable', async () => {
+      const prod = await producto()
+      const viaje = await viajeEntregado({ prod })
+      await prueba.q(`UPDATE op_encabezado SET facturado = 1 WHERE id = ?`, [viaje])
+      const html = await pagina(viaje)
+      for (const campo of ['cantidad', 'precioProducto', 'precioFlete', 'precioTotal', 'editarTotal']) assert.match(html, deshabilitado(campo), campo)
+      assert.match(html, /Ya está facturada: no se puede cambiar el monto/)
+      for (const campo of ['calle', 'descripcion', 'metodoPago']) assert.doesNotMatch(html, deshabilitado(campo), campo)
+      compila(html)
+
+      const { id, lineas } = await canteraDos()
+      await prueba.q(`UPDATE op_encabezado SET facturado = 1 WHERE id = ?`, [id])
+      const htmlCantera = await pagina(id)
+      for (const l of lineas) {
+        assert.match(htmlCantera, deshabilitado(`cantidad_${l.id}`))
+        assert.match(htmlCantera, deshabilitado(`precio_${l.id}`))
+      }
+      compila(htmlCantera)
     })
   })
 })

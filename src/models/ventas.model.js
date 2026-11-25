@@ -299,16 +299,18 @@ const VentasModel = {
       const subtotal = nuevas.reduce((s, n) => s + n.cantidad * n.precio, 0)
       // Total: el editado a mano si se tildó, si no productos + flete
       const totalManual = String(datos.editarTotal) === '1' && !vacio(datos.precioTotal)
-      const total = totalManual ? Math.max(0, Number(datos.precioTotal) || 0) : subtotal + flete
+      let total = totalManual ? Math.max(0, Number(datos.precioTotal) || 0) : subtotal + flete
 
-      // Facturada: el monto es el de la factura, no se cambia
+      // Facturada: el monto es el de la factura. Los campos de monto llegan deshabilitados (no se
+      // envían), así que sin cambios pedidos se conserva el neto guardado, incluso uno pactado a mano.
       if (Number(op.facturado) === 1) {
         const subtotalViejo = detalles.reduce((s, d) => s + Number(d.cantidad_pedida) * Number(d.precio_unitario), 0)
         const fleteViejo = Number(op.precio_flete) || 0
         const netoViejo = op.monto_total != null ? Number(op.monto_total) : subtotalViejo + fleteViejo
-        const cambia = Math.abs(total - netoViejo) > 0.005 || Math.abs(flete - fleteViejo) > 0.005
+        const cambia = Math.abs(flete - fleteViejo) > 0.005 || (totalManual && Math.abs(total - netoViejo) > 0.005)
           || nuevas.some(n => Math.abs(n.cantidad - Number(n.cantidad_pedida)) > 1e-6 || Math.abs(n.precio - Number(n.precio_unitario)) > 0.005)
         if (cambia) throw new Error('Ya está facturada: no se puede cambiar el monto, la cantidad ni los precios.')
+        total = netoViejo
       }
 
       // Pagada con saldo a favor: el crédito (más lo que ya usó esta venta) tiene que alcanzar
