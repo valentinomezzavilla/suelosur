@@ -75,7 +75,7 @@ const TransaccionesController = {
         totalTransacciones: resultado.total,
         estadosPago: await require('../models/liquidaciones.model').estadosPago(
           resultado.rows.filter(t => t.origen === 'transaccion').map(t => t.id_op_encabezado)),
-        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/transacciones.js', '/js/estadoPago.js'],
+        scripts: ['/js/buscarCliente.js', '/js/filtroObra.js', '/js/transacciones.js', '/js/estadoPago.js', '/js/anularPago.js'],
       })
     } catch (err) {
       console.error(err); req.flash('error', 'Error al cargar transacciones.'); res.redirect('back')

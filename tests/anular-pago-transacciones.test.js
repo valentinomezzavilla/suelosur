@@ -11,6 +11,9 @@ const path = require('node:path')
 const VentasModel = require('../src/models/ventas.model')
 const ClientesModel = require('../src/models/clientes.model')
 const MovimientosDineroModel = require('../src/models/movimientosDinero.model')
+const TransaccionesModel = require('../src/models/transacciones.model')
+const { renderVista } = require('./helpers/vistas')
+const { execFileSync } = require('node:child_process')
 const Transacciones = require('../src/controllers/transacciones.controller')
 
 let admin, producto
@@ -144,10 +147,10 @@ describe('vista previa y anulación de un pago de cliente (modelo)', () => {
 })
 
 // Llama a una acción del controlador con un req / res simulados (como tests/filtro-cliente-obra-transacciones.test.js)
-function llamar(accion, { params = {}, body = {}, rol = 'dueno' } = {}) {
+function llamar(accion, { params = {}, body = {}, query = {}, rol = 'dueno' } = {}) {
   return new Promise((resolve, reject) => {
     const flashes = []
-    const req = { body, params, query: {}, session: { user: { id: admin, rol, nombre: 'Prueba' } }, flash: (t, m) => flashes.push({ t, m }), get: () => '' }
+    const req = { body, params, query, session: { user: { id: admin, rol, nombre: 'Prueba' } }, flash: (t, m) => flashes.push({ t, m }), get: () => '' }
     const res = {
       redirect: (url) => resolve({ url, flashes }),
       render: (vista, data) => resolve({ vista, data, flashes }),
@@ -225,5 +228,49 @@ describe('anular un pago desde Transacciones (controlador y rutas)', () => {
       assert.ok(linea, `falta la ruta ${metodo} de anular pago`)
       assert.match(linea, /auth,\s*roles\('admin_contable',\s*'dueno'\)/)
     }
+  })
+})
+
+describe('ícono y modal de anular pago en Transacciones (vista)', () => {
+  let cliente, pago, tx
+  const rango = { preset: 'rango', fechaDesde: '2026-11-01', fechaHasta: '2026-11-30' }
+  before(async () => {
+    cliente = await datos.crearCliente({ cuentaCorriente: true })
+    const A = await venta(cliente, '2026-10-10', 100000)
+    pago = await pagar(cliente, 100000, '2026-11-01 10:00:00', [{ id: A, monto: 100000 }])
+    // Un cobro de contado del mismo cliente: su fila (CAN / VIA / CON) no lleva el ícono
+    tx = await TransaccionesModel.crear({ tipo: 'Venta Viaje', cliente_id: cliente, cliente: 'PRUEBA', monto: 5000, metodo_pago: 'efectivo', fecha: '2026-11-05' })
+  })
+  const pagina = async (rol) => {
+    const { data } = await llamar('index', { query: { ...rango, clienteId: String(cliente) } })
+    return { data, html: await renderVista('pages/transacciones/index', { ...data, user: { rol, nombre: 'Prueba' } }) }
+  }
+
+  it('la fila PAG tiene el ícono Anular pago (aria-label, data-id) para contable y dueño', async () => {
+    for (const rol of ['dueno', 'admin_contable']) {
+      const { html } = await pagina(rol)
+      assert.equal((html.match(/btn-anular-pago/g) || []).length, 1, rol)
+      assert.match(html, /aria-label="Anular pago"/)
+      assert.match(html, new RegExp(`class="btn btn-sm btn-icon btn-outline-danger btn-anular-pago"[^>]*data-id="${pago}"[^>]*data-codigo="${codigoPag(pago)}"`))
+    }
+  })
+
+  it('no aparece para administración de ventas ni en las filas de cobros (CAN, VIA, CON)', async () => {
+    const { data, html } = await pagina('admin_ventas')
+    assert.ok(data.movimientos.some(m => m.origen === 'transaccion' && String(m.id) === String(tx)), 'el cobro de contado tiene que estar en la tabla')
+    assert.equal((html.match(/btn-anular-pago/g) || []).length, 0)
+    assert.doesNotMatch(html, /id="modal-anular-pago"/)
+  })
+
+  it('la página trae el modal de anular pago y el script', async () => {
+    const { data, html } = await pagina('dueno')
+    for (const id of ['modal-anular-pago', 'formAnularPago', 'anularPagoMotivo', 'anularPagoOps', 'anularPagoConfirmar']) {
+      assert.match(html, new RegExp(`id="${id}"`), id)
+    }
+    assert.ok(data.scripts.includes('/js/anularPago.js'))
+  })
+
+  it('el script de la pantalla tiene sintaxis válida', () => {
+    execFileSync(process.execPath, ['--check', path.join(__dirname, '..', 'public', 'js', 'anularPago.js')])
   })
 })

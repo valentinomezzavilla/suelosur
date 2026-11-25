@@ -1,0 +1,37 @@
+<%#
+  Modal "Anular pago" de un pago de cliente (fila PAG-… de Transacciones; public/js/anularPago.js).
+  Lo abre cualquier botón .btn-anular-pago con data-id (id del pago), data-codigo, data-cliente y
+  data-monto. Antes de confirmar muestra qué operaciones vuelven a pendiente y cómo queda el saldo
+  del cliente (GET /transacciones/pagos/:id/anular/vista-previa); el POST pide el motivo.
+%>
+<div id="modal-anular-pago" class="modal-overlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="anularPagoTitulo">
+    <div class="modal-header">
+      <h2 class="modal-title" id="anularPagoTitulo">Anular pago <span id="anularPagoCodigo"></span></h2>
+      <button type="button" class="modal-close" id="anularPagoCerrar" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="anularPagoCliente" class="fw-semibold mb-2"></p>
+      <p id="anularPagoCargando" class="text-muted">Calculando qué cambia…</p>
+      <div id="anularPagoBloqueos" class="alert alert-warning" hidden></div>
+      <p id="anularPagoResumen" class="mb-2" hidden></p>
+      <ul id="anularPagoOps" class="mb-2 ps-3" hidden></ul>
+      <p id="anularPagoAFavor" class="small text-muted mb-2" hidden></p>
+      <p id="anularPagoSaldo" class="fw-semibold" hidden></p>
+      <form id="formAnularPago" method="POST" hidden>
+        <div class="form-group">
+          <label for="anularPagoMotivo">Motivo</label>
+          <input type="text" name="motivo" id="anularPagoMotivo" maxlength="300" placeholder="Ej: se cargó al cliente equivocado" autocomplete="off" required>
+          <p class="form-hint">Queda registrado junto con tu usuario.</p>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-outline-secondary" id="anularPagoCancelar">Cancelar</button>
+          <button type="submit" class="btn btn-danger" id="anularPagoConfirmar" disabled>Sí, anular pago</button>
+        </div>
+      </form>
+      <div class="modal-actions" id="anularPagoSoloCerrar" hidden>
+        <button type="button" class="btn btn-outline-secondary" id="anularPagoCerrar2">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
