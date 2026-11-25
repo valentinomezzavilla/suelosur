@@ -9,6 +9,7 @@ const ClientesModel = require('./clientes.model')
 const { SQL_MUEVE_STOCK, SQL_DESCRIPCION_DETALLE, SQL_UNIDAD_DETALLE } = require('../utils/contenedor')
 const { textoDestino } = require('../utils/destino')
 const { ivaDe, conIva, sqlFactorIva } = require('../utils/iva')
+const { registrarAuditoria } = require('../utils/auditoria')
 
 // Total de una venta: el pactado (monto_total) cuando se guardó; si no, productos + flete.
 // Es el NETO; si la venta es para facturar se le suma el IVA (iva_alicuota) y eso es lo que
@@ -249,16 +250,18 @@ const VentasModel = {
     const zona   = datos.zona || null
     const metodoPago = datos.metodoPago || null
 
-    let entregada = false
+    let entregada = false, cobroCorregido = false, auditoria = null
     await transaction(async (q) => {
       // Se bloquea la venta: dos ediciones a la vez no pueden calcular el stock sobre datos viejos
       const op = (await q(`
-        SELECT estado, modalidad, facturado, tercero, precio_flete, monto_total, id_cliente, metodo_pago, iva_alicuota, observaciones
+        SELECT nro_op, estado, modalidad, facturado, tercero, precio_flete, monto_total, id_cliente, metodo_pago, iva_alicuota, observaciones
         FROM op_encabezado WHERE id = ? FOR UPDATE
       `, [id])).rows[0]
       if (!op) throw new Error('Orden no encontrada.')
       if (op.estado === 'anulado') throw new Error('No se puede editar una venta anulada.')
       entregada = op.estado === 'entregado'
+      // Cómo estaba el cobro antes de tocar nada (total con IVA, método, tercero, descripción)
+      const antes = entregada ? await VentasModel.estadoDeCobro(id, q) : null
       const esViaje = op.modalidad === 'flete'
       if (esViaje && !calle && !obra) throw new Error('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
       const flete = vacio(datos.precioFlete) ? (Number(op.precio_flete) || 0) : Math.max(0, Number(datos.precioFlete) || 0)
@@ -357,10 +360,23 @@ const VentasModel = {
         `, [metodoPago, observaciones, flete, total, fechaCompra, id])
       }
       if (datos.tercero !== undefined) await require('../services/tercero.service').guardarEnOp(id, datos.tercero, {}, q)
+      if (entregada) {
+        cobroCorregido = await VentasModel.corregirCobro(id, antes, q)
+        const despues = await VentasModel.estadoDeCobro(id, q)
+        const cambioLineas = nuevas.some(n => n.editada && (Math.abs(n.cantidad - Number(n.cantidad_pedida)) > 1e-6 || Math.abs(n.precio - Number(n.precio_unitario)) > 0.005))
+        if (cambioLineas || Math.abs(despues.total - antes.total) > 0.005 || despues.metodo !== antes.metodo) {
+          auditoria = {
+            nro_op: op.nro_op, cliente_id: op.id_cliente,
+            antes: { total: antes.total, metodo_pago: antes.metodo, lineas: detalles.map(d => ({ id: d.id, cantidad: Number(d.cantidad_pedida), precio: Number(d.precio_unitario) })) },
+            despues: { total: despues.total, metodo_pago: despues.metodo, lineas: nuevas.map(n => ({ id: n.id, cantidad: n.cantidad, precio: n.precio })) },
+          }
+        }
+      }
       // Cambió el total, el método o la fecha de compra: el cargo en cuenta corriente acompaña
       await VentasModel.sincronizarCargoCC(id, q, { moverFecha: fechaCompra != null })
     })
-    return { entregada, cobroCorregido: false }
+    if (auditoria) await registrarAuditoria({ entidad_tipo: 'operacion', entidad_id: id, accion: 'editar_entregada', usuario, detalle: auditoria })
+    return { entregada, cobroCorregido }
   },
 
   // Adapta una OP a la forma que esperan las vistas viaje/edit/detalle
@@ -578,6 +594,69 @@ async function sincronizarCargoVenta(idOp, q = query, { moverFecha = false } = {
     VALUES (?, ?, ?, ?, ?, COALESCE(?, ahora_local()))
   `, [op.id_cliente, tipoCargo, descripcion, monto, op.id, createdAt])
   return `cargo creado por ${-monto}`
+}
+
+// Texto de la transacción de una venta: el mismo que arman la entrega (controlador y hoja de ruta).
+// Un viaje lleva el destino; la cantera, sus observaciones.
+VentasModel.descripcionDeCobro = function (op) {
+  if (op.modalidad !== 'flete') return op.observaciones || ''
+  const destino = textoDestino({ calle: op.domicilio_calle, numero: op.domicilio_altura, obra: op.obra })
+  return [destino ? `Viaje a ${destino}` : 'Venta con viaje', op.observaciones].filter(Boolean).join(' — ')
+}
+
+// Lo que alimenta el cobro de una venta, para comparar antes y después de editarla:
+// { estado, tipo_op, total (con IVA), metodo, tercero (JSON), descripcion }
+VentasModel.estadoDeCobro = async function (idOp, q = query) {
+  const op = (await q(`
+    SELECT op.estado, op.tipo_op, op.modalidad, op.metodo_pago, op.tercero, op.observaciones,
+           op.domicilio_calle, op.domicilio_altura, op.obra, ${SQL_TOTAL} AS total
+    FROM op_encabezado op WHERE op.id = ?
+  `, [idOp])).rows[0]
+  if (!op) return null
+  return { estado: op.estado, tipo_op: op.tipo_op, total: Number(op.total), metodo: op.metodo_pago || null,
+           tercero: op.tercero || null, descripcion: VentasModel.descripcionDeCobro(op) }
+}
+
+// Edición de una venta ya entregada: lo cobrado acompaña lo que cambió. `antes` es el
+// estadoDeCobro previo a la edición; solo se corrige lo que esa edición cambió (así un cobro que
+// difiere del total por un motivo válido, como un IVA agregado después de cobrar, no se pisa).
+//  - Monto: la diferencia de total va a la última transacción (tipo <> 'Ajuste'); la fecha no se toca.
+//  - Método: pasa a todas sus transacciones. Descripción: si hay una sola, y cambió.
+//  - Egreso a tercero: se rehace por cada transacción por transferencia si cambió monto, método o tercero.
+// La cuenta corriente la deja sincronizarCargoCC. Devuelve true si cambió algo del cobro.
+VentasModel.corregirCobro = async function (idOp, antes, q = query) {
+  const despues = await VentasModel.estadoDeCobro(idOp, q)
+  if (!despues || despues.tipo_op !== 'M' || despues.estado !== 'entregado') return false
+  const txs = (await q(`SELECT * FROM transacciones WHERE id_op_encabezado = ? AND tipo <> 'Ajuste' ORDER BY id`, [idOp])).rows
+  if (!txs.length) return false
+  const diferencia = redondear(despues.total - antes.total)
+  const cambiaMonto = Math.abs(diferencia) > 0.005
+  const cambiaMetodo = !!despues.metodo && despues.metodo !== antes.metodo
+  const cambiaTercero = (despues.tercero || null) !== (antes.tercero || null)
+  const cambiaDescripcion = txs.length === 1 && despues.descripcion !== antes.descripcion
+  if (!cambiaMonto && !cambiaMetodo && !cambiaTercero && !cambiaDescripcion) return false
+
+  const ultima = txs[txs.length - 1]
+  if (cambiaMonto) {
+    const nuevo = redondear(Number(ultima.monto) + diferencia)
+    if (nuevo < 0) throw new Error('Bajar el monto dejaría lo cobrado de esta venta en negativo. Revisá los cobros registrados.')
+    ultima.monto = nuevo
+    await q(`UPDATE transacciones SET monto = ? WHERE id = ?`, [nuevo, ultima.id])
+  }
+  if (cambiaMetodo) {
+    await q(`UPDATE transacciones SET metodo_pago = ? WHERE id_op_encabezado = ? AND tipo <> 'Ajuste'`, [despues.metodo, idOp])
+    txs.forEach(t => { t.metodo_pago = despues.metodo })
+  }
+  if (cambiaDescripcion) await q(`UPDATE transacciones SET descripcion = ? WHERE id = ?`, [despues.descripcion, ultima.id])
+  if (cambiaMonto || cambiaMetodo || cambiaTercero) {
+    const Tercero = require('../services/tercero.service')
+    for (const t of txs) await Tercero.borrarDeTransaccion(t.id, q)
+    for (const t of txs) {
+      if ((t.metodo_pago || 'efectivo') !== 'transferencia') continue
+      await Tercero.egresoDeCobro({ id_transaccion: t.id, id_op_encabezado: idOp, monto: t.monto, fecha: t.fecha, cliente: t.cliente, tipo: t.tipo }, q)
+    }
+  }
+  return true
 }
 
 // Pone en regla todas las ventas a cuenta corriente o pagadas con saldo a favor
