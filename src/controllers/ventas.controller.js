@@ -18,6 +18,14 @@ const { leerFechaPago, fechaHoraDePago } = require('../utils/fechaPago')
 const marcadaParaFacturar = (v) => v === true || v === 1 || ['1', 'on', 'true'].includes(String(v))
 const totalConIva = (total, paraFacturar) => conIva(total, marcadaParaFacturar(paraFacturar) ? ALICUOTA_FACTURAR : 0)
 
+// Líneas de una venta con varios productos (cantera): los campos cantidad_<id> y precio_<id>.
+// undefined si el formulario no las trae (viaje: una sola línea, campos cantidad y precioProducto).
+function lineasDeBody(body = {}) {
+  const lineas = Object.keys(body).filter(k => /^cantidad_\d+$/.test(k))
+    .map(k => { const id = k.slice('cantidad_'.length); return { id, cantidad: body[k], precio: body['precio_' + id] } })
+  return lineas.length ? lineas : undefined
+}
+
 // Una venta cargada con fecha pasada tiene que impactar en ESA fecha, no en la de
 // carga: se usa como fecha de emisión y como fecha de la transacción. Con fecha de
 // hoy o futura (un viaje programado) la emisión sigue siendo hoy.
@@ -466,13 +474,13 @@ const VentasController = {
     }
   },
 
-  // ── Edición de viaje en proceso ───────────────────────────────
+  // ── Edición de una venta (viaje o cantera), también ya entregada ──
   async editarViaje(req, res) {
     try {
       const viaje = await VentasModel.obtenerViaje(req.params.id)
       if (!viaje) { req.flash('error', 'Viaje no encontrado.'); return res.redirect('/ventas') }
-      if (viaje.estado === 'entregado' || viaje.estado === 'anulado') {
-        req.flash('error', 'Solo se pueden editar viajes pendientes o despachados.')
+      if (viaje.estado === 'anulado') {
+        req.flash('error', 'No se puede editar una venta anulada.')
         return res.redirect(`/ventas/${req.params.id}`)
       }
       const clienteViaje = viaje.id_cliente ? await ClientesModel.obtener(viaje.id_cliente) : null
@@ -494,9 +502,11 @@ const VentasController = {
   async actualizarViaje(req, res) {
     try {
       const tercero = await Tercero.leer(req.body, req.body.metodoPago)
-      await VentasModel.actualizarViaje(req.params.id, req.body)
-      await Tercero.guardarEnOp(req.params.id, tercero)
-      req.flash('success', 'Viaje actualizado.')
+      const r = await VentasModel.actualizarVenta(req.params.id,
+        { ...req.body, tercero, lineas: lineasDeBody(req.body) }, { usuario: req.session.user?.id })
+      req.flash('success', !r.entregada ? 'Viaje actualizado.'
+        : r.cobroCorregido ? 'Venta actualizada: se corrigieron el cobro, el stock y la cuenta del cliente.'
+        : 'Venta actualizada.')
       res.redirect(`/ventas/${req.params.id}`)
     } catch (err) {
       console.error(err)

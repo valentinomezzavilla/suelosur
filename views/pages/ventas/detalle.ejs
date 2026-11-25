@@ -20,7 +20,7 @@
       <a href="/ventas/<%= op.id %>/remito" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('printer', { size: 15 }) %> Remito</a>
       <a href="/remitos/<%= op.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><%- icon('fileText', { size: 15 }) %> PDF</a>
     <% } %>
-    <% if (op.modalidad === 'flete' && op.estado !== 'entregado' && op.estado !== 'anulado') { %>
+    <% if (op.estado !== 'anulado') { %>
       <a href="/ventas/<%= op.id %>/editar" class="btn btn-sm btn-naranja"><%- icon('edit', { size: 15 }) %> Editar</a>
     <% } %>
     <a href="/ventas" class="btn btn-sm btn-outline-secondary">← Volver</a>

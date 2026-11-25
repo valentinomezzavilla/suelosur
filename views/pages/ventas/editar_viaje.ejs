@@ -1,11 +1,19 @@
+<%# Edición de una venta (viaje o cantera), también ya entregada. Facturada: los campos de monto van deshabilitados (no se envían y el monto no cambia). %>
+<% const bloqueoMonto = viaje.facturado ? 'disabled' : '' %>
 <main id="venta-viaje">
 
         <div class="page-header">
             <div>
-                <a href="/ventas/<%= viaje.id %>" class="back-link">← Detalle viaje</a>
+                <a href="/ventas/<%= viaje.id %>" class="back-link">← Detalle</a>
                 <h1 class="page-title">Editar OP-<%= String(viaje.nro_op).padStart(4, '0') %></h1>
             </div>
         </div>
+
+        <% if (viaje.entregada) { %>
+        <div class="venta-aviso">
+            Esta venta ya fue entregada. Si cambiás la cantidad, el precio o el método de pago, se corrigen el stock, el cobro y la cuenta corriente del cliente.
+        </div>
+        <% } %>
 
         <form action="/ventas/<%= viaje.id %>/editar" method="POST" class="viaje-form-layout" id="formEditarViaje">
 
@@ -32,19 +40,24 @@
                             <input type="date" name="fechaCompra" id="fechaCompra" value="<%= viaje.fechaCompra || hoyISO() %>" max="<%= hoyISO() %>" required>
                             <p class="form-hint">El día en que el cliente hizo el pedido. Define a qué mes pertenece la venta (también en su cuenta corriente).</p>
                         </div>
+                        <% if (!viaje.esCantera) { %>
                         <div class="form-group">
                             <label for="fecha">Fecha de envío *</label>
                             <input type="date" name="fecha" id="fecha" value="<%= viaje.fecha %>" required>
                         </div>
+                        <% } %>
                     </div>
+                    <% if (!viaje.esCantera) { %>
                     <div class="form-row-2">
                         <div class="form-group">
                             <label for="hora">Hora de envío</label>
                             <input type="time" name="hora" id="hora" value="<%= viaje.hora || '' %>">
                         </div>
                     </div>
+                    <% } %>
                 </div>
 
+                <% if (!viaje.esCantera) { %>
                 <div class="form-section">
                     <h3 class="form-section__title">Direccion de entrega</h3>
                     <p class="form-hint">Cargá la dirección, la obra, o las dos. Al menos una es obligatoria.</p>
@@ -72,6 +85,25 @@
                         </select>
                     </div>
                 </div>
+                <% } else { %>
+                <div class="form-section">
+                    <h3 class="form-section__title">Productos</h3>
+                    <p class="form-hint">El producto no se cambia: se corrigen cantidad y precio. El stock acompaña la diferencia de cantidad.</p>
+                    <table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Producto</th><th>Cantidad</th><th>Precio unitario</th><th class="text-end">Subtotal</th></tr></thead>
+                        <tbody>
+                        <% viaje.lineas.forEach(l => { %>
+                            <tr data-linea>
+                                <td><%= l.producto %></td>
+                                <td><input type="number" name="cantidad_<%= l.id %>" value="<%= l.cantidad %>" min="<%= l.esContenedor ? 1 : 0.01 %>" step="<%= l.esContenedor ? 1 : 'any' %>" required <%= bloqueoMonto %> class="form-control form-control-sm"></td>
+                                <td><input type="number" name="precio_<%= l.id %>" value="<%= l.precio %>" min="0" step="any" <%= bloqueoMonto %> class="form-control form-control-sm"></td>
+                                <td class="text-end" data-subtotal></td>
+                            </tr>
+                        <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+                <% } %>
 
                 <div class="form-section">
                     <h3 class="form-section__title">Descripcion (opcional)</h3>
@@ -83,6 +115,7 @@
 
             <aside class="viaje-form-aside">
 
+                <% if (!viaje.esCantera) { %>
                 <div class="form-section">
                     <h3 class="form-section__title">Producto</h3>
                     <div class="form-group">
@@ -93,7 +126,7 @@
                     <%# Contenedor: por unidad (cantidad entera × precio), no mueve stock %>
                     <div class="form-group">
                         <label for="cantidad">Cantidad de contenedores *</label>
-                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="1" step="1" required>
+                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="1" step="1" required <%= bloqueoMonto %>>
                         <p class="form-hint">
                             Se cobra por unidad y no mueve stock.
                             <% if (viaje.dias != null) { %>Se había cargado por <%= viaje.dias %> día(s): al guardar queda como <%= viaje.cantidad %> contenedor a $<%= Number(viaje.precioProducto || 0).toLocaleString('es-AR') %> (podés cambiar cantidad y precio).<% } %>
@@ -102,33 +135,41 @@
                     <% } else { %>
                     <div class="form-group">
                         <label for="cantidad">Cantidad *</label>
-                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="0.01" step="any" required>
+                        <input type="number" name="cantidad" id="cantidad" value="<%= viaje.cantidad %>" min="0.01" step="any" required <%= bloqueoMonto %>>
                         <p class="form-hint">Cambiar la cantidad ajusta el stock del producto. Admite decimales (ej: 2.5).</p>
                     </div>
                     <% } %>
                 </div>
+                <% } %>
 
                 <div class="form-section">
                     <h3 class="form-section__title">Precios</h3>
+                    <% if (viaje.facturado) { %>
+                    <p class="form-hint">Ya está facturada: no se puede cambiar el monto, la cantidad ni los precios.</p>
+                    <% } %>
+                    <% if (!viaje.esCantera) { %>
                     <div class="form-group">
                         <label for="precioProducto"><%= viaje.esContenedor ? 'Precio por unidad' : 'Precio unitario' %></label>
-                        <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="any">
+                        <input type="number" name="precioProducto" id="precioProducto" value="<%= viaje.precioProducto %>" min="0" step="any" <%= bloqueoMonto %>>
                     </div>
+                    <% } %>
                     <div class="form-group">
-                        <label for="subtotalEditar">Subtotal producto</label>
+                        <label for="subtotalEditar">Subtotal <%= viaje.esCantera ? 'productos' : 'producto' %></label>
                         <input type="text" id="subtotalEditar" readonly class="input-readonly">
                     </div>
+                    <% if (!viaje.esCantera) { %>
                     <div class="form-group">
                         <label for="precioFlete">Precio del flete</label>
-                        <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="any">
+                        <input type="number" name="precioFlete" id="precioFlete" value="<%= viaje.precioFlete %>" min="0" step="any" <%= bloqueoMonto %>>
                     </div>
+                    <% } %>
                     <div class="form-group">
                         <label for="precioTotal"><%= viaje.ivaAlicuota ? `Total neto (+ IVA ${viaje.ivaAlicuota}%)` : 'Total' %></label>
                         <div class="precio-total-row">
                             <input type="number" name="precioTotal" id="precioTotal" value="<%= viaje.precioTotal %>" min="0" step="any"
-                                   <%= viaje.totalManual ? '' : 'readonly' %>>
+                                   <%= viaje.totalManual ? '' : 'readonly' %> <%= bloqueoMonto %>>
                             <label class="toggle-row toggle-sm">
-                                <input type="checkbox" id="checkEditarTotal" name="editarTotal" value="1" <%= viaje.totalManual ? 'checked' : '' %>>
+                                <input type="checkbox" id="checkEditarTotal" name="editarTotal" value="1" <%= viaje.totalManual ? 'checked' : '' %> <%= bloqueoMonto %>>
                                 <span>Editar</span>
                             </label>
                         </div>
@@ -144,8 +185,9 @@
                             <option value="cheque"           <%= viaje.metodoPago === 'cheque' ? 'selected' : '' %>>Cheque</option>
                             <option value="echeq"           <%= viaje.metodoPago === 'echeq' ? 'selected' : '' %>>Echeq</option>
                             <option value="cuenta_corriente" <%= viaje.metodoPago === 'cuenta_corriente' ? 'selected' : '' %>>Cuenta corriente</option>
-                            <% if (saldoFavorCliente > 0) { %>
-                              <option value="saldo_a_favor" <%= viaje.metodoPago === 'saldo_a_favor' ? 'selected' : '' %>>Usar saldo a favor del cliente ($<%= Math.round(saldoFavorCliente).toLocaleString('es-AR') %>)</option>
+                            <%# También si la venta YA está pagada con saldo a favor (aunque hoy el saldo sea 0): si no, el navegador mandaría "efectivo" %>
+                            <% if (saldoFavorCliente > 0 || viaje.metodoPago === 'saldo_a_favor') { %>
+                              <option value="saldo_a_favor" <%= viaje.metodoPago === 'saldo_a_favor' ? 'selected' : '' %>>Usar saldo a favor del cliente<%= saldoFavorCliente > 0 ? ` ($${Math.round(saldoFavorCliente).toLocaleString('es-AR')})` : '' %></option>
                             <% } %>
                         </select>
                     </div>
@@ -183,14 +225,28 @@
     const total = document.getElementById('precioTotal')
     const subtotal = document.getElementById('subtotalEditar')
     const check = document.getElementById('checkEditarTotal')
+    const filas = Array.from(document.querySelectorAll('[data-linea]'))
+    const pesos = (n) => '$' + n.toLocaleString('es-AR')
 
-    // Total = subtotal + flete, salvo que se tilde "Editar" para cargarlo a mano
+    // Total = productos + flete, salvo que se tilde "Editar" para cargarlo a mano.
+    // Productos: una fila por producto (cantera) o cantidad × precio (viaje).
     function calcular() {
-        const sub = (Number(cant.value) || 0) * (Number(precio.value) || 0)
-        subtotal.value = '$' + sub.toLocaleString('es-AR')
-        if (!check.checked) total.value = Math.round((sub + (Number(flete.value) || 0)) * 100) / 100
+        let sub = 0
+        if (filas.length) {
+            filas.forEach(fila => {
+                const [c, p] = fila.querySelectorAll('input')
+                const s = (Number(c.value) || 0) * (Number(p.value) || 0)
+                fila.querySelector('[data-subtotal]').textContent = pesos(s)
+                sub += s
+            })
+        } else {
+            sub = (Number(cant.value) || 0) * (Number(precio.value) || 0)
+        }
+        subtotal.value = pesos(sub)
+        if (!check.checked) total.value = Math.round((sub + (flete ? Number(flete.value) || 0 : 0)) * 100) / 100
     }
-    ;[cant, precio, flete].forEach(el => el.addEventListener('input', calcular))
+    const campos = filas.length ? filas.flatMap(f => Array.from(f.querySelectorAll('input'))) : [cant, precio, flete]
+    campos.filter(Boolean).forEach(el => el.addEventListener('input', calcular))
 
     check.addEventListener('change', () => {
         total.readOnly = !check.checked
@@ -198,10 +254,11 @@
         calcular()
     })
 
+    // Un viaje necesita dirección u obra; la cantera no tiene dirección
     document.getElementById('formEditarViaje').addEventListener('submit', (e) => {
-        const calle = document.getElementById('calle').value.trim()
-        const obra = document.getElementById('obra').value.trim()
-        if (!calle && !obra) {
+        const calle = document.getElementById('calle')
+        const obra = document.getElementById('obra')
+        if (calle && obra && !calle.value.trim() && !obra.value.trim()) {
             alert('Cargá la dirección (calle) o la obra. Al menos uno es obligatorio.')
             e.preventDefault()
         }
