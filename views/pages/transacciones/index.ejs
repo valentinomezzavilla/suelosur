@@ -194,6 +194,10 @@
                                         <% } %>
                                     <% } else if (t.origen === 'pago_cliente') { %>
                                         <a href="/clientes/cuentas/<%= t.cliente_id %>" class="btn btn-sm btn-icon btn-outline-secondary" title="Ver la cuenta corriente del cliente" aria-label="Ver la cuenta corriente del cliente" data-bs-toggle="tooltip" data-bs-placement="top"><%- icon('user', { size: 16 }) %></a>
+                                        <% if (puedeCorregir) { %>
+                                            <%- include('../../partials/btn_icono', { icono: 'ban', etiqueta: 'Anular pago', clase: 'btn-outline-danger btn-anular-pago',
+                                                  attrs: { 'data-id': t.id, 'data-codigo': codigoMov(t), 'data-cliente': t.persona, 'data-monto': t.monto } }) %>
+                                        <% } %>
                                     <% } else { %>
                                         <% if (t.id_pago_empleado) { %>
                                             <a href="/compras/recibo/<%= t.id_pago_empleado %>" class="btn btn-sm btn-icon btn-outline-secondary" target="_blank" rel="noopener" title="Recibo de pago" aria-label="Recibo de pago" data-bs-toggle="tooltip" data-bs-placement="top"><%- icon('printer', { size: 16 }) %></a>
@@ -362,3 +366,5 @@
         }) %></script>
 <%# Marcar pendiente / pagada una operación (con vista previa de lo que cambia) %>
 <%- include('../../partials/modal_estado_pago') %>
+<%# Anular un pago de cliente (con vista previa de las operaciones que vuelven a pendiente) %>
+<% if (puedeCorregir) { %><%- include('../../partials/modal_anular_pago') %><% } %>

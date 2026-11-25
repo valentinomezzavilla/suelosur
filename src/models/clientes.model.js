@@ -10,6 +10,7 @@ const redondear = (n) => Math.round((Number(n) || 0) * 100) / 100
 const pesos = (n) => '$' + redondear(n).toLocaleString('es-AR')
 // Métodos de pago que no se cobran en el momento sino contra la cuenta del cliente
 const TIPO_CARGO_POR_METODO = { cuenta_corriente: 'deuda', saldo_a_favor: 'uso_saldo_favor' }
+const MSG_PAGO_CON_CHEQUE = 'Este pago es de un cheque: anulalo desde Cheques (deshabilitando el cheque).'
 
 // Operación a cuenta corriente, no anulada, que todavía no tiene su cargo (op = op_encabezado).
 // En un alquiler agrupado con cobro "por alquiler" el cargo es UNO para todo el grupo
@@ -567,13 +568,76 @@ const ClientesModel = {
       if (m.tipo !== 'pago') throw new Error('Solo se pueden anular pagos.')
       if (Number(m.anulado)) throw new Error('Ese pago ya estaba anulado.')
       const cheque = (await q(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [movId])).rows[0]
-      if (cheque) throw new Error('Este pago es de un cheque: anulalo desde Cheques (deshabilitando el cheque).')
+      if (cheque) throw new Error(MSG_PAGO_CON_CHEQUE)
       // El saldo lo recalcula la base (los anulados no suman)
       await q(`UPDATE movimientos_cuenta SET anulado = 1, anulado_en = ahora_local(), anulado_por = ?, anulado_motivo = ? WHERE id = ?`,
         [usuario || null, motivo, movId])
       await require('../services/tercero.service').borrarDeMovimiento(movId, q)
       return m
     })
+  },
+
+  // Lo mismo que anularPago, dejando constancia en la auditoría (la usan Cuenta corriente y Transacciones).
+  async anularPagoAuditado(movId, clienteId, { usuario, motivo }) {
+    const m = await this.anularPago(movId, clienteId, { usuario, motivo })
+    await require('../utils/auditoria').registrarAuditoria({
+      entidad_tipo: 'movimiento_cuenta', entidad_id: m.id, accion: 'anular_pago', usuario,
+      detalle: { cliente_id: m.cliente_id, monto: Number(m.monto), descripcion: m.descripcion, metodo_pago: m.metodo_pago, fecha: m.created_at, motivo },
+    })
+    return m
+  },
+
+  // Un movimiento de la cuenta corriente por su id (anulado o no), o undefined.
+  async pagoPorId(movId, q = query) {
+    return (await q(`SELECT * FROM movimientos_cuenta WHERE id = ?`, [movId])).rows[0]
+  },
+
+  // Qué pasaría al anular este pago (no escribe nada): las operaciones que vuelven a pendiente con
+  // cuánto, el saldo a favor que se pierde y el saldo del cliente antes / después. Se compara la
+  // cuenta entera con y sin el pago (misma imputación que todo el sistema), así incluye también lo
+  // que se mueva por el orden en que se aplican los demás pagos, no solo las obras elegidas.
+  async vistaPreviaAnularPago(movId) {
+    const m = await this.pagoPorId(movId)
+    const v = { idPago: m ? m.id : null, clienteId: m ? m.cliente_id : null, cliente: '', monto: 0, metodo_pago: null, fecha: null,
+      descripcion: '', puede: false, bloqueos: [], operaciones: [], aFavorQuitado: 0, saldoAntes: null, saldoDespues: null }
+    const no = (msg) => { v.bloqueos.push(msg); return v }
+    if (!m) return no('El pago no existe.')
+    const cli = await this.obtener(m.cliente_id)
+    Object.assign(v, { cliente: this.nombreCompleto(cli), monto: redondear(m.monto), metodo_pago: m.metodo_pago || null,
+      fecha: m.created_at, descripcion: m.descripcion || '' })
+    if (m.tipo !== 'pago') return no('Solo se pueden anular pagos.')
+    if (Number(m.anulado)) return no('Ese pago ya estaba anulado.')
+    if ((await query(`SELECT 1 FROM cheques WHERE id_mov_cuenta = ? LIMIT 1`, [movId])).rows[0]) return no(MSG_PAGO_CON_CHEQUE)
+
+    const antes = await this.imputacionDe(m.cliente_id)
+    // Las asignaciones de pagos que ya no están entre los movimientos no cuentan (utils/imputacion)
+    const despues = imputar(antes.movs.filter(x => String(x.id) !== String(movId)), await this.asignacionesDe([m.cliente_id]))
+    const pagadoAntes = porOperacion(antes.cargos), pagadoDespues = porOperacion(despues.cargos)
+    const bajas = Object.keys(pagadoAntes)
+      .map(id => ({ id, quitado: redondear(pagadoAntes[id].pagado - (pagadoDespues[id] ? pagadoDespues[id].pagado : 0)) }))
+      .filter(b => b.quitado > 0.005)
+    const info = bajas.length ? Object.fromEntries((await query(
+      `SELECT id, nro_op, nro_remito, obra, tipo_op, modalidad FROM op_encabezado WHERE id = ANY(?::bigint[])`, [bajas.map(b => Number(b.id))]
+    )).rows.map(r => [String(r.id), r])) : {}
+    const L = require('../utils/liquidaciones')
+    v.operaciones = bajas.map(b => {
+      const o = info[b.id] || {}
+      return { id: Number(b.id), nro_op: o.nro_op, etiqueta: `OP-${String(o.nro_op ?? '?').padStart(4, '0')}`,
+        tipo: L.TIPOS[L.tipoDeOperacion({ tipo_op: o.tipo_op, modalidad: o.modalidad })] || '',
+        remito: o.nro_remito || null, obra: o.obra || '', quitado: b.quitado }
+    }).sort((a, b) => (a.nro_op ?? 0) - (b.nro_op ?? 0)).map(({ nro_op, ...resto }) => resto)
+    // Cargos cargados a mano (sin operación) que el pago cubría
+    for (const [id, c] of Object.entries(antes.cargos)) {
+      if (c.idOp) continue
+      const quitado = redondear(despues.cargos[id].restante - c.restante)
+      if (quitado > 0.005) v.operaciones.push({ id: null, etiqueta: String((antes.movs.find(x => String(x.id) === id) || {}).descripcion || 'Cargo a mano').slice(0, 60),
+        tipo: '', remito: null, obra: '', quitado })
+    }
+    v.aFavorQuitado = Math.max(0, redondear(antes.aFavor - despues.aFavor))
+    v.saldoAntes = redondear(cli ? cli.saldo : 0)
+    v.saldoDespues = redondear(v.saldoAntes - v.monto)
+    v.puede = true
+    return v
   },
 
   nombreCompleto(c) {
