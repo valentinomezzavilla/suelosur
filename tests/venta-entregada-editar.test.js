@@ -586,4 +586,36 @@ describe('modelo: editar una venta entregada', () => {
       assert.deepEqual(await stockDe(arena), { actual: 98, pendiente: 0 })
     })
   })
+
+  // ── editar desde el listado de Ventas ───────────────────────
+  describe('lápiz de editar en el listado', () => {
+    const { renderVista } = require('./helpers/vistas')
+    const rango = { preset: 'rango', fechaDesde: '2026-11-01', fechaHasta: '2026-11-30' }
+
+    it('cada venta no anulada tiene un botón de solo ícono "Editar venta"; la anulada no', async () => {
+      const cli = await datos.crearCliente()
+      const prod = await producto()
+      const viaje = await viajeEntregado({ prod, cli })
+      const cantera = await canteraEntregada({ items: [{ id: prod, cantidad: 1 }], cli })
+      const pendiente = await crearViaje({ prod, cli })
+      const anulada = await crearViaje({ prod, cli })
+      await VentasModel.anular(anulada)
+
+      const r = await llamar(VentasController, 'index', { user, query: { ...rango, clienteId: String(cli) } })
+      assert.deepEqual(r.data.ops.map(o => Number(o.id)).sort((a, b) => a - b), [viaje, cantera, pendiente, anulada].map(Number).sort((a, b) => a - b))
+      const html = await renderVista(r.vista, { ...r.data, user })
+
+      const boton = (id) => (html.match(new RegExp(`<a\\b[^>]*href="/ventas/${id}/editar"[^>]*>[\\s\\S]*?</a>`)) || [])[0]
+      for (const id of [viaje, cantera, pendiente]) {
+        const b = boton(id)
+        assert.ok(b, `la venta ${id} tiene su botón de editar`)
+        assert.match(b, /\bbtn-icon\b/)
+        assert.match(b, /aria-label="Editar venta"/)
+        assert.match(b, /title="Editar venta"/)
+        assert.match(b, /data-bs-toggle="tooltip"/)
+        assert.equal(b.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<[^>]*>/g, '').trim(), '', 'solo ícono, sin texto visible')
+      }
+      assert.equal(boton(anulada), undefined, 'una anulada no se edita')
+    })
+  })
 })

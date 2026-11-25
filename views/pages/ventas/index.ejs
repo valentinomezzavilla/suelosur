@@ -153,6 +153,9 @@
           <td class="text-center">
             <div class="acciones-fila">
               <%- include('../../partials/btn_icono', { icono: 'eye', etiqueta: 'Ver detalle', clase: 'btn-outline-secondary', href: '/ventas/' + op.id }) %>
+              <% if (op.estado !== 'anulado') { %>
+                <%- include('../../partials/btn_icono', { icono: 'edit', etiqueta: 'Editar venta', clase: 'btn-outline-secondary', href: '/ventas/' + op.id + '/editar' }) %>
+              <% } %>
               <%- include('../../partials/boton_nro_factura', { op }) %>
               <%- include('../../partials/botones_estado_pago', { e: (locals.estadosPago || {})[op.id], compacto: true }) %>
             </div>
