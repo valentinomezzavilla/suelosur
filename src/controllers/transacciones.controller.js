@@ -263,6 +263,35 @@ const TransaccionesController = {
     res.redirect('back')
   },
 
+  // Vista previa de anular un pago de cliente (fila PAG-…): qué operaciones vuelven a pendiente
+  // y cómo queda el saldo. No guarda nada (ver ClientesModel.vistaPreviaAnularPago).
+  async vistaPreviaAnularPago(req, res) {
+    try {
+      res.json(await ClientesModel.vistaPreviaAnularPago(req.params.id))
+    } catch (err) {
+      console.error(err); res.status(500).json({ error: 'No se pudo calcular el cambio.' })
+    }
+  },
+
+  // Anula un pago de cliente con motivo: las operaciones que cubría vuelven a pendiente y el
+  // saldo del cliente se actualiza (ver ClientesModel.anularPagoAuditado).
+  async anularPago(req, res) {
+    try {
+      const motivo = String(req.body.motivo || '').trim().slice(0, 300)
+      if (!motivo) throw new Error('Indicá el motivo de la anulación.')
+      const v = await ClientesModel.vistaPreviaAnularPago(req.params.id)
+      if (!v.puede) throw new Error(v.bloqueos[0])
+      await ClientesModel.anularPagoAuditado(req.params.id, v.clienteId, { usuario: req.session.user?.id, motivo })
+      const n = v.operaciones.length
+      const vuelven = n === 0 ? '' : (n === 1 ? ' 1 operación vuelve a pendiente.' : ` ${n} operaciones vuelven a pendiente.`)
+      req.flash('success', `Pago ${MovimientosDineroModel.codigo({ origen: 'pago_cliente', id: v.idPago })} de $${v.monto.toLocaleString('es-AR')} anulado.${vuelven} El saldo del cliente se actualizó.`)
+    } catch (err) {
+      console.error(err)
+      req.flash('error', err.message || 'Error al anular el pago.')
+    }
+    res.redirect('back')
+  },
+
   // Borra la transacción junto con su operación. Es irreversible: la confirmación
   // se pide en el modal de la vista.
   async eliminar(req, res) {

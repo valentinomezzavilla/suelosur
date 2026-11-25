@@ -12,6 +12,9 @@ router.get('/export/:formato', auth, roles('admin_ventas','admin_contable','duen
 router.post('/:id/metodo-pago', auth, roles('admin_contable','dueno'), ctrl.cambiarMetodoPago)
 // Corregir la fecha de pago de un cobro: mismos permisos que corregir el método
 router.post('/:id/fecha-pago', auth, roles('admin_contable','dueno'), ctrl.cambiarFechaPago)
+// Anular un pago de cliente (fila PAG-…): vista previa de lo que cambia y confirmación con motivo
+router.get('/pagos/:id/anular/vista-previa', auth, roles('admin_contable','dueno'), ctrl.vistaPreviaAnularPago)
+router.post('/pagos/:id/anular', auth, roles('admin_contable','dueno'), ctrl.anularPago)
 // Borrar arrastra la operación entera: lo dejamos solo para contable y dueño
 router.post('/:id/eliminar', auth, roles('admin_contable','dueno'), ctrl.eliminar)
 

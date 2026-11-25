@@ -6,8 +6,12 @@ const prueba = require('./helpers/db')
 const datos = require('./helpers/datos')
 const { describe, it, before, after } = require('node:test')
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const VentasModel = require('../src/models/ventas.model')
 const ClientesModel = require('../src/models/clientes.model')
+const MovimientosDineroModel = require('../src/models/movimientosDinero.model')
+const Transacciones = require('../src/controllers/transacciones.controller')
 
 let admin, producto
 before(async () => {
@@ -136,5 +140,90 @@ describe('vista previa y anulación de un pago de cliente (modelo)', () => {
     const vNada = await ClientesModel.vistaPreviaAnularPago(999999999)
     assert.equal(vNada.puede, false)
     assert.deepEqual(vNada.bloqueos, ['El pago no existe.'])
+  })
+})
+
+// Llama a una acción del controlador con un req / res simulados (como tests/filtro-cliente-obra-transacciones.test.js)
+function llamar(accion, { params = {}, body = {}, rol = 'dueno' } = {}) {
+  return new Promise((resolve, reject) => {
+    const flashes = []
+    const req = { body, params, query: {}, session: { user: { id: admin, rol, nombre: 'Prueba' } }, flash: (t, m) => flashes.push({ t, m }), get: () => '' }
+    const res = {
+      redirect: (url) => resolve({ url, flashes }),
+      render: (vista, data) => resolve({ vista, data, flashes }),
+      json: (data) => resolve({ json: data, flashes }),
+      status(c) { this.codigo = c; return this },
+    }
+    Promise.resolve(Transacciones[accion](req, res)).catch(reject)
+  })
+}
+const vigente = async (pago) => Number((await prueba.q(`SELECT COALESCE(anulado, 0) AS a FROM movimientos_cuenta WHERE id = ?`, [pago])).rows[0].a) === 0
+const entradasDe = async (cliente) => (await MovimientosDineroModel.resumen({ clienteId: cliente })).entradas
+const codigoPag = (id) => `PAG-${String(id).padStart(6, '0')}`
+
+describe('anular un pago desde Transacciones (controlador y rutas)', () => {
+  it('vistaPreviaAnularPago devuelve el JSON del modelo', async () => {
+    const cli = await datos.crearCliente({ cuentaCorriente: true })
+    const A = await venta(cli, '2026-10-10', 100000)
+    const pago = await pagar(cli, 100000, '2026-11-01 10:00:00', [{ id: A, monto: 100000 }])
+    const { json } = await llamar('vistaPreviaAnularPago', { params: { id: String(pago) } })
+    assert.deepEqual(json, await ClientesModel.vistaPreviaAnularPago(pago))
+    assert.equal(json.puede, true)
+  })
+
+  it('anularPago sin motivo (o con solo espacios) no anula y avisa con error', async () => {
+    const cli = await datos.crearCliente({ cuentaCorriente: true })
+    await venta(cli, '2026-10-10', 100000)
+    const pago = await pagar(cli, 100000, '2026-11-01 10:00:00')
+    for (const motivo of [undefined, '', '    ']) {
+      const { flashes } = await llamar('anularPago', { params: { id: String(pago) }, body: { motivo } })
+      assert.equal(flashes[0].t, 'error')
+      assert.match(flashes[0].m, /motivo/i)
+    }
+    assert.equal(await vigente(pago), true)
+  })
+
+  it('anularPago anula, avisa con el código PAG-… y el pago sale de Transacciones y de las entradas', async () => {
+    const cli = await datos.crearCliente({ cuentaCorriente: true })
+    const A = await venta(cli, '2026-10-10', 100000)
+    const B = await venta(cli, '2026-10-11', 50000)
+    const pago = await pagar(cli, 150000, '2026-11-01 10:00:00', [{ id: A, monto: 100000 }, { id: B, monto: 50000 }])
+    const entradasAntes = await entradasDe(cli)
+    assert.ok((await MovimientosDineroModel.listar({ categoria: 'pagos_clientes', clienteId: cli })).rows.some(r => String(r.id) === String(pago)))
+
+    const { url, flashes } = await llamar('anularPago', { params: { id: String(pago) }, body: { motivo: `  ${MOTIVO}  ` } })
+    assert.equal(url, 'back')
+    assert.equal(flashes[0].t, 'success')
+    assert.ok(flashes[0].m.includes(codigoPag(pago)), flashes[0].m)
+    assert.match(flashes[0].m, /2 operaciones/)
+    assert.equal(await vigente(pago), false)
+    assert.equal((await prueba.q(`SELECT anulado_motivo FROM movimientos_cuenta WHERE id = ?`, [pago])).rows[0].anulado_motivo, MOTIVO)
+    assert.equal((await MovimientosDineroModel.listar({ categoria: 'pagos_clientes', clienteId: cli })).rows.some(r => String(r.id) === String(pago)), false)
+    assert.equal(await entradasDe(cli), entradasAntes - 150000)
+  })
+
+  it('anularPago de un pago con cheque avisa el motivo y no anula', async () => {
+    const cli = await datos.crearCliente({ cuentaCorriente: true })
+    await venta(cli, '2026-10-10', 100000)
+    const pago = await pagar(cli, 20000, '2026-11-01 10:00:00')
+    await prueba.q(`INSERT INTO cheques (tipo_cartera, monto, id_cliente, id_mov_cuenta) VALUES ('recibido', 20000, ?, ?)`, [cli, pago])
+    const { flashes } = await llamar('anularPago', { params: { id: String(pago) }, body: { motivo: MOTIVO } })
+    assert.equal(flashes[0].t, 'error')
+    assert.match(flashes[0].m, /Cheques/)
+    assert.equal(await vigente(pago), true)
+  })
+
+  it('anularPago de un pago que no existe avisa con error', async () => {
+    const { flashes } = await llamar('anularPago', { params: { id: '999999999' }, body: { motivo: MOTIVO } })
+    assert.equal(flashes[0].t, 'error')
+  })
+
+  it('las dos rutas exigen contable o dueño', () => {
+    const rutas = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'transacciones.routes.js'), 'utf8')
+    for (const metodo of ['get', 'post']) {
+      const linea = rutas.split('\n').find(l => l.includes(`router.${metodo}('/pagos/:id/anular`))
+      assert.ok(linea, `falta la ruta ${metodo} de anular pago`)
+      assert.match(linea, /auth,\s*roles\('admin_contable',\s*'dueno'\)/)
+    }
   })
 })
