@@ -562,6 +562,19 @@ $sticky-top: calc(#{$navbar-h} + 1rem);
   @include md-down { position: static; }
 }
 
+// Aviso fijo al editar una venta ya entregada
+// (no usa .alert: main.js cierra solas las .alert a los 4 segundos)
+.venta-aviso {
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  background: $warning-soft;
+  border: 1px solid $warning-border;
+  border-radius: $radius-lg;
+  color: $warning-text;
+  font-size: $fs-sm;
+  font-weight: 500;
+}
+
 // ── Viaje: densidad compacta y profesional ─────────────────────
 #venta-viaje {
   .form-section {

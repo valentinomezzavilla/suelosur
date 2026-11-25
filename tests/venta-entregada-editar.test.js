@@ -330,6 +330,17 @@ describe('modelo: editar una venta entregada', () => {
       assert.equal(Number((await txsDe(id))[0].monto), 3210)
     })
 
+    it('cambiar solo la nota: la descripción del cobro la sigue, pero no se avisa una corrección del cobro', async () => {
+      const prod = await producto()
+      const id = await viajeEntregado({ prod, cantidad: 2, precio: 1000 })
+      const r = await VentasModel.actualizarVenta(id, { ...base, cantidad: 2, precioProducto: 1000, descripcion: 'Nota de prueba' })
+      assert.equal(r.cobroCorregido, false, 'el dinero no cambió')
+      const [tx] = await txsDe(id)
+      assert.equal(Number(tx.monto), 2000)
+      assert.match(tx.descripcion, /Nota de prueba/)
+      assert.equal(tx.descripcion, VentasModel.descripcionDeCobro(await fila(id)))
+    })
+
     it('auditoría: queda el monto anterior solo si cambió algo de dinero o stock', async () => {
       const prod = await producto()
       const id = await viajeEntregado({ prod, cantidad: 2, precio: 1000 })
@@ -442,7 +453,9 @@ describe('modelo: editar una venta entregada', () => {
 
     it('una entregada avisa que se corrigen el stock, el cobro y la cuenta; una pendiente no', async () => {
       const prod = await producto()
-      assert.match(await pagina(await viajeEntregado({ prod })), /ya fue entregada/)
+      const html = await pagina(await viajeEntregado({ prod }))
+      assert.match(html, /<div class="venta-aviso">\s*Esta venta ya fue entregada/)
+      assert.doesNotMatch(html, /class="alert[^"]*"[^>]*>\s*Esta venta ya fue entregada/, 'no usa .alert: main.js cierra solas las .alert a los 4 segundos')
       assert.doesNotMatch(await pagina(await crearViaje({ prod })), /ya fue entregada/)
     })
 

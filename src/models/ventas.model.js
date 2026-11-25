@@ -632,7 +632,8 @@ VentasModel.estadoDeCobro = async function (idOp, q = query) {
 //  - Monto: la diferencia de total va a la última transacción (tipo <> 'Ajuste'); la fecha no se toca.
 //  - Método: pasa a todas sus transacciones. Descripción: si hay una sola, y cambió.
 //  - Egreso a tercero: se rehace por cada transacción por transferencia si cambió monto, método o tercero.
-// La cuenta corriente la deja sincronizarCargoCC. Devuelve true si cambió algo del cobro.
+// La cuenta corriente la deja sincronizarCargoCC. Devuelve true si cambió el DINERO del cobro
+// (monto, método o tercero): la descripción acompaña, pero no cuenta como corrección.
 VentasModel.corregirCobro = async function (idOp, antes, q = query) {
   const despues = await VentasModel.estadoDeCobro(idOp, q)
   if (!despues || despues.tipo_op !== 'M' || despues.estado !== 'entregado') return false
@@ -665,7 +666,7 @@ VentasModel.corregirCobro = async function (idOp, antes, q = query) {
       await Tercero.egresoDeCobro({ id_transaccion: t.id, id_op_encabezado: idOp, monto: t.monto, fecha: t.fecha, cliente: t.cliente, tipo: t.tipo }, q)
     }
   }
-  return true
+  return cambiaMonto || cambiaMetodo || cambiaTercero
 }
 
 // Pone en regla todas las ventas a cuenta corriente o pagadas con saldo a favor
