@@ -337,3 +337,15 @@
     border-top: 1px solid $border-soft;
   }
 }
+
+// Campos numéricos con decimales: sin las flechitas del costado, que suman de a 0.01 y ponen
+// decimales solos (las flechas del teclado suben de a 1: public/js/inputsNumero.js)
+input[type="number"][step="any"],
+input[type="number"][step="0.01"],
+input[type="number"][step="0.5"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+}
